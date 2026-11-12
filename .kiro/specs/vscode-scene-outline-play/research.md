@@ -142,3 +142,103 @@
 - `.kiro/steering/roadmap.md`「0.5.3 の範囲」
 - `crates/pasta_lua/src/debug/source_map/scene_join.rs`・`crates/pasta_lua/tests/scene_identity_index_test.rs` — 行からシーンを引く表と、その試験
 - `book/src/lua/shiori-events.md`「OnPastaSceneAt」・`book/src/debug/dev-actions.md`「シーン再生」
+
+---
+
+# 設計フェーズの調査（2026-11-12・`/kiro-spec-design -y`）
+
+## Summary（設計）
+- **Discovery Scope**: Extension（軽い discovery。新しい依存は無い）
+- **Key Findings**:
+  - VSCode は、メニュー（`editor/context`）から呼ぶコマンドに文書の `Uri` を第 1 引数で渡す。右クリックの呼び出しは「`Uri` だけ・行なし」の形になる。引数あり／なしの見分けは「第 2 引数が数か」で行う。
+  - CodeLens のコマンドの引数は、拡張のホストの中の控えに置かれ、押したときに元の JS の物のまま渡る（直列化されない）。`vscode.Uri` は `Uri` のまま届き、`instanceof vscode.Uri` で見分けられる。
+  - スティッキースクロールの既定の作り方は `editor.stickyScroll.defaultModel = "outlineModel"`（`enabled` の既定は `true`）。DocumentSymbol のプロバイダを足すだけで、アウトライン・パンくず・`Ctrl+Shift+O` と一緒にスティッキースクロールにも出る。拡張の側の設定・`contributes` は要らない。
+  - 範囲の終わりの決め方は pasta.dll の `scene_join.rs` と同じ「次の同じか上の階層の見出しの行 − 1・無ければファイルの終わり」。ローカルシーンは親の中にしか無いので、この式で 1.8（子は親の中）が自然に満たされる。
+
+## Research Log（設計）
+
+### Research Needed 1: `editor/context` から呼んだコマンドの引数
+- **Sources**: VS Code API「Contribution Points」の `contributes.menus`（https://code.visualstudio.com/api/references/contribution-points ）。要旨: メニューから呼ぶと、VS Code はそのメニューの文脈を `registerCommand` のハンドラへ渡す。`editor/context` は文書の URI を受ける。
+- **Findings**: 右クリックの「▶ シーンを実行」は `(uri)` で呼ばれる。コマンドパレットからは引数なし。今の登録 `() => execute(cmd)` はこれを捨てている。
+- **Implications**: 「`Uri` があるか」で見分けると右クリックを引数ありと取り違える。「第 1 引数が `vscode.Uri` で、かつ第 2 引数が数」のときだけ引数ありとし、それ以外（引数なし・`Uri` だけ）は今までどおりアクティブなエディタとカーソルの行を使う。e2e に `Uri` だけの呼び出しを足す。
+
+### Research Needed 2: CodeLens のコマンドの引数に `vscode.Uri` を入れたとき
+- **Sources**: VS Code のソース `src/vs/workbench/api/common/extHostCommands.ts`（`CommandsConverter.toInternal`・`_executeConvertedCommand`。https://github.com/microsoft/vscode/blob/main/src/vs/workbench/api/common/extHostCommands.ts ）。
+- **Findings**: 引数のある拡張のコマンドは、`this._cache.set(id, command)` で拡張のホストに控え、表示の側へは控えの鍵だけを送る。押されると `executeCommand(actualCmd.command, ...actualCmd.arguments)` で、元の物をそのまま渡す。
+- **Implications**: `arguments: [document.uri, line]` は `Uri` の物と数のまま届く。引数を文字列にする・`Uri.parse` し直す必要は無い。
+
+### Research Needed 3: スティッキースクロールの既定
+- **Sources**: VS Code のソース `src/vs/editor/common/config/editorOptions.ts`（stickyScroll の設定の定義）。
+- **Findings**: `defaultModel` の値は `outlineModel`・`foldingProviderModel`・`indentationModel`、既定は `outlineModel`。アウトラインの作り方が使えなければ折りたたみ、さらに字下げへ落ちる。`enabled` の既定は `true`。
+- **Implications**: DocumentSymbol を出せば、既定の設定のままスティッキースクロールに見出しが出る（2.2・2.6）。出る行は DocumentSymbol の `range` の始まりの行なので、`range` を見出しの行の頭から始める。
+
+### その他の確かめ（設計）
+- `@types/vscode`（node_modules は 1.140.0。`engines.vscode` は `^1.85.0`）: `DocumentSymbol(name, detail, kind, range, selectionRange)`・`selectionRange` は `range` に含まれること・`CodeLens(range, command?)`（range は 1 行に収める）・`registerDocumentSymbolProvider`・`registerCodeLensProvider`。どれも 1.85 より前からある。
+- `DocumentSymbol` は名前が空だと例外になる。続きのシーンは前の名前を受け継ぎ、ファイルの頭の名前の無い `＊` は構文の誤り（`parse_scene.rs`）で部分解析でも塊ごと捨てられるので、空の名前は並びに現れない。
+- `wasm_analyze` は `serde_wasm_bindgen::to_value`（既定の直列化）で返す。`Option` の欄は `undefined` になるので、シーンの型には `Option` の欄を置かない（`children` は空の配列にする）。構造体は JS の素の物、単位の列挙は文字列になる。
+- 拡張の試験: 本物のモジュールを mock で動かす `vscodeModules.test.ts` は `test:unit` に既にある。新しいプロバイダの試験をここに足せば、`package.json`（`vsce-4-upgrade` と共有）の試験のスクリプトを直さなくて済む。`vscodeModules.test.ts` の `bridgeWithWasmResult({ tokens: [], diagnostics: [] })` が「正しい形」として通る試験（565・582 行）は、`scenes` の確かめを足すと期待を直す必要がある。
+- pasta.dll の記録（`pasta_lua/src/code_gen/scope_gen.rs`）は、グローバルシーンとローカルシーン（名前の無い開始の部分は `__start__`）の `span.start_line` を記録する。`__start__` はグローバルの見出しと同じ行なので境にならない。アクター辞書・単語定義・ファイル属性は記録しないので、シーンの範囲を切らない（`＊挨拶` の後ろの `％さくら` の塊は、次のシーンの見出しまで `挨拶` の範囲に入る）。解析器も同じにする。
+
+## 使ったスキル・指針
+- `kiro-spec-design` の `rules/design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`。
+- プロジェクトの方針（呼び手の指示）: 最小で完全な変更・既存の作りの再利用・先回りの抽象を作らない。
+
+## Synthesis（設計）
+- **一般化**: 「アウトライン」と「見出しの上の ▶」は、どちらも同じ木の写し。木を作るのは解析器の 1 か所（`scenes.rs`）、写すのは拡張の 1 クラス（`SceneOutlineProvider` が 2 つのプロバイダの役を持つ）。木の形は DocumentSymbol に寄せず、`pasta-recipe` がそのまま使える素の形にする（インタフェースだけを一般にし、実装は今の要件の分だけ）。
+- **作るか使うか**: VSCode の標準の DocumentSymbol・CodeLens を使う（パンくず・`Ctrl+Shift+O`・スティッキースクロールは VSCode が DocumentSymbol から作る）。CodeLens を消す設定は VSCode の言語ごとの `editor.codeLens` を使う。範囲の決め方は pasta.dll の式を写す（pasta.dll の部品は Lua の実行時に依存するので、解析器からは呼べない）。
+- **簡素化**:
+  - 新しいコマンドを作らず、`pasta.runSceneAtCursor` の登録で引数を受ける。`runScene(ctx, fsPath, line1)` は変えない。
+  - 解析の結果の控えを `DocumentSync`・`SemanticTokensProvider` と共有する作り直しはしない。新しいプロバイダの中に「最後に解いた 1 つの文書の版」だけを覚える 1 枠の控えを置き、DocumentSymbol と CodeLens の問い合わせで 2 回解かないようにする。
+  - DocumentSymbol と CodeLens を別のファイル・別のクラスに分けない（写す元が同じで、どちらも数行）。
+  - `package.json` を触らない（試験は既存の `vscodeModules.test.ts`・`devCommands.e2e.test.ts` に足す）。
+
+## Design Decisions（設計）
+
+### Decision D1: 項目の型と JSON の欄（申し送り 1）
+- **Selected**: Rust `SceneNode { name: String, kind: SceneKind, heading: Range, range: Range, children: Vec<SceneNode> }`、`SceneKind { Global, Local }`（`#[serde(rename_all = "lowercase")]` で `"global"`・`"local"`）。JSON は `{"name","kind","heading","range","children"}`。欄の名前はどれも 1 語なので `rename_all = "camelCase"` は要らない（`SemanticToken` は複数語の欄があるので名前を変えている）。`AnalysisResult` の欄 `scenes: Vec<SceneNode>` は `tokens`・`diagnostics` の後ろに置く。
+- **Rationale**: 文字列の `kind` は JS・`pasta-recipe` のどちらでも読みやすく、TS の文字の合併型 `'global' | 'local'` にそのまま写る。
+- **Alternatives**: `kind` を数にする（読みにくい）／`kind` を持たず深さで決める（要件 1.2 が種類を求める）。
+
+### Decision D2: 見出しを Range で持つ（申し送り 2）
+- **Selected**: `heading: Range`。見出しの行の、最初の空白でない文字（印）から、行の終わり（改行・`\r` を除く）まで。
+- **Rationale**: DocumentSymbol の `selectionRange` と CodeLens の `range`（1 行）にそのまま使える。行だけが要る呼び手（`pasta-recipe`・CodeLens の引数）は `heading.start.line` を読む。行だけで持つと、拡張の側で行の文字を読み直して列を決めることになる。
+- **Trade-off**: 見出しの後ろの属性・行末のコメントも `heading` に入る（選んだときに行の頭へ移れば足りるので害は無い）。
+
+### Decision D3: 範囲の終わり（申し送り 3）
+- **Selected**: `range.start` は（見出しの行, 0）。`range.end` は、次の同じか上の階層の見出しがあれば（その行 − 1, その行の UTF-16 の長さ）、無ければ文書の終わり（最後の `\n` の後ろの行, その行の UTF-16 の長さ）。行は `\n` で数え、行の長さは `\r` を数えない（`get_line_text` と同じ。トークン・診断と揃う）。文書が改行で終わるときは、最後の改行の後ろの空の行（VSCode の最後の行）の頭が終わりになる。
+- **Rationale**: `scene_join.rs` の「次の同レベル以上宣言の開始行 − 1、無ければファイル末尾」をそのまま写す。ローカルシーンの次の見出しは、同じ親の次のローカルシーンか次のグローバルシーンしかないので、子の範囲は親の範囲を越えない（1.8）。
+- **Known limit**: 単独の `\r`（古い Mac の改行）は VSCode では改行だが、解析器では改行にしない。トークン・診断と同じ扱いで、この spec では変えない。
+
+### Decision D4: `isWasmAnalysisResult` の確かめ（申し送り 4）
+- **Selected**: `Array.isArray(scenes)` を足す（`tokens`・`diagnostics` と同じ浅さ。中身の 1 つずつは確かめない）。
+- **Rationale**: WASM と拡張の JS は同じコミットから 1 つの VSIX に入るので、`scenes` の無い WASM は作り間違いの時だけ起きる。そのときは既存の「`WASM analysis failed`」の道で失敗させる（着色も TextMate に落ちる）。確かめを 2 か所に分けると、型の上では `scenes` があるのに実際は無い、という食い違いが残る。
+- **Alternatives**: プロバイダの側だけで確かめる（着色は残るが、型と実際がずれる）。
+
+### Decision D5: 解析の結果の控え（申し送り 5）
+- **Selected**: 共有しない。`SceneOutlineProvider` が 1 枠（uri・版・並び）の控えを持つ。1 回の編集で解析は `DocumentSync` の 1 回＋並びの 1 回（＋版の食い違いのときだけ `SemanticTokensProvider` の 1 回）。
+- **Rationale**: 控えを共有すると `DocumentSync`・`SemanticTokensProvider` の責務を作り直すことになる。辞書の 1 ファイルは小さく、解析は同期で速い。1 枠なら閉じた文書の後始末も要らない。
+- **Follow-up**: 大きな辞書で遅さが見えたら、`SemanticTokensProvider` の控えを結果ごとに広げて共有する（コードに shortcut の注記を置く）。
+
+### Decision D6: コマンドの引数の形（申し送り 6）
+- **Selected**: 位置引数 `(uri: vscode.Uri, line: number)`。`line` は 0 始まり（解析器の `heading.start.line` をそのまま渡す）。`devCommands.ts` が `line + 1` にして `run` へ渡す（カーソルの道の `selection.active.line + 1` と同じ所で 1 足す）。見分け: `args[0] instanceof vscode.Uri && typeof args[1] === 'number'` なら指定の文書と行、それ以外（引数なし・右クリックの `Uri` だけ）はアクティブなエディタとカーソルの行。
+- **Rationale**: 0 始まりは VSCode・解析器の座標と同じで、1 始まりへの直しが 1 か所に集まる。数の確かめ（整数か・0 以上か）は持たない（要件の決定: 行の確かめは pasta.dll）。
+- **Alternatives**: 1 つの物 `{ uri, line }`（ほかの拡張の呼び方と揃わない）／1 始まり（直しの所が 2 つに割れる）。
+
+### Decision D7: 指定の文書を開く（申し送り 7）
+- **Selected**: 引数ありのときは、いつも `vscode.workspace.openTextDocument(uri)` で文書を得る。開いている文書ならそれが返り（未保存の中身も含む）、開いていなければ読み込む（エディタには出さない）。開けなければ `BAD_DOCUMENT` で止める。
+- **Rationale**: 開いているかどうかで道を分けずに済む。CodeLens からは必ず開いている文書なので、実際には読み込みは起きない。
+
+### Decision D8（閉じている）
+- 行の確かめは pasta.dll に任せる。拡張は確かめない（要件ディスカッションで確定）。
+
+### Decision D9: `editors/vscode/README.md`（申し送り 9）
+- **Selected（仮定・OPEN QUESTION）**: 「機能」の「開発支援コマンド」の行に、見出しの上の「▶ シーンを実行」と、アウトライン・パンくずへの並びを一言足す。要件の範囲（マニュアルだけ）を少し超えるので、開発者の判断に回す。
+
+### Decision D10: SymbolKind（設計で足した論点）
+- **Selected（仮定・OPEN QUESTION）**: グローバルシーン＝`SymbolKind.Namespace`（着色のトークン `namespace` と揃う）、ローカルシーン＝`SymbolKind.Function`（シーンは呼べる単位）。`detail` は空。
+
+## Risks & Mitigations（設計）
+- 右クリックの `Uri` だけの呼び出しを引数ありと取り違える → 見分けを「第 2 引数が数か」にし、e2e で `Uri` だけの呼び出しがカーソルの行で鳴ることを確かめる。
+- `scenes` の確かめを足して既存の試験が赤くなる → `vscodeModules.test.ts` の「正しい形」の試験の期待に `scenes: []` を足す（同じタスクで直す）。
+- 範囲が pasta.dll とずれる → `scene_identity_index_test.rs` と同じ並び（グローバル・ローカル・続き・最後のシーン）を解析器の試験に置き、終わりの行を同じ式で確かめる。鳴るシーンは見出しの行だけで決まるので、ずれてもアウトラインの見え方だけに出る。
+- `transport.rs` の形の試験の直し忘れ → 欄を足すタスクに含める。

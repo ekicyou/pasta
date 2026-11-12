@@ -1,16 +1,16 @@
 {
   "feature_name": "vscode-scene-outline-play",
   "created_at": "2026-11-12T10:37:48Z",
-  "updated_at": "2026-11-12T10:42:56Z",
+  "updated_at": "2026-11-12T11:21:22Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {
