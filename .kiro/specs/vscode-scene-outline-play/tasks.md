@@ -60,7 +60,7 @@
   - _Depends: 1.3, 3.2_
   - _Requirements: 1.13, 5.1, 5.2_
 
-- [ ] 5. (P) マニュアルと README に書き足す
+- [x] 5. (P) マニュアルと README に書き足す
   - `book/src/debug/dev-actions.md` の「シーン再生（▶ シーンを実行）」の節を、見出しを変えずに書き足す: 見出しの上の ▶ で右クリックと同じ流れで鳴ること・右クリックとコマンドパレットはカーソルの行のままであること・消す設定 `"[pasta]": { "editor.codeLens": false }`（JSON のフェンスの中に口調の印を入れない）・アウトライン・パンくず・`Ctrl+Shift+O`・スティッキースクロールの 2 階層と続きのシーン・解析器が読めないときは ▶ とアウトラインが出ず右クリックは使えること
   - `editors/vscode/README.md` の開発支援コマンドの行に見出しの上の ▶ を足し、シーンの並びがアウトライン・パンくず・スティッキースクロールに出る行を足す
   - `book` の検査（`verify-content.mjs`・`link-check.mjs`・mdbook build）が通り、`lua/shiori-events.md` からこの節へのリンクが切れない
