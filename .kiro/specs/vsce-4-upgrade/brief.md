@@ -80,15 +80,15 @@ Node 22 への移行を先に済ませ（`ponytail-manual-ci` が「Node 22 に�
 - 公開の job の第三者の action は SHA で固定し、行末にタグのコメントを置く形になった（`Azure/login@a641126d… # v3` など。`release-setup-check.yml` も同じ）。`publish-vsce` の job を変えるときは、この形を保つ。
 - `publish-vsix.ps1` の「公開済みなら飛ばす」判定は、`release-scripts-test.ps1` の項目 12（偽の vsce が公開済みと答える）が試験するようになった。4.x で `vsce show` の出力が変わるなら、この項目の偽の vsce の答えも合わせる。
 
-## 2026-11-03 棚卸の再測定（main c575febd）
+## 2026-11-12 棚卸の再測定（main 2381bf52）
 
-- **前提の変化**: `ponytail-manual-ci` が入り、Node 22 は済んだ（`release.yml` 27 行 `NODE_VERSION: '22'`・`setup-node@v7` 117・419 行、`release-setup-check.yml` 33・35 行）。働きの上で先に要るものは無くなった。vsce は 3.x のまま（`editors/vscode/package.json` 316 行 `^3.0.0`、`package-lock.json` 1528 行で 3.9.2。`"package": "vsce package"` は 310 行）。job `publish-vsce` は 391 行、`Azure/login` は SHA で固定（430 行）、`publish-vsix.ps1` を呼ぶのは 438 行。`publish-vsix.ps1`（120 行）の 3.x の前提（62 行の `undefined`、75〜77 行で `VSCE_PAT` を消す、91 行の `--skip-duplicate`）は変わっていない。`release-setup-check.yml` の `verify-pat` は 74 行。
-- **触るファイル**: `editors/vscode/package.json`（316 行の 1 行）・`package-lock.json`。4.x で振る舞いが変われば `publish-vsix.ps1` と `release-scripts-test.ps1` の項目 12（255〜260 行の偽の vsce の答え）。公開の道がだめなら `release.yml` の `publish-vsce`・`release-setup-check.yml`・`release` スキル・`tech.md` のリリースの節。
-- **規模**: 3〜6 タスク（Node の分が抜けた。公開の道が通れば 3、OIDC の口へ移すなら 6 ほど）。
-- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `vscode-mcp-client`（`editors/vscode/package.json`・`package-lock.json`。DAP の `debuggers` と `host` を消す）、`pasta-dll-multiarch`（`release.yml`）、CI に clang を入れるなら `pest-2-9-4-upgrade`（`release.yml`）。リリースの実行中は `release.yml` を main へ入れない。
+- **前提の変化**: `vscode-mcp-client`（#231）が入り、`editors/vscode/package.json` は 316 → 249 行になった。vsce は今も `^3.0.0`（241 行）、`"package": "vsce package"` は 235 行、lock は 3.9.2（`package-lock.json` 1528 行）。その後の `package.json` の変化は版の数字だけ。`release.yml`・`release-setup-check.yml`・`publish-vsix.ps1`・`release-scripts-test.ps1` は 2026-11-03 から変わっていない（`NODE_VERSION: '22'` 27 行・`publish-vsce` 391 行・`Azure/login` 430 行・`publish-vsix.ps1` を呼ぶのは 438 行・`verify-pat` 74 行）。Node 22 は済んだ（上の申し送り）。
+- **触るファイル**: `editors/vscode/package.json`（241 行の 1 行）・`package-lock.json`。4.x で振る舞いが変われば `publish-vsix.ps1`（120 行）と `release-scripts-test.ps1`（276 行）の項目 12。公開の道がだめなら `release.yml` の `publish-vsce`・`release-setup-check.yml`（122 行）・`release` スキル・`tech.md` のリリースの節。
+- **規模**: 3〜6 タスク（前のまま）。
+- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `pasta-recipe-dev-actions`（`editors/vscode/package.json` の試験のスクリプト・`package-lock.json`）、`pasta-recipe`（`release.yml`）、`pasta-dll-multiarch`（`release.yml`）、CI に clang を入れるなら `pest-2-9-4-upgrade`（`release.yml`）。リリースの実行中は `release.yml` を main へ入れない。
 - **種別**: 基盤（道具の版を上げる。開発者の依頼で `/update` から起票）。
-- **要件定義のモデル**: Opus。決めることは「公開の道を `release-setup-check.yml` の 2 つの確かめで代えてよいか」と「だめなら OIDC の口へ移すか」の 2 つで、どちらも後から戻せる。
+- **要件定義のモデル**: Opus（決めることは「公開の道を `release-setup-check.yml` の 2 つの確かめで代えてよいか」と「だめなら OIDC の口へ移すか」の 2 つで、どちらも後から戻せる）。
 - **分割の案**: 不要。
 - **見つけた穴・古くなった記述**
-  - Scope の「Node の版」と Current State の Node 20 の行は古い（上の申し送りのとおり）。前回の「`ponytail-editor-tooling` が `host` の項目（250・281・293 行）を消す」は起きなかった（あちらは要件 10 を欠番にし、`vscode-mcp-client` が引き継いだ）。`package.json` を共有する相手は `vscode-mcp-client` になる。
-  - 前回から残る: `vsce publish --azure-credential` を実際に叩くのは `publish-vsix.ps1` で、Current State と Scope にこのスクリプトが無い。4.x で上の 2 つの振る舞い（`--pat` が既定で `VSCE_PAT` を読み `--azure-credential` より勝つこと・拡張が無いと `vsce show` が `undefined` を出して 0 で終えること）が変わっていないかを要件の前に確かめる。手元の `editors/vscode/node_modules` の vsce が lock と違う版のことがあるので、手元で確かめるときは `npm ci` し直す。
+  - Current State・Scope の Node 20 の行と、`package.json` の行番号（316・310 行）は古い（上の行が正しい）。`package.json` を共有する相手は `vscode-mcp-client`（完了）から `pasta-recipe-dev-actions` に変わった。
+  - 前回から残る: `vsce publish --azure-credential` を実際に叩くのは `publish-vsix.ps1` で、Current State と Scope にこのスクリプトが無い。4.x で 2 つの振る舞い（`--pat` が既定で `VSCE_PAT` を読み `--azure-credential` より勝つこと・拡張が無いと `vsce show` が `undefined` を出して 0 で終えること）が変わっていないかを要件の前に確かめる。手元の `editors/vscode/node_modules` の vsce が lock と違う版のことがあるので、手元で確かめるときは `npm ci` し直す。

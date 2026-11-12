@@ -114,3 +114,16 @@ interface GhostIO {
 - 誤りは 3 種（表にできない値・名前にならない値・代入できない値）で、1 件だけを表記とログの警告 1 行で返し、鳴らさない。文言の実例はマニュアルの誤りの表。配列 `[1]` も「表にできない値」。
 - グローバルシーンだけを指名して値を入れるときは、`OnPastaScene` の Reference1 を `""` にする。値の文字列は TOML のリテラル文字列 `'…'` で組み立てると `\` と `"` を気にしなくてよい。
 - 値はシーンが見つかったときだけ入り、次のイベントには持ち越さない。2^53 を超える整数は丸まる。
+
+## 2026-11-12 棚卸の再測定（main 2381bf52）
+
+- **前提の変化**: 起票の後に `vscode-scene-outline-play`（#252）と `scene-play-locals`（#253）が入り、上の Upstream と申し送りのとおりになっている。移す 5 つ（`mcpClient.ts` 199・`reloadShiori.ts` 140・`runSceneAtCursor.ts` 108・`dumpVariables.ts` 64・`ghostFiles.ts` 263 行）は今も `vscode` を import しない。`runScene(ctx, fileFsPath, line1)` は `runSceneAtCursor.ts` 34 行、受け取りの `resolveTarget` は `devCommands.ts` 50 行（209 行）。新しい `sceneOutline.ts`（60 行）は `vscode` を使う糊なので移さない。`runScene` は Reference2 をまだ送らない（ローカル変数を渡す引数はこの spec が足す）。分け目（ランタイムは `scene-play-locals`、アプリの本体は `pasta-recipe`）はそのまま。
+- **触るファイル**: 新しく `editors/shared/`（上の 5 つと、その試験 `editors/vscode/src/test/` の `mcpClient`・`ghostFiles`・`dumpVariables`・`runSceneAtCursor`・`reloadShiori`・`fakeMcpServer`）。既存は `editors/vscode/src/devCommands.ts`、`editors/vscode/package.json`（231 行の `test:unit` などが `./src/test/…` を名指しする）・`tsconfig.json`（`rootDir: "src"`・`include: ["src/**/*"]`）・`eslint src`、`editors/recipe/`（Rust の入出力のコマンドと画面）、マニュアルの `pasta-recipe` の章。1,000 行に近いものは無い。
+- **規模**: 11〜14 タスク（共有へ移す・入出力の面 2、拡張の Node の実装と試験 1〜2、Rust の入出力のコマンド 2、▶・リロード・出力の欄 2、保存変数の表と書き換え 2、ローカル変数の入力 1〜2、マニュアル 1）。
+- **先に要るもの**: 働きの上では `pasta-recipe`（ほかの 2 本は入った）。ファイルの重なり（未完了）: `pasta-recipe`（`editors/recipe/`・マニュアルの章。順に置くので問題ない）、`vsce-4-upgrade`（`editors/vscode/package.json`・`package-lock.json`）。
+- **種別**: 機能（VS Code の外でシーンを鳴らす・保存変数を書き換える・ローカル変数を入れて鳴らす。開発者の依頼）。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 入出力の面の見込み（`post`・`readText`・`mtime` の 3 つ）では足りない。移す 5 つは `fs.readdir`・バイト列の `readFile`（`descript.txt` の名前の読み取り）・`fs.stat` の大きさ・`fs.open` してずらして読む（`pasta.log` の続き）も使う。`reloadShiori.ts`・`dumpVariables.ts`・`ghostFiles.ts` は Node の `path` を import するが、Vite の中には無いので、パスの組み立ても面に入れるか、小さな自前の関数にする。
+  - Constraints の「`OnPastaSetSaveVariable` はデバッグが有効なときだけ効く」は誤り。`external_control.lua` 8 行のとおり、デバッグの有無によらず働き、SecurityLevel が external のときだけ何もしない（204）。デバッグが要るのは `OnPastaScene`・`OnPastaSceneAt`・`OnPastaDumpVariables`（`scene_play.lua` 10 行）。

@@ -118,17 +118,6 @@
 
 - ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.5（ponytail）の次に入る。
 
-## 2026-11-03 棚卸の再測定（main c575febd）
-
-- **前提の変化**: `＄＊x` が `save.x` になる決まりと、表の同一性・予約の名前・保存できない値の前提は変わらない。動いたのは置き場所と、文法を足すときの決まり。`ponytail-dsl-parser` はパーサを直し（`parse_elements.rs` 223・`parse_action.rs` 499）、括弧の深さ 64・演算子 256 の上限と、大きな数を構文の誤りにする決まりを足した。新しい書き方は、この上限と誤りの種類の中に置く。`ponytail-editor-tooling` は部分解析 `partial.rs` を 477 → 315 行に作り直し（失敗した行を `failed_lines` で返す）、LSP を WASM の解析だけにし、VSCode の着色を `grammar.pest` をそのまま写す形に書き直した（272 → 366 行。変数の規則は 160〜173 行、照合は `editors/vscode/src/test/tmGrammar.test.ts`）。書き方を足すなら、この写し方で着色に足す。`ponytail-lua-scripts` は表記の書き戻しを `failure.lua` 79〜80 行に動かした（233 → 282 行）。
-- **触るファイル**: 文法 `grammar.pest` 272（84・95・107 行は合っている）、パーサ `parse_elements.rs` 223・`parse_action.rs` 499・構文木 `ast/action.rs` 323・`partial.rs` 315、生成 `element_gen.rs` 553（`save.x` は 39 行）、`save.lua` 13・`runtime/persistence.rs` 697・`runtime/lifecycle.rs` 61、`failure.lua` 282、検査 `transpile_rules.rs` 188、LSP `visit_expr.rs` 484、VSCode の着色 366 と `tmGrammar.test.ts`、マニュアル `grammar/variables.md` 444・`lua/modules/pasta-persistence.md` 213・`getting-started/10-save.md` 122 と生成スキル、テスト。表を 2 つにするなら `act.lua` 812（188・216 行）と `scope_gen.rs` 404（262 行）、予約の名前を動かすなら `virtual_dispatcher.lua` 340（`pasta.save` を読むのは 62 行、間隔の名前は 88〜89 行）も。1,000 行に近いものは無い。
-- **規模**: 8〜10 のまま。
-- **先に要るもの**: 機能の上ではなし（`novel-talk-flow` を待たない。`toml-serialization` は入った）。ファイルの重なり（未完了）: 0.5.0 の `scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`（`grammar.pest`・`parse_action.rs`・`element_gen.rs`。`scene-condition-attributes` は VSCode の文法定義と LSP も）、新しく `debug-mcp-runtime`（`failure.lua` に `.pasta` の位置を添える。予約の名前を動かすなら `virtual_dispatcher.lua` も）、0.6.0 の `cue-command-runtime`（`grammar.pest`・`scope_gen.rs`）・`novel-save-slots`（`save.lua`・`persistence.rs`・`lifecycle.rs`。後に置く）・`novel-checkpoint-rollback`（予約の名前を動かす場合の `virtual_dispatcher.lua`。前後に置く）、版の決まっていない `scene-anchor-link`（文法・`element_gen.rs`・着色と LSP）。表を 2 つにするなら `act.lua`（1 つのウェーブに 1 つの spec）とも。
-- **種別**: 機能（保存の範囲を書き分ける方法が無い）。開発者の 0.5.0（今は 0.6.0）の決定（巻き戻しとセーブ）から。
-- **要件定義のモデル**: Fable のまま。今のゴーストの `＄＊x` が頼っている保存の形と DSL の意味に触り、取り消しにくい。書き方・どちらを今の `＄＊` にするか・両立・何を全セーブ共通にするか・保存できない値（`toml-serialization` のキーごとに外す決まりが出発点）が互いに絡み、推奨案がまだ無い（3 つ以上の絡む問い）。今回入った 7 本は、このどれも決めていない。
-- **分割の案**: 不要（8〜10）。
-- **見つけた穴・古くなった記述**: 「Current State」の行番号: `element_gen.rs` 71 行 → 69 行（書く側）、`parse_elements.rs` 119 行 → 141 行、`parse_action.rs` 111・212・369 行 → 117・225・413 行、`partial.rs` 462 行 → 300 行、`act.lua` 189・219 行 → 188・216 行、`scope_gen.rs` 294 行 → 262 行、`virtual_dispatcher.lua` 46・72〜73 行 → 62・88〜89 行、`failure.lua` 71・77 行 → 79・80 行、VSCode の着色 185・197 行 → 160〜173 行、`visit_expr.rs` 47・88・194・247 行 → 48・89・195・248 行。`save.json`・JSON の記述は、申し送りのとおり `save.toml`・TOML と読む。
-
 ## 申し送り（2026-11-03・`scene-condition-attributes` の実装より）
 
 - イベントの act は、シーンを選ぶ前に `act.var` へ Reference（`＄ｒ０`〜・`r0`〜）と日時（`＄季節`・`＄節句`・`hour` など）が入る（`shiori/event/init.lua` の `create_act` が `transfer_req_to_var`・`transfer_date_to_var` を呼ぶ）。`＄` と `＄＊` の範囲を分けるときは、この自動で入る変数がどちらの表に属するかを決める。
@@ -142,3 +131,14 @@
 - 単語の構文木 `KeyWords` に `weight_spans: Vec<Span>` が増えた（`ast/action.rs`）。構文木を直に組み立てる所は空の欄が要り、`partial.rs` の位置ずらしもこの欄をずらす。
 - VSCode の着色は `word` の捕捉を 1 つ増やした（値の並びが捕捉 4、後方参照が \5・\6、コメントが 7）。`word` の正規表現を触るときは番号に注意する。
 - 参照: `.kiro/specs/completed/scene-pick-modes/design.md`（Grammar・ParseKeyWords・pasta_lsp・VSCode の節）。
+
+## 2026-11-12 棚卸の再測定（main 2381bf52）
+
+- **前提の変化**: 0.5.0 の 2 本は上の 2 つの申し送りのとおり。`scene-pick-modes` の文法の変更は単語の値（`word_item`・`word_weight`。`grammar.pest` 150〜160 行）だけで、変数の規則と `VarScope` は変わらない。`actor-line-newlines` は変数に触れない。`scene-play-locals` は、開発用の `OnPastaScene`・`OnPastaSceneAt` の Reference2 で `act.var`（`＄`）に値を入れる口を足した（`shiori/event/scene_play.lua`。名前の検査は `@pasta_debug.is_local_var_name`）。`＄＊` の表を外から読む・書く口は 2 つある。変数の書き出し `OnPastaDumpVariables`（`scene_play.lua` 163 行が `pasta.save` を丸ごと渡す）と、書き換え `OnPastaSetSaveVariable`（`external_control.lua` 129 行が `pasta.save[name]` に書く）。0.5.3 の `pasta-recipe-dev-actions` が、この 2 つを保存変数の表として作者に見せる。範囲を 2 つにするなら、この 2 つの口と、条件の評価（`search/scene_cond.rs` が `act.save` を読む）も合わせる。
+- **触るファイル**: 文法 `grammar.pest` 285（変数の規則 84・95・107 行は合っている）、パーサ `parse_elements.rs` 316・`parse_action.rs` 499・構文木 `ast/action.rs` 371・`partial.rs` 335、生成 `element_gen.rs` 570（`save.x` 39 行）、`save.lua` 13・`runtime/persistence.rs` 709・`runtime/lifecycle.rs` 61、`failure.lua` 304、検査 `transpile_rules.rs` 271、LSP `visit_expr.rs` 484、VSCode の着色 408 と `tmGrammar.test.ts`、範囲を 2 つにするなら条件の評価 `search/scene_cond.rs` 198 と外の口 `scene_play.lua` 165・`external_control.lua` 131、マニュアル `grammar/variables.md` 459・`lua/modules/pasta-persistence.md` 213・`getting-started/10-save.md` 122 と生成スキル、テスト。表を 2 つにするなら `act.lua` 857（`save` は 204・232 行）と `scope_gen.rs` 498（274 行）、予約の名前を動かすなら `virtual_dispatcher.lua` 315（62・88〜89 行）も。1,000 行に近い本体は無い（`tmGrammar.test.ts` 1,041 行はテスト）。
+- **規模**: 8〜10。範囲を 2 つの表にすると、外の口と条件の評価を合わせる分で 1 つ増える（9〜11）。
+- **先に要るもの**: 機能の上ではなし（`novel-talk-flow` を待たない）。ファイルの重なり（未完了）: 0.6.0 の `cue-command-runtime`（`grammar.pest`・`scope_gen.rs`）・`novel-talk-flow`（`virtual_dispatcher.lua`、生成なら `scope_gen.rs`・`element_gen.rs`）・`novel-save-slots`（`save.lua`・`persistence.rs`・`lifecycle.rs`。後に置く）・`novel-checkpoint-rollback`（予約の名前を動かす場合の `virtual_dispatcher.lua`。前後に置く）、版の決まっていない `scene-anchor-link`（文法・`element_gen.rs`・`partial.rs`・着色と LSP）・`scene-exact-match`（`element_gen.rs`・`virtual_dispatcher.lua`、外の口を触るなら `external_control.lua`・`scene_play.lua`）、`shiori4-v4-lua-api`（外の口を触るなら `scene_play.lua`・`external_control.lua`）。表を 2 つにするなら `act.lua`（1 つのウェーブに 1 つの spec）とも。0.5.0 の 3 本と `debug-mcp-runtime` は入って外れた。
+- **種別**: 機能（保存の範囲を書き分ける方法が無い）。開発者の 0.6.0 の決定（巻き戻しとセーブ）から。
+- **要件定義のモデル**: Fable のまま。今のゴーストの `＄＊x` が頼っている保存の形と DSL の意味に触り、取り消しにくい。書き方・今の `＄＊` をどちらにするか・両立・何を全セーブ共通にするか・保存できない値が互いに絡み、推奨案がまだ無い（3 つ以上の絡む問い）。今回の 5 本は、このどれも決めていない。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: 「Current State」の行番号（2026-11-03 の節で直した値から、さらに動いた）: `parse_elements.rs` 141 行 → 234 行、`partial.rs` 300 行 → 303 行、`element_gen.rs` 69 行 → 68 行（書く側）、`act.lua` 188・216 行 → 204・232 行、`scope_gen.rs` 262 行 → 274 行、`failure.lua` 79・80 行 → 81・82 行、`transpile_rules.rs` 87 行 → 170 行、構文木 `ast/action.rs` 284 行 → 336 行。`parse_action.rs` 117・225・413 行、`virtual_dispatcher.lua` 62・88〜89 行、`visit_expr.rs` 48・89・195・248 行は合っている。`save.json`・JSON の記述は、2026-10-24 の申し送りのとおり `save.toml`・TOML と読む。

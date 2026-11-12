@@ -186,18 +186,14 @@ areka の側の作業が一番重い。依頼が遅れるほど、0.5.0 が遅�
 - `ponytail-manual-ci` が、章の数を決め打ちする 3 つの検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）をやめ、`SUMMARY.md` から数えて比べる形にする（同 spec の requirements.md の決定 A・Requirement 9）。
 - それが main に入った後なら、章を足すときに 3 つの検査の数を直さなくてよい。目次 `SUMMARY.md` に章を載せ、章のフォルダが口調の検査の見るフォルダ（`verify-content.mjs` の `VOICE_DIRS`）に入っていればよい。入る前なら、今までどおり数を合わせる。
 
-## 2026-11-03 棚卸の再測定（main c575febd）
+## 2026-11-12 棚卸の再測定（main 2381bf52）
 
-- **前提の変化**: `ponytail-manual-ci` が入り、3 つの検査の「全部の章の数」は目次 `SUMMARY.md` から数える形になった（上の申し送りの「入った後」の側）。マニュアルに章を足しても、その 3 つの数は直さなくてよい。ただし内部設計の部に章を足すなら、内部設計の章の一覧（`book/tools/verify-content.mjs` 505〜508 行の `INTERNALS_CHAPTERS`）と、部ごとの決め打ちの数（`book/tools/verify-scripts-test.mjs` 63 行の 10 章・65 行の題材章 8 章）が動く。`ponytail-shiori` は `crates/pasta_shiori` を片付けたが、NOTIFY に即 204 を返すこと（`actor/marshaling.rs` 257 行の `marshal_notify`）と、GET が 5 秒で 204 になること（71 行の `GET_TIMEOUT`）は変わらない。
-- **前の節から持ち越す取り決めの材料**（2026-10-17・10-18 の節）:
-  - 止まったときも、pasta は 200 の応答に `【スクリプトのエラー：…】`・`【時間切れ：…】` を載せ、理由を `X-Error-Reason` の行に入れる（`shiori/stop.lua`・`shiori/res.lua`）。「失敗の表記は普通の台本で届くので、特別に扱わなくてよい」と書くかを要件で決める。完全一致の部品（`SCENE.co_exec_exact`）と撫で・つつきの受け口（`shiori/event/mouse.lua`）は、イベントの名前を決める材料になる。
-  - pasta が出すタグ: アクターごとの装いの `\f[属性,値]` と戻す `\f[default]`（`shiori/actor_style.lua`。属性は `crates/pasta_core/src/actor_font.rs` の 12 個。`font` の `name` は書体の名前なので、話者名の欄と取り違えない呼び方にする）、トーク中でない OnSecondChange の `\![get,property,OnPastaClock,system.year,…]\e`（`shiori/clock.lua` 33〜34 行。返さなければ pasta は OS の時計のままで害は無い）、縦書きの budoux の改行 `\n[N]` と作者の `\_l[x,y]`。どれも areka の扱いを確かめる項目に入れる。
-  - 1 つのスポットを複数のアクターで共有する形が正式なので、話者名の欄に書く名前を台本に載せる取り決めの値打ちが高い（載せ方は `novel-talk-flow`）。「Approach」の「文章」の色と大きさは、「areka が `\f[…]` を解釈すること」の依頼として書く。
-  - エレメントのクリックのイベントの名前は、早めに決めると `shell-element-click` が先に進める。
-- **触るファイル**: 取り決めの文書・依頼書・対応表だけ。pasta の Rust・Lua・文法・テストは触らない。置き場所は要件の最初の議題のまま（マニュアルの内部設計の部 `book/src/internals/` に章を足すか、リポジトリの `doc/`）。マニュアルに足すなら、目次 `book/src/SUMMARY.md` と、上の内部設計の一覧と数。
+- **前提の変化**: 取り決めの材料が 2 つ増えた。(1) 止まるエラーの表記に「条件に合うシーンが無い」（`pasta/failure.lua` の `FAILURE.LABEL.SCENE_UNMET`。選択肢の飛び先や `OnPastaCallFunction` の候補が条件で全部外れたとき）が加わった。`FAILURE.raise` の記録も、`shiori/stop.lua` の `STOP.response` が今までと同じ 200 の応答と `X-Error-Reason` の行で返す。通り道は変わらないので、「失敗の表記は普通の台本で届く」の材料はそのまま使える。(2) イベントを受けた act は、場面を選ぶ前に Reference を `＄ｒ０`〜（`r0`〜）へ写す（`shiori/event/init.lua` の `create_act`）。ノベル用のイベントの Reference は、作者が場面の条件（`＊スロット　＆＄ｒ０＝「slot1」`）で振り分けられる。Reference の並びを決めるときの材料にする。
+- **前の節から持ち越す材料**（今も正しい）: NOTIFY に即 204（`crates/pasta_shiori/src/actor/marshaling.rs` 257 行の `marshal_notify`）と GET の 5 秒（71 行）。pasta が出すタグ（装いの `\f[属性,値]`・`\f[default]`、時計の `\![get,property,OnPastaClock,…]\e`、縦書きの `\n[N]`、作者の `\_l[x,y]`）。これに、同じ話し手が続く行の頭の `\n[N]`（`actor-line-newlines` の `[ghost] line_newlines`。既定の 0 なら出ない）を、areka の扱いを確かめる項目に足す。1 つのスポットを複数のアクターで共有する形が正式なので、話者名の欄の取り決めの値打ちが高い。エレメントのクリックのイベントの名前は、早めに決めると `shell-element-click` が先に進める。
+- **触るファイル**: 取り決めの文書・依頼書・対応表だけ。pasta の Rust・Lua・文法・テストは触らない。置き場所は要件の最初の議題（`book/src/internals/` に章を足すか、`doc/`）。内部設計の部に章を足すなら、目次 `book/src/SUMMARY.md`（85 行）と、内部設計の章の一覧（`book/tools/verify-content.mjs` の `INTERNALS_CHAPTERS`）と部ごとの数（`book/tools/verify-scripts-test.mjs`）。この 2 つの検査は今回動いていない。
 - **規模**: 7〜9 のまま。
-- **先に要るもの**: なし。ソースを共有する未完了の spec は無い。目次 `SUMMARY.md` は `manual-novel-guide`・`vscode-mcp-client`・`debug-mcp-runtime` も触るが、別の節なので並べられる。
-- **種別**: 文書（コードを書かない取り決めと依頼）。開発者の 0.5.0（今は 0.6.0）の目標（2026-10-10）から起こした。
-- **要件定義のモデル**: Opus のまま。名前と線引きは areka との約束だが、版の番号を持つ書き直せる文書で、議題に推奨案を付けられる。DSL の意味・保存の形・公開の Lua の約束のどれでもない。
+- **先に要るもの**: なし。ソースを共有する未完了の spec は無い。目次 `SUMMARY.md` は `manual-novel-guide` も触るが、別の節なので並べられる。
+- **種別**: 文書（コードを書かない取り決めと依頼）。開発者の 0.6.0 の目標（2026-10-10）から起こした。
+- **要件定義のモデル**: Opus のまま。版の番号を持つ書き直せる文書で、議題に推奨案を付けられる。DSL の意味・保存の形・公開の Lua の約束のどれでもない。
 - **分割の案**: 不要。
-- **見つけた穴・古くなった記述**: 「pasta の現在地」の「NOTIFY に 204 を返す所 `crates/pasta_shiori/src/actor/marshaling.rs` 232 行付近」→ 257 行の `marshal_notify`（71 行の 5 秒は合っている）。前の節の「3 つの検査の数を 64 に合わせる」は、上のとおり要らなくなった。
+- **見つけた穴・古くなった記述**: 「pasta の現在地」の「`marshaling.rs` 232 行付近」は 257 行の `marshal_notify`（前の節から持ち越し。71 行の 5 秒は合っている）。
