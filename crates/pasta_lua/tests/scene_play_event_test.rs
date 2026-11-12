@@ -48,6 +48,9 @@ const FIXTURE: &str = "\
 　さくら：「一拍目」
 　＞チェイントーク
 　さくら：「二拍目」
+
+＊天気を言う
+　さくら：「今日は＄天気」
 ";
 
 /// `＊再生大域` の本体の行
@@ -590,4 +593,18 @@ enabled = true
             "{level}: one warning line {warning:?}: {log}"
         );
     }
+}
+
+/// scene-play-locals 1.1・1.3: Reference2 のインライン表の値を、再生するシーンのローカル変数として読める。
+#[test]
+fn on_pasta_scene_reads_reference2_locals() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_debug_ghost(temp.path());
+
+    let value = value_of_200(&request(
+        &runtime,
+        "OnPastaScene",
+        &["天気を言う", "", "{ '天気' = '雨' }"],
+    ));
+    assert!(value.contains("雨"), "Reference2 local is read: {value}");
 }

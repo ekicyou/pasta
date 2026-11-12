@@ -3,6 +3,8 @@
 ---
 --- OnPastaScene:   Reference0 = 大域シーンの書いた名前、Reference1 = ローカルシーンの書いた名前（省略・空なら大域だけ）
 --- OnPastaSceneAt: Reference0 = ファイル（ghost/master/ からの相対パスか絶対パス）、Reference1 = 行（半角数字だけの 1 以上）
+--- 2 つに共通の Reference2: 省略できる TOML のインライン表（{ '天気' = '雨' }）。シーンが見つかったときだけ、
+---   各値を act.var（再生するシーンのローカル変数）に入れてから再生する。誤りなら何も入れずに失敗の表記
 --- OnPastaDumpVariables: 引数なし。保存変数を profile/pasta/debug/variables.toml に書き、喋らずに 204
 ---
 --- 3 つに共通の決まり: デバッグが有効（@pasta_debug.enabled()）で、SecurityLevel が external でないときだけ働く。
@@ -97,13 +99,17 @@ end
 
 REG.OnPastaScene = REG.OnPastaScene or function(act)
     local event = "OnPastaScene"
-    if not allowed(act, event, "scene not played") then return nil end
+    local debug = allowed(act, event, "scene not played")
+    if not debug then return nil end
     local name, local_name = act.req.reference[0], act.req.reference[1]
     if not FAILURE.is_name(name) then return FAILURE.bad_reference0(act, event, name) end
     if local_name == "" then local_name = nil end
+    local ok, locals = read_locals(act, event, debug)
+    if not ok then return locals end
 
     local co, miss = require("pasta.scene").co_exec_exact(name, local_name)
     if co then
+        for k, v in pairs(locals or {}) do act.var[k] = v end
         STORE.co_preempt[co] = true
         return co
     end
@@ -135,10 +141,13 @@ REG.OnPastaSceneAt = REG.OnPastaSceneAt or function(act)
             warning = event .. ": bad argument: Reference1=" .. FAILURE.quoted(line),
         })
     end
+    local ok, locals = read_locals(act, event, debug)
+    if not ok then return locals end
 
     local global_name, local_name = debug.scene_at(file, n)
     local co = global_name and require("pasta.scene").co_exec_registered(global_name, local_name)
     if co then
+        for k, v in pairs(locals or {}) do act.var[k] = v end
         STORE.co_preempt[co] = true
         return co
     end
