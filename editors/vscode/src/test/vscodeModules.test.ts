@@ -30,6 +30,7 @@ import {
   PASTA_TOKENS_LEGEND,
   SemanticTokensProvider,
 } from '../semanticTokensProvider';
+import { SceneOutlineProvider } from '../sceneOutline';
 import { DiagnosticsManager } from '../diagnosticsManager';
 import { WasmBridge } from '../wasmBridge';
 import { DocumentSync } from '../documentSync';
@@ -289,6 +290,102 @@ test('provider failure on a new version returns null and drops the previous vers
   opts.fail = false;
   provider.provideDocumentSemanticTokens(fakeDocument(uri, 'pasta', 'v1', 1) as never, dummyToken);
   assert.deepStrictEqual(bridge.calls, ['v1', 'v2', 'v1'], 'the failed analysis must drop the cache');
+});
+
+// =============================================================================
+// SceneOutlineProvider (real)
+// =============================================================================
+
+const span = (l0: number, c0: number, l1: number, c1: number) => ({
+  start: { line: l0, character: c0 }, end: { line: l1, character: c1 },
+});
+
+/** ＊挨拶（ローカル ・朝）／＊挨拶（続き）／＊挨拶（同じ名前の別の続き） */
+const SCENES = [
+  {
+    name: '挨拶', kind: 'global', heading: span(0, 0, 0, 3), range: span(0, 0, 4, 0),
+    children: [{ name: '朝', kind: 'local', heading: span(2, 2, 2, 4), range: span(2, 0, 4, 0), children: [] }],
+  },
+  { name: '挨拶', kind: 'global', heading: span(5, 0, 5, 3), range: span(5, 0, 6, 0), children: [] },
+  { name: '挨拶', kind: 'global', heading: span(7, 0, 7, 3), range: span(7, 0, 8, 5), children: [] },
+];
+
+function sceneBridge(opts: { fail?: boolean } = {}) {
+  return fakeBridge({ result: { tokens: [], diagnostics: [], scenes: SCENES }, fail: opts.fail });
+}
+
+const plainRange = (r: mock.Range) => span(r.start.line, r.start.character, r.end.line, r.end.character);
+
+test('SceneOutlineProvider: DocumentSymbol は名前・アイコン・範囲・選ぶ位置・子を写す（2.1・2.3・2.5）', () => {
+  const provider = new SceneOutlineProvider(sceneBridge() as never);
+  const symbols = provider.provideDocumentSymbols(fakeDocument('file:///s.pasta', 'pasta', 'x') as never, dummyToken) as unknown as mock.DocumentSymbol[];
+  assert.strictEqual(symbols.length, 3);
+  const [first] = symbols;
+  assert.ok(first instanceof mock.DocumentSymbol);
+  assert.strictEqual(first.name, '挨拶');
+  assert.strictEqual(first.detail, '');
+  assert.strictEqual(first.kind, mock.SymbolKind.Namespace);
+  assert.deepStrictEqual(plainRange(first.range), SCENES[0].range);
+  assert.deepStrictEqual(plainRange(first.selectionRange), SCENES[0].heading);
+  assert.strictEqual(first.children.length, 1);
+  const child = first.children[0];
+  assert.strictEqual(child.name, '朝');
+  assert.strictEqual(child.kind, mock.SymbolKind.Function);
+  assert.deepStrictEqual(plainRange(child.range), SCENES[0].children[0].range);
+  assert.deepStrictEqual(plainRange(child.selectionRange), SCENES[0].children[0].heading);
+  assert.deepStrictEqual(child.children, []);
+});
+
+test('SceneOutlineProvider: 同じ名前の 2 つのシーンは別の項目（2.4）', () => {
+  const provider = new SceneOutlineProvider(sceneBridge() as never);
+  const symbols = provider.provideDocumentSymbols(fakeDocument('file:///same.pasta', 'pasta', 'x') as never, dummyToken) as unknown as mock.DocumentSymbol[];
+  assert.deepStrictEqual(symbols.map((s) => [s.name, s.selectionRange.start.line]), [['挨拶', 0], ['挨拶', 5], ['挨拶', 7]]);
+});
+
+test('SceneOutlineProvider: すべての見出しに CodeLens が 1 つ・題は package.json と同じ・引数は [uri, 見出しの行]（3.1・4.5）', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf-8'));
+  const title = pkg.contributes.commands.find((c: { command: string }) => c.command === 'pasta.runSceneAtCursor').title;
+  const provider = new SceneOutlineProvider(sceneBridge() as never);
+  const doc = fakeDocument('file:///lens.pasta', 'pasta', 'x');
+  const lenses = provider.provideCodeLenses(doc as never, dummyToken) as unknown as mock.CodeLens[];
+  // グローバル・ローカル・続き・続きの順（文書の順）
+  assert.deepStrictEqual(lenses.map((l) => plainRange(l.range)), [SCENES[0].heading, SCENES[0].children[0].heading, SCENES[1].heading, SCENES[2].heading]);
+  for (const lens of lenses) {
+    assert.ok(lens instanceof mock.CodeLens);
+    assert.strictEqual(lens.command?.title, title);
+    assert.strictEqual(lens.command?.command, 'pasta.runSceneAtCursor');
+    assert.strictEqual(lens.command?.arguments?.[0], doc.uri);
+    assert.strictEqual(lens.command?.arguments?.[1], lens.range.start.line);
+    assert.strictEqual(lens.command?.arguments?.length, 2);
+  }
+  assert.strictEqual((provider as unknown as Record<string, unknown>).resolveCodeLens, undefined);
+  assert.strictEqual((provider as unknown as Record<string, unknown>).onDidChangeCodeLenses, undefined);
+});
+
+test('SceneOutlineProvider: 解析の例外なら両方とも空で、通知を出さない（5.3）', () => {
+  const provider = new SceneOutlineProvider(sceneBridge({ fail: true }) as never);
+  const doc = fakeDocument('file:///boom.pasta', 'pasta', 'x');
+  const before = mock.shownMessages.length;
+  const outputBefore = mock.outputLines.length;
+  assert.deepStrictEqual(provider.provideDocumentSymbols(doc as never, dummyToken), []);
+  assert.deepStrictEqual(provider.provideCodeLenses(doc as never, dummyToken), []);
+  assert.strictEqual(mock.shownMessages.length, before);
+  assert.strictEqual(mock.outputLines.length, outputBefore);
+});
+
+test('SceneOutlineProvider: 同じ版では解析は 1 回・版が変わると解き直す（2.7・3.6）', () => {
+  const bridge = sceneBridge();
+  const provider = new SceneOutlineProvider(bridge as never);
+  const uri = 'file:///cache-scenes.pasta';
+  const v1 = fakeDocument(uri, 'pasta', 'v1', 1);
+  provider.provideDocumentSymbols(v1 as never, dummyToken);
+  provider.provideCodeLenses(v1 as never, dummyToken);
+  assert.deepStrictEqual(bridge.calls, ['v1']);
+  provider.provideCodeLenses(fakeDocument(uri, 'pasta', 'v2', 2) as never, dummyToken);
+  assert.deepStrictEqual(bridge.calls, ['v1', 'v2']);
+  // 別の文書は同じ版の数でも解き直す
+  provider.provideDocumentSymbols(fakeDocument('file:///other.pasta', 'pasta', 'o', 2) as never, dummyToken);
+  assert.deepStrictEqual(bridge.calls, ['v1', 'v2', 'o']);
 });
 
 // =============================================================================

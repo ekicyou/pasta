@@ -73,6 +73,30 @@ export class Diagnostic {
   }
 }
 
+export enum SymbolKind {
+  Namespace = 2,
+  Function = 11,
+}
+
+export class DocumentSymbol {
+  children: DocumentSymbol[] = [];
+  constructor(
+    public name: string,
+    public detail: string,
+    public kind: SymbolKind,
+    public range: Range,
+    public selectionRange: Range,
+  ) {}
+}
+
+export class CodeLens {
+  constructor(
+    public range: Range,
+    public command?: { title: string; command: string; arguments?: unknown[] },
+  ) {}
+  get isResolved(): boolean { return this.command !== undefined; }
+}
+
 export class EventEmitter<T> {
   private listeners: Array<(e: T) => void> = [];
   readonly event = (listener: (e: T) => void) => {
@@ -402,6 +426,8 @@ export const languages = {
     return collection;
   },
   registerDocumentSemanticTokensProvider: () => ({ dispose: () => {} }),
+  registerDocumentSymbolProvider: () => ({ dispose: () => {} }),
+  registerCodeLensProvider: () => ({ dispose: () => {} }),
 };
 
 export const workspace = {
