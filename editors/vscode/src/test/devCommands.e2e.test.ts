@@ -49,7 +49,7 @@ function openEditor(file: string, languageId = 'pasta', line = 0) {
   vscode.window.activeTextEditor = { document, selection: { active: new vscode.Position(line, 0) } };
 }
 
-const run = (id: string) => vscode.commands.executeCommand(id);
+const run = (id: string, ...args: unknown[]) => vscode.commands.executeCommand(id, ...args);
 const callsOf = (s: FakeMcpServer, name: string) => s.state.calls.filter((c) => c.name === name);
 const messagesSince = (n: number) => vscode.shownMessages.slice(n);
 const outputSince = (n: number) => vscode.outputLines.slice(n).map((l) => l.message);
@@ -401,6 +401,77 @@ async function main() {
     assert.ok(messagesSince(m)[0].message.includes('保存できなかったファイルがあるので止めました'));
     assert.ok(messagesSince(m)[0].message.includes(bad));
     assert.ok(outputSince(o).some((l) => l.includes(bad)));
+  });
+
+  // --- vscode-scene-outline-play 2: the command takes (uri, line0) -------------------
+
+  /** A ghost on `a` with a second (open) document `target`, while the active editor sits on dic at line 0. */
+  function argTarget(opts: { isDirty?: boolean; languageId?: string; rel?: string } = {}) {
+    const ctx = onlyOn(a, b, 0);
+    const file = `${ctx.g.root}/ghost/master/${opts.rel ?? 'dic/other.pasta'}`;
+    const doc = vscode.createTextDocument(file, { isDirty: opts.isDirty ?? false, languageId: opts.languageId });
+    vscode.workspace.textDocuments.push(doc);
+    return { ...ctx, doc, uri: vscode.Uri.file(file), calls: a.state.calls.length };
+  }
+
+  await test('4.2 / 4.3 / 3.4: (uri, 2) plays that document at line 3, after save and reload', async () => {
+    const { doc, uri, calls, m } = argTarget({ isDirty: true });
+    const saves = vscode.savedDocuments.length;
+    await run('pasta.runSceneAtCursor', uri, 2);
+    vscode.workspace.textDocuments.length = 0;
+    assert.deepStrictEqual(messagesSince(m), []);
+    assert.deepStrictEqual(vscode.savedDocuments.slice(saves).map((d) => d.path), [doc.uri.path]);
+    const names = a.state.calls.slice(calls).map((c) => c.name);
+    const scene = a.state.calls.slice(calls).find((c) => c.name === 'raise_event')!;
+    assert.strictEqual(scene.arguments.event, 'OnPastaSceneAt');
+    assert.deepStrictEqual(scene.arguments.references, [doc.uri.fsPath, '3']);
+    assert.ok(names.indexOf('reload') >= 0 && names.indexOf('reload') < names.indexOf('raise_event'), names.join(','));
+  });
+
+  await test('4.1: a right-click style call (uri only) plays the active editor at the cursor line', async () => {
+    const { g, uri, scenes } = argTarget();
+    vscode.window.activeTextEditor.selection = { active: new vscode.Position(1, 0) };
+    await run('pasta.runSceneAtCursor', uri);
+    vscode.workspace.textDocuments.length = 0;
+    assert.strictEqual(callsOf(a, 'raise_event').length, scenes + 1);
+    assert.deepStrictEqual(callsOf(a, 'raise_event').pop()!.arguments.references, [g.dic, '2']);
+  });
+
+  for (const [name, setup] of [
+    ['an untitled document', () => { const t = argTarget(); (t.doc as any).isUntitled = true; return t; }],
+    ['a non-.pasta document', () => argTarget({ rel: 'scripts/x.lua', languageId: 'lua' })],
+    ['a Uri that cannot be opened', () => ({ ...argTarget(), uri: vscode.Uri.file(`${tmp}/nowhere/missing.pasta`) })],
+  ] as const) {
+    await test(`4.4: (uri, 2) on ${name} stops with the ghost message and sends nothing`, async () => {
+      const { uri, calls, m } = setup();
+      await run('pasta.runSceneAtCursor', uri, 2);
+      vscode.workspace.textDocuments.length = 0;
+      assert.deepStrictEqual(messagesSince(m).map((x) => x.kind), ['warning']);
+      assert.match(messagesSince(m)[0].message, /ゴーストを特定できません/);
+      assert.strictEqual(a.state.calls.length, calls, 'nothing sent');
+    });
+  }
+
+  await test('3.9: a second (uri, line) call while one runs is not sent', async () => {
+    const { uri, m } = argTarget();
+    a.state.reloadDelayMs = 100;
+    const scenes = callsOf(a, 'raise_event').length;
+    await Promise.all([run('pasta.runSceneAtCursor', uri, 0), run('pasta.runSceneAtCursor', uri, 0)]);
+    a.state.reloadDelayMs = 0;
+    vscode.workspace.textDocuments.length = 0;
+    assert.strictEqual(callsOf(a, 'raise_event').length, scenes + 1);
+    assert.deepStrictEqual(messagesSince(m).map((x) => [x.kind, x.message]), [['warning', 'このゴーストへのコマンドが進んでいます']]);
+  });
+
+  await test('4.6: the other 2 commands still work when given a Uri', async () => {
+    const { uri } = argTarget();
+    const reloads = callsOf(a, 'reload').length;
+    const dumps = callsOf(a, 'raise_event').filter((c) => c.arguments.event === 'OnPastaDumpVariables').length;
+    await run('pasta.reloadShiori', uri);
+    await run('pasta.showSaveVariables', uri);
+    vscode.workspace.textDocuments.length = 0;
+    assert.strictEqual(callsOf(a, 'reload').length, reloads + 1);
+    assert.strictEqual(callsOf(a, 'raise_event').filter((c) => c.arguments.event === 'OnPastaDumpVariables').length, dumps + 1);
   });
 
   await a.close();

@@ -56,7 +56,22 @@ pub mod wasm {
 
 #[cfg(test)]
 mod tests {
-    use crate::analysis::{AnalysisResult, Diagnostic, Position, Range, SemanticToken};
+    use crate::analysis::{
+        AnalysisResult, Diagnostic, Position, Range, SceneKind, SceneNode, SemanticToken,
+    };
+
+    fn range(sl: u32, sc: u32, el: u32, ec: u32) -> Range {
+        Range {
+            start: Position {
+                line: sl,
+                character: sc,
+            },
+            end: Position {
+                line: el,
+                character: ec,
+            },
+        }
+    }
 
     /// `wasm_analyze` が JS へ渡す形（欄の名前・順・型）が今の拡張の型と同じこと
     #[test]
@@ -83,13 +98,26 @@ mod tests {
                 message: "test warning".to_string(),
                 severity: 1,
             }],
+            scenes: vec![SceneNode {
+                name: "挨拶".to_string(),
+                kind: SceneKind::Global,
+                heading: range(0, 0, 0, 3),
+                range: range(0, 0, 3, 12),
+                children: vec![SceneNode {
+                    name: "朝".to_string(),
+                    kind: SceneKind::Local,
+                    heading: range(2, 2, 2, 4),
+                    range: range(2, 0, 3, 12),
+                    children: vec![],
+                }],
+            }],
         };
 
         let json = serde_json::to_string(&analysis_result).expect("should serialize to JSON");
 
         assert_eq!(
             json,
-            r#"{"tokens":[{"deltaLine":0,"deltaStartCharacter":1,"length":2,"tokenType":3,"tokenModifiers":4}],"diagnostics":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":5}},"message":"test warning","severity":1}]}"#
+            r#"{"tokens":[{"deltaLine":0,"deltaStartCharacter":1,"length":2,"tokenType":3,"tokenModifiers":4}],"diagnostics":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":5}},"message":"test warning","severity":1}],"scenes":[{"name":"挨拶","kind":"global","heading":{"start":{"line":0,"character":0},"end":{"line":0,"character":3}},"range":{"start":{"line":0,"character":0},"end":{"line":3,"character":12}},"children":[{"name":"朝","kind":"local","heading":{"start":{"line":2,"character":2},"end":{"line":2,"character":4}},"range":{"start":{"line":2,"character":0},"end":{"line":3,"character":12}},"children":[]}]}]}"#
         );
     }
 

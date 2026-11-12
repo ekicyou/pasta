@@ -11,7 +11,8 @@ Pasta DSL（`*.pasta` ファイル）のシンタックスハイライトと診�
 - **診断情報** — パースエラーの Problems パネル表示
 - **ゴースト全体の診断** — `ghost/master` 配下の `.pasta`・`ghost/master/pasta.toml` を保存したとき、または `ghost/master` 配下の `.pasta`・`.lua` を作成・削除・改名したときに、そのゴースト全体を `pasta_check validate` と同じ規則で検査し（`ghost`・`master`・`pasta.toml` の名前と拡張子は大文字・小文字を区別しない。`Ghost/Master` も対象）、誤りを Error・注意を Warning として該当ファイル・行に表示（source は `pasta validate`。続けて保存したときはまとめて 1 回検査。保存前の入力中と起動直後は検査しない。ディスクに保存された内容を読む。WASM ロード失敗時は動作しない）。報告の意味と直し方は [マニュアル](https://ekicyou.github.io/pasta/debug/validate.html#エディタの診断) を参照
 - **フォールバック** — WASM ロード失敗時は TextMate 文法のみで動作
-- **開発支援コマンド** — 「▶ シーンを実行」（カーソルの下のシーンを読み込み直してから再生）・「SHIORI をリロード」・「保存変数を表示」の 3 つ（エディタの右クリックメニュー / コマンドパレット）。編集中のファイルのゴーストが動いている SSP・areka へ、ベースウェアの MCP の窓口を通して送り、結果を出力パネル「Pasta 開発」に表示。使い方は [マニュアル](https://ekicyou.github.io/pasta/debug/dev-actions.html) を参照
+- **開発支援コマンド** — 「▶ シーンを実行」（カーソルの下のシーンを読み込み直してから再生）・「SHIORI をリロード」・「保存変数を表示」の 3 つ（エディタの右クリックメニュー / コマンドパレット。「▶ シーンを実行」は各シーンの見出しの上にも出て、押すとその見出しのシーンを再生。`"[pasta]": { "editor.codeLens": false }` で消せる）。編集中のファイルのゴーストが動いている SSP・areka へ、ベースウェアの MCP の窓口を通して送り、結果を出力パネル「Pasta 開発」に表示。使い方は [マニュアル](https://ekicyou.github.io/pasta/debug/dev-actions.html) を参照
+- **シーンの並び** — `.pasta` のシーンを グローバルシーン ＞ ローカルシーン の 2 階層でアウトライン・パンくず・`Ctrl+Shift+O`・スティッキースクロールに表示（続きのグローバルシーンは同じ名前の別の項目。WASM ロード失敗時は表示しない）。使い方は [マニュアル](https://ekicyou.github.io/pasta/debug/dev-actions.html#シーンの並びアウトライン) を参照
 
 ## Pasta DSL とは
 

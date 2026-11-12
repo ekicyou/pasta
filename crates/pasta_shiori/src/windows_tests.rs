@@ -26,7 +26,8 @@ const LEAK_PROBE_LEN: usize = 64;
 
 /// `windows.rs` のプロセス全域状態（`lifecycle::LEGACY` と `loadu` 初期化フラグ）を
 /// 触るテストを直列化する。並列実行下でも互いの前提（LEGACY 未初期化／フラグの状態）を
-/// 壊さない。
+/// 壊さない。`alloc_leak_probe` を使うテストもすべてこれを取る（解放済みの handle の枠を
+/// 並列テストの probe が使い回すと `hglobal_is_freed` が偽になるため）。
 static FFI_GLOBAL_STATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// 直列化ロックを取得する（poison は無視して内部値を使う）。
@@ -215,6 +216,7 @@ fn len_from_c_treats_negative_as_zero() {
 
 #[test]
 fn len_to_c_overflow_frees_response_and_returns_null_and_zero() {
+    let _guard = lock_global_state();
     let h = alloc_leak_probe();
     assert_eq!(len_to_c(h, LEAK_PROBE_LEN), (h, LEAK_PROBE_LEN as c_long));
     // 収まる側は手放さない（呼び出し側が解放する）。
@@ -257,6 +259,7 @@ fn extern_request_negative_len_is_an_empty_request() {
 
 #[test]
 fn extern_request_null_len_pointer_returns_null() {
+    let _guard = lock_global_state();
     let h = alloc_leak_probe();
     let res = request(h, ptr::null_mut());
     assert!(res.is_null(), "null length pointer must yield null");

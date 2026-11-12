@@ -3,6 +3,7 @@
 //! Converts pasta_dsl AST nodes into LSP semantic tokens with
 //! proper UTF-8 → UTF-16 position conversion.
 
+mod scenes;
 mod text_utils;
 mod token_types;
 mod visit_action;
@@ -10,6 +11,7 @@ mod visit_expr;
 mod visit_scope;
 
 // Re-export public API (preserve existing import paths)
+pub use scenes::{SceneKind, SceneNode};
 pub use text_utils::{get_line_text, line_byte_offset};
 pub use token_types::*;
 
@@ -24,6 +26,8 @@ pub struct AnalysisResult {
     pub tokens: Vec<SemanticToken>,
     /// パースエラーから生成されたDiagnostics
     pub diagnostics: Vec<Diagnostic>,
+    /// シーンの並び（グローバルシーン ＞ ローカルシーン・文書の順）
+    pub scenes: Vec<SceneNode>,
 }
 
 /// 診断
@@ -78,19 +82,22 @@ impl AnalysisEngine {
     pub fn analyze(source: &str) -> AnalysisResult {
         let mut raw_tokens = Vec::new();
         // 受け取った文字のまま 1 回だけ解く（改行を補わない。保存時と同じ誤りを出す）
-        let (diagnostics, failed_lines) = match pasta_dsl::parse_str(source, "<lsp>") {
+        let (diagnostics, failed_lines, scenes) = match pasta_dsl::parse_str(source, "<lsp>") {
             Ok(pasta_file) => {
                 Self::visit_file_items(&pasta_file.items, source, &mut raw_tokens);
-                (vec![], vec![])
+                let scenes = scenes::collect_scenes(&pasta_file.items, source);
+                (vec![], vec![], scenes)
             }
             Err(e) => {
                 // 色だけを部分解析の AST から作る（部分解析の誤りは読まない）
                 let partial = pasta_dsl::parse_str_partial(source);
                 Self::visit_file_items(&partial.items, source, &mut raw_tokens);
+                let scenes = scenes::collect_scenes(&partial.items, source);
                 let finding = pasta_check::validate::syntax_finding("<lsp>", e);
                 (
                     vec![finding_to_diagnostic(&finding, source)],
                     partial.failed_lines,
+                    scenes,
                 )
             }
         };
@@ -100,6 +107,7 @@ impl AnalysisEngine {
         AnalysisResult {
             tokens: encode_tokens(&mut raw_tokens),
             diagnostics,
+            scenes,
         }
     }
 

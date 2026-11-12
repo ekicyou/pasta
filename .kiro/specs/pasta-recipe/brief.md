@@ -98,3 +98,9 @@ pasta DSL の編集支援は、今は VS Code 拡張 `ekicyou.pasta-vscode`（v0
 - Tauri は 2.12.x に固定する（3.0 は alpha）。Monaco 0.53 以降は ESM 前提なので、Vite で worker を `?worker` で読み、オフラインで動かす（CDN を使わない）。
 - shiki の着色とセマンティックトークンの色の併用は確かめていない（設計で最初に確かめる）。
 - 起動の手段（ドラッグドロップ以外。関連付け・送るメニューなど）は開発者に所論があり、要件で詰める。
+
+## 申し送り（vscode-scene-outline-play より・2026-11-12）
+
+- `scenes` は実装済み。Rust からは `pasta_lsp::analysis::AnalysisEngine::analyze` の `AnalysisResult.scenes: Vec<SceneNode>`（`SceneNode`・`SceneKind` は `pasta_lsp::analysis` から公開）。JSON の欄は `tokens`・`diagnostics`・`scenes` の順、項目は `name`・`kind`（`"global"`／`"local"`）・`heading`・`range`・`children`。行は 0 始まり・列は UTF-16。形は `crates/pasta_lsp/src/transport.rs` の形の試験が文字列で固定している。
+- 範囲の式は pasta.dll の行からシーンを引く表と同じ（次の見出しの前の行まで）。シーンの後ろのアクター辞書・単語定義の塊は前のシーンの範囲に入る。構文の誤りのあるシーンは並びに出ず、範囲は出た見出しだけで決まる（詳しくは `completed/vscode-scene-outline-play/design.md` の Open Questions / Risks の Known limit）。
+- 見出しの行からの再生は `OnPastaSceneAt` に `ファイルの絶対パス, 1 始まりの行` を渡す今の形のまま。
