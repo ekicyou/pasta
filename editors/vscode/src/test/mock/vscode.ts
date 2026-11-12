@@ -73,6 +73,30 @@ export class Diagnostic {
   }
 }
 
+export enum SymbolKind {
+  Namespace = 2,
+  Function = 11,
+}
+
+export class DocumentSymbol {
+  children: DocumentSymbol[] = [];
+  constructor(
+    public name: string,
+    public detail: string,
+    public kind: SymbolKind,
+    public range: Range,
+    public selectionRange: Range,
+  ) {}
+}
+
+export class CodeLens {
+  constructor(
+    public range: Range,
+    public command?: { title: string; command: string; arguments?: unknown[] },
+  ) {}
+  get isResolved(): boolean { return this.command !== undefined; }
+}
+
 export class EventEmitter<T> {
   private listeners: Array<(e: T) => void> = [];
   readonly event = (listener: (e: T) => void) => {
@@ -395,6 +419,10 @@ export function createTextDocument(path: string, opts: { isDirty?: boolean; lang
 /** All diagnostic collections created via languages.createDiagnosticCollection (in order). */
 export const createdDiagnosticCollections: MockDiagnosticCollection[] = [];
 
+/** Providers registered via languages.registerDocumentSymbolProvider / registerCodeLensProvider (in order). */
+export const registeredDocumentSymbolProviders: { selector: any; provider: any }[] = [];
+export const registeredCodeLensProviders: { selector: any; provider: any }[] = [];
+
 export const languages = {
   createDiagnosticCollection: (name: string) => {
     const collection = new MockDiagnosticCollection(name);
@@ -402,6 +430,14 @@ export const languages = {
     return collection;
   },
   registerDocumentSemanticTokensProvider: () => ({ dispose: () => {} }),
+  registerDocumentSymbolProvider: (selector: any, provider: any) => {
+    registeredDocumentSymbolProviders.push({ selector, provider });
+    return { dispose: () => {} };
+  },
+  registerCodeLensProvider: (selector: any, provider: any) => {
+    registeredCodeLensProviders.push({ selector, provider });
+    return { dispose: () => {} };
+  },
 };
 
 export const workspace = {
@@ -412,6 +448,14 @@ export const workspace = {
   onDidCloseTextDocument: didCloseTextDocumentEmitter.event,
   onDidSaveTextDocument: didSaveTextDocumentEmitter.event,
   fs: fakeFs,
+  // shortcut: only documents already in textDocuments open (no load from disk); anything else rejects like a missing file
+  openTextDocument: async (uri: Uri): Promise<any> => {
+    const doc = workspace.textDocuments.find((d) => d.uri.path === uri.path);
+    if (!doc) {
+      throw fakeNotFound(uri);
+    }
+    return doc;
+  },
   createFileSystemWatcher: (globPattern: unknown) => {
     const watcher = new MockFileSystemWatcher(globPattern);
     createdFileSystemWatchers.push(watcher);

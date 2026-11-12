@@ -30,6 +30,7 @@ import {
   PASTA_TOKENS_LEGEND,
   SemanticTokensProvider,
 } from '../semanticTokensProvider';
+import { SceneOutlineProvider } from '../sceneOutline';
 import { DiagnosticsManager } from '../diagnosticsManager';
 import { WasmBridge } from '../wasmBridge';
 import { DocumentSync } from '../documentSync';
@@ -71,6 +72,7 @@ interface FakeAnalysisResult {
     message: string;
     severity: number;
   }>;
+  scenes: unknown[];
 }
 
 /** Duck-typed WasmBridge double (real WasmBridge requires the vscode runtime). */
@@ -83,7 +85,7 @@ function fakeBridge(opts: { ready?: boolean; result?: FakeAnalysisResult; fail?:
       if (opts.fail) {
         throw new Error('simulated analysis failure');
       }
-      return opts.result ?? { tokens: [], diagnostics: [] };
+      return opts.result ?? { tokens: [], diagnostics: [], scenes: [] };
     },
   };
   return bridge;
@@ -198,6 +200,7 @@ test('provider converts delta-encoded tokens to absolute builder positions', () 
       { deltaLine: 0, deltaStartCharacter: 3, length: 1, tokenType: 13, tokenModifiers: 0 },
     ],
     diagnostics: [],
+    scenes: [],
   };
   const provider = new SemanticTokensProvider(fakeBridge({ result }) as never);
   const doc = fakeDocument('file:///delta.pasta', 'pasta', 'dummy');
@@ -214,7 +217,7 @@ test('provider converts delta-encoded tokens to absolute builder positions', () 
 });
 
 test('provider caches on-demand analysis (no re-analysis for same uri)', () => {
-  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [] } });
+  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [], scenes: [] } });
   const provider = new SemanticTokensProvider(bridge as never);
   const doc = fakeDocument('file:///cache.pasta', 'pasta', 'text');
   provider.provideDocumentSemanticTokens(doc as never, dummyToken);
@@ -223,7 +226,7 @@ test('provider caches on-demand analysis (no re-analysis for same uri)', () => {
 });
 
 test('clearTokens drops the cache and forces re-analysis', () => {
-  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [] } });
+  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [], scenes: [] } });
   const provider = new SemanticTokensProvider(bridge as never);
   const doc = fakeDocument('file:///clear.pasta', 'pasta', 'text');
   provider.provideDocumentSemanticTokens(doc as never, dummyToken);
@@ -233,7 +236,7 @@ test('clearTokens drops the cache and forces re-analysis', () => {
 });
 
 test('updateTokens replaces the cache and fires onDidChangeSemanticTokens', () => {
-  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [] } });
+  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [], scenes: [] } });
   const provider = new SemanticTokensProvider(bridge as never);
   let fired = 0;
   provider.onDidChangeSemanticTokens(() => { fired++; });
@@ -256,7 +259,7 @@ test('provider returns null when analysis throws (TextMate fallback)', () => {
 // 要件 8.1: 控えは版つき。違う版の控えは返さず、その場で解き直す
 test('provider does not serve tokens cached for a different document version', () => {
   const fresh = { deltaLine: 0, deltaStartCharacter: 0, length: 3, tokenType: 1, tokenModifiers: 0 };
-  const bridge = fakeBridge({ result: { tokens: [fresh], diagnostics: [] } });
+  const bridge = fakeBridge({ result: { tokens: [fresh], diagnostics: [], scenes: [] } });
   const provider = new SemanticTokensProvider(bridge as never);
   const uri = 'file:///ver.pasta';
   provider.updateTokens(mock.Uri.parse(uri).toString(), 1, [
@@ -273,7 +276,7 @@ test('provider does not serve tokens cached for a different document version', (
 
 // 要件 8.2: 今の版の解析に失敗したら、前の版の色を返さず控えも消す
 test('provider failure on a new version returns null and drops the previous version', () => {
-  const opts = { result: { tokens: [], diagnostics: [] }, fail: false };
+  const opts = { result: { tokens: [], diagnostics: [], scenes: [] }, fail: false };
   const bridge = fakeBridge(opts);
   const provider = new SemanticTokensProvider(bridge as never);
   const uri = 'file:///ver-fail.pasta';
@@ -287,6 +290,102 @@ test('provider failure on a new version returns null and drops the previous vers
   opts.fail = false;
   provider.provideDocumentSemanticTokens(fakeDocument(uri, 'pasta', 'v1', 1) as never, dummyToken);
   assert.deepStrictEqual(bridge.calls, ['v1', 'v2', 'v1'], 'the failed analysis must drop the cache');
+});
+
+// =============================================================================
+// SceneOutlineProvider (real)
+// =============================================================================
+
+const span = (l0: number, c0: number, l1: number, c1: number) => ({
+  start: { line: l0, character: c0 }, end: { line: l1, character: c1 },
+});
+
+/** ＊挨拶（ローカル ・朝）／＊挨拶（続き）／＊挨拶（同じ名前の別の続き） */
+const SCENES = [
+  {
+    name: '挨拶', kind: 'global', heading: span(0, 0, 0, 3), range: span(0, 0, 4, 0),
+    children: [{ name: '朝', kind: 'local', heading: span(2, 2, 2, 4), range: span(2, 0, 4, 0), children: [] }],
+  },
+  { name: '挨拶', kind: 'global', heading: span(5, 0, 5, 3), range: span(5, 0, 6, 0), children: [] },
+  { name: '挨拶', kind: 'global', heading: span(7, 0, 7, 3), range: span(7, 0, 8, 5), children: [] },
+];
+
+function sceneBridge(opts: { fail?: boolean } = {}) {
+  return fakeBridge({ result: { tokens: [], diagnostics: [], scenes: SCENES }, fail: opts.fail });
+}
+
+const plainRange = (r: mock.Range) => span(r.start.line, r.start.character, r.end.line, r.end.character);
+
+test('SceneOutlineProvider: DocumentSymbol は名前・アイコン・範囲・選ぶ位置・子を写す（2.1・2.3・2.5）', () => {
+  const provider = new SceneOutlineProvider(sceneBridge() as never);
+  const symbols = provider.provideDocumentSymbols(fakeDocument('file:///s.pasta', 'pasta', 'x') as never, dummyToken) as unknown as mock.DocumentSymbol[];
+  assert.strictEqual(symbols.length, 3);
+  const [first] = symbols;
+  assert.ok(first instanceof mock.DocumentSymbol);
+  assert.strictEqual(first.name, '挨拶');
+  assert.strictEqual(first.detail, '');
+  assert.strictEqual(first.kind, mock.SymbolKind.Namespace);
+  assert.deepStrictEqual(plainRange(first.range), SCENES[0].range);
+  assert.deepStrictEqual(plainRange(first.selectionRange), SCENES[0].heading);
+  assert.strictEqual(first.children.length, 1);
+  const child = first.children[0];
+  assert.strictEqual(child.name, '朝');
+  assert.strictEqual(child.kind, mock.SymbolKind.Function);
+  assert.deepStrictEqual(plainRange(child.range), SCENES[0].children[0].range);
+  assert.deepStrictEqual(plainRange(child.selectionRange), SCENES[0].children[0].heading);
+  assert.deepStrictEqual(child.children, []);
+});
+
+test('SceneOutlineProvider: 同じ名前の 2 つのシーンは別の項目（2.4）', () => {
+  const provider = new SceneOutlineProvider(sceneBridge() as never);
+  const symbols = provider.provideDocumentSymbols(fakeDocument('file:///same.pasta', 'pasta', 'x') as never, dummyToken) as unknown as mock.DocumentSymbol[];
+  assert.deepStrictEqual(symbols.map((s) => [s.name, s.selectionRange.start.line]), [['挨拶', 0], ['挨拶', 5], ['挨拶', 7]]);
+});
+
+test('SceneOutlineProvider: すべての見出しに CodeLens が 1 つ・題は package.json と同じ・引数は [uri, 見出しの行]（3.1・4.5）', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf-8'));
+  const title = pkg.contributes.commands.find((c: { command: string }) => c.command === 'pasta.runSceneAtCursor').title;
+  const provider = new SceneOutlineProvider(sceneBridge() as never);
+  const doc = fakeDocument('file:///lens.pasta', 'pasta', 'x');
+  const lenses = provider.provideCodeLenses(doc as never, dummyToken) as unknown as mock.CodeLens[];
+  // グローバル・ローカル・続き・続きの順（文書の順）
+  assert.deepStrictEqual(lenses.map((l) => plainRange(l.range)), [SCENES[0].heading, SCENES[0].children[0].heading, SCENES[1].heading, SCENES[2].heading]);
+  for (const lens of lenses) {
+    assert.ok(lens instanceof mock.CodeLens);
+    assert.strictEqual(lens.command?.title, title);
+    assert.strictEqual(lens.command?.command, 'pasta.runSceneAtCursor');
+    assert.strictEqual(lens.command?.arguments?.[0], doc.uri);
+    assert.strictEqual(lens.command?.arguments?.[1], lens.range.start.line);
+    assert.strictEqual(lens.command?.arguments?.length, 2);
+  }
+  assert.strictEqual((provider as unknown as Record<string, unknown>).resolveCodeLens, undefined);
+  assert.strictEqual((provider as unknown as Record<string, unknown>).onDidChangeCodeLenses, undefined);
+});
+
+test('SceneOutlineProvider: 解析の例外なら両方とも空で、通知を出さない（5.3）', () => {
+  const provider = new SceneOutlineProvider(sceneBridge({ fail: true }) as never);
+  const doc = fakeDocument('file:///boom.pasta', 'pasta', 'x');
+  const before = mock.shownMessages.length;
+  const outputBefore = mock.outputLines.length;
+  assert.deepStrictEqual(provider.provideDocumentSymbols(doc as never, dummyToken), []);
+  assert.deepStrictEqual(provider.provideCodeLenses(doc as never, dummyToken), []);
+  assert.strictEqual(mock.shownMessages.length, before);
+  assert.strictEqual(mock.outputLines.length, outputBefore);
+});
+
+test('SceneOutlineProvider: 同じ版では解析は 1 回・版が変わると解き直す（2.7・3.6）', () => {
+  const bridge = sceneBridge();
+  const provider = new SceneOutlineProvider(bridge as never);
+  const uri = 'file:///cache-scenes.pasta';
+  const v1 = fakeDocument(uri, 'pasta', 'v1', 1);
+  provider.provideDocumentSymbols(v1 as never, dummyToken);
+  provider.provideCodeLenses(v1 as never, dummyToken);
+  assert.deepStrictEqual(bridge.calls, ['v1']);
+  provider.provideCodeLenses(fakeDocument(uri, 'pasta', 'v2', 2) as never, dummyToken);
+  assert.deepStrictEqual(bridge.calls, ['v1', 'v2']);
+  // 別の文書は同じ版の数でも解き直す
+  provider.provideDocumentSymbols(fakeDocument('file:///other.pasta', 'pasta', 'o', 2) as never, dummyToken);
+  assert.deepStrictEqual(bridge.calls, ['v1', 'v2', 'o']);
 });
 
 // =============================================================================
@@ -361,6 +460,7 @@ function makeSyncHarness(bridgeOpts: Parameters<typeof fakeBridge>[0] = {}) {
         message: 'diag',
         severity: 1,
       }],
+      scenes: [],
     },
     ...bridgeOpts,
   });
@@ -449,7 +549,7 @@ test('analysis failure logs to the output channel and clears diagnostics', () =>
 // 要件 8.2: 同期の解析に失敗したら、診断と一緒に色の控えも消す
 test('analysis failure in DocumentSync also drops the cached tokens', () => {
   const opts = {
-    result: { tokens: [{ deltaLine: 0, deltaStartCharacter: 0, length: 1, tokenType: 1, tokenModifiers: 0 }], diagnostics: [] },
+    result: { tokens: [{ deltaLine: 0, deltaStartCharacter: 0, length: 1, tokenType: 1, tokenModifiers: 0 }], diagnostics: [], scenes: [] },
     fail: false,
   };
   const h = makeSyncHarness(opts);
@@ -482,6 +582,7 @@ test('a wasm trap during sync is caught, logged, and clears diagnostics and toke
           message: 'diag',
           severity: 1,
         }],
+        scenes: [],
       };
     },
   });
@@ -562,7 +663,7 @@ test('WasmBridge is not ready before initialize and analyzeDocument throws', () 
 });
 
 test('WasmBridge.dispose makes the bridge not ready and analyzeDocument throw', () => {
-  const bridge = bridgeWithWasmResult({ tokens: [], diagnostics: [] });
+  const bridge = bridgeWithWasmResult({ tokens: [], diagnostics: [], scenes: [] });
   assert.strictEqual(bridge.isReady(), true);
   bridge.dispose();
   assert.strictEqual(bridge.isReady(), false);
@@ -579,8 +680,8 @@ test('analyzeDocument wraps a throwing wasm_analyze as "WASM analysis failed"', 
 });
 
 test('analyzeDocument passes an empty (but well-formed) wasm result through', () => {
-  const result = bridgeWithWasmResult({ tokens: [], diagnostics: [] }).analyzeDocument('');
-  assert.deepStrictEqual(result, { tokens: [], diagnostics: [] });
+  const result = bridgeWithWasmResult({ tokens: [], diagnostics: [], scenes: [] }).analyzeDocument('');
+  assert.deepStrictEqual(result, { tokens: [], diagnostics: [], scenes: [] });
 });
 
 test('analyzeDocument rejects a null/non-object wasm result at the boundary', () => {
@@ -591,15 +692,26 @@ test('analyzeDocument rejects a null/non-object wasm result at the boundary', ()
 
 test('analyzeDocument rejects a wasm result with non-array tokens/diagnostics', () => {
   assert.throws(
-    () => bridgeWithWasmResult({ tokens: 'oops', diagnostics: [] }).analyzeDocument('x'),
+    () => bridgeWithWasmResult({ tokens: 'oops', diagnostics: [], scenes: [] }).analyzeDocument('x'),
     /WASM analysis failed/
   );
   assert.throws(
-    () => bridgeWithWasmResult({ tokens: [], diagnostics: null }).analyzeDocument('x'),
+    () => bridgeWithWasmResult({ tokens: [], diagnostics: null, scenes: [] }).analyzeDocument('x'),
     /WASM analysis failed/
   );
   assert.throws(
-    () => bridgeWithWasmResult({ tokens: [] }).analyzeDocument('x'),
+    () => bridgeWithWasmResult({ tokens: [], scenes: [] }).analyzeDocument('x'),
+    /WASM analysis failed/
+  );
+});
+
+test('analyzeDocument rejects a wasm result without a scenes array', () => {
+  assert.throws(
+    () => bridgeWithWasmResult({ tokens: [], diagnostics: [] }).analyzeDocument('x'),
+    /WASM analysis failed/
+  );
+  assert.throws(
+    () => bridgeWithWasmResult({ tokens: [], diagnostics: [], scenes: null }).analyzeDocument('x'),
     /WASM analysis failed/
   );
 });
@@ -611,6 +723,19 @@ test('analyzeDocument passes a well-formed wasm result through unchanged', () =>
       range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
       message: 'syntax error',
       severity: 1,
+    }],
+    scenes: [{
+      name: 'メイン',
+      kind: 'global',
+      heading: { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } },
+      range: { start: { line: 0, character: 0 }, end: { line: 2, character: 3 } },
+      children: [{
+        name: '続き',
+        kind: 'local',
+        heading: { start: { line: 1, character: 0 }, end: { line: 1, character: 3 } },
+        range: { start: { line: 1, character: 0 }, end: { line: 2, character: 3 } },
+        children: [],
+      }],
     }],
   };
   const result = bridgeWithWasmResult(wellFormed).analyzeDocument('x');
@@ -877,6 +1002,9 @@ function ghostValidatorCreated(fromCollection: number, fromWatcher: number): { c
   };
 }
 
+/** 要件（requirements.md の Introduction）の例の文書 */
+const REQUIREMENT_EXAMPLE = '＊挨拶\n  さくら：やあ\n  ・朝\n    さくら：おはよう\n＊\n  さくら：またね\n';
+
 // 3 つのコマンドは activate が 1 回で登録する（4.1・5.1・6.1）
 const DEV_COMMANDS = ['pasta.runSceneAtCursor', 'pasta.reloadShiori', 'pasta.showSaveVariables'];
 function assertDevCommandsRegistered(): void {
@@ -890,6 +1018,8 @@ test('activate loads the real WASM bridge and registers the ghost validator', as
   const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(ROOT) };
   const collectionsBefore = mock.createdDiagnosticCollections.length;
   const watchersBefore = mock.createdFileSystemWatchers.length;
+  const symbolsBefore = mock.registeredDocumentSymbolProviders.length;
+  const lensesBefore = mock.registeredCodeLensProviders.length;
   mock.registeredCommands.clear();
   await activate(context as never);
   // WASM が読めたら GhostValidator を作って登録する（11.12）
@@ -899,6 +1029,18 @@ test('activate loads the real WASM bridge and registers the ghost validator', as
   // DAP の提示モードの切り替えはもう登録しない（要件 1.3）
   assert.ok(!mock.registeredCommands.has('pasta.debug.toggleSourcePresentation'), 'DAP toggle command must not be registered');
   assertDevCommandsRegistered();
+  // 5.1・1.13: 2 つのプロバイダが pasta に登録され、本物の WASM で要件の例から 2 つのグローバルと 1 つのローカルが出る
+  const symbols = mock.registeredDocumentSymbolProviders.slice(symbolsBefore);
+  const lenses = mock.registeredCodeLensProviders.slice(lensesBefore);
+  assert.deepStrictEqual(symbols.map((r) => r.selector), [{ language: 'pasta' }]);
+  assert.deepStrictEqual(lenses.map((r) => r.selector), [{ language: 'pasta' }]);
+  const doc = fakeDocument('file:///ghost/master/dic/a.pasta', 'pasta', REQUIREMENT_EXAMPLE);
+  const tree = (symbols[0].provider.provideDocumentSymbols(doc, dummyToken) as mock.DocumentSymbol[])
+    .map((s) => [s.name, s.children.map((c) => c.name)]);
+  assert.deepStrictEqual(tree, [['挨拶', ['朝']], ['挨拶', []]]);
+  const lensLines = (lenses[0].provider.provideCodeLenses(doc, dummyToken) as mock.CodeLens[])
+    .map((l) => l.command!.arguments![1]);
+  assert.deepStrictEqual(lensLines, [0, 2, 4]);
 });
 
 test('deactivate disposes cleanly', () => {
@@ -910,9 +1052,14 @@ test('WASM が読めないときは GhostValidator を作らず、activate は�
   const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(path.join(ROOT, 'no-such-dir')) };
   const collectionsBefore = mock.createdDiagnosticCollections.length;
   const watchersBefore = mock.createdFileSystemWatchers.length;
+  const symbolsBefore = mock.registeredDocumentSymbolProviders.length;
+  const lensesBefore = mock.registeredCodeLensProviders.length;
   mock.registeredCommands.clear();
   await activate(context as never);
   assert.strictEqual(getActivationState().wasmReady, false);
+  // 5.1: アウトラインも見出しの上の ▶ も出さない
+  assert.strictEqual(mock.registeredDocumentSymbolProviders.length, symbolsBefore);
+  assert.strictEqual(mock.registeredCodeLensProviders.length, lensesBefore);
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 0, watchers: 0 });
   assertDevCommandsRegistered(); // WASM と関係なく登録する（1.5）
   deactivate();

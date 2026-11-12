@@ -12,7 +12,7 @@
 - **pasta_core**: 言語非依存層（レジストリ）
 - **pasta_lua**: Luaバックエンド層（pasta_dsl + pasta_core依存）
 - **pasta_shiori**: SHIORI DLLインターフェース層
-- **pasta_lsp**: VSCode 拡張に埋め込む WASM の解析器（色・構文の診断・ゴースト全体の検査。publish=false）
+- **pasta_lsp**: VSCode 拡張に埋め込む WASM の解析器（色・構文の診断・シーンの並び・ゴースト全体の検査。publish=false）
 - **pasta_check**: 辞書の検査の核（ライブラリ・ファイルシステム非依存で WASM でも動く）＋CLIツール（`validate`＝辞書の検査、`release`＝検査を関門にしたゴーストパッケージング・NAR生成）
 - **pasta_sample_ghost**: サンプルゴースト「hello-pasta」（publish=false, 配布物作成。立ち絵はコミットした素材）
 
@@ -117,7 +117,7 @@ pasta (workspace)
 | pasta_lua          | Runtime      | Lua VM実行、コルーチン制御      |
 | pasta_lua          | Loader       | スクリプト読み込み・キャッシュ  |
 | pasta_shiori       | SHIORI       | DLLエクスポート、リクエスト処理 |
-| pasta_lsp          | Editor       | WASM の解析器（色・構文の診断・ゴースト全体の検査） |
+| pasta_lsp          | Editor       | WASM の解析器（色・構文の診断・シーンの並び・ゴースト全体の検査） |
 | pasta_check        | CLI          | 辞書の検査（核は WASM 共有）・リリースパッケージング・NAR生成 |
 | pasta_sample_ghost | Distribution | サンプルゴーストの素材・配布    |
 

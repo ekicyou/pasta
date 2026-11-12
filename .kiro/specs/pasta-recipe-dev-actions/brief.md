@@ -92,7 +92,7 @@ interface GhostIO {
 
 ## Upstream / Downstream
 
-- **Upstream**: `pasta-recipe`（アプリの本体・ツリー）、`scene-play-locals`（ローカル変数を受ける口）、`vscode-scene-outline-play`（拡張の `devCommands.ts`・`runSceneAtCursor.ts` に引数付きの呼び出しを足す。こちらはその後に移す）。
+- **Upstream**: `pasta-recipe`（アプリの本体・ツリー）、`scene-play-locals`（ローカル変数を受ける口）、`vscode-scene-outline-play`（2026-11-12 に実装済み。`pasta.runSceneAtCursor` は `executeCommand(id, uri, line0)` の引数を受ける。受け取りは `devCommands.ts` の `resolveTarget`（0 始まりを 1 始まりに直す）に置き、`runSceneAtCursor.ts` の `runScene(ctx, fsPath, line1)` の形は変えていない。シーンの並びは `pasta_lsp::analysis::AnalysisEngine::analyze` の `scenes`（`SceneNode`）を Rust から直接使える。こちらはその後に移す）。
 - **Downstream**: なし（拡張にも変数の書き換えを足す話は、ここから生まれうる）。
 
 ## Existing Spec Touchpoints
