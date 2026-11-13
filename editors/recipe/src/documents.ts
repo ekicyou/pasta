@@ -36,6 +36,8 @@ export interface DocumentsHooks {
   onClosed?(tab: Tab): void;
   /** 新しい解析の結果を当てた後（ツリーのシーン 4.10・診断の一覧 7.3 は 6.5・6.6 でここへつなぐ） */
   onAnalyzed?(tab: Tab): void;
+  /** 名前の変更でタブの rel・言語を付け替えた後（診断の一覧の名前と 9.8 の除外を今の rel に揃える） */
+  onRenamed?(): void;
 }
 
 /** 書き換えが止まってから解析するまで（7.2） */
@@ -190,6 +192,7 @@ export class Documents {
     }
     this.#render();
     this.#renderNotices();
+    this.#hooks.onRenamed?.();
   }
 
   /** 全タブをディスクと比べて 5.2 の判定を当てる（10.2・10.3・10.4・10.6）。呼びが重なっても 1 つずつ走る */

@@ -3,6 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Finding, Report, SceneNode } from "./ipc.ts";
 import {
+  checkRows,
+  diagnosticRows,
   languageOf,
   buildTree,
   diagnosticsToMarkers,
@@ -161,6 +163,30 @@ test("検査の項目の位置は 1 始まりのまま、行の無い項目は�
   assert.deepEqual(findingPosition(finding("a.pasta", "x", 3, 5)), { lineNumber: 3, column: 5 });
   assert.deepEqual(findingPosition(finding("a.pasta", "x", null, null)), { lineNumber: 1, column: 1 });
   assert.deepEqual(findingPosition(finding("a.pasta", "x", 7, null)), { lineNumber: 7, column: 1 });
+});
+
+test("診断の一覧の行は 1 始まりの行・列とメッセージ（7.3・7.5）", () => {
+  const rows = diagnosticRows("dic/a.pasta", [{ range: range(2, 4, 6), message: "閉じていない", severity: 1 }]);
+  assert.deepEqual(rows, [{ label: "dic/a.pasta:3:5 閉じていない", rel: "dic/a.pasta", pos: { lineNumber: 3, column: 5 } }]);
+});
+
+test("検査の一覧は誤りか警告かを文字で出し、見える項目だけを数える（9.6・9.7・9.8）", () => {
+  const report: Report = {
+    findings: [
+      finding("dic/a.pasta", "syntax", 2, 3),
+      { ...finding("dic/b.pasta", "undefined-scene", 4, 2), severity: "warning" },
+      finding("pasta.toml", "config", null, null),
+    ],
+    stats: { dictionaryFiles: 2, errors: 2, warnings: 1, uncheckedDynamicCalls: 0, skipReasons: [] },
+  };
+  assert.deepEqual(checkRows(report, new Set(["DIC/A.pasta"])), {
+    rows: [
+      { label: "警告 dic/b.pasta:4:2 undefined-scene", rel: "dic/b.pasta", pos: { lineNumber: 4, column: 2 } },
+      { label: "誤り pasta.toml config", rel: "pasta.toml", pos: { lineNumber: 1, column: 1 } },
+    ],
+    errors: 1,
+    warnings: 1,
+  });
 });
 
 test("言語は拡張子で決め、.pasta・.lua 以外は色なし（5.1・5.2・8.1）", () => {

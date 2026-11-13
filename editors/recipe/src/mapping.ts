@@ -113,6 +113,33 @@ export function findingPosition(f: Finding): { lineNumber: number; column: numbe
   return { lineNumber: f.line ?? 1, column: f.line === null ? 1 : (f.column ?? 1) };
 }
 
+/** 一覧の 1 行。label はそのまま textContent に書く（名前・メッセージはディスクから来る） */
+export interface PanelRow {
+  label: string;
+  rel: string;
+  pos: { lineNumber: number; column: number };
+}
+
+/** 診断の一覧の行。行・列は diagnosticsToMarkers と同じ 1 始まり（7.3・7.5） */
+export function diagnosticRows(rel: string, d: readonly Diagnostic[]): PanelRow[] {
+  return diagnosticsToMarkers(d).map((m) => ({
+    label: `${rel}:${m.startLineNumber}:${m.startColumn} ${m.message}`,
+    rel,
+    pos: { lineNumber: m.startLineNumber, column: m.startColumn },
+  }));
+}
+
+/** 検査の一覧の行と件数。件数は一覧に見える項目だけを数える（9.6・9.8）。色だけに頼らず「誤り」「警告」を文字で出す */
+export function checkRows(report: Report, openRels: ReadonlySet<string>): { rows: PanelRow[]; errors: number; warnings: number } {
+  const shown = visibleFindings(report, openRels);
+  const rows = shown.map((f) => {
+    const at = f.line === null ? "" : `:${f.line}` + (f.column === null ? "" : `:${f.column}`);
+    return { label: `${f.severity === "error" ? "誤り" : "警告"} ${f.path}${at} ${f.message}`, rel: f.path, pos: findingPosition(f) };
+  });
+  const errors = shown.filter((f) => f.severity === "error").length;
+  return { rows, errors, warnings: shown.length - errors };
+}
+
 /** タブの言語は拡張子で決める。.pasta・.lua 以外は色なし（5.2） */
 export function languageOf(rel: string): "pasta" | "lua" | "plaintext" {
   const ext = rel.slice(rel.lastIndexOf("/") + 1).match(/\.([^.]+)$/)?.[1].toLowerCase();
