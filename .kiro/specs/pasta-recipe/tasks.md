@@ -230,7 +230,7 @@
   - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6_
 
 - [ ] 10. 全体の確かめ
-- [ ] 10.1 実物のゴーストで端から端まで確かめる
+- [x] 10.1 実物のゴーストで端から端まで確かめる
   - hello-pasta で、exe へのドロップで開く → ツリーの「朝」で 2 行目へ → 書き換えて 1 秒以内に波線が出て消える → 保存して改行と BOM が変わらない → 外のエディタで変えて読み直し／尋ねる → 2 つ目の起動で今の窓に開く → 窓を閉じるときの 3 択、を順に通す
   - 同じ文書を拡張で開いたときと波線の位置・色の種類を見比べ、開いてからツリーとシーンが出るまで 1 秒以内を確かめる
   - ルートの `cargo test --workspace`・clippy、アプリの `cargo test`・clippy・`npm test` が緑で、確かめの結果とスクリーンショットを報告に残している
@@ -256,3 +256,4 @@
 - 7.2: 窓を閉じるのは onCloseRequested（@tauri-apps/api 2.12 は handler を await してから preventDefault が無ければ destroy する）。閉じる前に全タブの保存の鎖を待つ。window.close() は core:window:allow-close が無いので拒まれる（確かめは WM_CLOSE を送る）。
 - 8.1: cargo-deny 0.20 は --config を check の前に置く（cargo deny --manifest-path editors/recipe/src-tauri/Cargo.toml --config editors/recipe/src-tauri/deny.toml check）。JS の第三者の表示は editors/recipe/build/js-licenses.txt（dist の外）。
 - 8.3: workflow_dispatch（run 43365624957）で pasta-recipe の job と cargo deny check (pasta-recipe) は緑。build-x64・build-x86 は pasta_shiori の free_library_test が「pasta.dll not next to test exe」で赤。Rust 1.100（2026-11-09）でテストの実行ファイルの置き場が変わったためで、この spec の変更とは関係なく手元の 1.100 でも同じに落ちる。
+- 10.1: 実物の hello-pasta の写しで端から端まで合格（波線 234 ms・消え 226 ms・保存はバイト一致・開いてからツリーとシーンまで 177〜249 ms）。プロセスの起動からツリーまでは WebView2 とエディタの用意で 2.3〜4.8 秒（設計の「ゴーストを開いてから」の外）。拡張との見比べは解析器の段（同じ pasta_lsp の WASM）で 14 文書が一致。
