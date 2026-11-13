@@ -148,7 +148,7 @@ flowchart TB
 
 - **手元の確かめ（`Local`）**: 版を上げる PR を作る前に、spec のブランチで行う。lock の差分の確かめ（1.6）・`npx --no-install vsce --version` = 4.1.1（1.2）・`npm audit`（1.3・1.4）・本物の WASM での VSIX の比べ（2.1〜2.4）・`npm test`（2.5 の手元の代わり）・`release-scripts-test.ps1`（3.7）・`vsce show ekicyou.pasta-vscode --json`（4.6）
 - **基準（`Baseline`）**: 今の main（3.9.2）で `release-setup-check.yml` を一度回し、`verify-pat` と `show` が通ることを記録する。失敗の原因を vsce の版に帰すかどうか（5.1・5.4）の比べの相手になる（仮置き。未決事項 Q3）
-- **版を上げる PR（`BumpPR`）**: `origin/main` から切ったブランチに、`package.json`・`package-lock.json` の 2 つだけを載せる。spec の文書は載せない（4.1）。`build.yml`（`vscode-test` を含む）の結果は待たずにマージしてよい（memory の運用）。ただし main が赤になれば追いかけて直す（2.5）
+- **版を上げる PR（`BumpPR`）**: `origin/main` から切ったブランチに、`package.json`・`package-lock.json` の 2 つだけを載せる（そのブランチの上で lock を作り直す。統合の手順を参照）。spec の文書は載せない（4.1）。`build.yml`（`vscode-test` を含む）の結果は待たずにマージしてよい（memory の運用）。ただし main が赤になれば追いかけて直す（2.5）
 - **確かめ（`Check`）**: マージの直後に、同じセッションで `gh workflow run release-setup-check.yml --ref main` を回す。マージから確かめまでの間はリリースタグを push しない（4.4）
 - **判定（`Judge`）**: run の緑だけでは判定しない（`verify-pat` の step は `continue-on-error`）。job summary の 2 つの行が「成功」であることで判定する（4.2・4.3）
 - **戻し（`Revert`）**: squash のコミットを `git revert` した PR を入れ、main をリリースできる状態に戻してから比べる（5.1）
@@ -355,12 +355,12 @@ flowchart TB
   - `bump-merged` → `path-verified`: 公開の道の確かめが「成功」
   - `path-verified` → `completed`: research.md 11 節を埋めて spec のブランチにコミットした
 - 禁止: `bump-merged` のままリリースタグを push する（4.4）・`/kiro-complete` を走らせる（4.7）
-- 版を上げる PR の作り方: `origin/main` から作業用のブランチを切り、spec のブランチから `editors/vscode/package.json`・`editors/vscode/package-lock.json` の 2 つだけを持ち込んでコミット → `gh pr create` → `gh pr merge --squash --delete-branch`。マージの後、spec のブランチへ `git merge origin/main`
+- 版を上げる PR の作り方: `origin/main` から作業用のブランチを切り、そのブランチの上で `editors/vscode` に `npm install --save-dev @vscode/vsce@^4.1.1` を叩いて `package.json`・`package-lock.json` を作り直す（spec のブランチから持ち込まない。その間に main の lock が変わっていても、他の更新を巻き戻さないため）→ lock の差分が vsce の配下だけであることをもう一度確かめる（1.6）→ コミット → `gh pr create` → `gh pr merge --squash --delete-branch`。マージの後、spec のブランチへ `git merge origin/main`
 - 完了のとき: ロードマップの `vsce-4-upgrade` の項を完了へ移す（6.3）。spec の文書は `/kiro-complete` の PR で入る
 
 **Implementation Notes**
 - `build.yml` の `vscode-test` は版を上げる PR と main で走る。memory の運用（PR は CI を待たずにマージ・main が赤なら追いかけて直す）に従う
-- **仮置き（Q2）**: 4.4 を守らせる仕組み（`release.yml` の verify に条件を足す・`release` スキルに 1 行足す）は作らない。マージの直後に同じセッションで確かめを回し、間を数分に縮める
+- 4.4 を守らせる仕組み（`release.yml` の verify に条件を足す・`release` スキルに 1 行足す）は作らない。4.4 は開発者の手順の要件で、マージの直後に同じセッションで確かめを回せば間は数分に縮まる。仕組みを足すとリリースの席の `release.yml` か `.claude/skills` を触ることになる
 
 #### 失敗のときの分岐
 
@@ -439,5 +439,4 @@ System Flows の「統合と確かめの順番」が移行の段階である。�
 ## 未決事項（設計のディスカッションへ）
 
 - **Q1（要件 1.3 と測りの食い違い）**: `minimatch` GHSA-g3hv-75wg-m249 は 4.1.1 でも消えない。仮置き: `glob` が消えることを 1.3 の合格とし、`minimatch` は残る理由を記録する。推奨: 要件 1.3 を「`glob` GHSA-3g3m-2fjr-6pw4 を報告しない。`minimatch` GHSA-g3hv-75wg-m249 は vsce 4.1.1・`eslint`・`typescript-eslint` が `minimatch ^10` を要るため残り、理由を記録する」に直す
-- **Q2（要件 4.4 を守らせる仕組み）**: 仮置き: 仕組みは足さず、マージの直後に同じセッションで確かめを回す。推奨: そのまま（リリースの席の `release.yml`・`.claude/skills` を触らない）
 - **Q3（3.9.2 の基準の確かめ）**: 仮置き: 版を上げる PR のマージの前に、main で一度 `release-setup-check.yml` を回す。推奨: 回す（公開なし・30 秒ほどで、5.1 と 5.4 の見分けがはっきりする）
