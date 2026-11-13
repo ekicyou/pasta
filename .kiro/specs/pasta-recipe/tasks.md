@@ -89,7 +89,7 @@
   - _Requirements: 1.6, 6.3, 13.4_
 
 - [ ] 4. コマンドの表と起動の配線
-- [ ] 4.1 Tauri のコマンドの表・開いているゴーストの状態・起動の plugin を揃える
+- [x] 4.1 Tauri のコマンドの表・開いているゴーストの状態・起動の plugin を揃える
   - 2.3 の解析・凡例のコマンドを残し、設計の API Contract の表の残りのコマンドを足す。相対パスを取るものは状態の master と範囲の門を必ず通す
   - ゴーストを開くと、状態（ゴーストと見張り）を置き換え、題名を `{名前} - pasta-recipe {版}` にし、最近開いたものに記録する。見張りの知らせは事件 `ghost-changed` に写す
   - 起動の処理を組み直して単一インスタンスの plugin を最初に登録し、2 つ目の起動のパスを事件 `open-request` で今の窓へ送って前に出す。フォルダを選ぶダイアログの plugin と初めの引数を返すコマンドを置く
@@ -242,3 +242,4 @@
 - 2.3: 関門は合格（shiki の下地＋セマンティックトークンの重なり、自前の提供者へは切り替えず）。monaco 0.57 には edcore.main が無く monaco-editor/editor＋features/register.all を使う。register.all は documentSemanticTokens・suggestController・goToCommands などを読まないので、要る部品は明示で import する。規則の無い種類のトークンは theme.ts の keepTokens で落とす（6.3 でも使う）。U+3000 は unicodeHighlight.allowedCharacters で許す。monaco 0.57 が引く dompurify の脆弱性は package.json の overrides で 3.4.17 に上げた。exe 8,066,048 B・zip 3,561,221 B。
 - 3.1: 大文字・小文字を区別しない比べは ASCII だけでなく to_uppercase の両側で（NTFS は全角・アクセントも区別しない）。ASCII だけの比べで重なりを見逃すと fs::rename が上書きして失う。resolve_rel は途中と目的そのもののリンクを拒む（設計 438 行を合わせた）。この機械では symlink の作成が os error 1314 で、試験はジャンクション（mklink /J）で毎回確かめる。
 - 3.5: 見張りの知らせにはフォルダの名前（例 dic）や名前の変更の新旧の両方も入る。drop の直後に古い master の on_batch が 1 回来うるので、4.1 の配線は今の master と違う知らせを捨てる。
+- 4.1: 画面からの入力は信用しない。open_ghost も Rust の中で find_master を通し直す（open_in）。run_blocking は文の頭（解析・検査）を引数で受ける。
