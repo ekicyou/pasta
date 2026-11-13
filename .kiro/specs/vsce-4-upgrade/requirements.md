@@ -27,7 +27,7 @@ VSCode 拡張のパッケージと公開の道具 `@vscode/vsce` を 3.9.2 か�
   - Node の版（`release.yml`・`release-setup-check.yml`・`build.yml` は既に 22。`ponytail-manual-ci` が済ませた）
   - Marketplace の Members の管理（画面からしかできない）
   - crates.io の公開（Trusted Publishing のまま）・GitHub Release の添付
-  - 開発機に入っている大域の `vsce`（`release` スキルの `release-state.ps1` が `show` だけに使う。仮定: 範囲外。OPEN QUESTION 5）
+  - 開発機に入っている大域の `vsce`（`release` スキルの `release-state.ps1` が `show` だけに使う。既に 4.0.0 で、`show` の振る舞いは 3.x・4.x で同じ。lock の版とは別物）
 - **Adjacent expectations**:
   - `ponytail-manual-ci`（完了）が、リリース CI の Node を 22 にし、公開 job の第三者の action を SHA で固定して行末にタグのコメントを置く形にした。この spec はその形を保つ
   - `build.yml` の `vscode-test`（ubuntu・Node 22・`npm ci` → `npm test`）が、lock の変更を main で試す
@@ -40,7 +40,7 @@ VSCode 拡張のパッケージと公開の道具 `@vscode/vsce` を 3.9.2 か�
 **Objective:** As a リリースを回す開発者, I want パッケージと公開の道具を保守の続く 4.x にしたい, so that 3.x の配下にしか残らない勧告が消え、道具が追いかけるだけの版にならない
 
 #### Acceptance Criteria
-1. The 拡張の依存の定義 shall `@vscode/vsce` の版を 4.x の範囲で指定し、lock で 4.1.1 に固定する（仮定: 指定の範囲は `^4.1.1`。OPEN QUESTION 4）
+1. The 拡張の依存の定義 shall `@vscode/vsce` の版を 4.x の範囲で指定し、lock で 4.1.1 に固定する（指定の範囲は `^4.1.1`。4.0.0 は OIDC のトークン交換が壊れていた版なので下限で外す）
 2. When `editors/vscode` で `npm ci` を行ったとき, the 拡張の開発環境 shall lock の 4.x の vsce を入れ、`npx --no-install vsce --version` が 4.1.1 を返す
 3. When 4.x へ上げた lock で `npm audit` を行ったとき, the 拡張の依存 shall `glob` GHSA-3g3m-2fjr-6pw4 と `minimatch` GHSA-g3hv-75wg-m249 を報告しない
 4. If 4.x へ上げた lock に、3.9.2 の lock には無かった勧告が現れたとき, the 開発者 shall その勧告を一覧にして、互換の範囲で消せるものは消し、消せないものは理由を残す
@@ -105,5 +105,3 @@ VSCode 拡張のパッケージと公開の道具 `@vscode/vsce` を 3.9.2 か�
 1. 公開そのものの確かめを、`release-setup-check.yml` の 2 つの確かめ（`verify-pat --azure-credential`・`show`）で代えてよいか（要件 4.3 の仮定: 代える）
 2. 確かめがだめだったときに、まず 3.9.2 へ戻すか、戻さずに直すか。直すなら `--oidc`（trusted publishing）へ移すか（要件 5.1 の仮定: まず戻し、直しはこの spec で続ける）
 3. `release-setup-check.yml` を走らせる時と、その記録の置き場（要件 4.1・4.3 の仮定: この spec の完了の手順の中でマージの直後に走らせ、spec に記録する）
-4. vsce の版の指定の範囲（要件 1.1 の仮定: `^4.1.1`）
-5. 開発機の大域の `vsce`（今 4.0.0・`release` スキルの `release-state.ps1` が `show` に使う）を範囲に入れるか（Boundary Context の仮定: 範囲外）
