@@ -3,7 +3,7 @@
 - **Feature**: `pasta-recipe-dev-actions`
 - **日付**: 2026-11-13（ブランチ `claude/pasta-recipe-dev-actions-0a553d`、base `93fa65c4`＝`pasta-recipe` #255 の後）
 - **Discovery Scope**: Extension（既存の拡張の流れを共有へ移し、既存のアプリに画面とネイティブのコマンドを足す）
-- **要件**: `requirements.md`（Requirement 1〜13・仮置き OQ1〜9）
+- **要件**: `requirements.md`（Requirement 1〜13。仮置きは 2026-11-13 の要件ディスカッションで確定）
 
 ## 要約
 
@@ -123,8 +123,8 @@
 5. 保存した中身での見出しの今の行（Requirement 1.4）を、保存の後にもう一度解析して取るか、保存の版とタブの解析の版を照らすか。ツリーの行の鍵は `rel|名前|n`（同じ名前の n 番目）。
 6. `variables.toml` の値の型の見分け（TOML の整数・浮動小数点数・日付（読み込みで文字列化されているはず）・入れ子の表・配列）と、`"a.b"` のような引用符付きのキーの名前をそのまま `OnPastaSetSaveVariable` の Reference0 へ返せるか。
 7. マニュアルの `debug/recipe.md` が、スキルの参照資料（`gen-skill-refs`）の生成の対象に入っているか。
-9. 操作の途中で別のゴーストを開いたとき（要件 5.2）: 開き直しを操作の終わりまで待たせるか、操作が始まったときの master を持ち続けてネイティブの門をその master で通すか。待たせると最長で数十秒（読み込みの終わり 20 秒＋頼み 15 秒）止まる。`main.ts` の `opening` の鎖・`generation` との組み方もあわせて決める。
 8. 送るファイルのパスの綴り（ドライブ文字の大小・8.3 の短い名前）が、ランタイムのシーンマップの照合と合うか。拡張は VS Code の `fsPath` を送り、アプリは `std::path::absolute` 由来の master を送る（CI の `RUNNER~1` の前例）。
+9. 操作の途中で別のゴーストを開いたとき（要件 5.2）: 開き直しを操作の終わりまで待たせるか、操作が始まったときの master を持ち続けてネイティブの門をその master で通すか。待たせると最長で数十秒（読み込みの終わり 20 秒＋頼み 15 秒）止まる。`main.ts` の `opening` の鎖・`generation` との組み方もあわせて決める。
 
 ### 隣の spec
 
