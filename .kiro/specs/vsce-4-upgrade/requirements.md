@@ -11,8 +11,6 @@
 
 VSCode 拡張のパッケージと公開の道具 `@vscode/vsce` を 3.9.2 から 4.x（4.1.1）へ上げる。上げた後も、手元と CI で作る VSIX の名前と中身は変わらず、リリース CI の `publish-vsce` は今と同じ認証（Azure のマネージド ID・`--azure-credential`）と同じ「公開済みなら飛ばす」振る舞いで公開できる。公開の道が 4.x で通ることは、公開そのものの前に `release-setup-check.yml` の 2 つの確かめ（`verify-pat --azure-credential`・`show`）で確かめる。
 
-このファイルの「仮定」は、brief.md だけでは決まらず要件ディスカッションで決める点を、最善の案で書いたものである。
-
 ## Boundary Context
 
 - **In scope**:
@@ -32,7 +30,7 @@ VSCode 拡張のパッケージと公開の道具 `@vscode/vsce` を 3.9.2 か�
   - `ponytail-manual-ci`（完了）が、リリース CI の Node を 22 にし、公開 job の第三者の action を SHA で固定して行末にタグのコメントを置く形にした。この spec はその形を保つ
   - `build.yml` の `vscode-test`（ubuntu・Node 22・`npm ci` → `npm test`）が、lock の変更を main で試す
   - リリースの席: リリースの実行中は `release.yml` を触る変更を main へ入れない。`pasta-dll-multiarch`・`pasta-recipe` と `release.yml` を共有する
-  - `release-setup-check.yml` は environment `release-setup-check` の保護規則で main からしか走らない。公開の道の確かめは、この spec が main へ入った後・次のリリースタグの前にしかできない
+  - `release-setup-check.yml` は environment `release-setup-check` の保護規則で main からしか走らない。公開の道の確かめは、版を上げる変更が main へ入った後・次のリリースタグの前にしかできない。そのため版を上げる変更だけを spec の完了より前に単独の PR で main へ入れる
 
 ## Requirements
 
@@ -76,21 +74,23 @@ VSCode 拡張のパッケージと公開の道具 `@vscode/vsce` を 3.9.2 か�
 **Objective:** As a リリースを回す開発者, I want 4.x での公開の道が通ることを次のリリースの前に知りたい, so that リリースの公開 job で初めて失敗することを避ける
 
 #### Acceptance Criteria
-1. When この spec の変更が main へ入ったとき, the 開発者 shall 次のリリースタグを push する前に、main で `release-setup-check.yml` を `workflow_dispatch` で走らせる（仮定: この spec の完了の手順の中で、マージの直後に走らせる。OPEN QUESTION 3）
+1. When この spec の実装で、vsce を 4.x へ上げる変更（`package.json` と lock）を spec の完了より前に単独の PR で main へ入れたとき, the 開発者 shall 次のリリースタグを push する前に、main で `release-setup-check.yml` を `workflow_dispatch` で走らせる
 2. When `release-setup-check.yml` が 4.x の lock で走ったとき, the 確かめのワークフロー shall `vsce verify-pat ekicyou --azure-credential` の成功と、`vsce show ekicyou.pasta-vscode --json` から版の一覧を読めたことを job summary に書く
-3. When 2 の 2 つの確かめがどちらも成功したとき, the 開発者 shall 公開の道が 4.x で通ると判断し、その結果（走らせた日・run の URL・vsce の版）を spec に記録する（仮定: 公開そのものの確かめは、この 2 つで代える。OPEN QUESTION 1）
+3. When 2 の 2 つの確かめがどちらも成功したとき, the 開発者 shall 公開の道が 4.x で通ると判断し、その結果（走らせた日・run の URL・vsce の版）を spec の `research.md` に記録する（公開そのものの確かめはこの 2 つで代える。本当に公開して確かめるのは次のリリースの `publish-vsce` である）
 4. While 公開の道の確かめが済んでいない間, the 開発者 shall vsce 4.x の入った main からリリースタグを push しない
 5. The 確かめのワークフロー shall どの公開先にも公開せず、crates.io のトークン交換も行わない（今のまま）
 6. When この spec の変更を main へ入れる PR を作る前, the 開発者 shall 手元で 4.x の `vsce show ekicyou.pasta-vscode --json` が版の一覧を返すことを確かめる（`read ECONNRESET` のときは IPv4 を優先して取り直す）
+7. While 公開の道の確かめが済んでいない間, the 開発者 shall この spec を完了（`/kiro-complete`）しない
 
 ### Requirement 5: 確かめがだめだったときの扱い
 **Objective:** As a リリースを回す開発者, I want 4.x で公開の道が通らなかったときの次の手が決まっていてほしい, so that リリースが止まったまま放っておかれない
 
 #### Acceptance Criteria
-1. If `release-setup-check.yml` の `verify-pat --azure-credential` が 4.x で失敗し、同じ設定の 3.9.2 では成功していたとき, the 開発者 shall vsce 4.x の変更を main から戻す（lock を 3.9.2 に戻す）か、公開の認証を直すかを、次のリリースタグより前に決める（仮定: まず戻して 3.9.2 で公開できる状態に戻し、直しはこの spec の中で続ける。OPEN QUESTION 2）
+1. If `release-setup-check.yml` の `verify-pat --azure-credential` が 4.x で失敗し、同じ設定の 3.9.2 では成功していたとき, the 開発者 shall vsce 4.x の変更を main から戻す（lock を 3.9.2 に戻す）か、まず vsce 4.x の変更を main から戻す PR（lock を 3.9.2 に戻す）を入れて main をリリースできる状態に戻し、そのうえでこの spec の中で公開の認証の直しか OIDC の口への移行を比べる
 2. Where 公開の認証を 4.x の OIDC の口（`--oidc`・Marketplace の trusted publishing）へ移すとき, the 公開の認証 shall 長期のトークンを開発機にも GitHub の secret にも置かない OIDC のままである
 3. Where 公開の認証を移すとき, the 開発者 shall `release.yml` の `publish-vsce`・`release-setup-check.yml`・`publish-vsix.ps1`・`release` スキル・`tech.md` のリリースの節・`.github/release-ci-setup.md` を、新しい認証の道に揃えて直す
 4. If `verify-pat` の失敗の原因が Members の設定など vsce の版と関係の無いものだったとき, the 開発者 shall vsce の版を戻さず、手順書 `.github/release-ci-setup.md` に沿って設定を直してから確かめ直す
+5. If 公開の認証の直しも OIDC の口への移行もできないとき, the 開発者 shall 部分的に出さずこの spec を見送り、vsce を 3.9.2 のままにして、勧告が残る理由を記録する
 
 ### Requirement 6: 文書を実際に合わせる
 **Objective:** As a リリースを回す開発者, I want 手順書と steering が使っている道具の版と認証の道に合っていてほしい, so that 次のリリースで手順書を読んで迷わない
@@ -99,9 +99,3 @@ VSCode 拡張のパッケージと公開の道具 `@vscode/vsce` を 3.9.2 か�
 1. When 公開の認証の道が変わらなかったとき（`--azure-credential` のまま）, the 文書 shall `release` スキル・`tech.md`・`.github/release-ci-setup.md` の認証の記述を変えない
 2. If 文書や公開の補助スクリプトのコメントに vsce 3.x に固有の記述（版の数字・3.x のソースの場所）があるとき, the 開発者 shall それを 4.x で正しい記述に直す
 3. When この spec を完了するとき, the ロードマップ shall `vsce-4-upgrade` を版の決まっていないもの・依存の更新の一覧から完了へ移す
-
-## 要件ディスカッションで決める点（OPEN QUESTIONS）
-
-1. 公開そのものの確かめを、`release-setup-check.yml` の 2 つの確かめ（`verify-pat --azure-credential`・`show`）で代えてよいか（要件 4.3 の仮定: 代える）
-2. 確かめがだめだったときに、まず 3.9.2 へ戻すか、戻さずに直すか。直すなら `--oidc`（trusted publishing）へ移すか（要件 5.1 の仮定: まず戻し、直しはこの spec で続ける）
-3. `release-setup-check.yml` を走らせる時と、その記録の置き場（要件 4.1・4.3 の仮定: この spec の完了の手順の中でマージの直後に走らせ、spec に記録する）
