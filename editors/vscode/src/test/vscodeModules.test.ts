@@ -53,6 +53,16 @@ function test(name: string, fn: () => void | Promise<void>): void {
   queue.push({ name, fn });
 }
 
+// 本物の wasm/ を読む試験。wasm/ は wasm-pack で作る生成物（git に無い）なので、CI の job vscode-test
+// （PASTA_VSCODE_NO_WASM=1）でだけ理由を出して外す（pasta-recipe-dev-actions 2.6）。手元では外さない
+function realWasmTest(name: string, fn: () => void | Promise<void>): void {
+  if (process.env.PASTA_VSCODE_NO_WASM === '1') {
+    queue.push({ name, fn: () => console.log('    - 外した: wasm/ を作らない CI（PASTA_VSCODE_NO_WASM=1）') });
+    return;
+  }
+  test(name, fn);
+}
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // =============================================================================
@@ -831,7 +841,7 @@ test('validateGhost throws on null and on every malformed report shape', () => {
   }
 });
 
-test('real WASM: selectGhostFiles / validateGhost results pass the shape checks', async () => {
+realWasmTest('real WASM: selectGhostFiles / validateGhost results pass the shape checks', async () => {
   const bridge = new WasmBridge({ appendLine: () => {} } as never);
   await bridge.initialize(mock.Uri.joinPath(mock.Uri.file(ROOT), 'wasm', 'pasta_lsp_wasm_bg.wasm') as never);
   const input = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta', 'readme.txt'], dirs: ['dic'] };
@@ -850,7 +860,7 @@ test('real WASM: selectGhostFiles / validateGhost results pass the shape checks'
 // 拡張と本物の核をつなぐ（pasta-check-validate-edges 3.4・要件 4.1 / 4.2）。
 // 大文字・小文字の混じった Ghost/Master の配下の中身の無い dic/x.pasta/ を、
 // 本物の WASM がフォルダの誤りとして返し、フォルダの URI に Error で出る。
-test('real WASM: Ghost/Master の配下の空の dic/x.pasta/ は folder-matches-pattern の Error になる', async () => {
+realWasmTest('real WASM: Ghost/Master の配下の空の dic/x.pasta/ は folder-matches-pattern の Error になる', async () => {
   const bridge = new WasmBridge({ appendLine: () => {} } as never);
   await bridge.initialize(mock.Uri.joinPath(mock.Uri.file(ROOT), 'wasm', 'pasta_lsp_wasm_bg.wasm') as never);
   mock.resetFakeFs();
@@ -1013,7 +1023,7 @@ function assertDevCommandsRegistered(): void {
   }
 }
 
-test('activate loads the real WASM bridge and registers the ghost validator', async () => {
+realWasmTest('activate loads the real WASM bridge and registers the ghost validator', async () => {
   mock.workspace.textDocuments = [];
   const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(ROOT) };
   const collectionsBefore = mock.createdDiagnosticCollections.length;
