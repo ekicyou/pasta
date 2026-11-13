@@ -27,6 +27,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 pasta_check = { path = "../../../crates/pasta_check", default-features = false, features = ["fs"] }
 pasta_lsp = { path = "../../../crates/pasta_lsp" }
+pasta_dsl = { path = "../../../crates/pasta_dsl" }
+reqwest = { version = "0.13", default-features = false }
 windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging"] }
 
 [dev-dependencies]
