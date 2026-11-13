@@ -126,9 +126,22 @@ dialog input {
   gap: 6px;
   margin-top: 6px;
 }
-.locals-row input {
+/* 窓の部品と見える名前の 1 行（名前・型・値） */
+.dialog-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.dialog-field input {
   flex: 1;
   width: auto;
+}
+.locals-row .dialog-field {
+  margin-top: 0;
+}
+.locals-row .dialog-field:has(> input) {
+  flex: 1;
 }
 .locals-problem {
   flex-basis: 100%;

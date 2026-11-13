@@ -33,6 +33,16 @@ export async function pickEndpoint(placeHolder: string, items: readonly PickItem
 
 export const confirmDelete = (name: string): Promise<boolean> => confirm(deleteMessage(name), "消す");
 
+/** 見える名前を添える（placeholder は打つと消える）。読み上げの名前は部品の aria-label のまま */
+function field(text: string, ...controls: HTMLElement[]): HTMLLabelElement {
+  const label = document.createElement("label");
+  label.className = "dialog-field";
+  const span = document.createElement("span");
+  span.textContent = text;
+  label.append(span, ...controls);
+  return label;
+}
+
 /** 型の 3 択と値（真偽は true・false の 2 択、ほかは 1 行の入力 7.10）。型を変えると値の部品を差し替える */
 function kindValue(kind: Kind, value: string) {
   const kindSel = document.createElement("select");
@@ -42,7 +52,6 @@ function kindValue(kind: Kind, value: string) {
   const text = document.createElement("input");
   text.type = "text";
   text.setAttribute("aria-label", "値");
-  text.placeholder = "値"; // 見える名前（追加の窓は空の入力が 2 つ並ぶ）
   const bool = document.createElement("select");
   bool.setAttribute("aria-label", "値");
   bool.add(new Option("true", "true"));
@@ -61,7 +70,7 @@ function kindValue(kind: Kind, value: string) {
     const k = kindSel.value as Kind;
     return { kind: k, value: k === "boolean" ? bool.value : text.value };
   };
-  return { parts: [kindSel, text, bool], read };
+  return { parts: [field("型", kindSel), field("値", text, bool)], read };
 }
 
 /** 書き換え（row）・追加（null）の窓。決めたら送る名前・型・値、閉じたら null（7.2・7.4・7.5） */
@@ -71,11 +80,10 @@ export async function editVariable(
   const name = document.createElement("input");
   name.type = "text";
   name.setAttribute("aria-label", "名前");
-  name.placeholder = "名前";
   const kv = kindValue(row?.kind ?? "string", row?.value ?? "");
   const message = row === null ? "保存変数を足します" : `＄＊${row.name} を書き換えます`;
   const rv = await open(message, [["ok", row === null ? "足す" : "書き換える"], ["cancel", "取り消す"]], {
-    parts: row === null ? [name, ...kv.parts] : kv.parts,
+    parts: row === null ? [field("名前", name), ...kv.parts] : kv.parts,
     accept: () => (row === null ? nameRequired(name.value) : true),
   });
   return rv === "ok" ? { name: row?.name ?? name.value, ...kv.read() } : null;
@@ -101,7 +109,6 @@ export async function localsDialog(
     const name = document.createElement("input");
     name.type = "text";
     name.setAttribute("aria-label", "名前");
-    name.placeholder = "名前";
     name.value = pair.name;
     const kv = kindValue(pair.kind, pair.value);
     const del = document.createElement("button");
@@ -110,7 +117,7 @@ export async function localsDialog(
     const problem = document.createElement("p");
     problem.className = "locals-problem";
     problem.setAttribute("role", "alert");
-    el.append(name, ...kv.parts, del, problem);
+    el.append(field("名前", name), ...kv.parts, del, problem);
     const row = { el, problem, read: (): LocalPair => ({ name: name.value, ...kv.read() }) };
     del.addEventListener("click", () => {
       rows.splice(rows.indexOf(row), 1);
