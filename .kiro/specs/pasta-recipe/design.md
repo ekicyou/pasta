@@ -654,7 +654,7 @@ class CoalescingRunner {
 - 順: `self.MonacoEnvironment = { getWorker: () => new EditorWorker() }`（`monaco-editor/esm/vs/editor/editor.worker?worker`）→ `import 'monaco-editor/esm/vs/editor/edcore.main'` → `monaco.languages.register({ id: 'pasta', extensions: ['.pasta'] })`・`({ id: 'lua', extensions: ['.lua'] })` → `createHighlighterCore({ engine: createOnigurumaEngine(import('shiki/wasm')), langs: [lua, { ...pastaGrammar, name: 'pasta', embeddedLangs: ['lua'] }, { ...injectionGrammar, name: 'pasta-lua-injection', injectTo: ['source.pasta'], embeddedLangs: ['lua'] }], themes: [withSemanticRules(lightPlus, scopes), withSemanticRules(darkPlus, scopes)] })` → `shikiToMonaco(highlighter, monaco)` → `registerDocumentSemanticTokensProvider('pasta', provider)`（凡例は `legend` コマンドの値）→ エディタを `'semanticHighlighting.enabled': true` で作る。
 - 文法と写しの読み込み: `import pastaGrammar from '../../vscode/syntaxes/pasta.tmLanguage.json'`・`'../../vscode/syntaxes/pasta-lua-injection.tmLanguage.json'`・`import { contributes } from '../../vscode/package.json'` の `semanticTokenScopes`（読むだけ）。
 - 明暗: `matchMedia('(prefers-color-scheme: dark)')` の値と変化で `monaco.editor.setTheme('light-plus' | 'dark-plus')`（6.7）。
-- セマンティックトークンの提供者: `provideDocumentSemanticTokens(model)` は Documents が持つ「そのモデルの最新の解析の結果」の `tokensToData` を返す（無ければ `null`）。Documents が新しい結果を得たら `onDidChange` を発火する。
+- セマンティックトークンの提供者: `provideDocumentSemanticTokens(model)` は Documents が持つ「そのモデルの最新の解析の結果」の `tokensToData` を返す（今の版の結果が無ければ "busy" のエラーを投げて今の色を残す。`null` は Monaco が色を消す）。Documents が新しい結果を得たら `onDidChange` を発火する。
 - `.pasta`・`.lua` 以外は `plaintext`（色なし・5.2）。
 
 **Implementation Notes**

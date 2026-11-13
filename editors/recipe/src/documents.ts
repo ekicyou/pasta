@@ -1,7 +1,8 @@
 // 開いているファイルの状態の正本（タブ・モデル・ディスクとの揃い）。判断は tabs.ts、ここは Monaco とタブに当てるだけ
-import { monaco } from "./editor.ts";
-import { readText, writeText } from "./ipc.ts";
-import { languageOf } from "./mapping.ts";
+import { monaco, semanticSource } from "./editor.ts";
+import { analyze, readText, writeText, type AnalysisResult } from "./ipc.ts";
+import { diagnosticsToMarkers, languageOf } from "./mapping.ts";
+import { CoalescingRunner } from "./scheduler.ts";
 import { afterChoice, findSame, needsConfirm } from "./tabs.ts";
 import { confirm3, notify } from "./dialog.ts";
 
@@ -19,6 +20,10 @@ export interface Tab {
   viewState: monaco.editor.ICodeEditorViewState | null;
   /** 最後に求めた保存。保存はこの後ろへつなぎ、同じファイルへの書き込みを重ねない */
   saving: Promise<boolean>;
+  /** 最後に当てた解析の結果（.pasta だけ）。解析の失敗では前のものを残す（6.5） */
+  analysis: AnalysisResult | null;
+  /** analysis を求めた時の model.getVersionId() */
+  analysisVersion: number;
 }
 
 export interface DocumentsHooks {
@@ -26,7 +31,12 @@ export interface DocumentsHooks {
   onSaved?(tab: Tab): void;
   /** タブを閉じた後（7.6 の波線・診断の一覧の片付けは 6.3・6.6 でここへつなぐ） */
   onClosed?(tab: Tab): void;
+  /** 新しい解析の結果を当てた後（ツリーのシーン 4.10・診断の一覧 7.3 は 6.5・6.6 でここへつなぐ） */
+  onAnalyzed?(tab: Tab): void;
 }
+
+/** 書き換えが止まってから解析するまで（7.2） */
+const ANALYZE_DELAY_MS = 200;
 
 export const isDirty = (tab: Tab) => tab.deleted || tab.model.getAlternativeVersionId() !== tab.savedVersionId;
 const baseName = (rel: string) => rel.slice(rel.lastIndexOf("/") + 1);
@@ -43,6 +53,11 @@ export class Documents {
     this.#editor = editor;
     this.#bar = bar;
     this.#hooks = hooks;
+    // 提供者は今の版の結果だけを返す。古い結果の位置で塗らない
+    semanticSource.tokensOf = (model) => {
+      const tab = this.tabs.find((t) => t.model === model);
+      return tab?.analysis && tab.analysisVersion === model.getVersionId() ? tab.analysis.tokens : null;
+    };
     // Ctrl+S はエディタの外に焦点があっても今のタブを保存する（5.6）。自動では保存しない（5.11）
     document.addEventListener("keydown", (e) => {
       if (!e.ctrlKey || e.altKey || e.shiftKey || e.key.toLowerCase() !== "s") return;
@@ -70,8 +85,18 @@ export class Documents {
         const id = this.#nextId++;
         // Monaco は中身から改行（CRLF・LF）を決め、getValue はその改行で返す（5.7）
         const model = monaco.editor.createModel(file.text, languageOf(rel), monaco.Uri.from({ scheme: "ghost-tab", path: `/${id}` }));
-        tab = { id, rel, model, diskText: file.text, diskBom: file.bom, deleted: false, savedVersionId: model.getAlternativeVersionId(), viewState: null, saving: Promise.resolve(true) };
-        model.onDidChangeContent(() => this.#render());
+        const opened: Tab = { id, rel, model, diskText: file.text, diskBom: file.bom, deleted: false, savedVersionId: model.getAlternativeVersionId(), viewState: null, saving: Promise.resolve(true), analysis: null, analysisVersion: -1 };
+        const runner = new CoalescingRunner(() => this.#analyze(opened), ANALYZE_DELAY_MS, globalThis);
+        // 解析は .pasta だけ（8.3）。言語は名前の変更（6.4）で変わりうるので、そのつど見る
+        const request = () => {
+          if (model.getLanguageId() === "pasta") runner.request();
+        };
+        model.onDidChangeContent(() => {
+          this.#render();
+          request();
+        });
+        request();
+        tab = opened;
         this.tabs.push(tab);
       }
     }
@@ -118,6 +143,24 @@ export class Documents {
     return true;
   }
 
+  /** 送った時の版と同じ結果だけを当てる。失敗は前の結果と波線を残す（6.5・7.2・7.7） */
+  async #analyze(tab: Tab): Promise<void> {
+    if (tab.model.isDisposed()) return; // 閉じた後に残った求め
+    const version = tab.model.getVersionId();
+    let result: AnalysisResult;
+    try {
+      result = await analyze(tab.model.getValue());
+    } catch {
+      return;
+    }
+    if (tab.model.isDisposed() || tab.model.getVersionId() !== version) return; // 古い。次の求めが新しい版を解析する
+    tab.analysis = result;
+    tab.analysisVersion = version;
+    monaco.editor.setModelMarkers(tab.model, "pasta", diagnosticsToMarkers(result.diagnostics));
+    semanticSource.changed.fire();
+    this.#hooks.onAnalyzed?.(tab);
+  }
+
   /** 未保存なら 3 択（5.9）。閉じたら true */
   async close(tab: Tab): Promise<boolean> {
     if (needsConfirm([{ id: tab.id, rel: tab.rel, dirty: isDirty(tab) }])) {
@@ -134,6 +177,7 @@ export class Documents {
       if (next) this.activate(next);
       else this.#editor.setModel(null);
     }
+    monaco.editor.setModelMarkers(tab.model, "pasta", []); // 波線を消す（7.6）
     tab.model.dispose();
     this.#render();
     this.#hooks.onClosed?.(tab);

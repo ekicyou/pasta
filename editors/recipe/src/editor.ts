@@ -14,10 +14,17 @@ import darkPlus from "@shikijs/themes/dark-plus";
 import pastaGrammar from "../../vscode/syntaxes/pasta.tmLanguage.json";
 import injectionGrammar from "../../vscode/syntaxes/pasta-lua-injection.tmLanguage.json";
 import vscodePackage from "../../vscode/package.json";
-import { analyze, legend } from "./ipc.ts";
+import { legend, type SemanticToken } from "./ipc.ts";
+import { tokensToData } from "./mapping.ts";
 import { keepTokens, semanticRules, withSemanticRules, type TmTheme } from "./theme.ts";
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
+
+/** セマンティックトークンの出どころ。Documents が当てる（そのモデルの今の版の解析のトークン。無ければ null）。changed で塗り直させる */
+export const semanticSource = {
+  tokensOf: (_model: monaco.editor.ITextModel): readonly SemanticToken[] | null => null,
+  changed: new monaco.Emitter<void>(),
+};
 
 const scopes = vscodePackage.contributes.semanticTokenScopes.find((e) => e.language === "pasta")!.scopes;
 
@@ -52,19 +59,15 @@ export async function createEditor(container: HTMLElement): Promise<monaco.edito
   );
   const dark = matchMedia("(prefers-color-scheme: dark)");
   let theme = themeFor(dark.matches);
-  const themeChanged = new monaco.Emitter<void>();
-  // shortcut: 今のモデルを直に解析する仮のつなぎ。6.3 で Documents の最新の結果を読む形へ差し替える
   monaco.languages.registerDocumentSemanticTokensProvider("pasta", {
     getLegend: () => ({ tokenTypes, tokenModifiers }),
-    onDidChange: themeChanged.event,
-    async provideDocumentSemanticTokens(model) {
+    onDidChange: semanticSource.changed.event,
+    provideDocumentSemanticTokens(model) {
+      const tokens = semanticSource.tokensOf(model);
+      // 今の版の結果が無い間（解析待ち・解析の失敗）は「busy」で答え、Monaco に今の色を残させる（null だと色が消える・6.5）
+      if (!tokens) throw new Error("busy");
       const kept = styled.get(theme)!;
-      const tokens = keepTokens((await analyze(model.getValue())).tokens, (t) => kept.has(t));
-      const data = new Uint32Array(tokens.length * 5);
-      tokens.forEach((t, i) =>
-        data.set([t.deltaLine, t.deltaStartCharacter, t.length, t.tokenType, t.tokenModifiers], i * 5),
-      );
-      return { data };
+      return { data: tokensToData(keepTokens(tokens, (t) => kept.has(t))) };
     },
     releaseDocumentSemanticTokens() {},
   });
@@ -72,7 +75,7 @@ export async function createEditor(container: HTMLElement): Promise<monaco.edito
   dark.addEventListener("change", (e) => {
     theme = themeFor(e.matches);
     monaco.editor.setTheme(theme);
-    themeChanged.fire();
+    semanticSource.changed.fire();
   });
   return monaco.editor.create(container, {
     theme,
