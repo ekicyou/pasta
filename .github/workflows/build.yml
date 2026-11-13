@@ -139,6 +139,66 @@ jobs:
       - name: cargo deny check
         uses: EmbarkStudios/cargo-deny-action@v2
 
+      # pasta-recipe の別の Cargo.lock を、アプリの deny.toml で検査する（pasta-recipe 要件 13.7）。
+      # --config は check の前に置く（cargo-deny 0.20）。arguments を書くと既定の --all-features が外れるので書き足す。
+      - name: cargo deny check (pasta-recipe)
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: editors/recipe/src-tauri/Cargo.toml
+          arguments: --all-features --config editors/recipe/src-tauri/deny.toml
+
+  # pasta-recipe（editors/recipe・別のワークスペース）の型・テスト・ビルド（pasta-recipe 要件 13.1）。
+  # ルートの検査は crates/* だけを見るので、アプリはここでだけ確かめる（13.2）。
+  recipe:
+    name: pasta-recipe
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: editors/recipe
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: editors/recipe/src-tauri
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: editors/recipe/package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      # node --test は型を外すだけで確かめないので、先に tsc で型を見る。
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Frontend tests
+        run: npm test
+
+      - name: Frontend build
+        run: npm run build
+
+      - name: Rust tests
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+
+      - name: Clippy (-D warnings)
+        run: cargo clippy --locked --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+      # リリースと同じ形で exe が作れること（beforeBuildCommand が npm run build を走らせる）。
+      - name: tauri build --no-bundle
+        run: npx tauri build --no-bundle
+
   # pasta_lua の Lua スクリプトを静的解析する。luacheck 本体は同梱版
   # （crates/pasta_lua/scriptlibs/luacheck, v1.2.0）を使い、依存の lfs / argparse のみ apt で入れる。
   luacheck:
