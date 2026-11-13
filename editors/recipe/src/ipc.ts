@@ -1,6 +1,7 @@
 // Rust のコマンドの表と事件を 1 対 1 で包む（型は Rust の serde の名前と同じ）
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { FileStat, GhostIO, PostOutcome } from "../../shared/ghostIO.ts";
 
 export interface Position {
   line: number;
@@ -77,6 +78,8 @@ export interface Resolved {
 }
 export interface GhostInfo {
   master: string;
+  /** ゴーストのフォルダ（master の 2 つ上）の絶対パス。開発の操作の指名に使う */
+  root: string;
   name: string;
   version: string;
 }
@@ -91,6 +94,22 @@ export interface GhostChanged {
 export interface OpenRequest {
   path: string | null;
 }
+
+// variables.rs の serde の名前
+export interface VarRow {
+  name: string;
+  kind: "string" | "number" | "boolean" | "table";
+  value: string;
+}
+export interface LocalPair {
+  name: string;
+  kind: "string" | "number" | "boolean";
+  value: string;
+}
+/** problems[].index は 0 始まり（組の並びの位置） */
+export type LocalsOutcome =
+  | { kind: "ok"; table: string }
+  | { kind: "invalid"; problems: { index: number; message: string }[] };
 
 /** 失敗は Rust の Err(String) の文。万一それ以外が来ても理由の文にして投げ直す */
 const call = <T>(cmd: string, args?: Record<string, unknown>): Promise<T> =>
@@ -113,6 +132,26 @@ export const legend = () => call<Legend>("legend");
 export const checkGhost = () => call<Report>("check_ghost");
 export const recentList = () => call<RecentEntry[]>("recent_list");
 export const recentRemove = (master: string) => call<null>("recent_remove", { master });
+export const devBegin = () => call<null>("dev_begin").then(() => {});
+export const devEnd = () => call<null>("dev_end").then(() => {});
+export const variableRows = (text: string) => call<VarRow[]>("variable_rows", { text });
+export const buildLocals = (pairs: LocalPair[]) => call<LocalsOutcome>("build_locals", { pairs });
+
+/** 門で断られた・無い・読めないは undefined（Rust の Err を投げずに写す） */
+const orUndefined = <T>(p: Promise<T>): Promise<T | undefined> => p.catch(() => undefined);
+
+/** 共有の流れの入出力を Rust の開発の門へ写す。パスは open_ghost の master・root と同じ綴りで結ぶこと（門は綴りで比べる） */
+export const tauriGhostIO: GhostIO = {
+  clientName: "pasta-recipe",
+  // 候補でないポートは Rust が送らずに unreachable を返す。invoke 自体の失敗も接続できないとして扱う
+  post: (port, body, timeoutMs) =>
+    call<PostOutcome>("dev_post", { port, body, timeoutMs }).catch((detail: string) => ({ kind: "unreachable", detail })),
+  list: (path) => orUndefined(call<string[]>("dev_list", { path })),
+  stat: (path) => orUndefined(call<FileStat>("dev_stat", { path })),
+  // dev_read は tauri::ipc::Response のバイト列なので ArrayBuffer で届く
+  read: (path, start) => orUndefined(call<ArrayBuffer>("dev_read", { path, start }).then((b) => new Uint8Array(b))),
+  join: (base, ...parts) => [base, ...parts].join("\\"),
+};
 
 export const onGhostChanged = (handler: (e: GhostChanged) => void): Promise<UnlistenFn> =>
   listen<GhostChanged>("ghost-changed", (e) => handler(e.payload));
