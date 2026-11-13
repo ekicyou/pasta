@@ -10,6 +10,8 @@ import {
   diagnosticsToMarkers,
   findingPosition,
   MARKER_SEVERITY_ERROR,
+  sceneLine,
+  scenePaths,
   scenesToItems,
   tokensToData,
   treeRows,
@@ -222,6 +224,8 @@ test("ツリーの見える行: 開いた所だけ・階層・親・シーンは
   // 押すと開くのはツリーの今の rel（名前の変更の後も古い rel へ行かない）と見出しの行
   assert.deepEqual([rows[5].rel, rows[5].line, rows[5].name], ["dic/挨拶.pasta", 2, "朝"]);
   assert.equal(rows[3].line, null);
+  assert.equal(rows[3].scene, null);
+  assert.deepEqual(rows[5].scene, [{ name: "挨拶", n: 0 }, { name: "朝", n: 0 }]);
   // シーンのキーは名前と同じ名前の中の順。前にシーンを足しても開いた所がずれない（4.5・4.10）
   const two = { kind: "scene" as const, rel: "x", name: "挨拶", sceneKind: "global" as const, line: 9, children: [] };
   const more = new Map([["DIC/挨拶.PASTA", [{ ...two, name: "前", line: 1 }, two, two]]]);
@@ -230,4 +234,35 @@ test("ツリーの見える行: 開いた所だけ・階層・親・シーンは
     "dic/挨拶.pasta|挨拶|0",
     "dic/挨拶.pasta|挨拶|1",
   ]);
+});
+
+test("シーンの道は名前と同じ名前の中の順で、保存した中身から今の見出しの行を引く（1.4）", () => {
+  const node = (name: string, line: number, children: SceneNode[] = []): SceneNode => ({
+    name,
+    kind: children.length || line % 2 === 0 ? "global" : "local",
+    heading: range(line, 0, 3),
+    range: range(line, 0, 9),
+    children,
+  });
+  // 同じ名前のグローバル 2 つ・その中の同じ名前のローカル 2 つ
+  const before = [node("挨拶", 0, [node("朝", 2), node("朝", 4)]), node("挨拶", 8, [node("朝", 9)])];
+  assert.deepEqual(scenePaths(before), [
+    { line: 1, path: [{ name: "挨拶", n: 0 }] },
+    { line: 3, path: [{ name: "挨拶", n: 0 }, { name: "朝", n: 0 }] },
+    { line: 5, path: [{ name: "挨拶", n: 0 }, { name: "朝", n: 1 }] },
+    { line: 9, path: [{ name: "挨拶", n: 1 }] },
+    { line: 10, path: [{ name: "挨拶", n: 1 }, { name: "朝", n: 0 }] },
+  ]);
+  const second = [{ name: "挨拶", n: 1 }, { name: "朝", n: 0 }];
+  assert.equal(sceneLine(before, second), 10);
+  assert.equal(sceneLine(before, [{ name: "挨拶", n: 0 }, { name: "朝", n: 1 }]), 5);
+  // 書き換えで行がずれたら新しい行（別の名前のシーンを前に足しても順は変わらない）
+  const shifted = [node("前", 0), node("挨拶", 3, [node("朝", 5), node("朝", 7)]), node("挨拶", 12, [node("朝", 14)])];
+  assert.equal(sceneLine(shifted, second), 15);
+  // 消えたら無い（ローカルだけ消えても、グローバルの道とは区別する）
+  const removed = [node("挨拶", 0, [node("朝", 2)]), node("挨拶", 8)];
+  assert.equal(sceneLine(removed, second), undefined);
+  assert.equal(sceneLine(removed, [{ name: "挨拶", n: 1 }]), 9);
+  assert.equal(sceneLine([], [{ name: "挨拶", n: 0 }]), undefined);
+  assert.deepEqual(scenePaths([]), []);
 });
