@@ -74,7 +74,7 @@
    ```
 
    - 1 つ目が 1 行だけで、`chore(release): vX.Y.Z`（`X.Y.Z` は数字 3 つ）の形である。
-   - 2 つ目が、段 4 の 6 ファイル（版の表記の 5 ファイルと、見どころのファイル `doc/release-notes/v{V}.md`）だけである。
+   - 2 つ目が、段 4 の 7 ファイル（版の表記の 6 ファイルと、見どころのファイル `doc/release-notes/v{V}.md`）だけである。
 
    続け方: 件名の `X.Y.Z` を `V` として開発者に示す。`VREQ` があって `V` と違うときは、止まって開発者に確かめる。手順 4（main の取り込み）を行い、段 2 を飛ばして、段 3 の手順 4（重複の検査）と、段 4 の手順 6 の (3)(4)（`cargo metadata --locked` と `verify-content.mjs`）と、定型コマンド D（`-Version {V} -Head origin/main`）を行う。どれも合格（定型コマンド D は 5 行とも `合格`）なら、段 5 から続ける。不合格なら止まる。
 
@@ -113,7 +113,7 @@
 | S8 | 無し | 0/7、かつ `GitHub Release` が `無し` | — | `VREQ` が `V_MAIN` と違う | main に未リリースの版があるのに、別の版が指定された | 止まる。`V_MAIN` を先に出すか、飛ばすかを開発者に確かめる |
 | S9 | 無し | 上以外 | — | — | タグが無いのに公開済みのものがある | 止まる。公開済みの行を示し、開発者に確かめる |
 
-- `V_MAIN` が 0.4.1 以下で、`GitHub Release` だけが `添付不足（公開・添付 3/5）`（5 クレートと Marketplace は `あり`）のときは、`集計` の公開済みを 7/7 と読み替えて表に当てる（S1・S3 に入る）。0.4.1 までの配布物は 3 つで、`pasta_check.zip`・`pasta-skills.zip` は 0.4.2 から添付する。
+- `V_MAIN` が 0.5.2 以下で、`GitHub Release` だけが `添付不足`（0.4.1 以下は `公開・添付 4/7`、0.4.2〜0.5.2 は `公開・添付 6/7`。5 クレートと Marketplace は `あり`）のときは、`集計` の公開済みを 7/7 と読み替えて表に当てる（S1・S3 に入る）。0.4.1 までの配布物は 3 つで、`pasta_check.zip`・`pasta-skills.zip` は 0.4.2 から、`pasta-recipe.zip` は 0.5.3 から添付する。
 - S4・S5 で `VREQ` が `V_MAIN` と違うときは、`V_MAIN` のリリースが未完了なので先に続きを行うこと、`VREQ` は始めていないことを開発者に示す。
 - 判定は毎回やり直す。前回の実行の会話の記録を使わない（8.4）。
 - S2 は欠番である（CI での初回のリリースの確認のための行だった。確認は 2026-10-10 に済んだ）。
@@ -143,7 +143,7 @@
 
 | Field | Detail |
 |-------|--------|
-| Intent | 版の表記の 5 ファイルをそろえ、見どころを書き、1 つのコミットにする |
+| Intent | 版の表記の 6 ファイルをそろえ、見どころを書き、1 つのコミットにする |
 | Requirements | 3.1, 3.2, 3.3, 3.4, 3.5 |
 
 `V_OLD` は更新の前の版（= `V_MAIN`）である。
@@ -154,10 +154,10 @@
    grep -cF 'version = "{V_OLD}"' Cargo.toml
    grep -cF '| 対象 pasta バージョン | **v{V_OLD}** |' book/src/introduction.md
    grep -cF '"version": "{V_OLD}"' editors/vscode/package.json
-   cargo metadata --locked --format-version 1 > /dev/null
+   cargo metadata --locked --format-version 1 > /dev/null && cargo metadata --locked --format-version 1 --manifest-path editors/recipe/src-tauri/Cargo.toml > /dev/null
    ```
 
-   4 つ目が失敗するのは、版の更新より前から main の `Cargo.lock` が `Cargo.toml` と食い違っている場合である。別の PR で直す必要があることを報告する。
+   4 つ目が失敗するのは、版の更新より前から main の 2 つの lock（ルートの `Cargo.lock` と `editors/recipe/src-tauri/Cargo.lock`）のどちらかが `Cargo.toml` と食い違っている場合である。別の PR で直す必要があることを報告する。
 
 2. `Cargo.toml`: `version = "{V_OLD}"` を `version = "{V}"` に、Edit の全置換で置き換える（6 か所）。
 3. `book/src/introduction.md`: `| 対象 pasta バージョン | **v{V_OLD}** |` を `| 対象 pasta バージョン | **v{V}** |` に置き換える（1 か所）。
@@ -175,6 +175,12 @@
 
    ワークスペースのクレートの版だけを書き換える。外部のクレートの版は動かない。`Cargo.lock` を文字列の置換で直さない（外部のクレートに同じ版の文字列がある）。
 
+   アプリ（pasta-recipe）の別の lock `editors/recipe/src-tauri/Cargo.lock` も、同じく path のクレートの版だけを書き換える:
+
+   ```bash
+   cargo update --workspace --manifest-path editors/recipe/src-tauri/Cargo.toml
+   ```
+
 **見どころを書く**（手順 5 の後、手順 6 の前に行う）。リリースの本文になる見どころのファイル `doc/release-notes/v{V}.md` を書く。書き方の決まりは `doc/release-notes/README.md` である。
 
 - **H1 材料の一覧**。出力の最後の行が `**Full Changelog**: https://github.com/ekicyou/pasta/compare/v{V_OLD}...v{V}` であること。違えば、前のタグを読めていないので止まる。
@@ -191,36 +197,36 @@
 
    ```bash
    git diff --numstat
-   git diff -U0 -- Cargo.lock | grep -E '^[+-][^+-]' | sort | uniq -c
-   cargo metadata --locked --format-version 1 > /dev/null
+   git diff -U0 -- Cargo.lock editors/recipe/src-tauri/Cargo.lock | grep -E '^[+-][^+-]' | sort | uniq -c
+   cargo metadata --locked --format-version 1 > /dev/null && cargo metadata --locked --format-version 1 --manifest-path editors/recipe/src-tauri/Cargo.toml > /dev/null
    node book/tools/verify-content.mjs
    git status --porcelain
    ```
 
    | # | 確認 | 合格の基準 |
    |---|------|------------|
-   | (1) | すべての表記が同じ版 | 1 つ目の出力が次の 5 行だけ: `N N Cargo.lock`・`6 6 Cargo.toml`・`1 1 book/src/introduction.md`・`2 2 editors/vscode/package-lock.json`・`1 1 editors/vscode/package.json`（`N` は 1 以上。今は 7） |
-   | (2) | `Cargo.lock` の変更が版の行だけ | 2 つ目の出力が 2 行だけ: `N +version = "{V}"` と `N -version = "{V_OLD}"`（`N` は (1) と同じ） |
-   | (3) | `Cargo.lock` が `Cargo.toml` と食い違わない | `cargo metadata --locked` が終了コード 0 |
+   | (1) | すべての表記が同じ版 | 1 つ目の出力が次の 6 行だけ: `N N Cargo.lock`・`6 6 Cargo.toml`・`1 1 book/src/introduction.md`・`M M editors/recipe/src-tauri/Cargo.lock`・`2 2 editors/vscode/package-lock.json`・`1 1 editors/vscode/package.json`（`N`・`M` は 1 以上。今は 7 と 4） |
+   | (2) | 2 つの lock の変更が版の行だけ | 2 つ目の出力が 2 行だけ: `K +version = "{V}"` と `K -version = "{V_OLD}"`（`K` は (1) の `N` と `M` の和） |
+   | (3) | 2 つの lock が `Cargo.toml` と食い違わない | 2 つの `cargo metadata --locked` が終了コード 0 |
    | (4) | マニュアルの内容検証 | `verify-content.mjs` が終了コード 0（`RESULT: OK`） |
-   | (5) | 他のファイルを変えていない | `git status --porcelain` に出るのが、版の表記の 5 ファイルと、`?? doc/release-notes/v{V}.md` だけ |
+   | (5) | 他のファイルを変えていない | `git status --porcelain` に出るのが、版の表記の 6 ファイルと、`?? doc/release-notes/v{V}.md` だけ |
 
-7. **不合格のとき**（3.4）。6 ファイルを元に戻し、不合格の確認を示して止まる。
+7. **不合格のとき**（3.4）。7 ファイルを元に戻し、不合格の確認を示して止まる。
 
    ```bash
-   git restore -- Cargo.toml Cargo.lock editors/vscode/package.json editors/vscode/package-lock.json book/src/introduction.md
+   git restore -- Cargo.toml Cargo.lock editors/recipe/src-tauri/Cargo.lock editors/vscode/package.json editors/vscode/package-lock.json book/src/introduction.md
    git clean -f -- doc/release-notes/v{V}.md
    ```
 
 8. **コミット**（3.5）
 
    ```bash
-   git add Cargo.toml Cargo.lock editors/vscode/package.json editors/vscode/package-lock.json book/src/introduction.md doc/release-notes/v{V}.md
+   git add Cargo.toml Cargo.lock editors/recipe/src-tauri/Cargo.lock editors/vscode/package.json editors/vscode/package-lock.json book/src/introduction.md doc/release-notes/v{V}.md
    git commit -m "chore(release): v{V}"
    git show --stat --format=%s HEAD
    ```
 
-   最後の出力が、件名 `chore(release): v{V}` と 6 ファイルであること。その後、`doc/release-notes/v{V}.md` の全文を開発者に示す。承認を求めない。開発者の答えを待たずに、段 5 へ進む。
+   最後の出力が、件名 `chore(release): v{V}` と 7 ファイルであること。その後、`doc/release-notes/v{V}.md` の全文を開発者に示す。承認を求めない。開発者の答えを待たずに、段 5 へ進む。
 
 **`build.yml` に `--locked` を足さない理由**: 版の更新での更新し忘れは手順 6 の (3) が、main に前からある食い違いは手順 1 が、PR を作る前に検出する。リリース CI の build の段の検査（`git diff --exit-code -- Cargo.lock`）は、そのまま最後の守りとして残る。`build.yml` を変えると、ふだんの PR の CI の挙動まで変わる。
 
@@ -231,7 +237,7 @@
 | Intent | 版の更新を、ほかの変更と同じ PR の流れ（squash）で main に入れる |
 | Requirements | 4.1, 4.2, 4.3, 4.4, 4.5 |
 
-1. PR に入る変更が、段 4 の 6 ファイルだけであることを確かめてから、作業ブランチを push する（main ではない）。1 つ目の出力が 6 ファイルだけでなければ、push せずに止まる（ほかのファイルがコミットに混ざっている）。
+1. PR に入る変更が、段 4 の 7 ファイルだけであることを確かめてから、作業ブランチを push する（main ではない）。1 つ目の出力が 7 ファイルだけでなければ、push せずに止まる（ほかのファイルがコミットに混ざっている）。
 
    ```bash
    git diff --name-only origin/main...HEAD
@@ -469,13 +475,13 @@ gh run view {RUN} --log-failed | tail -n 60
 | `tag` | `tag \| 最大 <版> \| v{V} <状態>` | `あり <コミットの SHA>`・`無し`。照会できなければ `tag \| 不明` |
 | `crates.io` | `crates.io \| <クレート> \| 最大 <版> \| {V} <状態>`（5 行） | `あり`・`無し`・`不明（HTTP <コード>）` |
 | `Marketplace` | `Marketplace \| ekicyou.pasta-vscode \| 最大 <版> \| {V} <状態>` | `あり`・`無し`。照会できなければ `不明` |
-| `GitHub Release` | `GitHub Release \| 最大 <版> \| v{V} <状態>` | `あり（公開・添付 5/5） <URL>`・`下書き（添付 n/5）`・`添付不足（公開・添付 n/5） <URL>`・`無し`・`不明` |
+| `GitHub Release` | `GitHub Release \| 最大 <版> \| v{V} <状態>` | `あり（公開・添付 7/7） <URL>`・`下書き（添付 n/7）`・`添付不足（公開・添付 n/7） <URL>`・`無し`・`不明` |
 | `run` | `run \| <ID> \| <status> \| <conclusion> \| attempt <n> \| <URL>` | 無ければ `run \| 無し`。照会できなければ `run \| 不明` |
 | `PR` | `PR \| 未統合 \| #<番号> \| <ブランチ> \| <URL>` | 無ければ `PR \| 無し` |
 | `集計` | `集計 \| {V} の公開済み <n>/7 \| 不明 <m>` | 7 = 5 クレート + Marketplace + GitHub Release |
 | `提案` | `提案 \| <版>（すべての出どころの最大 <版> の PATCH + 1）` | `不明` があれば `提案 \| 出せない（不明がある）` |
 
-「公開済み」に数えるのは、crates.io と Marketplace の `あり`、GitHub Release の `あり（公開・添付 5/5）` だけである。下書きと添付不足は数えない。配布物は `pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-{V}.vsix`・`pasta_check.zip`・`pasta-skills.zip` の 5 つで、`pasta_check.zip`・`pasta-skills.zip` を添付していない 0.4.1 までの版は `添付不足（公開・添付 3/5）` と出る。
+「公開済み」に数えるのは、crates.io と Marketplace の `あり`、GitHub Release の `あり（公開・添付 7/7）` だけである。下書きと添付不足は数えない。添付は配布物の `pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-{V}.vsix`・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.zip` の 6 つと、詳しいリリースノート `release-notes-v{V}.md` の 7 つで、`pasta-recipe.zip` を添付していない 0.4.2〜0.5.2 の版は `添付不足（公開・添付 6/7）`、さらに `pasta_check.zip`・`pasta-skills.zip` も添付していない 0.4.1 までの版は `添付不足（公開・添付 4/7）` と出る。
 
 ## 定型コマンド B の出力（リリース CI の結果）
 

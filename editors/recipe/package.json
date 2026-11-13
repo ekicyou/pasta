@@ -1,0 +1,29 @@
+{
+  "name": "pasta-recipe",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --test \"src/**/*.test.ts\" \"scripts/*.test.mjs\"",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4",
+    "@types/node": "22.20.5",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
+  },
+  "dependencies": {
+    "@shikijs/langs": "4.6.0",
+    "@shikijs/monaco": "4.6.0",
+    "@shikijs/themes": "4.6.0",
+    "@tauri-apps/api": "2.12.4",
+    "@tauri-apps/plugin-dialog": "2.8.4",
+    "monaco-editor": "0.57.0",
+    "shiki": "4.6.0"
+  },
+  "overrides": {
+    "dompurify": "3.4.17"
+  }
+}

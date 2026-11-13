@@ -2,7 +2,7 @@
 //! 要件 1.2・1.3・1.5・1.8）。
 //!
 //! 親の `#[test]` が、同じテストの実行ファイルを子のプロセスとして起こす（役は環境変数で指示）。子は
-//! 実行ファイルの隣の `pasta.dll`（`cargo test` が cdylib として `target/<profile>/deps/` に作る）を
+//! `cargo test` が cdylib として作った `pasta.dll`（置き場は `dll_path` を参照）を
 //! `LoadLibraryW` し、`GetProcAddress` で入口を引いて駆動し、`FreeLibrary` にかかった時間と、外した後に
 //! モジュールが残っているかを標準出力に 1 行出す。親はその 1 行と子の終わり方を確かめる。
 //! 子のプロセスに分けるのは、テストの実行ファイルに静的にリンクした pasta とは別の、本物の DLL の
@@ -38,10 +38,28 @@ type RequestFn = unsafe extern "C" fn(HGLOBAL, *mut c_long) -> HGLOBAL;
 type UnloadFn = unsafe extern "C" fn() -> i32;
 type GetApiFn = unsafe extern "C" fn(u32) -> *const ShioriApi;
 
+/// `cargo test` が lib の単位（cdylib と rlib を 1 回で作る）で作った `pasta.dll`。cargo 1.99 までは
+/// テストの実行ファイルと同じ `deps/` に、1.100 からは単位ごとの `build/pasta_shiori/<hash>/out/` にある
+/// （テストの実行ファイルは別の `<hash>/out/`。`cargo test` は cdylib を `target/<profile>/` へ上げない）。
 fn dll_path() -> PathBuf {
-    std::env::current_exe()
-        .expect("current_exe")
-        .with_file_name("pasta.dll")
+    let exe = std::env::current_exe().expect("current_exe");
+    let sibling = exe.with_file_name("pasta.dll");
+    if sibling.is_file() {
+        return sibling;
+    }
+    // 機能の合流などの違いで lib の単位が複数残ることがある。いちばん新しいものは今のソースから作ったもの
+    // （今の単位が作り直しなら最新、作り直しでなければソースはそれ以来変わっていない）。
+    exe.ancestors()
+        .nth(3) // <exe> → out → <hash> → build/pasta_shiori
+        .and_then(|pkg| std::fs::read_dir(pkg).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(|e| {
+            let p = e.ok()?.path().join("out").join("pasta.dll");
+            Some((p.metadata().ok()?.modified().ok()?, p))
+        })
+        .max()
+        .map_or(sibling, |(_, p)| p)
 }
 
 fn wide(s: &OsStr) -> Vec<u16> {
@@ -161,12 +179,8 @@ struct ChildResult {
 
 fn run_child(role: &str) -> ChildResult {
     let dll = dll_path();
-    // 前提（設計の Open Questions 8）：cargo test がテストの実行ファイルの隣に pasta.dll を作ること。
-    assert!(
-        dll.is_file(),
-        "pasta.dll not next to test exe: {}",
-        dll.display()
-    );
+    // 前提（設計の Open Questions 8）：cargo test が統合テストの前に cdylib の pasta.dll を作ること。
+    assert!(dll.is_file(), "pasta.dll not found: {}", dll.display());
     let ghost = copy_fixture_to_temp("free_library");
     let start = Instant::now();
     let out = Command::new(std::env::current_exe().unwrap())

@@ -218,6 +218,12 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/NN-*.pasta 12 段/install/shell/master の立ち絵 18 枚・surfaces.txt)＋生成物(dll/ライセンス表示/scripts は .gitignore 済み)
 │       └── tests/            # 統合テスト・配布ファイル構成検証・全段階の検証（tutorial_stages_test.rs）・立ち絵と当たり判定の検証（shell_assets_test.rs）
 ├── editors/                  # エディタ拡張
+│   ├── recipe/              # pasta-recipe（VS Code を使わずに書く Windows x64 のアプリ・Tauri 2 ＋ Vite ＋ Monaco。別の Cargo ワークスペース）
+│   │   ├── src/             # 画面（TypeScript）。純粋な判断（mapping・sync・tabs・scheduler・theme）は *.test.ts を node --test で
+│   │   ├── src-tauri/       # Rust の殻（自前の Cargo.lock・deny.toml・about.toml）。paths（ghost/master の探し方と範囲の門）・files・recent・check・watch・commands
+│   │   │   └── tests/       # repo_parity_test.rs（lock の版・凡例・版の置き場がルートや拡張と一致）
+│   │   ├── scripts/         # package.ps1（release/pasta-recipe.zip を作る）・js-licenses.mjs（画面の部品の第三者の表示）
+│   │   └── tauri.conf.json  # 版は ../vscode/package.json を指す・CSP・窓
 │   └── vscode/              # VSCode拡張（TypeScript + WASM統合）
 │       ├── package.json     # 拡張マニフェスト
 │       ├── tsconfig.json    # TypeScript設定
@@ -271,7 +277,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   ├── scripts/release/     # リリース CI の job 補助スクリプト（verify-tag/publish-crate/publish-vsix/release-notes/github-release の .ps1）と、その検査 release-scripts-test.ps1（build.yml の release-scripts job で実行）
 │   └── release-ci-setup.md  # リリース CI の一回限りのセットアップ手順書
 ├── img/                     # README のロゴ・スクリーンショット
-├── release/                 # release.ps1 の出力先（pasta_check.zip・.nar・pasta.dll.zip・pasta-skills.zip。.gitignore 済み・コミットしない）
+├── release/                 # release.ps1 と editors/recipe/scripts/package.ps1 の出力先（pasta_check.zip・.nar・pasta.dll.zip・pasta-skills.zip・pasta-recipe.zip。.gitignore 済み・コミットしない）
 ├── Cargo.lock               # 依存の解決結果（コミット対象・リリース CI の build で不変を検査）
 ├── README.md                # プロジェクト概要
 ├── LICENSE                  # ライセンス

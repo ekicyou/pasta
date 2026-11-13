@@ -23,7 +23,9 @@ required-features = ["cli"]
 [features]
 default = ["cli"]
 # バイナリだけが使う依存（ライブラリは WASM でも使うので含めない）
-cli = ["dep:lexopt", "dep:md5", "dep:zip"]
+cli = ["fs", "dep:lexopt", "dep:md5", "dep:zip"]
+# ゴーストのフォルダからファイルを集める（ネイティブだけ。WASM では使わない）
+fs = []
 
 [dependencies]
 # 検査の核（ライブラリ）

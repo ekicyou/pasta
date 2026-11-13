@@ -1,6 +1,6 @@
 # .github/workflows/release.yml
 # リリース CI（release-ci）。リリースタグ vX.Y.Z の push だけで起動し、
-# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（5 つの配布物）の順に進める。
+# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（6 つの配布物）の順に進める。
 # 上流の job が失敗したら後続は needs の既定で止まり、どの公開先にも公開しない。
 name: Release
 
@@ -118,7 +118,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: editors/vscode/package-lock.json
+          cache-dependency-path: |
+            editors/vscode/package-lock.json
+            editors/recipe/package-lock.json
 
       # release.ps1 の cargo は --locked を持たないため、後段の Cargo.lock の不変検査で同等にする。
       - name: Build pasta.dll.zip, hello-pasta.nar, pasta_check.zip and pasta-skills.zip
@@ -131,6 +133,10 @@ jobs:
           npm ci
           npm run package
           Move-Item -LiteralPath "pasta-vscode-$env:VERSION.vsix" -Destination ../../release/ -Force
+
+      # tauri build も --locked を持たないため、後段の Cargo.lock の不変検査にアプリの lock を入れる。
+      - name: Build pasta-recipe.zip
+        run: pwsh -NoProfile -File editors/recipe/scripts/package.ps1
 
       - name: Verify release assets
         run: |
@@ -209,15 +215,36 @@ jobs:
             }
           }
 
+          # pasta-recipe.zip: pasta-recipe.exe と THIRD_PARTY_LICENSES.txt の 2 つだけ・exe の版がタグの版・30 MB 以下・
+          # 表示にネイティブ（tauri）と画面の部品（monaco-editor）の両方の名前
+          $recipeZip = 'release/pasta-recipe.zip'
+          $recipe = @(Get-ZipEntries $recipeZip | Sort-Object)
+          if (($recipe -join '|') -ne 'pasta-recipe.exe|THIRD_PARTY_LICENSES.txt') {
+            $errors.Add("pasta-recipe.zip の中身が pasta-recipe.exe・THIRD_PARTY_LICENSES.txt の 2 つでない: $($recipe -join ', ')")
+          }
+          else {
+            $recipeDir = Join-Path $env:RUNNER_TEMP 'pasta-recipe'
+            Expand-Archive -LiteralPath $recipeZip -DestinationPath $recipeDir -Force
+            $vi = (Get-Item -LiteralPath (Join-Path $recipeDir 'pasta-recipe.exe')).VersionInfo
+            $exeVersion = "$($vi.FileMajorPart).$($vi.FileMinorPart).$($vi.FileBuildPart)"
+            if ($exeVersion -cne $env:VERSION) { $errors.Add("pasta-recipe.zip の pasta-recipe.exe の版が $env:VERSION でない: $exeVersion") }
+            $notice = Get-Content -LiteralPath (Join-Path $recipeDir 'THIRD_PARTY_LICENSES.txt') -Raw
+            foreach ($n in 'monaco-editor', 'tauri') {
+              if (-not $notice.Contains($n)) { $errors.Add("pasta-recipe.zip の THIRD_PARTY_LICENSES.txt に $n の名前が無い") }
+            }
+          }
+          $recipeSize = (Get-Item -LiteralPath $recipeZip).Length
+          if ($recipeSize -gt 31457280) { $errors.Add("pasta-recipe.zip が 30 MB（31,457,280 バイト）を超える: $recipeSize バイト") }
+
           if ($errors.Count -gt 0) {
             $errors | ForEach-Object { Write-Output "::error::$_" }
             exit 1
           }
           Write-Output "配布物の検査: 成功（版 $env:VERSION）"
 
-      # release.ps1・wasm-pack は --locked を付けないため、lock が書き換わっていないことをここで確かめる。
+      # release.ps1・wasm-pack・tauri build は --locked を付けないため、lock が書き換わっていないことをここで確かめる。
       - name: Check Cargo.lock is unchanged
-        run: git diff --exit-code -- Cargo.lock
+        run: git diff --exit-code -- Cargo.lock editors/recipe/src-tauri/Cargo.lock
 
       - name: Upload release-assets
         uses: actions/upload-artifact@v7
@@ -228,6 +255,7 @@ jobs:
             release/hello-pasta.nar
             release/pasta_check.zip
             release/pasta-skills.zip
+            release/pasta-recipe.zip
             release/pasta-vscode-${{ needs.verify.outputs.version }}.vsix
           retention-days: 90
           if-no-files-found: error

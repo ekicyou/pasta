@@ -40,3 +40,8 @@ book/book/
 /crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.dll
 /crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/THIRD_PARTY_LICENSES.txt
 /crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/scripts/
+
+# pasta-recipe（editors/recipe）の画面の出力・第三者の表示・tauri-build が作る許可の型
+/editors/recipe/dist/
+/editors/recipe/build/
+/editors/recipe/src-tauri/gen/

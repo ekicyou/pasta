@@ -6,7 +6,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 現在の主題は次のとおり。
 
-- **0.5.3: VS Code を使わないエディタ pasta-recipe**（2026-11-12 開発者の決定「次のリリースにする。最優先事項」）。2026-11-12 にウェーブ 1 の 2 本（`vscode-scene-outline-play`・`scene-play-locals`）が入り、残りは `pasta-recipe` → `pasta-recipe-dev-actions` の 2 本。spec のウェーブ 2 つとリリースで出す見込み（下の「0.5.3 の範囲」と棚卸）。
+- **0.5.3: VS Code を使わないエディタ pasta-recipe**（2026-11-12 開発者の決定「次のリリースにする。最優先事項」）。2026-11-12 にウェーブ 1 の 2 本（`vscode-scene-outline-play`・`scene-play-locals`）が入り、2026-11-13 にウェーブ 2 の `pasta-recipe` が入った。残りは `pasta-recipe-dev-actions` の 1 本。spec のウェーブ 1 つとリリースで出す見込み（下の「0.5.3 の範囲」と棚卸）。
 - **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`、2026-10-24 に起票した `vsce-4-upgrade`・`pest-2-9-4-upgrade`（下の「依存の更新」）。まとめは下の「版がまだ決まっていないもの」にある。
 - **Phase 13: areka でノベルゲーム（0.6.0。2026-10-29 に 0.5.0 から順延）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性の 2 本（`scene-attribute-store`・`scene-condition-attributes`）は、2026-10-29 に 0.5.0 へ移した。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
@@ -35,7 +35,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 - **LuaJIT 2.1**: `coroutine.close`・`<close>` が無い。中断したコルーチンは参照を外して GC に任せる。
 - **シーン名の別名**: pasta.toml の `[scene.alias]` で定義する。既定の表は 7 件（`会話 → OnTalk`・おすすめメニューのシーン 3 件・ボタンの名前 3 件）で、書いたキーだけ既定を置き換える（空の配列で消す・見出しだけなら既定のまま・既定とぶつかれば読み込みエラー。2026-10-24 `recommend-menu-scenes`）。完全一致の 1 段だけで、キー正規化の前段で登録・検索の両側に効く。
 - **式の中の値なし**: 式の中の nil は、算術なら 0、連結なら空文字列とみなし、ログを出さない。
-- **リリース**: タグ `vX.Y.Z` の push で `.github/workflows/release.yml` が検証・ビルド・公開まで行う。ビルドした成果物は git で追跡しない。シェルの画像は追跡を続ける。配布物は `pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip` の 5 つで、GitHub Release には、それにリリースの全件の一覧を足した 6 つを添える（`pasta-skills.zip` は 0.4.2 で `pasta-skills-release-asset` が足した）。
+- **リリース**: タグ `vX.Y.Z` の push で `.github/workflows/release.yml` が検証・ビルド・公開まで行う。ビルドした成果物は git で追跡しない。シェルの画像は追跡を続ける。配布物は `pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.zip` の 6 つで、GitHub Release には、それにリリースの全件の一覧を足した 7 つを添える（`pasta-skills.zip` は 0.4.2 で `pasta-skills-release-asset` が、`pasta-recipe.zip` は `pasta-recipe` が足した）。
 - **hello-pasta の辞書**: 1 段 1 ファイル（`dic/01-boot.pasta`〜`12-lua.pasta`）で、段階表は `crates/pasta_sample_ghost/STAGES.md`。全段が起動することをテストが確かめる。
 - **入門ガイド**: Claudia が全編を語る（`getting-started` に限った執筆規約の例外）。段の章と段階辞書を逐語で照合する（`book/tools/tutorial-check.mjs`）。辞書を変える spec は、同じ変更で入門の章の作例を直す。絵は `book/SCREENSHOTS.md` の手順で撮り直す。
 - **マニュアルの見た目**: mdBook のまま「Claudia のマニュアル」。台詞は顔アイコン付きの部品で書く（記法は `book/AUTHORING.md`）。印刷用のページ（`print.html`）は作らず、章の印刷はテーマが受け持つ。
@@ -131,8 +131,8 @@ v0.5.2 の次の版で、最優先（開発者「次のリリースにする。�
 
 | 順 | spec | 要件定義 | 規模 | 始められる時期 |
 | -- | ---- | -------- | ---- | -------------- |
-| 3 | pasta-recipe | Opus | 18〜21 | **ウェーブ 1（2026-11-12 の棚卸）**。アプリの本体（ツリー・エディタ・着色・診断・ゴースト全体の検査・`.lua`・保存・最近開いたもの・リリース CI・マニュアル）。先に要った 1 番（`vscode-scene-outline-play`）は入った
-| 4 | pasta-recipe-dev-actions | Opus | 11〜14 | ウェーブ 2 の見込み。実行の流れを `editors/shared/` へ移し、アプリにシーンの ▶・リロード・保存変数の表と書き換え・ローカル変数を入れた実行を足す。3 番の後（先に要った 1 番・2 番は入った）
+| 3 | pasta-recipe | Opus | 34 | **入った（2026-11-13）**。アプリの本体（ツリー・エディタ・着色・診断・ゴースト全体の検査・`.lua`・保存・最近開いたもの・リリース CI・マニュアル）
+| 4 | pasta-recipe-dev-actions | Opus | 11〜14 | 次のウェーブ（先に要った 3 番は入った）。実行の流れを `editors/shared/` へ移し、アプリにシーンの ▶・リロード・保存変数の表と書き換え・ローカル変数を入れた実行を足す。3 番の後（先に要った 1 番・2 番は入った）
 | 5 | 0.5.3 のリリース（`release` スキル） | Opus | — | 上の全部の後（ウェーブ 3 の見込み） |
 
 ## 棚卸（2026-11-12・main `2381bf52`）
@@ -381,7 +381,7 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 - [ ] scene-exact-match -- 完全一致でシーンを呼ぶ `＞＞シーン名`（同名が複数ならランダム。既存の `search_scene_exact` を使う）と、`pasta.toml` の `[scene] match = "exact"`（`＞`・イベントの受け口・OnTalk・時報・選択肢の飛び先を全部完全一致にする。既定は前方一致）を足す。既定のモードでも、イベントの受け口はイベント ID の直後が英大文字で続く候補（`＊OnInstallCompleteAll` など）を外す。`novel-talk-flow` の完全一致の切り替えを引き取る（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者が承認して `event-scene-exact-match` から広げた）。版は未定。`scene-anchor-link` と同じウェーブに置かない（文法・`act.lua`・`choice_select.lua` を共有する）。Dependencies: none
 - [ ] vsce-4-upgrade -- `@vscode/vsce` を 4.x に上げる。リリース CI の Node は `ponytail-manual-ci` が 22 にした。`--azure-credential` の公開の道を `release-setup-check.yml` で確かめる。だめなら 4.x の OIDC の口へ移すかを決める（2026-10-24 起票。`/update` から）。版は未定。`pasta-dll-multiarch`・`pasta-recipe`（`release.yml`）、`pasta-recipe-dev-actions`（`editors/vscode/package.json`）と同じウェーブに置かない。Dependencies: none（`ponytail-manual-ci` は入った）
 - [ ] pest-2-9-4-upgrade -- pest を 2.9.4 以降に上げても、手元と CI の 3 か所で `pasta_lsp` の WASM のビルドが通るようにする（psm が wasm32 に clang を要る）。wasm32 向けの C コンパイラの用意か、上流の直しかを決める（2026-10-24 起票。`/update` から）。版は未定。`Cargo.lock` の席を触る spec と同じウェーブに置かない（0.5.0 の `debug-mcp-runtime` は 2026-11-03 に入った）。Dependencies: none（ファイルの順番で後に置いた ponytail の 3 本は入った）
-- [ ] pasta-recipe -- VS Code を使わない pasta DSL のエディタ（仮名）。Tauri 2 ＋ Vite ＋ Monaco の Windows x64 の単一の exe。ゴーストのフォルダのドラッグドロップで `ghost/master` を開き、最近開いたものを TOML で残す。ファイルとシーンのツリー、`.pasta` の着色（TextMate ＋ セマンティックトークン）と診断、ゴースト全体の検査、コードブロックの Lua の着色と `.lua` の編集、保存。解析は Rust の側で `pasta_lsp`・`pasta_check` を直接呼ぶ。`editors/recipe/`（`src-tauri` は別の Cargo ワークスペース）。リリースの成果物 `pasta-recipe.zip` とマニュアル（2026-11-12 起票。開発者の依頼「最優先事項」）。0.5.3 のウェーブ 1（2026-11-12 の棚卸）。`pasta-dll-multiarch`・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`vscode-scene-outline-play` は入った）
+- [x] pasta-recipe -- VS Code を使わない pasta DSL のエディタ（仮名）。Tauri 2 ＋ Vite ＋ Monaco の Windows x64 の単一の exe。ゴーストのフォルダのドラッグドロップで `ghost/master` を開き、最近開いたものを TOML で残す。ファイルとシーンのツリー、`.pasta` の着色（TextMate ＋ セマンティックトークン）と診断、ゴースト全体の検査、コードブロックの Lua の着色と `.lua` の編集、保存。解析は Rust の側で `pasta_lsp`・`pasta_check` を直接呼ぶ。`editors/recipe/`（`src-tauri` は別の Cargo ワークスペース）。リリースの成果物 `pasta-recipe.zip` とマニュアル（2026-11-12 起票。開発者の依頼「最優先事項」）。0.5.3 のウェーブ 1（2026-11-12 の棚卸）。`pasta-dll-multiarch`・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`vscode-scene-outline-play` は入った）
 - [ ] pasta-recipe-dev-actions -- VS Code 拡張の実行の流れ（MCP クライアント・リロード・シーン実行・変数ダンプ）を `editors/shared/` へ移し、入出力（HTTP の POST・ファイルの読み取り・更新時刻）だけを Node と Tauri で差し込む。拡張の振る舞いは変えない。`pasta-recipe` に、シーンの ▶・リロード・出力の欄・保存変数の表（`OnPastaSetSaveVariable` で書き換え・削除。表は見るだけ）・ローカル変数を入れた実行を足す（2026-11-12 起票。`pasta-recipe` から分けた）。0.5.3 のウェーブ 2 の見込み。`vsce-4-upgrade`（`editors/vscode/package.json`）と同じウェーブに置かない。Dependencies: pasta-recipe（`scene-play-locals`・`vscode-scene-outline-play` は入った）
 
 ## Existing Spec Updates

@@ -127,3 +127,17 @@ interface GhostIO {
 - **見つけた穴・古くなった記述**
   - 入出力の面の見込み（`post`・`readText`・`mtime` の 3 つ）では足りない。移す 5 つは `fs.readdir`・バイト列の `readFile`（`descript.txt` の名前の読み取り）・`fs.stat` の大きさ・`fs.open` してずらして読む（`pasta.log` の続き）も使う。`reloadShiori.ts`・`dumpVariables.ts`・`ghostFiles.ts` は Node の `path` を import するが、Vite の中には無いので、パスの組み立ても面に入れるか、小さな自前の関数にする。
   - Constraints の「`OnPastaSetSaveVariable` はデバッグが有効なときだけ効く」は誤り。`external_control.lua` 8 行のとおり、デバッグの有無によらず働き、SecurityLevel が external のときだけ何もしない（204）。デバッグが要るのは `OnPastaScene`・`OnPastaSceneAt`・`OnPastaDumpVariables`（`scene_play.lua` 10 行）。
+
+## 申し送り（pasta-recipe の要件ディスカッションより・2026-11-12）
+
+- アプリの名前は `pasta-recipe`（exe は `pasta-recipe.exe`）で確定。
+- アプリは単一インスタンス（2 つ目の起動は今の窓へパスを渡す。`pasta-recipe` の要件 2.11）。この spec で別の窓や別の起動の口を足さない。
+- ツリーには、ファイル・フォルダの作成と名前の変更の操作が入る（要件 4.14〜4.17。削除は無い）。▶ などのシーンの操作は、その操作と並べて足す。
+- ゴースト全体の検査のファイル集めは `pasta_check` のライブラリの opt-in の機能へ移る（要件 9.12）。ゴーストのファイルを Rust で集めるなら、これを使う。
+
+## 申し送り（pasta-recipe の完了より・2026-11-13）
+
+- 開発者が実物のアプリを触って、最初に「シーン再生とかの機能は実装されていないのか？」と尋ねた。この spec の ▶ は待たれている。
+- ツールバーは `#toolbar` に左から「保存 (Ctrl+S)」（`primary`）・「フォルダを開く…」・「ファイルを開く… (Ctrl+O)」・「最近開いたもの」が並ぶ（`main.ts`・`start.ts` が足す）。リロードなどのボタンも同じ形（`button` を `#toolbar` へ append。主の操作だけ `className = "primary"`）で並べる。
+- 色は `style.css` の `:root` の変数（`--bg-chrome`・`--bg-side`・`--bg-editor`・`--bg-hover`・`--border`・`--text-dim`・`--accent`・`--accent-text`・`--accent-soft`。`light-dark()` で明暗の両方）を使う。出力の欄・変数の表も、見出しの帯は `--bg-chrome`・中身は `--bg-side`・選んだ行は `--accent-soft` と左の `--accent` の線、で一覧（`.panel`）にそろえる。
+- 起動の窓は 1000×680 で中央に出す（`tauri.conf.json`。200% 表示の 1440×900 の画面で 1200×800 は下がはみ出した）。下に欄を足すときは、この高さでエディタが潰れないかを確かめる。
