@@ -627,7 +627,7 @@ function findingPosition(f: Finding): { lineNumber: number; column: number };   
 
 ```typescript
 type DiskState = { kind: 'text'; text: string; bom: boolean } | { kind: 'missing' } | { kind: 'unreadable'; reason: string };
-interface TabSnapshot { diskText: string | null; diskBom: boolean; dirty: boolean; deleted: boolean }
+interface TabSnapshot { diskText: string | null; diskBom: boolean; dirty: boolean; deleted: boolean; editorText: string } // editorText は戻ってきた中身との比べに使う
 type ExternalAction = 'none' | 'reload' | 'ask' | 'deleted';
 function decideExternal(tab: TabSnapshot, disk: DiskState): ExternalAction;
 ```
@@ -697,7 +697,7 @@ interface Tab {
   function afterChoice(choice: 'save' | 'discard' | 'cancel', saved: 'ok' | 'failed' | null): 'proceed' | 'stay';
   ```
 - 名前の付け替え: `rename_entry` の結果で、その `rel`（フォルダなら前方一致・大文字・小文字を区別しない）のタブの `rel` を書き換える。モデル・未保存の書き換え・取り消しの履歴は保たれる（4.15）。拡張子が変わったら `setModelLanguage`。
-- 外の変更（`applyExternal()`）: 全タブで `read_text` → `DiskState` → `decideExternal`。`reload` はモデルの中身を `pushEditOperations` で置き換え（取り消し可能）、`diskText` を更新。`ask` は知らせの帯に「外で変わりました: 読み直す／今の中身を残す」（選ぶまで中身を変えない・10.3）。「今の中身を残す」は `diskText` を今のディスクに更新し未保存のまま。`deleted` は「外で消えました」の印を出し、未保存にする（10.4）。
+- 外の変更（`applyExternal()`）: 全タブで `read_text` → `DiskState` → `decideExternal`。`reload` はモデルの中身を `pushEditOperations` で置き換え（取り消し可能）、`diskText` を更新。`ask` は知らせの帯に「外で変わりました: 読み直す／今の中身を残す」（選ぶまで中身を変えない・10.3）。「今の中身を残す」は `diskText` を今のディスクに更新し未保存のまま。`deleted` は「外で消えました」の印を出し、未保存にする（10.4）。消えた後に戻ってきて `none` になったときは、`diskText`・`diskBom` を今のディスクの値に揃えてから未保存でない状態にする（古い BOM で書き戻さない・5.7）。
 
 #### TreeView・Panels・StartView・Dialog（表示の部品・概要だけ）
 
