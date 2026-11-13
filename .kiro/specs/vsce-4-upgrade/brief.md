@@ -85,7 +85,7 @@ Node 22 への移行を先に済ませ（`ponytail-manual-ci` が「Node 22 に�
 - **前提の変化**: `vscode-mcp-client`（#231）が入り、`editors/vscode/package.json` は 316 → 249 行になった。vsce は今も `^3.0.0`（241 行）、`"package": "vsce package"` は 235 行、lock は 3.9.2（`package-lock.json` 1528 行）。その後の `package.json` の変化は版の数字だけ。`release.yml`・`release-setup-check.yml`・`publish-vsix.ps1`・`release-scripts-test.ps1` は 2026-11-03 から変わっていない（`NODE_VERSION: '22'` 27 行・`publish-vsce` 391 行・`Azure/login` 430 行・`publish-vsix.ps1` を呼ぶのは 438 行・`verify-pat` 74 行）。Node 22 は済んだ（上の申し送り）。
 - **触るファイル**: `editors/vscode/package.json`（241 行の 1 行）・`package-lock.json`。4.x で振る舞いが変われば `publish-vsix.ps1`（120 行）と `release-scripts-test.ps1`（276 行）の項目 12。公開の道がだめなら `release.yml` の `publish-vsce`・`release-setup-check.yml`（122 行）・`release` スキル・`tech.md` のリリースの節。
 - **規模**: 3〜6 タスク（前のまま）。
-- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `pasta-recipe-dev-actions`（`editors/vscode/package.json` の試験のスクリプト・`package-lock.json`）、`pasta-recipe`（`release.yml`）、`pasta-dll-multiarch`（`release.yml`）、CI に clang を入れるなら `pest-2-9-4-upgrade`（`release.yml`）。リリースの実行中は `release.yml` を main へ入れない。
+- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `pasta-recipe-dev-actions`（`editors/vscode/package.json` の試験のスクリプト・`package-lock.json`）、`pasta-recipe`（`release.yml`）、`pasta-dll-multiarch`（`release.yml`）。リリースの実行中は `release.yml` を main へ入れない。
 - **種別**: 基盤（道具の版を上げる。開発者の依頼で `/update` から起票）。
 - **要件定義のモデル**: Opus（決めることは「公開の道を `release-setup-check.yml` の 2 つの確かめで代えてよいか」と「だめなら OIDC の口へ移すか」の 2 つで、どちらも後から戻せる）。
 - **分割の案**: 不要。
@@ -97,3 +97,11 @@ Node 22 への移行を先に済ませ（`ponytail-manual-ci` が「Node 22 に�
 
 - `pasta-recipe-dev-actions` は `editors/vscode/package.json`・`package-lock.json` を変えなかった（上の「先に要るもの」に書いた重なりは無くなった）。拡張の開発の操作の流れは `editors/shared/` へ移り、拡張は `nodeGhostIO` で差し込む（同 spec の design.md の「File Structure Plan」「共有の流れ（`editors/shared/`）」）。
 - `build.yml` に job `vscode-test`（ubuntu-latest・Node 22・`editors/vscode` で `npm ci` → `npm test`。`PASTA_VSCODE_NO_WASM=1`）が入った。vsce を上げて lock が変われば、この job が main で `npm ci` と拡張の試験を走らせる（同 design.md の「Testing Strategy」の拡張の行）。
+
+## 申し送り（2026-11-13 の `/update` より）
+
+- 4.x の最新は 4.1.1（4.1.0 で OIDC の公開を help に出し、トークン交換を Marketplace の取り決めに合わせた）。`engines.node` は `>= 22`。4.1.1 の CLI にも `publish`・`verify-pat`・`unpublish` の `--azure-credential` は残っている（`src/main.ts`）。
+- 勧告の面で急ぐ理由が 1 つ増えた。`glob` GHSA-3g3m-2fjr-6pw4・`minimatch` GHSA-g3hv-75wg-m249（どちらも moderate）は、vsce 3.x の配下では 4.x でしか消えない（4.0 で glob を tinyglobby に替えた）。配る VSIX には入らない、パッケージを作る道具の中の DoS なので、公開の道を確かめるこの spec を待って見送った。
+- `@azure/msal-node` GHSA-xcx6-jx8p-x3h5（high）は、同じ `/update` の `npm audit fix` で 3.9.2 のまま消えた。
+- `release-setup-check.yml` は environment の保護規則で main からしか走らない。ブランチで vsce 4 を入れても、公開の道は統合の前には確かめられない。
+- 同じ `/update` で、`editors/vscode` の lock は互換の範囲で更新した（`@types/vscode` 1.146・`typescript-eslint` 8.72.2 など）。`package.json` は変えていない。

@@ -7,7 +7,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 現在の主題は次のとおり。
 
 - **0.5.3: VS Code を使わないエディタ pasta-recipe**（2026-11-12 開発者の決定「次のリリースにする。最優先事項」）。2026-11-12 にウェーブ 1 の 2 本（`vscode-scene-outline-play`・`scene-play-locals`）が入り、2026-11-13 にウェーブ 2 の `pasta-recipe` と、ウェーブ 3 の `pasta-recipe-dev-actions`（アプリのシーンの ▶・リロード・保存変数の表と書き換え・値を入れて実行）が入った。0.5.3 の spec は揃い、残りはリリース（下の「0.5.3 の範囲」と棚卸）。
-- **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`、2026-10-24 に起票した `vsce-4-upgrade`・`pest-2-9-4-upgrade`（下の「依存の更新」）。まとめは下の「版がまだ決まっていないもの」にある。
+- **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`、2026-10-24 に起票した `vsce-4-upgrade`（下の「依存の更新」）。まとめは下の「版がまだ決まっていないもの」にある。
 - **Phase 13: areka でノベルゲーム（0.6.0。2026-10-29 に 0.5.0 から順延）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性の 2 本（`scene-attribute-store`・`scene-condition-attributes`）は、2026-10-29 に 0.5.0 へ移した。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
@@ -203,11 +203,11 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 /release 0.5.3
 ```
 
-ゴールの後: 版の決まっていないもの: `scene-exact-match`、`scene-anchor-link`（先に置いた条件の spec は入った。`scene-exact-match` と文法・`act.lua`・`choice_select.lua`・`references.rs` を共有する）、`pest-2-9-4-upgrade`、`pasta-dll-multiarch`（`pasta-recipe` とリリースの席を共有する）、`vsce-4-upgrade`（`pasta-recipe-dev-actions` と `editors/vscode/package.json` を共有する）。0.6.0: `novel-areka-contract`・`novel-variable-scope`・`cue-command-runtime`・`shiori4-v4-host`（先頭。先に要るものはどれも入った）。
+ゴールの後: 版の決まっていないもの: `scene-exact-match`、`scene-anchor-link`（先に置いた条件の spec は入った。`scene-exact-match` と文法・`act.lua`・`choice_select.lua`・`references.rs` を共有する）、`pasta-dll-multiarch`（`pasta-recipe` とリリースの席を共有する）、`vsce-4-upgrade`（`pasta-recipe-dev-actions` と `editors/vscode/package.json` を共有する）。0.6.0: `novel-areka-contract`・`novel-variable-scope`・`cue-command-runtime`・`shiori4-v4-host`（先頭。先に要るものはどれも入った）。
 
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
-- 前回からの持ち越し（推奨は前回のまま）: `pasta-dll-multiarch` の版（推奨 0.6.0）、`vsce-4-upgrade`・`pest-2-9-4-upgrade` の版、`scene-exact-match` の版（遅くとも 0.6.0）、`scene-anchor-link` の版、会えた日数を数える spec を起票するか（`scene-condition-attributes` の研究の記録。推奨: 起票する）、`SOUL.md` §2・§5 の記述（§「Radix Trie 等」の例も古い）、`steering/structure.md` の作り直し、ghost_dev の emo2 開発のフォルダに残る撮影の保存データとログ。
+- 前回からの持ち越し（推奨は前回のまま）: `pasta-dll-multiarch` の版（推奨 0.6.0）、`vsce-4-upgrade` の版、`scene-exact-match` の版（遅くとも 0.6.0）、`scene-anchor-link` の版、会えた日数を数える spec を起票するか（`scene-condition-attributes` の研究の記録。推奨: 起票する）、`SOUL.md` §2・§5 の記述（§「Radix Trie 等」の例も古い）、`steering/structure.md` の作り直し、ghost_dev の emo2 開発のフォルダに残る撮影の保存データとログ。
 - `review-improvement-loop`（常駐）が次に回るときは、v0.5.2 の後のコードを基準にする。
 
 ### 人手の確認が残っている項目
@@ -340,7 +340,7 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 - `pasta-dll-multiarch`（2026-10-23 起票）: x64 版と arm64 版の pasta.dll をビルドし、32bit 版と同じリリースで出す。見本ゴーストの .nar には、areka の探し方（x64 は `pasta.x64.dll` → `pasta.dll`、arm64 は `pasta.arm64.dll` → `pasta.x64.dll` → `pasta.dll`）に合う名前で同梱する。接尾辞の無い `pasta.dll` は SSP 向けの 32bit 版のまま。`pasta_check` は名前も arch も気にしないので今のまま使える。手を入れるのは `release.ps1`・`.cargo/config.toml`（aarch64 の `crt-static`）・配布物とリリース CI の検査・マニュアル（`[loader] ffi` で作者の DLL の arch が合わないと読めない注意）。aarch64 で LuaJIT がビルドできるかは確かめていない。`shiori4-v3-portable` の後（areka は shiori4 の入口で読むため）。版は開発者が後で決める（2026-10-23）。推奨は 0.5.0（2026-10-24 の棚卸）だったが、2026-10-29 にノベルゲームを 0.6.0 へ順延したので、推奨は 0.6.0。
 - `scene-exact-match`（2026-10-21 起票。ghost_dev のヒアリング）: 中身は台帳の行にある。0.6.0 の `novel-talk-flow` が前提にするので、遅くとも 0.6.0。選び方の `scene-pick-modes` は 0.5.0 で入った。
 - `scene-anchor-link`（2026-10-08 起票）: 中身は上の「Phase 11 の残り」の「文中のシーンリンク」にある。先に置いた `scene-condition-attributes` は入った。
-- `vsce-4-upgrade`・`pest-2-9-4-upgrade`（2026-10-24 起票）: 中身は下の「依存の更新」にある。
+- `vsce-4-upgrade`（2026-10-24 起票）: 中身は下の「依存の更新」にある。
 
 ## 依存の更新（2026-10-24 起票）
 
@@ -348,8 +348,8 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 
 - **`mlua-stdlib-removal`・`toml-serialization`・`mlua-0-12-upgrade`**: 0.4.3 で入った（「完了フェーズ」）。経緯と決定は各 spec の `.kiro/specs/completed/<name>/` にある。
 - **`vsce-4-upgrade`**: `@vscode/vsce` 3.9 → 4.0。Node 22 が要る（`release.yml`・`release-setup-check.yml` は `ponytail-manual-ci` が 2026-11-03 に 22 にした）。`--azure-credential` の公開の道が 4.x でも通るかを、`release-setup-check.yml` で公開の前に確かめる。先に要った `ponytail-manual-ci` は 2026-11-03 に入った。`editors/vscode/package.json` を `vscode-mcp-client` と共有するので、その後に置く。
-- **`pest-2-9-4-upgrade`**: pest 2.9.2 → 2.9.4 以降。2.9.4 は `std` で stacker・psm を必ず引き込み、psm が wasm32 のビルドに clang を要るので、手元の `build-wasm.ps1` が落ちる。wasm32 向けの C コンパイラを手元と CI に用意するか、上流に直してもらうかを要件で比べる。先に置いた ponytail の 3 本（`ponytail-dsl-parser`・`ponytail-core-registry`・`ponytail-editor-tooling`）は 2026-11-03 までに入った。上げた後も、括弧の走査が pest の守りより先に走るので、64 段までの辞書の結果は変わらない（`ponytail-dsl-parser` の申し送り）。
-- **席**: `pest-2-9-4-upgrade` は `Cargo.lock` とルートの `Cargo.toml` を触る。同じく `Cargo.lock` を触る spec とは、同じウェーブに置かない（0.5.0 の `debug-mcp-runtime` は 2026-11-03 に入り、`socket2` を外した）。`vsce-4-upgrade` はリリースの席（`release.yml`）を触るので、リリースの実行中は main へ入れない。
+- **`pest-2-9-4-upgrade`（2026-11-13 取り下げ）**: 上流の側で片付いた。pest 2.9.6 では stacker・psm が `pest_stack_guard` に移り、引き込むのはネイティブの 6 ターゲット（x86_64-pc-windows-msvc など）だけになった。wasm32 には入らないので clang は要らない。2026-11-13 の `/update` の互換の更新で pest 一式を 2.9.6 にし（`build-wasm.ps1 -Release` が通ることを確かめた）、spec を取り下げた。括弧の走査が pest の守りより先に走るので、64 段までの辞書の結果は変わらない（`ponytail-dsl-parser` の申し送り）。
+- **席**: `vsce-4-upgrade` はリリースの席（`release.yml`）を触るので、リリースの実行中は main へ入れない。
 
 ## リリース（`release` スキル）
 
@@ -380,7 +380,6 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 - [ ] scene-exact-match -- 完全一致でシーンを呼ぶ `＞＞シーン名`（同名が複数ならランダム。既存の `search_scene_exact` を使う）と、`pasta.toml` の `[scene] match = "exact"`（`＞`・イベントの受け口・OnTalk・時報・選択肢の飛び先を全部完全一致にする。既定は前方一致）を足す。既定のモードでも、イベントの受け口はイベント ID の直後が英大文字で続く候補（`＊OnInstallCompleteAll` など）を外す。`novel-talk-flow` の完全一致の切り替えを引き取る（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者が承認して `event-scene-exact-match` から広げた）。版は未定。`scene-anchor-link` と同じウェーブに置かない（文法・`act.lua`・`choice_select.lua` を共有する）。Dependencies: none
 - [ ] vsce-4-upgrade -- `@vscode/vsce` を 4.x に上げる。リリース CI の Node は `ponytail-manual-ci` が 22 にした。`--azure-credential` の公開の道を `release-setup-check.yml` で確かめる。だめなら 4.x の OIDC の口へ移すかを決める（2026-10-24 起票。`/update` から）。版は未定。`pasta-dll-multiarch`・`pasta-recipe`（`release.yml`）、`pasta-recipe-dev-actions` は入った（`editors/vscode/package.json`・lock は変えず、`build.yml` に job `vscode-test` を足した）。Dependencies: none（`ponytail-manual-ci` は入った）
-- [ ] pest-2-9-4-upgrade -- pest を 2.9.4 以降に上げても、手元と CI の 3 か所で `pasta_lsp` の WASM のビルドが通るようにする（psm が wasm32 に clang を要る）。wasm32 向けの C コンパイラの用意か、上流の直しかを決める（2026-10-24 起票。`/update` から）。版は未定。`Cargo.lock` の席を触る spec と同じウェーブに置かない（0.5.0 の `debug-mcp-runtime` は 2026-11-03 に入った）。Dependencies: none（ファイルの順番で後に置いた ponytail の 3 本は入った）
 - [x] pasta-recipe -- VS Code を使わない pasta DSL のエディタ（仮名）。Tauri 2 ＋ Vite ＋ Monaco の Windows x64 の単一の exe。ゴーストのフォルダのドラッグドロップで `ghost/master` を開き、最近開いたものを TOML で残す。ファイルとシーンのツリー、`.pasta` の着色（TextMate ＋ セマンティックトークン）と診断、ゴースト全体の検査、コードブロックの Lua の着色と `.lua` の編集、保存。解析は Rust の側で `pasta_lsp`・`pasta_check` を直接呼ぶ。`editors/recipe/`（`src-tauri` は別の Cargo ワークスペース）。リリースの成果物 `pasta-recipe.zip` とマニュアル（2026-11-12 起票。開発者の依頼「最優先事項」）。0.5.3 のウェーブ 1（2026-11-12 の棚卸）。`pasta-dll-multiarch`・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`vscode-scene-outline-play` は入った）
 - [x] pasta-recipe-dev-actions -- VS Code 拡張の実行の流れ（MCP クライアント・リロード・シーン実行・変数ダンプ）を `editors/shared/` へ移し、入出力（HTTP の POST・ファイルの読み取り・更新時刻）だけを Node と Tauri で差し込む。拡張の振る舞いは変えない。`pasta-recipe` に、シーンの ▶・リロード・出力の欄・保存変数の表（`OnPastaSetSaveVariable` で書き換え・削除。表は見るだけ）・ローカル変数を入れた実行を足す（2026-11-12 起票。`pasta-recipe` から分けた）。0.5.3 のウェーブ 2 の見込み。`vsce-4-upgrade`（`editors/vscode/package.json`）と同じウェーブに置かない。Dependencies: pasta-recipe（`scene-play-locals`・`vscode-scene-outline-play` は入った）
 
