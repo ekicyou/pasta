@@ -200,7 +200,7 @@
   - _Boundary: JsLicenses, AppAbout, AppDeny_
   - _Requirements: 12.5, 12.10, 13.7_
 
-- [ ] 8.2 配布物 `pasta-recipe.zip` を作るスクリプトを作る
+- [x] 8.2 配布物 `pasta-recipe.zip` を作るスクリプトを作る
   - 古い zip を消す → `npm ci` → `tauri build --no-bundle` → `cargo about` → 画面の表示を区切りの見出し付きで足す → exe と表示の 2 つの zip → 中身が 2 つだけかの自己検査、の順に走り、どの段の失敗でも終了コード 1 で止まって半端な zip を残さない
   - 手元で走らせると `release/pasta-recipe.zip` ができ、中身が exe と `THIRD_PARTY_LICENSES.txt` の 2 つで、表示に `monaco-editor` と `tauri` の名前が両方ある
   - _Requirements: 12.1, 12.2, 12.4, 12.5_
