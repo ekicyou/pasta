@@ -130,3 +130,78 @@
 
 - `vsce-4-upgrade`: `editors/vscode/package.json`・`package-lock.json` が重なる。同じウェーブに置かない。
 - `pasta-recipe`（completed）: 要件 1.3・11.4 は「この spec の機能では」と切ってあるので書き換えない。完了のときに steering（`tech.md` の pasta-recipe の節・`structure.md` の `editors/`）を直す。
+
+## 7. 設計の調べ（2026-11-13・`/kiro-design`）
+
+- **Discovery Scope**: Extension（light discovery。外の新しい部品は無いので、Web の調べはせず、手元のコードと cargo の置き場の crate のソースで確かめた）
+- **使ったスキル・決まり**: `kiro-spec-design` の `design-principles`・`design-discovery-light`・`design-synthesis`・`design-review-gate`。ponytail（最小の完全な変更）。
+
+### 7.1 Research Needed の答え
+
+| # | 問い | 答え | 設計への効き |
+| - | ---- | ---- | ------------ |
+| 1 | reqwest を足して crate が増えるか | `Cargo.lock` の `reqwest 0.13.5` は tauri の **Android・iOS 向けだけ**の依存（`tauri-2.12.5/Cargo.toml` の `[target.'cfg(any(target_os = "android", …))'.dependencies.reqwest]`・`default-features = false`・`json`・`stream`）。lock の包みは増えないが、Windows では reqwest と hyper・hyper-util・tower・http-body-util などが**新しく compile される**。ライセンスは MIT・Apache-2.0（`deny.toml`・`about.toml` の許可の表に入っている）。`cargo about` は `--target x86_64-pc-windows-msvc` で自動で拾う。reqwest 0.13.5 には `ClientBuilder::retry`・`retry::never()`・`no_proxy`・`http1_only`・`pool_max_idle_per_host`・`Error::is_connect`・`is_timeout` がある | reqwest を `default-features = false` で直接の依存に足す（OPEN QUESTION 3） |
+| 2 | 拡張の `tsconfig.json` で `.ts` 付きの import をどう許すか | 拡張は `tsc` を走らせない（`compile` は esbuild・`lint` は型を見ない `typescript-eslint` の recommended）。`out/` は esbuild の出力。`tsconfig.json` は手元のエディタの型の表示にだけ効く | `noEmit`・`allowImportingTsExtensions` を足し、`rootDir`・`outDir`・`declaration*` を外し、`include` に `../shared/**/*`。`eslint src` は `../shared` を見ない（基準の外のファイルは無視される）。共有の型はアプリの `tsc --noEmit` が見る |
+| 3 | 画面の `tsc` と `node --test` の両方を通す書き方 | アプリは `verbatimModuleSyntax`・`allowImportingTsExtensions`・`types: ["vite/client"]`（vite の型が node の型を引く）。`node --test` は型を外すだけ | 共有は `import type` と `.ts` 付きの相対 import・enum なし・`Uint8Array`/`TextDecoder` だけ |
+| 4 | Vite が `editors/recipe` の外を配れるか | `editor.ts` が既に `../../vscode/syntaxes/*.json`・`../../vscode/package.json` を読んでいる（許された所から import されたファイルは配られる）。本番は束ねるので関係ない | `server.fs.allow` は触らない |
+| 5 | 保存した中身での見出しの今の行 | タブの解析は書き換えから 200ms ＋往復遅れる。ツリーの行の鍵は `rel|名前|n` | 保存の後に、保存した中身（タブの `diskText`・無ければディスク）を解析し直し、`ScenePath`（名前と同じ名前の中の順）で引く。鍵の文字列は戻さず、`TreeRow` に `scene` を足す |
+| 6 | `variables.toml` の型 | `persistence.rs` の `lua_value_to_toml_strict`: String・Integer（整数の Lua の数）・Float（それ以外）・Boolean・Array（列）・Table。Datetime は書かない。最上位のキーが保存変数。`external_control.lua` は名前を区切らない（`require("pasta.save")[name] = value`） | 型は 4 つ（数＝整数と浮動小数点数、表＝配列と表）。`"a.b"` のキーはそのまま Reference0 に返す |
+| 7 | マニュアル `debug/recipe.md` がスキルの参照資料の対象か | `book/tools/gen-skill-refs.mjs` の `GENERATION_MAP`（24 件）に `debug/` の章は無い | 照合は変わらない。リンクの検証だけ |
+| 8 | 送るファイルのパスの綴り | `playscene.rs` の `resolve_position` は `std::path::absolute`（canonicalize しない）で、区切りと Windows の大小は `SourceMap::scene_at` が揃える。アプリの master も `std::path::absolute` 由来（ディスクの綴りのまま） | 絶対パスを `\` で結んで送る。8.3 の短い名前の違いは拡張と同じ危うさで、増えない |
+| 9 | 途中のゴーストの切り替え | 待たせると最長で数十秒止まる。`main.ts` の `opening` の鎖は開く流れだけ | 待たない。操作は始めの `GhostTarget` を持ち、門は今の master だけを通す。操作はアプリ全体で 1 つずつ（OPEN QUESTION 4） |
+
+ほかに確かめたこと:
+
+- `node --test "src/**/*.test.ts" "../shared/*.test.ts"` は、`package.json` の無いフォルダの `.ts`（型を外す・`import` で ESM と見る）も含めて通った（手元の Node 26。CI は Node 22 なので実装で確かめる。通らなければ `editors/shared/package.json` に `{"type":"module"}` を置く）。
+- Monaco 0.57 に `languages.registerCodeLensProvider`・`editor.registerCommand` と、`features/register.all` に入る `codelens.showLensesInCurrentLine`（「Show CodeLens Commands For Current Line」）がある。
+- 開始の画面の間は `style.css` の `body:has(#start:not([hidden])) > :not(#start, …)` がツールバーごと隠すので、リロードのボタンは何もしなくても出ない（2.5）。
+- `is_local_var_name` は `pasta_dsl::parser::is_id`（pest の `id = !(reserved_id) ~ identifier`）。TS で写すとずれるので Rust で呼ぶ。`pasta_dsl` は lock にある（`pasta_lsp`・`pasta_check` の依存）。
+- `OnPastaSetSaveVariable` の成功は `return nil`（204）、失敗は `FAILURE.reply` の表記。SecurityLevel が external のときも 204 なので、成功と見分けられない（表を読み直して確かめる）。
+- 拡張の試験は CI で走らない（`build.yml` に拡張の `npm test` の job は無い。`release.yml` は `vsce package` だけ）。`.vsix` は esbuild の束ねなので `../shared` を中に入れなくてよい（`.vscodeignore` は `src/**`・`**/*.ts` を外す）。
+
+### 7.2 合成（generalization・build vs adopt・simplification）
+
+- **一般化**: 6 つの操作（▶・値を入れて実行・リロード・表示・書き換え・削除と追加）は、どれも「相手を決める → 見出し → （保存）→ 流れ → 報告」の同じ手順。拡張の `execute` の後半を `DevSession.execute(cmd, ghost)` として共有し、操作は `DevCommand { title, saves, run }` を足すだけにした。書き換え・削除・追加は 1 つの `setSaveVariable(ctx, name, change)` にまとめた。
+- **採る・作る**: HTTP は reqwest を採る（lock にある・接続の失敗と時間切れを見分けられる・chunked の応答を自分で読まなくてよい）。TOML は `toml` crate（ランタイムと同じ）、名前は `pasta_dsl::parser::is_id`（ランタイムと同じ）。窓は `dialog.ts` の `open` を広げて使う（新しい窓の部品を作らない）。下の欄は `.panel` の見た目をそのまま使う。
+- **削ったもの**: 共有の側の `dirname`・`basename`・`relative`（ルートは Rust・拡張が渡す）、拡張の古いファイルの写し（re-export）、アプリの `clientInfo` の名前の切り替え、画面の TOML の部品、拡張の CI の job、`OnPastaScene` の画面、表の欄を開いたときの自動の読み込み。
+
+### 7.3 設計の決定
+
+#### 決定: 入出力の面は 5 つ（post・list・stat・read・join）
+- **Context**: 移す 5 つが使う Node の入出力（2 章の 3 の表）。
+- **Alternatives**: (1) brief の 3 つ（post・readText・mtime）、(2) 5 つ、(3) Node の `fs` の形を写す。
+- **Selected**: (2)。`readText`・`mtimeOf`・`openLogCursor`・`readNewLines`・`decodeDescriptName` は共有の中で 5 つの上に書く。`join` を面に入れ、拡張は `path.join` のまま（出力の文言のパスの区切りが変わらない）。
+- **Trade-offs**: 関数に `io` を渡すので、拡張の試験の呼び方が変わる（確かめることは変わらない）。
+
+#### 決定: 相手の選び方と文言は `devSession.ts` で共有
+- **Context**: 要件 10.1（相手の探し方・出力の行と案内の文言も 1 本）。
+- **Selected**: `devCommands.ts` の `chooseEndpoint`・`execute` の後半・文言の定数・`clock()`・`ERROR_KINDS` を移す。vscode に固有のもの（対象の文書・`accepts`・`BAD_DOCUMENT`・`NOT_IN_GHOST`・QuickPick・保存・進み具合・通知）は `DevHost` で差し込む。
+- **Follow-up**: `devCommands.e2e.test.ts` を変えずに通すことで、拡張の振る舞いが変わらないことを確かめる。
+
+#### 決定: Rust の読み取りの門は「直下の descript.txt・pasta.toml と profile の下のファイル」
+- **Context**: 要件 9.4（読むのは 4 つ）と 2.4（`pasta.log` の場所は `pasta.toml` の設定で `profile/` の下のどこでもよい）。
+- **Alternatives**: (1) `profile/` の下のファイル全部（logger.rs の場所の決まりをそのまま門にする）、(2) Rust でも `pasta.toml` を読んで `pasta.log` の場所を決める（TS の読み方とずれると読めなくなる）、(3) 画面が渡す場所を信じる。
+- **Selected**: (1)。共有の流れが読むのは 4 つだけで、門はその場所の決まりと同じ幅。
+- **Trade-offs**: 画面から求めれば `profile/pasta/save/` の保存も読める（読むだけ・開いているゴーストの中）。要件の「限り」より門が広い（OPEN QUESTION 2）。
+
+#### 決定: 途中で別のゴーストを開いても待たない
+- **Context**: 要件 5.2・Research Needed 9。
+- **Selected**: 操作はアプリ全体で 1 つずつ。操作は始めの `GhostTarget` を持つ。門が今の master だけを通すので、前のゴーストの操作は新しいゴーストのファイルを読めない。表へ当てる前にゴーストの鍵を比べる。
+- **Trade-offs**: 前のゴーストの操作は、読み取りを断られて「確かめられない」などの結果で終わる（前のゴーストの見出しの下）。
+
+#### 決定: 下の欄は 4 つの切り替え
+- **Context**: 要件 11.1（1000×680 でエディタを残す）・11.2（一覧と同じ見た目）。180px の横並びに 4 つ置くと 1 つ約 250px。
+- **Selected**: 高さ 180px のまま、見出しの帯に 4 つのボタンを置き、中身を 1 つずつ見せる。開発の操作は出力へ切り替える（焦点は動かさない）。
+- **Trade-offs**: 今の「診断と検査を同時に見る」形が変わる（OPEN QUESTION 1）。
+
+#### 決定: 表の読み直しは同じ操作の中で
+- **Context**: 要件 6.9・7.6。
+- **Selected**: ▶・値を入れて実行（鳴らしたとき）と書き換え・削除・追加の `run` の終わりで `dumpVariables(ctx)` を呼ぶ。見出しは 1 つ・相手の確かめも 1 回。
+- **Trade-offs**: 表の読み直しの「書き出されなかった」も、その操作の行と知らせに混ざる。
+
+## 8. 設計のリスクと手当て
+
+- 拡張の振る舞いを移すときにずらす — `devCommands.e2e` と 5 つの試験を変えずに（呼び方だけ直して）通す。共有の流れの試験をアプリの CI で走らせる。
+- reqwest で Windows の exe が大きくなる・compile が増える — `package.ps1` の 30 MB の上限の検査がそのまま見張る。
+- CI の Node 22 で `../shared` の `.ts` が読めない — 手元で通ることは確かめた。通らなければ `editors/shared/package.json`（`"type": "module"`）。
+- CodeLens はマウスの操作 — キーボードはツリーのメニューと Monaco の「Show CodeLens Commands For Current Line」で届く（実機で確かめる）。
