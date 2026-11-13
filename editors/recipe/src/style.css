@@ -118,6 +118,23 @@ dialog input {
   padding: 4px 6px;
   font: inherit;
 }
+/* ローカル変数の窓の組の行（名前・型・値・消す、その下に弾きの理由） */
+.locals-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.locals-row input {
+  flex: 1;
+  width: auto;
+}
+.locals-problem {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--accent);
+}
 .dialog-buttons {
   display: flex;
   justify-content: flex-end;

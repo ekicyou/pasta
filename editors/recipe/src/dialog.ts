@@ -22,8 +22,9 @@ export function chooseResult(returnValue: string, count: number): number | null 
 export interface OpenOptions {
   /** 文とボタンの間に並べる部品（入力・選択・組の行など） */
   parts?: HTMLElement[];
-  /** 決める（value "ok"）で閉じる前の確かめ。true で閉じる・false で閉じない・文字列は閉じずに窓に理由として出す */
-  accept?: () => boolean | string;
+  /** 決める（value "ok"）で閉じる前の確かめ。true で閉じる・false で閉じない・文字列は閉じずに窓に理由として出す。
+   * Rust へ尋ねる確かめ（組のインライン表）のために Promise も取る。答えを待つ間の決めるは重ねない */
+  accept?: () => boolean | string | Promise<boolean | string>;
 }
 
 export function open(message: string, buttons: [value: string, label: string][], options: OpenOptions = {}): Promise<string> {
@@ -41,13 +42,22 @@ export function open(message: string, buttons: [value: string, label: string][],
     reason = document.createElement("p");
     reason.setAttribute("role", "alert");
     form.append(reason);
-    // Enter での送りも submitter は最初のボタンになる
+    let waiting = false;
+    // Enter での送りも submitter は最初のボタンになる。閉じるのは答えを見てから自分で閉じる
     form.addEventListener("submit", (e) => {
       if ((e.submitter as HTMLButtonElement | null)?.value !== "ok") return;
-      const r = accept();
-      if (r === true) return;
       e.preventDefault();
-      if (typeof r === "string") reason!.textContent = r;
+      if (waiting) return;
+      waiting = true;
+      void Promise.resolve().then(accept)
+        .then((r) => {
+          // 待つ間に Esc で閉じていたら close は何もしない
+          if (r === true) dialog.close("ok");
+          else if (typeof r === "string") reason!.textContent = r;
+        })
+        .finally(() => {
+          waiting = false;
+        });
     });
   }
   const row = document.createElement("div");
