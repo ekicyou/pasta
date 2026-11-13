@@ -140,6 +140,12 @@ export function checkRows(report: Report, openRels: ReadonlySet<string>): { rows
   return { rows, errors, warnings: shown.length - errors };
 }
 
+/** 下の欄の帯の、書く面のボタンの名前。検査がまだ・できないときは診断の件数だけ（4.2・11.4） */
+export function writeFaceLabel(diagnostics: number, check: { errors: number; warnings: number } | null): string {
+  const tail = check ? `・誤り ${check.errors} 件・警告 ${check.warnings} 件` : "";
+  return `診断・検査（${diagnostics} 件${tail}）`;
+}
+
 /** タブの言語は拡張子で決める。.pasta・.lua 以外は色なし（5.2） */
 export function languageOf(rel: string): "pasta" | "lua" | "plaintext" {
   const ext = rel.slice(rel.lastIndexOf("/") + 1).match(/\.([^.]+)$/)?.[1].toLowerCase();

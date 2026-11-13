@@ -228,9 +228,40 @@ dialog input {
 }
 #panels {
   display: flex;
-  height: 180px;
+  flex-direction: column;
   border-top: 1px solid var(--border);
   background: var(--bg-side);
+}
+/* 面を切り替える帯（約 27px）。ボタンはタブの列と同じ形で、今の面を aria-pressed で示す */
+.panels-bar {
+  display: flex;
+  background: var(--bg-chrome);
+  border-bottom: 1px solid var(--border);
+}
+.panels-bar button {
+  border: none;
+  border-top: 3px solid transparent;
+  border-right: 1px solid var(--border);
+  background: none;
+  color: var(--text-dim);
+  padding: 3px 12px;
+  white-space: nowrap;
+}
+.panels-bar button:hover {
+  background: var(--bg-hover);
+}
+.panels-bar button[aria-pressed="true"] {
+  background: var(--bg-side);
+  border-top-color: var(--accent);
+  color: CanvasText;
+  font-weight: bold;
+}
+.panels-face {
+  display: flex;
+  height: 180px;
+}
+.panels-face[hidden] {
+  display: none;
 }
 .panel {
   flex: 1;

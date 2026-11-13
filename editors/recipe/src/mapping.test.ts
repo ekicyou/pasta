@@ -16,6 +16,7 @@ import {
   tokensToData,
   treeRows,
   visibleFindings,
+  writeFaceLabel,
   type TreeNode,
 } from "./mapping.ts";
 
@@ -265,4 +266,9 @@ test("シーンの道は名前と同じ名前の中の順で、保存した中�
   assert.equal(sceneLine(removed, [{ name: "挨拶", n: 1 }]), 9);
   assert.equal(sceneLine([], [{ name: "挨拶", n: 0 }]), undefined);
   assert.deepEqual(scenePaths([]), []);
+});
+
+test("writeFaceLabel は書く面のボタンに診断と検査の件数を出す（検査がまだ・できないときは診断だけ）", () => {
+  assert.equal(writeFaceLabel(0, null), "診断・検査（0 件）");
+  assert.equal(writeFaceLabel(3, { errors: 1, warnings: 2 }), "診断・検査（3 件・誤り 1 件・警告 2 件）");
 });

@@ -119,6 +119,7 @@ async function openNow(path: string, origin: string): Promise<void> {
       switching = false;
     }
     current = info.master;
+    panels.show("write"); // 開いた直後は書く面
     start.hide();
     // すべての .pasta のシーンを作る（4.8）。一覧が読めなければ tree.reset が理由を出している
     files = (await tree.reset())?.files ?? [];
