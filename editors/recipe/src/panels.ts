@@ -67,8 +67,12 @@ export class Panels {
   /** 面を切り替える。焦点は動かさない（4.2） */
   show(face: Face): void {
     for (const f of ["write", "run"] as const) {
-      this.#faces[f].button.setAttribute("aria-pressed", String(f === face));
-      this.#faces[f].body.hidden = f !== face;
+      const { button, body } = this.#faces[f];
+      button.setAttribute("aria-pressed", String(f === face));
+      // 隠す面の中の焦点は body へ落ちるので、その面へ戻るボタンへ置く（エディタの焦点は触らない）
+      const lost = f !== face && !body.hidden && body.contains(document.activeElement);
+      body.hidden = f !== face;
+      if (lost) button.focus();
     }
   }
 

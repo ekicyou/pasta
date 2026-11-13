@@ -12,6 +12,8 @@ import { findSame, sameMaster } from "./tabs.ts";
 import { planGhostChanged } from "./sync.ts";
 import { notify } from "./dialog.ts";
 import { TreeView } from "./tree.ts";
+import { DevActions } from "./devActions.ts";
+import { OutputPanel, VariablesPanel } from "./devPanels.ts";
 
 const editor = await createEditor(document.getElementById("editor")!);
 const docs = new Documents(editor, document.getElementById("tabs")!, document.getElementById("notices")!, {
@@ -33,6 +35,13 @@ const docs = new Documents(editor, document.getElementById("tabs")!, document.ge
 });
 const tree = new TreeView(document.getElementById("tree")!, docs);
 const panels = new Panels(document.getElementById("panels")!, docs);
+// 開発の操作の糊を 1 つ組み、下の欄の動かす面とつなぐ。保存変数の表の操作は 5.2・5.3 でつなぐ
+const devActions = new DevActions({
+  docs,
+  output: new OutputPanel(panels.output),
+  vars: new VariablesPanel(panels.variables, { onRefresh() {}, onEdit() {}, onDelete() {}, onAdd() {} }),
+  panels,
+});
 // 保存の後と見張りの知らせの検査の求めを 300 ms で 1 回にまとめる（9.9）
 const checker = new CoalescingRunner(async () => panels.setReport(await checkGhost().catch((reason: unknown) => String(reason))), 300, globalThis);
 
@@ -55,7 +64,11 @@ saveButton.className = "primary";
 saveButton.addEventListener("click", () => {
   if (docs.active) void docs.save(docs.active);
 });
-document.getElementById("toolbar")!.append(saveButton);
+// 開始の画面では今の CSS がツールバーごと隠す（2.5）
+const reloadButton = document.createElement("button");
+reloadButton.textContent = "SHIORI をリロード";
+reloadButton.addEventListener("click", () => void devActions.reload());
+document.getElementById("toolbar")!.append(saveButton, reloadButton);
 
 const start = new StartView(document.getElementById("start")!, document.getElementById("toolbar")!, (path, origin) => void openPath(path, origin));
 
@@ -119,6 +132,7 @@ async function openNow(path: string, origin: string): Promise<void> {
       switching = false;
     }
     current = info.master;
+    devActions.setGhost(info);
     panels.show("write"); // 開いた直後は書く面
     start.hide();
     // すべての .pasta のシーンを作る（4.8）。一覧が読めなければ tree.reset が理由を出している
