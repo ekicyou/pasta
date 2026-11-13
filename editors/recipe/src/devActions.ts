@@ -24,6 +24,7 @@ export type { SceneTarget };
 
 export const notFoundInSaved = (label: string, rel: string): string => `シーン「${label}」が保存した中身に見つかりません（${rel}）`;
 export const switchedMidOp = "操作の途中で別のゴーストを開いたので、保存した中身を読めません";
+export const switchedInDialog = "窓を開いている間に別のゴーストを開いたので、送りませんでした";
 export const notToml =(path: string, reason: string): string => `${path} を TOML として読めませんでした: ${reason}`;
 
 export interface DevActionsDeps {
@@ -109,7 +110,8 @@ export class DevActions {
     if (info === null) return;
     const key = `${info.root.toLowerCase()}|${target.rel.toUpperCase()}|${JSON.stringify(target.path)}`;
     const r = await this.#dialogs.localsDialog(target.label, this.#locals.get(key) ?? []);
-    if (r === null || this.#current?.master !== info.master) return; // 窓の間に別のゴーストを開いたら鳴らさない
+    if (r === null) return;
+    if (this.#current?.master !== info.master) return this.#stopSwitched("値を入れて実行", info); // 窓の間に別のゴーストを開いたら鳴らさない
     this.#locals.set(key, r.pairs);
     return this.#play("値を入れて実行", target, r.table);
   }
@@ -143,29 +145,31 @@ export class DevActions {
   /** 書き換え（7.1・7.2） */
   async editVariable(row: VarRow): Promise<void> {
     if (row.kind === "table") return; // 表の行には操作が出ない（6.3）
-    const master = this.#current?.master;
+    const info = this.#current;
     const v = await this.#dialogs.editVariable({ ...row, kind: row.kind });
-    if (v) await this.#change(master, v.name, { type: v.kind, value: v.value });
+    if (v) await this.#change(info, v.name, { type: v.kind, value: v.value });
   }
 
   /** 削除: 確かめてから型 delete で送る（7.3） */
   async deleteVariable(row: VarRow): Promise<void> {
-    const master = this.#current?.master;
-    if (await this.#dialogs.confirmDelete(row.name)) await this.#change(master, row.name, { type: "delete" });
+    const info = this.#current;
+    if (await this.#dialogs.confirmDelete(row.name)) await this.#change(info, row.name, { type: "delete" });
   }
 
   /** 追加: 入れた名前で送る（7.4・7.5 は窓の中） */
   async addVariable(): Promise<void> {
-    const master = this.#current?.master;
+    const info = this.#current;
     const v = await this.#dialogs.editVariable(null);
-    if (v) await this.#change(master, v.name, { type: v.kind, value: v.value });
+    if (v) await this.#change(info, v.name, { type: v.kind, value: v.value });
   }
 
   /** 書き換えを頼み、成功でも断りでも届かなくても同じ操作の中で表を読み直す（7.6〜7.8）。ファイルは書かない（7.9） */
-  async #change(master: string | undefined, name: string, change: SaveVariableChange): Promise<void> {
-    if (this.#current?.master !== master) return; // 窓の間に別のゴーストを開いたら、前の表の名前を送らない
+  async #change(info: GhostInfo | null, name: string, change: SaveVariableChange): Promise<void> {
+    const title = "保存変数を書き換え";
+    if (info === null) return;
+    if (this.#current?.master !== info.master) return this.#stopSwitched(title, info); // 窓の間に別のゴーストを開いたら、前の表の名前を送らない
     return this.#execute({
-      title: "保存変数を書き換え",
+      title,
       saves: false,
       run: async (ctx) => merge(formatSet(name, change, await setSaveVariable(ctx, name, change)), await this.#readTable(ctx)),
     });
@@ -199,6 +203,11 @@ export class DevActions {
     }
     if (current()) this.#deps.vars.setRows(rows);
     return { lines: [`保存変数（${o.path}）を表に出しました`] };
+  }
+
+  /** 窓の間に別のゴーストを開いた: 何も送らず、前のゴーストの名前を添えて止める（5.2） */
+  #stopSwitched(title: string, info: GhostInfo): void {
+    this.#session.stop([`${clock()} ${title} — ${switchedInDialog}（${info.name}）`], switchedInDialog);
   }
 
   async #execute(cmd: DevCommand): Promise<void> {

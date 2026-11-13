@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createFakeGhostIO, type FakeGhostIO, type PostRequest } from "../../shared/fakeGhostIO.ts";
 import type { PostOutcome } from "../../shared/ghostIO.ts";
 import { BUSY, SAVE_FAILED } from "../../shared/devSession.ts";
-import { DevActions, merge, noDescript, notFoundInSaved, notToml, switchedMidOp } from "./devActions.ts";
+import { DevActions, merge, noDescript, notFoundInSaved, notToml, switchedInDialog, switchedMidOp } from "./devActions.ts";
 import { isDevSource } from "./tabs.ts";
 import { sceneLabel, sceneTargets } from "./mapping.ts";
 import type { LocalPair, SceneNode, VarRow } from "./ipc.ts";
@@ -458,6 +458,55 @@ test("値を入れて実行の窓を閉じたら何も送らない（8.1）", as
   const s = setup({ raise: played, disk: { "dic/a.pasta": "DISK" }, analyze: morningScenes });
   await s.actions.runWithLocals(morning);
   assert.equal(s.count("dev_begin") + s.raises().length, 0);
+});
+
+test("値を入れて実行の窓の間に別のゴーストを開いたら、何も送らずに前のゴーストの名前を添えて止める（5.2）", async () => {
+  const holder: { s?: ReturnType<typeof setup> } = {};
+  holder.s = setup({
+    raise: played,
+    disk: { "dic/a.pasta": "DISK" },
+    analyze: morningScenes,
+    locals: () => (holder.s!.actions.setGhost(OTHER), { pairs: [], table: undefined }),
+  });
+  const s = holder.s;
+  await s.actions.runWithLocals(morning);
+  assert.equal(s.count("dev_begin") + s.raises().length, 0);
+  assert.match(s.lines[0], new RegExp(`値を入れて実行 — ${switchedInDialog}（g）$`));
+  assert.deepEqual(s.notices, [`warning: ${switchedInDialog}`]);
+});
+
+test("書き換え・削除・追加の窓の間に別のゴーストを開いたら、前の表の名前を送らずに止める（5.2）", async () => {
+  for (const act of [(a: DevActions) => a.editVariable(ROW_A), (a: DevActions) => a.deleteVariable(ROW_A), (a: DevActions) => a.addVariable()]) {
+    const s = setup({ raise: setAnd(ok), edit: { name: "a", kind: "number", value: "2" }, confirm: true });
+    const p = act(s.actions);
+    s.actions.setGhost(OTHER); // 窓の答えが返る前
+    await p;
+    assert.equal(s.count("dev_begin") + s.raises().length, 0);
+    assert.match(s.lines[0], new RegExp(`保存変数を書き換え — ${switchedInDialog}（g）$`));
+    assert.deepEqual(s.notices, [`warning: ${switchedInDialog}`]);
+  }
+});
+
+test("窓を閉じたときに別の操作が進んでいれば、重なりの文言で止めて何も送らない（5.1）", async () => {
+  let release!: () => void;
+  const s = setup({
+    raise: setAnd(ok),
+    begin: new Promise<void>((r) => (release = () => r())),
+    disk: { "dic/a.pasta": "DISK" },
+    analyze: morningScenes,
+    locals: () => ({ pairs: [], table: undefined }),
+    edit: { name: "a", kind: "number", value: "2" },
+  });
+  const first = s.actions.reload();
+  await s.actions.runWithLocals(morning);
+  await s.actions.editVariable(ROW_A);
+  assert.deepEqual(s.notices, [`warning: ${BUSY}`, `warning: ${BUSY}`]);
+  assert.match(s.lines[0], new RegExp(`値を入れて実行 — ${BUSY}（g）$`));
+  assert.match(s.lines[1], new RegExp(`保存変数を書き換え — ${BUSY}（g）$`));
+  release();
+  await first;
+  assert.equal(s.count("dev_begin"), 1);
+  assert.equal(s.raises().length, 0);
 });
 
 test("表を読めている間は、▶・値を入れて実行で鳴らした後に同じ操作の中で表を読み直す（6.9）", async () => {
