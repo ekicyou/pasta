@@ -167,7 +167,7 @@
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
 - [ ] 7. 確かめ
-- [ ] 7.1 全部の関門を通す
+- [x] 7.1 全部の関門を通す
   - アプリ: 型の検査・`npm test`・ビルド・`cargo test`・clippy・依存の検査・第三者の表示に足した依存が入る
   - 拡張: `npm test`・`.vsix` を作れる
   - 編集・色分け・診断・検査が、開発の操作をしないかぎりつながない（開発のコマンドのほかに送る口が無い）
@@ -192,3 +192,5 @@
 - 5.1: アプリの実機の確かめは npx tauri build --debug --no-bundle の exe を WebView2 リモートデバッグ付きで起動し CDP で見る。相手は拡張の fakeMcpServer を候補のポートで中継（9801・9821 は別のプロセスが使っていることがある）。ゴーストは hello-pasta の写し。閉じるのは WM_CLOSE、recent.toml は写しから戻す。
 - 5.2: docs.tabs と Rust の read_text は「今開いているゴースト」を読む。操作の中でゴーストのファイルを読むときは、読む前と await の後に #current.master が操作のゴーストかを確かめる。openNow は切り替えの前に setGhost(null)、失敗で前へ戻す（表は消えたまま）。
 - 5.3: 設計の changeVariable(name, change) は editVariable(row)・deleteVariable(row)・addVariable() と非公開の #change に分けた（窓を DevActions の中で開くため）。窓の間にゴーストが替わると黙って戻る（出力に 1 行出すのは任意の改善）。merge は後だけが失敗なら後の知らせを採る。
+- 7.1（2026-11-13・9cdd6216 の上）: アプリは tsc・npm test（121 本）・npm run build・cargo test（69＋3＋4）・clippy -D warnings・cargo deny（advisories・bans・licenses・sources ok）・触った Rust 5 ファイルの rustfmt --check が通り、cargo about generate の出力に reqwest 0.13.5 と pasta_dsl 0.5.2 が入る。拡張は tsc・lint・npm test（grammar・unit・e2e 全部 0 failed）・build-wasm.ps1 -Release → compile → vsce package（18 files）が通る。つながない確かめは目で: 画面で外へ出る口は ipc.ts の tauriGhostIO.post（dev_post）だけで、それを使うのは DevActions の操作（リロード・▶・表の表示と書き換え）だけ。Rust で reqwest・TcpStream を使うのは dev.rs だけ（宛先は 127.0.0.1 と候補のポートに固定）。CSP の connect-src は ipc: と http://ipc.localhost のまま、capabilities は core:default・dialog:allow-open・core:window:allow-destroy だけ（http の許可なし）。自動の見張りの試験は足していない。
+- 7.1 のレビューで: dev_post の reqwest は既定で転送（redirect）に従い宛先の固定が崩れうるので、Policy::none() を足し試験 redirect_is_not_followed で縛った（cargo test 70 本）。

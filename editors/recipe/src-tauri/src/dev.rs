@@ -45,12 +45,13 @@ pub async fn dev_post(port: u16, body: String, timeout_ms: u64) -> PostOutcome {
 
 /// 送り手の芯（ポートの検査の前）。試験は空きポートへ向けてこれを呼ぶ
 async fn send(port: u16, body: String, timeout_ms: u64) -> PostOutcome {
-    // 代理を通さず・HTTP/1 だけ・接続を使い回さず・送り直さない。Origin は付けない
+    // 代理を通さず・HTTP/1 だけ・接続を使い回さず・送り直さない・転送に従わない（宛先は固定）。Origin は付けない
     let client = match reqwest::Client::builder()
         .no_proxy()
         .http1_only()
         .pool_max_idle_per_host(0)
         .retry(reqwest::retry::never())
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_millis(timeout_ms))
         .build()
     {
@@ -300,6 +301,25 @@ mod tests {
             "{head}"
         );
         assert_eq!(sent, body);
+        assert_no_second_connection(listener);
+    }
+
+    #[test]
+    fn redirect_is_not_followed() {
+        // 転送の指図が来ても従わず、そのまま応答として返す
+        let (port, h) = serve(|s| {
+            s.write_all(b"HTTP/1.1 307 Temporary Redirect\r\nLocation: /elsewhere\r\nContent-Length: 0\r\n\r\n")
+                .unwrap();
+        });
+        let out = tauri::async_runtime::block_on(send(port, "{}".into(), 2000));
+        assert_eq!(
+            out,
+            PostOutcome::Response {
+                status: 307,
+                body: String::new()
+            }
+        );
+        let (_, listener) = h.join().unwrap();
         assert_no_second_connection(listener);
     }
 
