@@ -2524,7 +2524,9 @@ version = "0.0.0"
 dependencies = [
  "notify",
  "pasta_check",
+ "pasta_dsl",
  "pasta_lsp",
+ "reqwest",
  "serde",
  "serde_json",
  "tauri",

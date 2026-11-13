@@ -3,11 +3,11 @@
 //
 // vscode に触らない純粋なモジュール。再生は頼まない（5.9）。時計を持たず、待ちは ctx.sleep の回数で数える。
 
-import * as path from 'path';
-import { CALL_TIMEOUT_MS, CallResult, Endpoint, callTool, describeResult, lastLogId, parseLogEntries } from './mcpClient';
+import { CALL_TIMEOUT_MS, type CallResult, type Endpoint, callTool, describeResult, lastLogId, parseLogEntries } from './mcpClient.ts';
+import type { GhostIO } from './ghostIO.ts';
 import {
-  GhostTarget, PastaLogLocation, loadCompletion, openLogCursor, parsePastaLogLine, pastaLogPath, readNewLines, readText,
-} from './ghostFiles';
+  type GhostTarget, type PastaLogLocation, loadCompletion, openLogCursor, parsePastaLogLine, pastaLogPath, readNewLines, readText,
+} from './ghostFiles.ts';
 
 export interface Timing {
   readonly loadTimeoutMs: number;     // 20000
@@ -21,6 +21,7 @@ export const DEFAULT_TIMING: Timing = {
 };
 
 export interface FlowContext {
+  readonly io: GhostIO;
   readonly endpoint: Endpoint;
   readonly ghost: GhostTarget;
   readonly timing: Timing;
@@ -42,14 +43,14 @@ export type ReloadOutcome =
     };
 
 export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
-  const { endpoint: { port }, ghost: { root, master }, timing } = ctx;
-  const pastaLog = pastaLogPath(master, await readText(path.join(master, 'pasta.toml')));
-  let cursor = await openLogCursor(pastaLog.path);
-  const sinceId = await lastLogId(port, 'error', root, timing.callTimeoutMs);
+  const { io, endpoint: { port }, ghost: { root, master }, timing } = ctx;
+  const pastaLog = pastaLogPath(io, master, await readText(io, io.join(master, 'pasta.toml')));
+  let cursor = await openLogCursor(io, pastaLog.path);
+  const sinceId = await lastLogId(io, port, 'error', root, timing.callTimeoutMs);
   if (typeof sinceId !== 'number') {
     return { kind: 'refused', result: sinceId };
   }
-  const reload = await callTool(port, 'reload', { target: 'shiori', ghost_name: root }, timing.callTimeoutMs);
+  const reload = await callTool(io, port, 'reload', { target: 'shiori', ghost_name: root }, timing.callTimeoutMs);
   if (reload.kind !== 'ok') {
     return { kind: 'refused', result: reload };
   }
@@ -61,7 +62,7 @@ export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
   let pastaLogReadable = false;
   const maxSleeps = Math.ceil(timing.loadTimeoutMs / timing.pollIntervalMs);
   for (let slept = 0; ; slept++) {
-    const read = await readNewLines(cursor); // 無い間も引き直し、最後の結果で「読めない」を決める（5.7）
+    const read = await readNewLines(io, cursor); // 無い間も引き直し、最後の結果で「読めない」を決める（5.7）
     pastaLogReadable = read !== undefined;
     for (const line of read?.lines ?? []) {
       const mark = loadCompletion(line);
@@ -86,7 +87,7 @@ export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
     await ctx.sleep(timing.pollIntervalMs);
   }
 
-  const after = await callTool(port, 'get_log', { log_type: 'error', ghost_name: root, since_id: sinceId }, timing.callTimeoutMs);
+  const after = await callTool(io, port, 'get_log', { log_type: 'error', ghost_name: root, since_id: sinceId }, timing.callTimeoutMs);
   if (after.kind === 'ok') {
     for (const e of parseLogEntries(after.text)) {
       (/warn/i.test(e.label) ? warnings : errors).push({ source: 'baseware', text: `[${e.label}] ${e.text}` });

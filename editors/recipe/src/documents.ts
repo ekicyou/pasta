@@ -3,7 +3,7 @@ import { monaco, semanticSource } from "./editor.ts";
 import { analyze, listTree, readText, writeText, type AnalysisResult, type TextFile } from "./ipc.ts";
 import { diagnosticsToMarkers, languageOf } from "./mapping.ts";
 import { CoalescingRunner } from "./scheduler.ts";
-import { afterChoice, findSame, needsConfirm, retargetTabs, saveAll } from "./tabs.ts";
+import { afterChoice, findSame, isDirty, needsConfirm, retargetTabs, saveAll } from "./tabs.ts";
 import { decideExternal, failedRead, type DiskState } from "./sync.ts";
 import { confirm3, notify } from "./dialog.ts";
 
@@ -43,7 +43,6 @@ export interface DocumentsHooks {
 /** 書き換えが止まってから解析するまで（7.2） */
 const ANALYZE_DELAY_MS = 200;
 
-export const isDirty = (tab: Tab) => tab.deleted || tab.model.getAlternativeVersionId() !== tab.savedVersionId;
 const baseName = (rel: string) => rel.slice(rel.lastIndexOf("/") + 1);
 
 export class Documents {

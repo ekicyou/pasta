@@ -218,9 +218,10 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/NN-*.pasta 12 段/install/shell/master の立ち絵 18 枚・surfaces.txt)＋生成物(dll/ライセンス表示/scripts は .gitignore 済み)
 │       └── tests/            # 統合テスト・配布ファイル構成検証・全段階の検証（tutorial_stages_test.rs）・立ち絵と当たり判定の検証（shell_assets_test.rs）
 ├── editors/                  # エディタ拡張
+│   ├── shared/              # 拡張とアプリの共有の実行の流れ（vscode・Node・Tauri を読み込まない・"type": "module"）。ghostIO（入出力の面の型）・mcpClient・ghostFiles・reloadShiori・runSceneAtCursor・dumpVariables・devSession（相手の覚えと選び・重なりの止め・見出し・保存の手順）と、偽の入出力 fakeGhostIO による *.test.ts（アプリの npm test が拾う）
 │   ├── recipe/              # pasta-recipe（VS Code を使わずに書く Windows x64 のアプリ・Tauri 2 ＋ Vite ＋ Monaco。別の Cargo ワークスペース）
 │   │   ├── src/             # 画面（TypeScript）。純粋な判断（mapping・sync・tabs・scheduler・theme）は *.test.ts を node --test で
-│   │   ├── src-tauri/       # Rust の殻（自前の Cargo.lock・deny.toml・about.toml）。paths（ghost/master の探し方と範囲の門）・files・recent・check・watch・commands
+│   │   ├── src-tauri/       # Rust の殻（自前の Cargo.lock・deny.toml・about.toml）。paths（ghost/master の探し方と範囲の門・開発の読み取りの門 dev_path）・files・recent・check・watch・commands・dev（127.0.0.1 の候補のポートへだけ送る POST と、進んでいる操作の master の下だけを読む門）・variables（保存変数の表の行・ローカル変数のインライン表）
 │   │   │   └── tests/       # repo_parity_test.rs（lock の版・凡例・版の置き場がルートや拡張と一致）
 │   │   ├── scripts/         # package.ps1（release/pasta-recipe.zip を作る）・js-licenses.mjs（画面の部品の第三者の表示）
 │   │   └── tauri.conf.json  # 版は ../vscode/package.json を指す・CSP・窓
@@ -236,11 +237,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── diagnosticsManager.ts   # 診断情報管理
 │       │   ├── documentSync.ts         # ドキュメント同期（200msデバウンス）
 │       │   ├── devCommands.ts          # 開発の 3 コマンド（▶ シーンを実行・SHIORI をリロード・保存変数を表示）の入口（引数 (uri, 0 始まりの行) でも呼べる）。相手の確かめと覚え・保存・出力のパネル「Pasta 開発」
-│       │   ├── mcpClient.ts            # SSP・areka の MCP（127.0.0.1 の 9801/9821…）へ道具を 1 回呼ぶ・相手を探す・記録を読む（vscode に依存しない）
-│       │   ├── ghostFiles.ts           # ゴーストのルートと表示名・pasta.log の場所と増えた分・variables.toml（vscode に依存しない）
-│       │   ├── reloadShiori.ts         # 読み込み直しと終わりの印の待ち・誤りの要約
-│       │   ├── runSceneAtCursor.ts     # OnPastaSceneAt での再生と台本の取り出し
-│       │   ├── dumpVariables.ts        # OnPastaDumpVariables と新しさの確かめ
+│       │   ├── nodeGhostIO.ts          # 共有の入出力の面（GhostIO）の Node の実装（HTTP・fs・path）と、ファイルから上ってゴーストを見つける resolveGhost
 │       │   └── test/                   # テスト（mock/vscode.ts と MCP の窓口を真似る fakeMcpServer.ts）
 │       ├── syntaxes/         # TextMate文法（全角/半角マーカー対応）
 │       ├── scripts/          # ビルドスクリプト（WASM等）

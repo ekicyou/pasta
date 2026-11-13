@@ -1,7 +1,7 @@
 //! ghost/master の探し方・相対パスの検査・名前の検査（読み書きの範囲の唯一の門）。
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub struct Found {
     /// std::path::absolute で形を揃えた ghost/master（ディスクの綴りのまま）
@@ -76,6 +76,50 @@ pub fn resolve_rel(master: &Path, rel: &str) -> Result<PathBuf, String> {
             return Err(deny(
                 "リンクを通るので読み書きしません（開いているゴーストの外へ出られます）",
             ));
+        }
+    }
+    Ok(path)
+}
+
+/// 開発の読み取りの門が通すもの
+#[derive(Clone, Copy, PartialEq)]
+pub enum Want {
+    /// 一覧（master そのものだけ）
+    List,
+    /// 状態・読み取り（直下の descript.txt・pasta.toml と、直下の profile の下）
+    Read,
+}
+
+/// 開発の操作の読み取りの門（9.4・9.6・7.9）。abs は絶対パス。通れば読むパスを返す
+pub fn dev_path(master: &Path, abs: &Path, want: Want) -> Result<PathBuf, String> {
+    let deny = || format!("{}: 開いているゴーストの外は読みません", abs.display());
+    let rel = abs.strip_prefix(master).map_err(|_| deny())?;
+    let mut parts = Vec::new();
+    for c in rel.components() {
+        // `..`・ドライブ・根を含まない普通の名前だけ
+        match c {
+            Component::Normal(s) if bad_name(&s.to_string_lossy()).is_none() => {
+                parts.push(s.to_string_lossy().into_owned())
+            }
+            _ => return Err(deny()),
+        }
+    }
+    let is = |s: &String, name: &str| s.eq_ignore_ascii_case(name);
+    let ok = match (want, parts.as_slice()) {
+        (Want::List, []) => true,
+        (Want::Read, [one]) => is(one, "descript.txt") || is(one, "pasta.toml"),
+        (Want::Read, [first, _, ..]) => is(first, "profile"),
+        _ => false,
+    };
+    if !ok {
+        return Err(deny());
+    }
+    let mut path = master.to_path_buf();
+    for part in &parts {
+        path.push(part);
+        // 途中・目的そのもののリンク（ジャンクションを含む）は、外へ出られるので拒む（resolve_rel と同じ）
+        if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err(deny());
         }
     }
     Ok(path)
@@ -325,6 +369,81 @@ mod tests {
             return;
         }
         assert!(resolve_rel(&master, "dic/l.pasta").is_err());
+    }
+
+    #[test]
+    fn dev_path_passes_only_the_fixed_files() {
+        let (_tmp, master) = ghost();
+        let p = |rel: &str| master.join(rel);
+        for rel in [
+            "descript.txt",
+            "DESCRIPT.TXT",
+            "pasta.toml",
+            "Pasta.TOML",
+            "profile/pasta/logs/pasta.log",
+            "profile/pasta/debug/variables.toml",
+            r"profile\pasta\logs\pasta.log",
+        ] {
+            assert_eq!(
+                dev_path(&master, &p(rel), Want::Read).unwrap(),
+                p(rel),
+                "{rel}"
+            );
+        }
+        assert_eq!(dev_path(&master, &master, Want::List).unwrap(), master);
+    }
+
+    #[test]
+    fn dev_path_refuses_everything_else() {
+        let (tmp, master) = ghost();
+        let read = |abs: PathBuf| dev_path(&master, &abs, Want::Read);
+        for rel in [
+            "dic/a.pasta",
+            "dic/descript.txt",
+            "profile",
+            "readme.txt",
+            "../descript.txt",
+            "profile/../descript.txt",
+            "profile/../../x",
+            "profile/a:b",
+            "",
+        ] {
+            let e = read(master.join(rel))
+                .err()
+                .unwrap_or_else(|| panic!("{rel:?} を通した"));
+            assert!(e.contains("外"), "{e}");
+        }
+        assert!(read(tmp.path().join("X").join("readme.txt")).is_err());
+        assert!(read(PathBuf::from(r"D:\x\ghost\master\descript.txt")).is_err());
+        assert!(read(PathBuf::from("descript.txt")).is_err());
+        // 一覧は master そのものだけ
+        assert!(dev_path(&master, &master.join("profile"), Want::List).is_err());
+        assert!(dev_path(&master, &master.join("dic"), Want::List).is_err());
+        assert!(dev_path(&master, master.parent().unwrap(), Want::List).is_err());
+        assert!(dev_path(&master, &master, Want::Read).is_err());
+    }
+
+    #[test]
+    fn dev_path_refuses_junction_and_symlink() {
+        let (tmp, master) = ghost();
+        let outside = tmp.path().join("outside");
+        fs::create_dir(&outside).unwrap();
+        fs::write(outside.join("pasta.log"), "").unwrap();
+        let status = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(master.join("profile").join("j"))
+            .arg(&outside)
+            .output()
+            .unwrap();
+        assert!(status.status.success(), "{status:?}");
+        assert!(dev_path(&master, &master.join("profile/j/pasta.log"), Want::Read).is_err());
+        let link = master.join("descript.txt");
+        if let Err(e) = std::os::windows::fs::symlink_file(outside.join("pasta.log"), &link) {
+            // シンボリックリンクは開発者モードか管理者の権限が要る。作れない環境ではここで終える
+            println!("シンボリックリンクを作れないので、この確かめを飛ばします: {e}");
+            return;
+        }
+        assert!(dev_path(&master, &link, Want::Read).is_err());
     }
 
     #[test]

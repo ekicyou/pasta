@@ -9,8 +9,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { startFakeMcpServer, FakeMcpServer } from './fakeMcpServer';
-import { DEFAULT_TIMING, FlowContext, ReloadOutcome, blocksPlayback, formatReload, reloadAndWait } from '../reloadShiori';
-import { DEFAULT_PASTA_LOG, GhostTarget } from '../ghostFiles';
+import { DEFAULT_TIMING, FlowContext, ReloadOutcome, blocksPlayback, formatReload, reloadAndWait } from '../../../shared/reloadShiori.ts';
+import { DEFAULT_PASTA_LOG, type GhostTarget } from '../../../shared/ghostFiles.ts';
+import { nodeGhostIO } from '../nodeGhostIO';
 
 let passed = 0;
 let failed = 0;
@@ -64,7 +65,7 @@ function scriptedSleep(logFile: string, script: Record<number, string[]>) {
 
 async function run(server: FakeMcpServer, ghost: GhostTarget, sleep: (ms: number) => Promise<void>): Promise<ReloadOutcome> {
   server.state.runningRoots = [ghost.root];
-  const ctx: FlowContext = { endpoint: { port: server.port, basewareName: 'SSP' }, ghost, timing: DEFAULT_TIMING, sleep };
+  const ctx: FlowContext = { io: nodeGhostIO, endpoint: { port: server.port, basewareName: 'SSP' }, ghost, timing: DEFAULT_TIMING, sleep };
   return reloadAndWait(ctx);
 }
 
@@ -199,6 +200,7 @@ async function main() {
     const g = makeGhost();
     server.state.runningRoots = [];
     const ctx: FlowContext = {
+      io: nodeGhostIO,
       endpoint: { port: server.port, basewareName: 'SSP' }, ghost: g, timing: DEFAULT_TIMING, sleep: async () => {},
     };
     const o = await reloadAndWait(ctx);

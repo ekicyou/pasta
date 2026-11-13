@@ -13,7 +13,7 @@ import * as path from 'path';
 import * as vscode from './mock/vscode';
 import { startFakeMcpServer, FakeMcpServer } from './fakeMcpServer';
 import { OUTPUT_CHANNEL, registerDevCommands } from '../devCommands';
-import { DEFAULT_TIMING } from '../reloadShiori';
+import { DEFAULT_TIMING } from '../../../shared/reloadShiori.ts';
 
 let passed = 0;
 let failed = 0;

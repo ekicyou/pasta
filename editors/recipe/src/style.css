@@ -42,7 +42,9 @@ button {
 #toolbar button,
 #start > button,
 dialog button,
-.notice button {
+.notice button,
+.panel p button,
+.variables-table button {
   padding: 4px 12px;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -52,7 +54,9 @@ dialog button,
 #toolbar button:hover,
 #start > button:hover,
 dialog button:hover,
-.notice button:hover {
+.notice button:hover,
+.panel p button:hover,
+.variables-table button:hover {
   background: var(--bg-hover);
 }
 #toolbar button.primary,
@@ -113,6 +117,36 @@ dialog input {
   box-sizing: border-box;
   padding: 4px 6px;
   font: inherit;
+}
+/* ローカル変数の窓の組の行（名前・型・値・消す、その下に弾きの理由） */
+.locals-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+/* 窓の部品と見える名前の 1 行（名前・型・値） */
+.dialog-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.dialog-field input {
+  flex: 1;
+  width: auto;
+}
+.locals-row .dialog-field {
+  margin-top: 0;
+}
+.locals-row .dialog-field:has(> input) {
+  flex: 1;
+}
+.locals-problem {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--accent);
 }
 .dialog-buttons {
   display: flex;
@@ -228,9 +262,40 @@ dialog input {
 }
 #panels {
   display: flex;
-  height: 180px;
+  flex-direction: column;
   border-top: 1px solid var(--border);
   background: var(--bg-side);
+}
+/* 面を切り替える帯（約 27px）。ボタンはタブの列と同じ形で、今の面を aria-pressed で示す */
+.panels-bar {
+  display: flex;
+  background: var(--bg-chrome);
+  border-bottom: 1px solid var(--border);
+}
+.panels-bar button {
+  border: none;
+  border-top: 3px solid transparent;
+  border-right: 1px solid var(--border);
+  background: none;
+  color: var(--text-dim);
+  padding: 3px 12px;
+  white-space: nowrap;
+}
+.panels-bar button:hover {
+  background: var(--bg-hover);
+}
+.panels-bar button[aria-pressed="true"] {
+  background: var(--bg-side);
+  border-top-color: var(--accent);
+  color: CanvasText;
+  font-weight: bold;
+}
+.panels-face {
+  display: flex;
+  height: 180px;
+}
+.panels-face[hidden] {
+  display: none;
 }
 .panel {
   flex: 1;
@@ -275,6 +340,48 @@ dialog input {
   outline: none;
   background: var(--accent-soft);
   border-left-color: var(--accent);
+}
+/* 出力の欄（4.4・4.5）。文字は折り返して残す。誤り・警告は頭の文字と太字で見分ける（色だけに頼らない 4.3） */
+.output-log > div {
+  padding: 1px 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.output-notice {
+  font-weight: bold;
+  border-left: 3px solid var(--accent);
+}
+.panel p button,
+.variables-table button {
+  padding: 2px 10px;
+}
+.variables-note {
+  color: var(--text-dim);
+}
+.variables-table {
+  border-collapse: collapse;
+  margin: 0 8px 4px;
+}
+.variables-table th,
+.variables-table td {
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.variables-table th {
+  color: var(--text-dim);
+  font-weight: normal;
+}
+.variables-table td:nth-child(3) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.variables-table td:nth-child(4) {
+  white-space: nowrap;
+}
+.variables-table td button + button {
+  margin-left: 4px;
 }
 /* 開始の画面の間は、開いたゴーストの部品（ツールバー・ツリー・エディタ・一覧）を出さない（焦点も入らない） */
 body:has(#start:not([hidden])) > :not(#start, #dialog-root, script) {

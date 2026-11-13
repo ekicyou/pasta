@@ -140,10 +140,60 @@ export function checkRows(report: Report, openRels: ReadonlySet<string>): { rows
   return { rows, errors, warnings: shown.length - errors };
 }
 
+/** 下の欄の帯の、書く面のボタンの名前。検査がまだ・できないときは診断の件数だけ（4.2・11.4） */
+export function writeFaceLabel(diagnostics: number, check: { errors: number; warnings: number } | null): string {
+  const tail = check ? `・誤り ${check.errors} 件・警告 ${check.warnings} 件` : "";
+  return `診断・検査（${diagnostics} 件${tail}）`;
+}
+
 /** タブの言語は拡張子で決める。.pasta・.lua 以外は色なし（5.2） */
 export function languageOf(rel: string): "pasta" | "lua" | "plaintext" {
   const ext = rel.slice(rel.lastIndexOf("/") + 1).match(/\.([^.]+)$/)?.[1].toLowerCase();
   return ext === "pasta" || ext === "lua" ? ext : "plaintext";
+}
+
+/** シーンの道: グローバルなら 1 つ、ローカルなら 2 つ。n は同じ名前の中の順（ツリーの行のキーと同じ数え方・1.4） */
+export type ScenePath = readonly { readonly name: string; readonly n: number }[];
+
+/** 見出しの行（1 始まり）と道の組を文書の順に平らに並べる（1.4） */
+export function scenePaths(scenes: readonly SceneNode[]): { line: number; path: ScenePath }[] {
+  const out: { line: number; path: ScenePath }[] = [];
+  const walk = (list: readonly SceneNode[], parent: ScenePath): void => {
+    const seen = new Map<string, number>();
+    for (const s of list) {
+      const n = seen.get(s.name) ?? 0;
+      seen.set(s.name, n + 1);
+      const path = [...parent, { name: s.name, n }];
+      out.push({ line: s.heading.start.line + 1, path });
+      walk(s.children, path);
+    }
+  };
+  walk(scenes, []);
+  return out;
+}
+
+/** 保存した中身の解析から道の今の行（1 始まり）を引く。無ければ undefined（1.4） */
+export function sceneLine(scenes: readonly SceneNode[], path: ScenePath): number | undefined {
+  return scenePaths(scenes).find(
+    (p) => p.path.length === path.length && p.path.every((s, i) => s.name === path[i].name && s.n === path[i].n),
+  )?.line;
+}
+
+/** ▶・値を入れて実行に渡すシーン（ツリーの行と見出しの上の操作が作る） */
+export interface SceneTarget {
+  /** master からの相対・'/' 区切り */
+  readonly rel: string;
+  readonly path: ScenePath;
+  /** 見出しの行に出す名前（＊挨拶・朝） */
+  readonly label: string;
+}
+
+/** ＊グローバル、ローカルなら ＊グローバル・ローカル */
+export const sceneLabel = (path: ScenePath): string => "＊" + path.map((p) => p.name).join("・");
+
+/** 見出しの上の操作の並び（1.2）。行は 1 始まり */
+export function sceneTargets(rel: string, scenes: readonly SceneNode[]): { line: number; target: SceneTarget }[] {
+  return scenePaths(scenes).map(({ line, path }) => ({ line, target: { rel, path, label: sceneLabel(path) } }));
 }
 
 /** ツリーの見える 1 行（aria-level で階層を表す平らな並び。キーで差分を描き、上下のキーはこの順に動く） */
@@ -158,6 +208,8 @@ export interface TreeRow {
   rel: string;
   /** シーンの見出しの行（1 始まり）。それ以外は null */
   line: number | null;
+  /** シーンの道。それ以外は null */
+  scene: ScenePath | null;
   parent: string | null;
   /** 子が無ければ null */
   expanded: boolean | null;
@@ -171,23 +223,24 @@ export function treeRows(root: TreeNode, scenes: ReadonlyMap<string, readonly Tr
     rows.push({ ...row, expanded: hasChildren ? open : null });
     return open;
   };
-  const sceneRows = (rel: string, items: readonly TreeItem[], level: number, parent: string) => {
+  const sceneRows = (rel: string, items: readonly TreeItem[], level: number, parent: string, path: ScenePath) => {
     const seen = new Map<string, number>();
     for (const item of items) {
       const n = seen.get(item.name) ?? 0;
       seen.set(item.name, n + 1);
       const key = `${parent}|${item.name}|${n}`;
-      if (add({ key, level, kind: "scene", name: item.name, rel, line: item.line, parent }, item.children.length > 0)) {
-        sceneRows(rel, item.children, level + 1, key);
+      const scene = [...path, { name: item.name, n }];
+      if (add({ key, level, kind: "scene", name: item.name, rel, line: item.line, scene, parent }, item.children.length > 0)) {
+        sceneRows(rel, item.children, level + 1, key, scene);
       }
     }
   };
   const walk = (node: TreeNode, level: number, parent: string | null): void => {
     const items = node.kind === "file" ? (scenes.get(node.rel.toUpperCase()) ?? []) : [];
     const kids = node.kind === "dir" ? node.children.length : items.length;
-    if (!add({ key: node.rel, level, kind: node.kind, name: node.name, rel: node.rel, line: null, parent }, kids > 0)) return;
+    if (!add({ key: node.rel, level, kind: node.kind, name: node.name, rel: node.rel, line: null, scene: null, parent }, kids > 0)) return;
     if (node.kind === "dir") node.children.forEach((c) => walk(c, level + 1, node.rel));
-    else sceneRows(node.rel, items, level + 1, node.rel);
+    else sceneRows(node.rel, items, level + 1, node.rel, []);
   };
   walk(root, 1, null);
   return rows;

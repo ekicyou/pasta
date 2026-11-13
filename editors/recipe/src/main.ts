@@ -12,6 +12,9 @@ import { findSame, sameMaster } from "./tabs.ts";
 import { planGhostChanged } from "./sync.ts";
 import { notify } from "./dialog.ts";
 import { TreeView } from "./tree.ts";
+import { DevActions } from "./devActions.ts";
+import { OutputPanel, VariablesPanel } from "./devPanels.ts";
+import { registerSceneLens } from "./sceneLens.ts";
 
 const editor = await createEditor(document.getElementById("editor")!);
 const docs = new Documents(editor, document.getElementById("tabs")!, document.getElementById("notices")!, {
@@ -31,8 +34,21 @@ const docs = new Documents(editor, document.getElementById("tabs")!, document.ge
     if (tab.rel.toLowerCase().endsWith(".pasta") || tab.rel.toLowerCase() === "pasta.toml") checker.request();
   },
 });
-const tree = new TreeView(document.getElementById("tree")!, docs);
 const panels = new Panels(document.getElementById("panels")!, docs);
+// 開発の操作の糊を 1 つ組み、下の欄の動かす面（表の読み直し・書き換え・削除・追加）・ツリーのメニュー・見出しの上の操作とつなぐ
+const devActions = new DevActions({
+  docs,
+  output: new OutputPanel(panels.output),
+  vars: new VariablesPanel(panels.variables, {
+    onRefresh: () => void devActions.showVariables(),
+    onEdit: (row) => void devActions.editVariable(row),
+    onDelete: (row) => void devActions.deleteVariable(row),
+    onAdd: () => void devActions.addVariable(),
+  }),
+  panels,
+});
+const tree = new TreeView(document.getElementById("tree")!, docs, devActions);
+registerSceneLens(docs, devActions);
 // 保存の後と見張りの知らせの検査の求めを 300 ms で 1 回にまとめる（9.9）
 const checker = new CoalescingRunner(async () => panels.setReport(await checkGhost().catch((reason: unknown) => String(reason))), 300, globalThis);
 
@@ -55,7 +71,11 @@ saveButton.className = "primary";
 saveButton.addEventListener("click", () => {
   if (docs.active) void docs.save(docs.active);
 });
-document.getElementById("toolbar")!.append(saveButton);
+// 開始の画面では今の CSS がツールバーごと隠す（2.5）
+const reloadButton = document.createElement("button");
+reloadButton.textContent = "SHIORI をリロード";
+reloadButton.addEventListener("click", () => void devActions.reload());
+document.getElementById("toolbar")!.append(saveButton, reloadButton);
 
 const start = new StartView(document.getElementById("start")!, document.getElementById("toolbar")!, (path, origin) => void openPath(path, origin));
 
@@ -106,12 +126,16 @@ async function openNow(path: string, origin: string): Promise<void> {
     // 開けなかったときはタブを閉じたまま今のゴーストに留まる（保存する／しないは選び終えている）
     switching = true;
     generation++;
+    // 進んでいる開発の操作に、Rust の master が替わり始めたことを先に知らせる（新しいゴーストのファイルを読ませない。5.2）
+    const before = devActions.current;
+    devActions.setGhost(null);
     await docs.beginSwitch();
     panels.update();
     let info;
     try {
       info = await openGhost(found.master);
     } catch (reason) {
+      devActions.setGhost(before);
       notify(String(reason));
       return;
     } finally {
@@ -119,6 +143,8 @@ async function openNow(path: string, origin: string): Promise<void> {
       switching = false;
     }
     current = info.master;
+    devActions.setGhost(info);
+    panels.show("write"); // 開いた直後は書く面
     start.hide();
     // すべての .pasta のシーンを作る（4.8）。一覧が読めなければ tree.reset が理由を出している
     files = (await tree.reset())?.files ?? [];

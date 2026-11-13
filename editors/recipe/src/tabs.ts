@@ -51,3 +51,13 @@ export function findSame<T extends { rel: string }>(tabs: readonly T[], rel: str
 export function sameMaster(current: string | null, master: string): boolean {
   return current !== null && current.toUpperCase() === master.toUpperCase();
 }
+
+/** 保存していない書き換えがあるか（消えたファイルのタブも保存の要るものに数える） */
+export const isDirty = (tab: { deleted: boolean; savedVersionId: number; model: { getAlternativeVersionId(): number } }): boolean =>
+  tab.deleted || tab.model.getAlternativeVersionId() !== tab.savedVersionId;
+
+/** 開発の操作の前に保存するファイル（.pasta・.lua・名前が pasta.toml。拡張と同じ範囲・1.5） */
+export function isDevSource(rel: string): boolean {
+  const name = rel.slice(rel.lastIndexOf("/") + 1).toLowerCase();
+  return name.endsWith(".pasta") || name.endsWith(".lua") || name === "pasta.toml";
+}

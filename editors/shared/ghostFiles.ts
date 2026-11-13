@@ -1,11 +1,10 @@
 // GhostFiles - ゴーストのディスクの上のこと（vscode-mcp-client の設計の GhostFiles）
 //
-// vscode に触らない純粋なモジュール。ルート・descript の name（2.1・2.3）と pasta.log の場所（5.6）を決め、
-// pasta.log の増えた分（4.3・5.7）と variables.toml（6.2・6.3）を読む。
+// 拡張とアプリの共有。descript の name（2.1・2.3）と pasta.log の場所（5.6）を決め、
+// pasta.log の増えた分（4.3・5.7）と variables.toml（6.2・6.3）を読む。ディスクには io を通してだけ触る。
 // 書き込まない（読むだけ）。
 
-import { promises as fs } from 'fs';
-import * as path from 'path';
+import type { GhostIO } from './ghostIO.ts';
 
 export interface GhostTarget {
   readonly root: string;        // ゴーストのルートの絶対パス（ghost_name に送る）
@@ -14,39 +13,15 @@ export interface GhostTarget {
   readonly key: string;         // root を小文字にしたもの（覚えと重なりの鍵）
 }
 
-export const MAX_ASCENT = 3;
-
-/**
- * masterPath は findGhostMaster(uri)?.fsPath。ファイルのフォルダから上へ MAX_ASCENT までの間にあり、
- * descript.txt（大文字・小文字を区別しない）を持つときだけ、その 2 つ上をルートにする（2.1）。外れたら undefined
- */
-export async function resolveGhost(fileFsPath: string, masterPath: string | undefined): Promise<GhostTarget | undefined> {
-  if (masterPath === undefined) {
-    return undefined;
-  }
-  const rel = path.relative(masterPath, path.dirname(fileFsPath));
-  const ups = rel === '' ? [] : rel.split(/[\\/]/);
-  if (ups.length > MAX_ASCENT || ups[0] === '..' || path.isAbsolute(rel)) {
-    return undefined;
-  }
-  let entries: string[];
-  try {
-    entries = await fs.readdir(masterPath);
-  } catch {
-    return undefined;
-  }
-  const descript = entries.find((e) => e.toLowerCase() === 'descript.txt');
+/** master に descript.txt（大文字・小文字を問わない）があればゴースト。名前は descript の name か folderName */
+export async function ghostTarget(io: GhostIO, root: string, master: string, folderName: string): Promise<GhostTarget | undefined> {
+  const descript = (await io.list(master))?.find((e) => e.toLowerCase() === 'descript.txt');
   if (descript === undefined) {
     return undefined;
   }
-  const root = path.dirname(path.dirname(masterPath));
-  let name: string | undefined;
-  try {
-    name = decodeDescriptName(await fs.readFile(path.join(masterPath, descript)));
-  } catch {
-    name = undefined;
-  }
-  return { root, master: masterPath, displayName: name ?? path.basename(root), key: root.toLowerCase() };
+  const bytes = await io.read(io.join(master, descript), 0);
+  const name = bytes === undefined ? undefined : decodeDescriptName(bytes);
+  return { root, master, displayName: name ?? folderName, key: root.toLowerCase() };
 }
 
 /**
@@ -94,8 +69,8 @@ export const DEBUG_HINT = 'pasta.toml に [debug] enabled = true を書いてリ
  * pasta.log の場所（5.6）。pasta.toml の [logging] file_path を 3 つの書き方で読み、pasta の logger.rs と同じ条件
  * （最初の部品が profile で後に部品がある・`..` 無し・絶対パスでない）に合えば使う。書かれていなければ既定。書かれているのに読めない・外れるときは既定と note
  */
-export function pastaLogPath(master: string, pastaTomlText: string | undefined): PastaLogLocation {
-  const fallback = { path: path.join(master, DEFAULT_PASTA_LOG) };
+export function pastaLogPath(io: GhostIO, master: string, pastaTomlText: string | undefined): PastaLogLocation {
+  const fallback = { path: io.join(master, DEFAULT_PASTA_LOG) };
   const found = pastaTomlText === undefined ? undefined : findLoggingFilePath(pastaTomlText);
   if (found === undefined) {
     return fallback;
@@ -110,7 +85,7 @@ export function pastaLogPath(master: string, pastaTomlText: string | undefined):
   if (rel.startsWith('/') || parts[0] !== 'profile' || parts.length < 2 || rel.includes('..')) {
     return note(`（${found}）が profile/ の下のファイルでない`);
   }
-  return { path: path.join(master, ...parts) };
+  return { path: io.join(master, ...parts) };
 }
 
 /**
@@ -191,35 +166,24 @@ function readString(s: string): string | null {
 export interface LogCursor { readonly path: string; readonly offset: number } // offset は読む前の大きさ（無ければ 0）
 
 /** 読む前の大きさを覚える。無い・読めないときは 0（後からできたファイルを頭から読む） */
-export async function openLogCursor(p: string): Promise<LogCursor> {
-  try {
-    return { path: p, offset: (await fs.stat(p)).size };
-  } catch {
-    return { path: p, offset: 0 };
-  }
+export async function openLogCursor(io: GhostIO, p: string): Promise<LogCursor> {
+  return { path: p, offset: (await io.stat(p))?.size ?? 0 };
 }
 
 /** offset から増えた分の完全な行（最後の改行より後は次の回に残す）。読めなければ undefined（5.7） */
-export async function readNewLines(cursor: LogCursor): Promise<{ lines: string[]; next: LogCursor } | undefined> {
-  let handle;
-  try {
-    handle = await fs.open(cursor.path, 'r');
-    const st = await handle.stat();
-    if (!st.isFile()) {
-      return undefined; // Windows ではフォルダも開けてしまう
-    }
-    const size = st.size;
-    const start = size < cursor.offset ? 0 : cursor.offset; // 縮んだ（作り直された）ら頭から
-    const buf = Buffer.alloc(size - start);
-    const { bytesRead } = await handle.read(buf, 0, buf.length, start);
-    const end = buf.subarray(0, bytesRead).lastIndexOf(0x0a) + 1; // 改行の後ろまで。無ければ 0
-    const lines = end === 0 ? [] : buf.subarray(0, end - 1).toString('utf8').split(/\r?\n/);
-    return { lines, next: { path: cursor.path, offset: start + end } };
-  } catch {
-    return undefined;
-  } finally {
-    await handle?.close();
+export async function readNewLines(io: GhostIO, cursor: LogCursor): Promise<{ lines: string[]; next: LogCursor } | undefined> {
+  const st = await io.stat(cursor.path);
+  if (st === undefined || !st.isFile) {
+    return undefined; // フォルダも読めない扱い
   }
+  const start = st.size < cursor.offset ? 0 : cursor.offset; // 縮んだ（作り直された）ら頭から
+  const buf = await io.read(cursor.path, start);
+  if (buf === undefined) {
+    return undefined;
+  }
+  const end = buf.lastIndexOf(0x0a) + 1; // 改行の後ろまで。無ければ 0
+  const lines = end === 0 ? [] : new TextDecoder('utf-8').decode(buf.subarray(0, end - 1)).split(/\r?\n/);
+  return { lines, next: { path: cursor.path, offset: start + end } };
 }
 
 export type PastaLogLevel = 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
@@ -240,24 +204,17 @@ export function loadCompletion(line: string): { loaded: boolean } | undefined {
   return m ? { loaded: m[1] === 'true' } : undefined;
 }
 
-export function variablesPath(master: string): string {
-  return path.join(master, 'profile', 'pasta', 'debug', 'variables.toml');
+export function variablesPath(io: GhostIO, master: string): string {
+  return io.join(master, 'profile', 'pasta', 'debug', 'variables.toml');
 }
 
 /** 更新時刻（ms）。無い・読めないときは undefined */
-export async function mtimeOf(p: string): Promise<number | undefined> {
-  try {
-    return (await fs.stat(p)).mtimeMs;
-  } catch {
-    return undefined;
-  }
+export async function mtimeOf(io: GhostIO, p: string): Promise<number | undefined> {
+  return (await io.stat(p))?.mtimeMs;
 }
 
-/** UTF-8 の中身。無い・読めないときは undefined */
-export async function readText(p: string): Promise<string | undefined> {
-  try {
-    return await fs.readFile(p, 'utf8');
-  } catch {
-    return undefined;
-  }
+/** UTF-8 の中身（先頭の BOM は外す）。無い・読めないときは undefined */
+export async function readText(io: GhostIO, p: string): Promise<string | undefined> {
+  const bytes = await io.read(p, 0);
+  return bytes === undefined ? undefined : new TextDecoder('utf-8').decode(bytes);
 }

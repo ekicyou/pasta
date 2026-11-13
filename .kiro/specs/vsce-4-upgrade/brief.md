@@ -92,3 +92,8 @@ Node 22 への移行を先に済ませ（`ponytail-manual-ci` が「Node 22 に�
 - **見つけた穴・古くなった記述**
   - Current State・Scope の Node 20 の行と、`package.json` の行番号（316・310 行）は古い（上の行が正しい）。`package.json` を共有する相手は `vscode-mcp-client`（完了）から `pasta-recipe-dev-actions` に変わった。
   - 前回から残る: `vsce publish --azure-credential` を実際に叩くのは `publish-vsix.ps1` で、Current State と Scope にこのスクリプトが無い。4.x で 2 つの振る舞い（`--pat` が既定で `VSCE_PAT` を読み `--azure-credential` より勝つこと・拡張が無いと `vsce show` が `undefined` を出して 0 で終えること）が変わっていないかを要件の前に確かめる。手元の `editors/vscode/node_modules` の vsce が lock と違う版のことがあるので、手元で確かめるときは `npm ci` し直す。
+
+## 申し送り（pasta-recipe-dev-actions より）
+
+- `pasta-recipe-dev-actions` は `editors/vscode/package.json`・`package-lock.json` を変えなかった（上の「先に要るもの」に書いた重なりは無くなった）。拡張の開発の操作の流れは `editors/shared/` へ移り、拡張は `nodeGhostIO` で差し込む（同 spec の design.md の「File Structure Plan」「共有の流れ（`editors/shared/`）」）。
+- `build.yml` に job `vscode-test`（ubuntu-latest・Node 22・`editors/vscode` で `npm ci` → `npm test`。`PASTA_VSCODE_NO_WASM=1`）が入った。vsce を上げて lock が変われば、この job が main で `npm ci` と拡張の試験を走らせる（同 design.md の「Testing Strategy」の拡張の行）。

@@ -2,9 +2,11 @@
 
 pub mod check;
 pub mod commands;
+pub mod dev;
 pub mod files;
 pub mod paths;
 pub mod recent;
+pub mod variables;
 pub mod watch;
 
 use tauri::{Emitter, Manager};

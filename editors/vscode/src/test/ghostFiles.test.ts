@@ -12,9 +12,10 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import {
-  resolveGhost, decodeDescriptName, MAX_ASCENT, pastaLogPath, DEFAULT_PASTA_LOG,
+  decodeDescriptName, pastaLogPath, DEFAULT_PASTA_LOG,
   openLogCursor, readNewLines, parsePastaLogLine, loadCompletion, variablesPath, mtimeOf, readText,
-} from '../ghostFiles';
+} from '../../../shared/ghostFiles.ts';
+import { MAX_ASCENT, nodeGhostIO as io, resolveGhost } from '../nodeGhostIO';
 
 let passed = 0;
 let failed = 0;
@@ -61,7 +62,7 @@ async function main() {
     const master = makeGhost('Depth', utf8('charset,UTF-8\r\nname,Depth Ghost\r\n'));
     const root = path.join(tmp, 'Depth');
     for (let d = 0; d <= MAX_ASCENT; d++) {
-      const g = await resolveGhost(fileAt(master, d), master);
+      const g = await resolveGhost(io, fileAt(master, d), master);
       assert.ok(g, `depth ${d} should be found`);
       assert.strictEqual(g.root, root);
       assert.strictEqual(g.master, master);
@@ -72,18 +73,18 @@ async function main() {
 
   await test('depth 4 is not found', async () => {
     const master = makeGhost('Deep', utf8('charset,UTF-8\r\nname,x\r\n'));
-    assert.strictEqual(await resolveGhost(fileAt(master, MAX_ASCENT + 1), master), undefined);
+    assert.strictEqual(await resolveGhost(io, fileAt(master, MAX_ASCENT + 1), master), undefined);
   });
 
   await test('no descript.txt is not found; no master is not found', async () => {
     const master = makeGhost('NoDescript');
-    assert.strictEqual(await resolveGhost(fileAt(master, 0), master), undefined);
-    assert.strictEqual(await resolveGhost(fileAt(master, 0), undefined), undefined);
+    assert.strictEqual(await resolveGhost(io, fileAt(master, 0), master), undefined);
+    assert.strictEqual(await resolveGhost(io, fileAt(master, 0), undefined), undefined);
   });
 
   await test('a file outside master is not found', async () => {
     const master = makeGhost('Outside', utf8('name,x\r\n'));
-    assert.strictEqual(await resolveGhost(path.join(tmp, 'Outside', 'a.pasta'), master), undefined);
+    assert.strictEqual(await resolveGhost(io, path.join(tmp, 'Outside', 'a.pasta'), master), undefined);
   });
 
   await test('UTF-8 name with BOM', async () => {
@@ -105,13 +106,13 @@ async function main() {
 
   await test('display name falls back to the root folder name', async () => {
     const master = makeGhost('Fallback', utf8('charset,UTF-8\r\ncraftman,x\r\n'));
-    const g = await resolveGhost(fileAt(master, 1), master);
+    const g = await resolveGhost(io, fileAt(master, 1), master);
     assert.strictEqual(g?.displayName, 'Fallback');
   });
 
   const m = path.join(tmp, 'g', 'ghost', 'master');
   const def = path.join(m, DEFAULT_PASTA_LOG);
-  const at = (toml: string | undefined) => pastaLogPath(m, toml);
+  const at = (toml: string | undefined) => pastaLogPath(io, m, toml);
 
   await test('file_path: three forms, basic and literal strings', async () => {
     const want = { path: path.join(m, 'profile/custom/app.log') };
@@ -168,36 +169,36 @@ async function main() {
     const log = path.join(tmp, 'tail', 'pasta.log');
     fs.mkdirSync(path.dirname(log), { recursive: true });
     fs.writeFileSync(log, 'old line\n');
-    const c0 = await openLogCursor(log);
+    const c0 = await openLogCursor(io, log);
     assert.strictEqual(c0.offset, Buffer.byteLength('old line\n'));
     fs.appendFileSync(log, 'あ1\r\nb2\npart');
-    const r1 = await readNewLines(c0);
+    const r1 = await readNewLines(io, c0);
     assert.ok(r1);
     assert.deepStrictEqual(r1.lines, ['あ1', 'b2']);
     fs.appendFileSync(log, 'ial\n');
-    const r2 = await readNewLines(r1.next);
+    const r2 = await readNewLines(io, r1.next);
     assert.ok(r2);
     assert.deepStrictEqual(r2.lines, ['partial']);
-    const r3 = await readNewLines(r2.next);
+    const r3 = await readNewLines(io, r2.next);
     assert.deepStrictEqual(r3?.lines, []);
   });
 
   await test('a log that does not exist yet starts at 0; unreadable gives undefined', async () => {
     const log = path.join(tmp, 'tail', 'later.log');
-    const c = await openLogCursor(log);
+    const c = await openLogCursor(io, log);
     assert.strictEqual(c.offset, 0);
-    assert.strictEqual(await readNewLines(c), undefined); // not there: unreadable
+    assert.strictEqual(await readNewLines(io, c), undefined); // not there: unreadable
     fs.writeFileSync(log, 'x\n');
-    assert.deepStrictEqual((await readNewLines(c))?.lines, ['x']);
-    assert.strictEqual(await readNewLines({ path: path.join(tmp, 'tail'), offset: 0 }), undefined); // a folder
+    assert.deepStrictEqual((await readNewLines(io, c))?.lines, ['x']);
+    assert.strictEqual(await readNewLines(io, { path: path.join(tmp, 'tail'), offset: 0 }), undefined); // a folder
   });
 
   await test('a log that shrank is read again from the start', async () => {
     const log = path.join(tmp, 'tail', 'shrink.log');
     fs.writeFileSync(log, 'long long line\n');
-    const c = await openLogCursor(log);
+    const c = await openLogCursor(io, log);
     fs.writeFileSync(log, 'new\n');
-    assert.deepStrictEqual((await readNewLines(c))?.lines, ['new']);
+    assert.deepStrictEqual((await readNewLines(io, c))?.lines, ['new']);
   });
 
   await test('parsePastaLogLine reads the 5 levels', async () => {
@@ -225,16 +226,26 @@ async function main() {
 
   await test('variables.toml: location, mtime, contents; missing has no mtime', async () => {
     const master = path.join(tmp, 'Vars', 'ghost', 'master');
-    const v = variablesPath(master);
+    const v = variablesPath(io, master);
     assert.strictEqual(v, path.join(master, 'profile', 'pasta', 'debug', 'variables.toml'));
-    assert.strictEqual(await mtimeOf(v), undefined);
-    assert.strictEqual(await readText(v), undefined);
+    assert.strictEqual(await mtimeOf(io, v), undefined);
+    assert.strictEqual(await readText(io, v), undefined);
     fs.mkdirSync(path.dirname(v), { recursive: true });
     fs.writeFileSync(v, 'a = "あ"\n');
-    const m = await mtimeOf(v);
+    const m = await mtimeOf(io, v);
     assert.strictEqual(typeof m, 'number');
-    assert.strictEqual(await readText(v), 'a = "あ"\n');
+    assert.strictEqual(await readText(io, v), 'a = "あ"\n');
     assert.strictEqual(fs.readFileSync(v, 'utf8'), 'a = "あ"\n'); // never written
+  });
+
+  await test('readText drops a leading BOM, so a BOM pasta.toml still finds [logging] on line 1', async () => {
+    const master = path.join(tmp, 'Bom', 'ghost', 'master');
+    fs.mkdirSync(master, { recursive: true });
+    const toml = path.join(master, 'pasta.toml');
+    fs.writeFileSync(toml, '﻿[logging]\nfile_path = "profile/x.log"\n');
+    const text = await readText(io, toml);
+    assert.strictEqual(text, '[logging]\nfile_path = "profile/x.log"\n');
+    assert.strictEqual(pastaLogPath(io, master, text).path, path.join(master, 'profile', 'x.log'));
   });
 
   fs.rmSync(tmp, { recursive: true, force: true });

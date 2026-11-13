@@ -10,9 +10,10 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { startFakeMcpServer, FakeMcpServer, FakeState } from './fakeMcpServer';
-import { DEFAULT_TIMING, FlowContext, Timing } from '../reloadShiori';
-import { SceneOutcome, findPlayedScript, formatScene, runScene, sceneReferences } from '../runSceneAtCursor';
-import { GhostTarget } from '../ghostFiles';
+import { DEFAULT_TIMING, FlowContext, Timing } from '../../../shared/reloadShiori.ts';
+import { SceneOutcome, findPlayedScript, formatScene, runScene, sceneReferences } from '../../../shared/runSceneAtCursor.ts';
+import type { GhostTarget } from '../../../shared/ghostFiles.ts';
+import { nodeGhostIO } from '../nodeGhostIO';
 
 let passed = 0;
 let failed = 0;
@@ -60,6 +61,7 @@ async function play(
   server.state.runningRoots = [ghost.root];
   const file = path.join(ghost.master, 'dic', 'pose.pasta');
   const ctx: FlowContext = {
+    io: nodeGhostIO,
     endpoint: { port: server.port, basewareName: 'SSP' }, ghost,
     timing: { ...DEFAULT_TIMING, ...opts.timing }, sleep: opts.sleep ?? countingSleep().sleep,
   };
@@ -82,6 +84,20 @@ async function main() {
   await test('sceneReferences: Reference0 is the path as given, Reference1 the 1-based line as a string (4.6)', async () => {
     assert.deepStrictEqual(sceneReferences('C:\\g\\ghost\\master\\dic\\pose.pasta', 1), ['C:\\g\\ghost\\master\\dic\\pose.pasta', '1']);
     assert.deepStrictEqual(sceneReferences('/g/dic/a.pasta', 42), ['/g/dic/a.pasta', '42']);
+  });
+
+  await test('locals: the inline table goes as Reference2; without it there are still 2 references (8.3・8.5)', async () => {
+    assert.deepStrictEqual(sceneReferences('/g/dic/a.pasta', 3, '{ "名前" = "a" }'), ['/g/dic/a.pasta', '3', '{ "名前" = "a" }']);
+    assert.deepStrictEqual(sceneReferences('/g/dic/a.pasta', 3, undefined), ['/g/dic/a.pasta', '3']);
+    const g = makeGhost();
+    Object.assign(server.state, { reloadLog: ['loadedTrue'], raiseEvent: { mode: 'script', script: 'x' }, raiseEventLog: [] });
+    server.state.runningRoots = [g.root];
+    const ctx: FlowContext = { io: nodeGhostIO, endpoint: { port: server.port, basewareName: 'SSP' }, ghost: g, timing: DEFAULT_TIMING, sleep: countingSleep().sleep };
+    const file = path.join(g.master, 'dic', 'pose.pasta');
+    const before = server.state.calls.length;
+    is(await runScene(ctx, file, 7, '{ n = 1 }'), 'played');
+    const sent = server.state.calls.slice(before).filter((c) => c.name === 'raise_event');
+    assert.deepStrictEqual(sent.map((c) => c.arguments), [{ event: 'OnPastaSceneAt', references: [file, '7', '{ n = 1 }'], ghost_name: g.root }]);
   });
 
   await test('plays: reload, latest script id, then OnPastaSceneAt [abs path, "42"] without strict; script shown (4.6・4.7)', async () => {
@@ -123,7 +139,7 @@ async function main() {
   await test('not sent when the reload is refused (ghost not running there)', async () => {
     const g = makeGhost();
     server.state.runningRoots = [];
-    const ctx: FlowContext = { endpoint: { port: server.port, basewareName: 'SSP' }, ghost: g, timing: DEFAULT_TIMING, sleep: countingSleep().sleep };
+    const ctx: FlowContext = { io: nodeGhostIO, endpoint: { port: server.port, basewareName: 'SSP' }, ghost: g, timing: DEFAULT_TIMING, sleep: countingSleep().sleep };
     const before = server.state.calls.length;
     const o = is(await runScene(ctx, path.join(g.master, 'dic', 'a.pasta'), 1), 'notPlayed');
     assert.ok(!server.state.calls.slice(before).some((c) => c.name === 'raise_event'));
