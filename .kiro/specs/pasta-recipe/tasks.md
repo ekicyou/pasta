@@ -43,7 +43,7 @@
   - _Requirements: 1.3, 6.1, 6.2, 6.4, 6.5, 6.7, 7.7, 8.1, 13.4_
 
 - [ ] 3. Rust の殻の各モジュール
-- [ ] 3.1 `ghost/master` の探し方と、読み書きの範囲の門を作る
+- [x] 3.1 `ghost/master` の探し方と、読み書きの範囲の門を作る
   - ゴーストのフォルダ・`ghost`・`ghost/master` のどれからでも同じ master に着き、名前は大文字・小文字を区別せずに見つけ、中のフォルダ・ファイルからは上へたどってファイルの相対パスも返す
   - 見つからないときは、パスと理由の日本語の文を返す
   - 相対パスの門は、範囲の外・`..`・`\`・`:`・デバイス名・最上位の `profile`（大文字・小文字を区別しない）・途中のシンボリックリンクを拒む
@@ -240,3 +240,4 @@
 - 2.1: exe は 6,225,408 B（--no-bundle・+crt-static はルートの .cargo/config.toml を受け継ぐ）。vcruntime/msvcp は引かず UCRT（api-ms-win-crt-*）だけ。全依存を先に入れたので、使い始めるまで cargo の unused dependency 警告が出る（clippy -D warnings は止まらない）。cargo は env -u NoDefaultCurrentDirectoryInExePath で走らせる。
 - 2.2: npm test は明示の glob（"src/**/*.test.ts"）で走らせる。Node 22 で裸のフォルダの引数は .ts を拾う保証が無い。テストの型のため @types/node を devDependency に置いた。
 - 2.3: 関門は合格（shiki の下地＋セマンティックトークンの重なり、自前の提供者へは切り替えず）。monaco 0.57 には edcore.main が無く monaco-editor/editor＋features/register.all を使う。register.all は documentSemanticTokens・suggestController・goToCommands などを読まないので、要る部品は明示で import する。規則の無い種類のトークンは theme.ts の keepTokens で落とす（6.3 でも使う）。U+3000 は unicodeHighlight.allowedCharacters で許す。monaco 0.57 が引く dompurify の脆弱性は package.json の overrides で 3.4.17 に上げた。exe 8,066,048 B・zip 3,561,221 B。
+- 3.1: 大文字・小文字を区別しない比べは ASCII だけでなく to_uppercase の両側で（NTFS は全角・アクセントも区別しない）。ASCII だけの比べで重なりを見逃すと fs::rename が上書きして失う。resolve_rel は途中と目的そのもののリンクを拒む（設計 438 行を合わせた）。この機械では symlink の作成が os error 1314 で、試験はジャンクション（mklink /J）で毎回確かめる。

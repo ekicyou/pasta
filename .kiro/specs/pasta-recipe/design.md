@@ -435,7 +435,7 @@ pub fn check_name(dir: &Path, name: &str, except: Option<&str>) -> Result<(), St
 ```
 
 - `find_master` の順: (1) `std::path::absolute`。無ければ「ありません」。(2) ファイルなら、そのフォルダから始め、ファイルを覚える。(3) フォルダ `D` に子 `ghost`（大文字・小文字を区別しない）があり、その下に `master` があればそれ。(4) `D` の名前が `ghost` で子に `master` があればそれ。(5) `D` の名前が `master` で親の名前が `ghost` なら `D`。(6) それ以外は `D` から上へたどり、名前が `master` で親が `ghost` の最も近いものを使い、渡されたパスをその相対パスにする（2.6）。(7) どれも無ければ「ゴーストのフォルダではありません（ghost/master が見つかりません）」。子の名前の照らし合わせは `read_dir` の名前を `eq_ignore_ascii_case` で比べ、返すパスはディスクの綴りにする。2.6 で見つけたファイルが master の外（`profile` の下など）なら、ゴーストは開き、ファイルは開かない。
-- `resolve_rel` が拒むもの: 空の要素・`.`・`..`・`\`・`:`・NUL を含む要素・末尾が `.` か空白の要素・予約されたデバイス名（`CON`・`PRN`・`AUX`・`NUL`・`COM1`〜`COM9`・`LPT1`〜`LPT9`。拡張子付きも）・最初の要素が `profile`（大文字・小文字を区別しない。11.4）・master から目的の手前までの途中にあるシンボリックリンク（`symlink_metadata().file_type().is_symlink()`。ジャンクションを含む）。`rel` が空の文字列のときは master そのもの（フォルダの操作だけが使う）。
+- `resolve_rel` が拒むもの: 空の要素・`.`・`..`・`\`・`:`・NUL を含む要素・末尾が `.` か空白の要素・予約されたデバイス名（`CON`・`PRN`・`AUX`・`NUL`・`COM1`〜`COM9`・`LPT1`〜`LPT9`。拡張子付きも）・最初の要素が `profile`（大文字・小文字を区別しない。11.4）・master から目的までの途中と目的そのもの（既にあるとき）のシンボリックリンク（`symlink_metadata().file_type().is_symlink()`。ジャンクションを含む）。`rel` が空の文字列のときは master そのもの（フォルダの操作だけが使う）。
 - `check_name` が拒むもの: 空・`/`・`\`・`< > : " | ? *`・制御文字・末尾の `.` と空白・予約されたデバイス名・`dir` の中の既にある名前（大文字・小文字を区別しない。名前の変更では自分自身の大文字・小文字だけの変更を `except` で許す）。
 
 **Implementation Notes**
@@ -798,7 +798,7 @@ interface OpenRequest { path: string | null }
 
 ### Unit Tests（Rust・`cargo test`）
 - `paths::find_master`: ゴーストのフォルダ・`ghost`・`ghost/master` の 3 つが同じ master に着く（2.4）、`Ghost/MASTER` を見つける（2.5）、中のフォルダ・ファイルから上へたどりファイルの相対パスを返す（2.6）、無いパス・ファイルでゴーストの外・ゴーストでないフォルダは理由付きの `Err`（2.7）。
-- `paths::resolve_rel`・`check_name`: `..`・`\`・`:`・`CON`・末尾の `.`・最上位の `Profile`・途中のリンクを拒み、`dic/a.pasta` を通す（11.2・11.4）。重なり（大文字・小文字違い）・空・`a?b` を拒み、自分の大文字・小文字だけの変更を許す（4.16）。
+- `paths::resolve_rel`・`check_name`: `..`・`\`・`:`・`CON`・末尾の `.`・最上位の `Profile`・途中と目的そのもののリンクを拒み、`dic/a.pasta` を通す（11.2・11.4）。重なり（大文字・小文字違い）・空・`a?b` を拒み、自分の大文字・小文字だけの変更を許す（4.16）。
 - `files`: BOM 付き・無し、CRLF・LF の読み → 書きで、バイト列が元と同じ（5.7）。UTF-8 でないファイルは `Err`（5.3）。`create_entry` は既にあれば失敗、`rename_entry` は新しい rel を返す（4.14・4.15）。
 - `recent`: 先頭へ移る・重ならない（大文字・小文字違い）・11 件目で古いものが落ちる・壊れた TOML は空・`render` → `parse` で戻る（3.1・3.2・3.7・3.8）。
 - `check`: 列の UTF-16 化（サロゲートペア・全角・CRLF の行）。
