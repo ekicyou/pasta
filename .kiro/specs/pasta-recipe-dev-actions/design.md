@@ -22,7 +22,6 @@
 - `OnPastaScene`（名前で鳴らす）の画面。
 - 表（テーブル）の値の保存変数の書き換え。
 - `pasta-recipe` のエディタ・ツリー・保存・単一インスタンスの仕組みそのもの。
-- 拡張の試験を CI に足すこと（共有の流れの試験はアプリの CI で走る）。
 
 ## Boundary Commitments
 
@@ -34,6 +33,7 @@
 - アプリの Rust の開発の門: 127.0.0.1 の候補のポートへの POST（`dev_post`）と、開いている `ghost/master` の決まった場所だけの読み取り（`dev_list`・`dev_stat`・`dev_read`）。
 - アプリの Rust の TOML の読み書き: `variables.toml` を表の行にすること（`variable_rows`）と、ローカル変数のインライン表を組み立てて弾くこと（`build_locals`）。
 - マニュアル `book/src/debug/recipe.md` の「ゴーストを動かす」節と、関連する言い直し。
+- CI（`.github/workflows/build.yml`）に、拡張の試験（`editors/vscode` の `npm test`）を走らせる job を足すこと。
 
 ### Out of Boundary
 
@@ -144,7 +144,7 @@ graph TB
 | 拡張の入出力 | Node `http`・`fs/promises`・`path` | `GhostIO` の Node の実装 | 今の `rpc`・`readNewLines` などの Node の部分をそのまま移す |
 | アプリの画面 | Vite 8・TypeScript・Monaco 0.57 | ▶ の CodeLens・下の欄・窓 | `monaco.languages.registerCodeLensProvider`・`monaco.editor.registerCommand` |
 | アプリの Rust | Tauri ~2.12・`reqwest 0.13.5`（`default-features = false`）・`toml 1`・`pasta_dsl`（パス） | POST の門・読み取りの門・TOML | reqwest は lock に既にある（tauri の Android・iOS 向けの依存）。Windows では新しく compile される（hyper の一式）。lock の包みは増えない |
-| 試験 | `node --test`（Node 22）・`cargo test` | 共有の流れ（偽の入出力）・Rust の門と TOML | 拡張の今の試験は手元の `npm test` |
+| 試験 | `node --test`（Node 22）・`cargo test` | 共有の流れ（偽の入出力）・Rust の門と TOML | 拡張の今の試験（`npm test`）は、この spec で CI の job に足す |
 
 ## File Structure Plan
 
@@ -193,9 +193,10 @@ editors/
             ├── dev.rs              # 新しい: dev_post（宛先とポートの固定・再送なし・Origin なし）と dev_list・dev_stat・dev_read
             ├── variables.rs        # 新しい: variable_rows（variables.toml → 行）と build_locals（組 → インライン表・弾き）
             ├── paths.rs            # 変える: dev_path（開発の読み取りの門）
-            ├── commands.rs         # 変える: コマンドの表に 6 つ・GhostInfo に root
+            ├── commands.rs         # 変える: コマンドの表に 8 つ・GhostInfo に root
             └── lib.rs              # 変える: mod dev・mod variables
 book/src/debug/recipe.md            # 変える: 「ゴーストを動かす」節・できること・まだできないこと・ネットワークの記述・締めの台詞
+.github/workflows/build.yml         # 変える: job `vscode-test`（ubuntu-latest・Node 22・editors/vscode で npm ci → npm test）を足す
 ```
 
 ### Modified Files
@@ -265,7 +266,7 @@ sequenceDiagram
 ### ゴーストの切り替えと操作の重なり
 
 - 開発の操作はアプリ全体で 1 つずつ。進んでいる間に次を始めると、共有の文言 `BUSY` を、進んでいる操作のゴーストの名前で出して始めない（5.1）。
-- 操作は、始めたときのゴーストの `GhostTarget`（root・master）を持ち続ける。途中で別のゴーストを開いても待たない。Rust の読み取りの門は「今開いている master」だけを通すので、前のゴーストの操作の読み取りは断られ（読めない扱い）、新しいゴーストのファイルは読まれない。結果の行は 1 つずつなので、前のゴーストの見出しの下に続く（5.2）。
+- 操作は、始めたときのゴーストの `GhostTarget`（root・master）を持ち続ける。途中で別のゴーストを開いても待たせず、進んでいる操作は前のゴーストのまま最後まで正しく走らせる。Rust の読み取りの門は「進んでいる操作の master」（操作の始めの `dev_begin` が、そのとき開いている master を覚え、終わりの `dev_end` が消す）だけを通すので、操作は前のゴーストのファイルを読み続けられ、新しいゴーストのファイルは読まない。結果の行は 1 つずつなので、前のゴーストの見出しの下に本当の結果が続く（5.2）。
 - 別のゴーストを開いたら、保存変数の表を消す（5.3）。前のゴーストの操作が後から表の行を返しても、ゴーストの鍵が今のものと違えば捨てる。
 
 ## Requirements Traceability
@@ -610,6 +611,8 @@ export type LocalsOutcome =
   | { kind: 'ok'; table: string }                                        // TOML のインライン表
   | { kind: 'invalid'; problems: { index: number; message: string }[] }; // 組の番号と理由（日本語）
 
+export const devBegin: () => Promise<void>;  // 操作の始め（門が今の master を覚える）
+export const devEnd: () => Promise<void>;    // 操作の終わり（finally で呼ぶ）
 export const tauriGhostIO: GhostIO; // post→dev_post・list→dev_list・stat→dev_stat・read→dev_read（ArrayBuffer）・join は \ で結ぶ
 export const variableRows: (text: string) => Promise<VarRow[]>;          // 失敗は理由の文で投げる
 export const buildLocals: (pairs: LocalPair[]) => Promise<LocalsOutcome>;
@@ -662,7 +665,8 @@ export class DevActions {
 - 表の状態は `VariablesPanel` が持ち、`DevActions` は「読めたか」だけを見る。
 
 **Implementation Notes**
-- Risks: 切り替えの後の前のゴーストの操作は、門に読み取りを断られ、時間切れ・読めないの結果で終わる（例: 読み込みの終わりを確かめられませんでした）。前のゴーストの見出しの下に出るので、混ざりはしない。
+- Integration: 操作は `devBegin()` → `session.execute(…)` → `finally` で `devEnd()` の順で包む。`ghostTarget` を作る読み取りも、この中で行う。
+- Risks: 切り替えの後も、前のゴーストの操作は最後まで走る（最長で読み込みの終わり 20 秒＋頼み 15 秒）。その間、新しいゴーストの開発の操作は `BUSY` で始まらない（5.1）。
 
 #### DevPanels（`devPanels.ts`）・Panels（`panels.ts`）
 
@@ -717,7 +721,8 @@ export class DevActions {
 **Responsibilities & Constraints**
 - `dev_post`: `port` が候補（9801〜9810・9821〜9830）でなければ送らずに `unreachable`。宛先は `http://127.0.0.1:{port}/api/mcp/v1` の固定。頭は `Content-Type: application/json`・`Accept: application/json, text/event-stream`（`Content-Length` は reqwest が付ける）で、`Origin` は付けない。`reqwest::Client` は `no_proxy()`・`http1_only()`・`pool_max_idle_per_host(0)`・`retry(reqwest::retry::never())` で作り、時間は `timeout_ms`。接続の失敗（`is_connect`）は `unreachable`、時間切れは `noResponse`（`no response within {ms} ms`）、ほかの失敗は `noResponse`。本文は UTF-8 で読む（壊れたバイトは置き換える）。
 - `dev_path(master, abs, want)`: `abs` が今の `master` の下で、部品が普通の名前だけ（`..`・ドライブ・根を含まない）のとき、次だけを通す。`want = List` は `master` そのもの。`want = Read` は (a) 直下の `descript.txt`（大文字・小文字を問わない）、(b) 直下の `pasta.toml`（同じ）、(c) 直下の `profile`（同じ）の下のファイル（`pasta.log` の場所の決まり＝最初の部品が `profile` で後に部品がある、をそのまま門にする。`variables.toml` もここ）。途中・目的のリンクは断る（`resolve_rel` と同じ）。ほかは `Err`（「開いているゴーストの外は読みません」）。
-- `dev_list(path)`・`dev_stat(path)`・`dev_read(path, start)` は、`state.master()` と `dev_path` を必ず通す。ゴーストを開いていなければ `Err`。`dev_read` は `tauri::ipc::Response` でバイト列を返す。書くコマンドは足さない（7.9）。
+- `dev_begin()` は、そのとき開いている master を `AppState` の「進んでいる操作の master」に覚える（ゴーストを開いていなければ `Err`。前の覚えが残っていれば上書きする）。`dev_end()` は消す。画面は master を渡さない。
+- `dev_list(path)`・`dev_stat(path)`・`dev_read(path, start)` は、「進んでいる操作の master」と `dev_path` を必ず通す。操作が進んでいなければ `Err`（開発の読み取りは、操作の中でしか起きない）。`dev_read` は `tauri::ipc::Response` でバイト列を返す。書くコマンドは足さない（7.9）。
 - 重い仕事（ファイルの読み取り）は `run_blocking`、`dev_post` は Tauri の非同期のまま。
 
 **Contracts**: API [x]
@@ -727,6 +732,8 @@ export class DevActions {
 | Command | Request | Response | Errors |
 |---------|---------|----------|--------|
 | `dev_post` | `{ port: u16, body: String, timeoutMs: u64 }` | `PostOutcome`（`kind` で分ける serde の enum） | なし（失敗も `PostOutcome`） |
+| `dev_begin` | なし | なし | ゴーストを開いていない → `Err(String)` |
+| `dev_end` | なし | なし | なし |
 | `dev_list` | `{ path: String }` | `Vec<String>` | 門・読めない → `Err(String)` |
 | `dev_stat` | `{ path: String }` | `{ size: u64, mtimeMs: f64, isFile: bool }` | 同上 |
 | `dev_read` | `{ path: String, start: u64 }` | バイト列（ArrayBuffer） | 同上・ファイルでない |
@@ -735,7 +742,7 @@ export class DevActions {
 
 **Implementation Notes**
 - Integration: `Cargo.toml` に `reqwest = { version = "0.13", default-features = false }`。tauri の reqwest は Android・iOS の向けだけなので、Windows では reqwest と hyper の一式が新しく compile される。`Cargo.lock` の包みは増えない（依存の列だけ）。第三者の表示は `cargo about`（`--target x86_64-pc-windows-msvc`）が自動で拾う。ライセンスは MIT・Apache-2.0 で `deny.toml`・`about.toml` の許可の表に入っている。
-- Validation（13.4）: (1) `check_port` が 9800・9811・9820・9831・80 を断り、候補の 20 を通す。(2) 宛先の文字列が `http://127.0.0.1:{port}/api/mcp/v1` だけ。(3) 送り手の芯（ポートの検査の前の関数）を、試験の中で 127.0.0.1 の空きポートの `TcpListener` へ向け、届いた生の頼みに `Origin` が無く、`Accept`・`Content-Type` があり、パスが `/api/mcp/v1` で、接続が 1 回だけ（切られても送り直さない）ことを確かめる。待ち受けの無いポートは `unreachable`、読んで黙るのは `noResponse`。(4) `dev_path` が master の外・`..`・別のドライブ・`dic/a.pasta`・リンクを断り、`descript.txt`（`DESCRIPT.TXT` も）・`pasta.toml`・`profile/pasta/logs/pasta.log`・`profile/pasta/debug/variables.toml` を通す。
+- Validation（13.4）: (1) `check_port` が 9800・9811・9820・9831・80 を断り、候補の 20 を通す。(2) 宛先の文字列が `http://127.0.0.1:{port}/api/mcp/v1` だけ。(3) 送り手の芯（ポートの検査の前の関数）を、試験の中で 127.0.0.1 の空きポートの `TcpListener` へ向け、届いた生の頼みに `Origin` が無く、`Accept`・`Content-Type` があり、パスが `/api/mcp/v1` で、接続が 1 回だけ（切られても送り直さない）ことを確かめる。待ち受けの無いポートは `unreachable`、読んで黙るのは `noResponse`。(4) `dev_path` が master の外・`..`・別のドライブ・`dic/a.pasta`・リンクを断り、`descript.txt`（`DESCRIPT.TXT` も）・`pasta.toml`・`profile/pasta/logs/pasta.log`・`profile/pasta/debug/variables.toml` を通す。(5) `dev_begin` の後に別の master を開いても、前の master の読み取りは `dev_end` まで通り、新しい master の読み取りは断る。`dev_end` の後・`dev_begin` の前はどちらも断る。
 
 #### Variables（`variables.rs`）
 
@@ -793,7 +800,7 @@ export class DevActions {
   - 書き出しの待ち: 更新時刻が進むまで待つ・進まなければ `stale` と `OnPastaDumpVariables:` の行。
   - 書き換えの頼み: `references` が `[名前, 値, 型]`・削除は `[名前, "", "delete"]`・204 は `set`・表記は `refusedByGhost`。
 - **DevSession（`devSession.test.ts`）**: 覚えた相手の 1 回の確かめ・名前が変わったら探し直す・2 つ以上で `pick`・閉じたら `run` を呼ばない・同じゴーストの重なりの止め・保存の失敗で止める・`ERROR_KINDS` で誤りと警告を分ける・見出しの行の形。
-- **拡張（`editors/vscode/src/test/`・手元の `npm test`。13.3）**: 今の試験を、共有と `nodeGhostIO` に向け直して全部通す（実物の一時フォルダと `fakeMcpServer`。Node の入出力の実装の試験を兼ねる）。`devCommands.e2e` は振る舞いの固定として変えずに通す。
+- **拡張（`editors/vscode/src/test/`・`npm test`。13.3）**: 今の試験を、共有と `nodeGhostIO` に向け直して全部通す（実物の一時フォルダと `fakeMcpServer`。Node の入出力の実装の試験を兼ねる）。`devCommands.e2e` は振る舞いの固定として変えずに通す。`npm test`（grammar・unit・e2e。e2e も偽の `vscode` で Node だけで走る）を CI の job `vscode-test` で走らせ、移した後の取りこぼしを main で見つけられるようにする。ランナーで走らない試験があれば、実装のときにその試験だけを理由を付けて外す。
 - **アプリの Rust（`cargo test`。13.2・13.4）**: `dev.rs`（ポートの検査・宛先・`Origin` なし・1 回だけ・失敗の分け）、`paths.rs`（`dev_path` の通す・断る）、`variables.rs`（組み立てと読み直し・弾き・表の行）。
 - **アプリの画面（`node --test`）**: `mapping.test.ts`（`scenePaths`・`sceneLine`: 同じ名前のグローバル・ローカル、書き換えで行がずれたときに新しい行を返す、消えたら `undefined`）、`dialog.test.ts`（`choose` の戻り値）。
 - **手で確かめる（実機）**: SSP と areka で ▶・リロード・表の書き換え・値を入れて実行が通ること、2 つのベースウェアで選ぶ窓が出ること、1000×680 でエディタに書ける高さが残ること、明暗の両方で読めること。
@@ -801,7 +808,7 @@ export class DevActions {
 ## Security Considerations
 
 - 送る先は Rust で `127.0.0.1` と候補のポートに固定し、画面は URL を渡せない。CSP は変えない（画面からは今までどおりどこにもつながらない）。
-- 読む場所は「今開いている `ghost/master`」の下の `descript.txt`・`pasta.toml`・`profile/` の下のファイルだけ。リンクは断る。書くコマンドは足さない。
+- 読む場所は「進んでいる操作の `ghost/master`」（操作の始めに開いていたもの）の下の `descript.txt`・`pasta.toml`・`profile/` の下のファイルだけ。リンクは断る。書くコマンドは足さない。
 - ディスクとゴーストから来た文字列（台本・ログ・パス・保存変数の値）は、いつも `textContent` で書く。
 
 ## Performance & Scalability
