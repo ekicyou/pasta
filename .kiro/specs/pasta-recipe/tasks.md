@@ -119,7 +119,7 @@
   - _Boundary: Sync_
   - _Requirements: 10.2, 10.3, 10.4, 10.6, 13.5_
 
-- [ ] 5.3 (P) 求めをまとめて走らせる仕組みを作る
+- [x] 5.3 (P) 求めをまとめて走らせる仕組みを作る
   - 決めた時間の中の求めを 1 回にまとめ、走っている間の求めは終わった後に 1 回だけ走らせる。時計は外から渡す
   - 300 ms 以内の 3 回の求めが 1 回、走っている間の 2 回の求めが後の 1 回になるテストが `node --test` で緑になっている
   - _Boundary: Scheduler_
@@ -245,3 +245,4 @@
 - 4.1: 画面からの入力は信用しない。open_ghost も Rust の中で find_master を通し直す（open_in）。run_blocking は文の頭（解析・検査）を引数で受ける。
 - 4.2: WebView2 は窓が後ろに隠れていると描画しない。PrintWindow で撮るときは窓を前に出す。動作確認で open_ghost を呼ぶと、利用者の %APPDATA% の下の io.github.ekicyou.pasta-recipe フォルダの recent.toml に記録が残る。
 - 5.1: 画面でファイルが同じかの判定は toUpperCase で両側をそろえる（Rust の to_uppercase と同じ）。並べ方だけは設計どおり toLowerCase。
+- 5.3: node --test は型を取り除くだけなので、コンストラクタの引数に書くプロパティ（parameter properties）や enum は使えない。#private のフィールドで書く。CoalescingRunner は run の失敗を握りつぶすので、知らせは呼ぶ側の run の中で出す。
