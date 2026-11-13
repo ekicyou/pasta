@@ -51,12 +51,21 @@ async function loadScenes(rel: string): Promise<void> {
 
 const saveButton = document.createElement("button");
 saveButton.textContent = "保存 (Ctrl+S)";
+saveButton.className = "primary";
 saveButton.addEventListener("click", () => {
   if (docs.active) void docs.save(docs.active);
 });
 document.getElementById("toolbar")!.append(saveButton);
 
 const start = new StartView(document.getElementById("start")!, document.getElementById("toolbar")!, (path, origin) => void openPath(path, origin));
+
+// Ctrl+O はどこに焦点があってもファイルを選ぶ窓を出す（開始の画面でも）
+document.addEventListener("keydown", (e) => {
+  if (!e.ctrlKey || e.altKey || e.shiftKey || e.key.toLowerCase() !== "o") return;
+  e.preventDefault();
+  if (e.repeat || document.querySelector("dialog[open]")) return;
+  void start.pick(false);
+});
 
 /** 開いているゴーストの master（まだ開いていなければ null） */
 let current: string | null = null;

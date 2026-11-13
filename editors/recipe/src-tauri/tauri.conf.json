@@ -15,8 +15,9 @@
       {
         "label": "main",
         "title": "pasta-recipe",
-        "width": 1200,
-        "height": 800,
+        "width": 1000,
+        "height": 680,
+        "center": true,
         "dragDropEnabled": true
       }
     ],

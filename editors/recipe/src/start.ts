@@ -27,7 +27,7 @@ export class StartView {
       e.preventDefault();
       void this.#openMenu();
     });
-    toolbar.append(this.#menuButton);
+    toolbar.append(this.#pickButton("フォルダを開く…", true), this.#pickButton("ファイルを開く… (Ctrl+O)", false), this.#menuButton);
   }
 
   /** ゴーストを開いていない間の画面を出す。記録は出すたびに読み直す（開いた後に順が変わる） */
@@ -35,15 +35,15 @@ export class StartView {
     const entries = await list();
     const heading = document.createElement("h1");
     heading.textContent = "ゴーストを開く";
-    const pick = document.createElement("button");
-    pick.textContent = "フォルダを選ぶ…";
-    pick.addEventListener("click", () => void this.#pick());
+    const pick = this.#pickButton("フォルダを選ぶ…", true);
+    pick.className = "primary";
+    const pickFile = this.#pickButton("ファイルを選ぶ…", false);
     const drop = document.createElement("p");
     drop.textContent = "ここにゴーストのフォルダをドロップしても開けます。";
     const recentHeading = document.createElement("h2");
     recentHeading.id = "start-recent-heading";
     recentHeading.textContent = "最近開いたもの";
-    const body: HTMLElement[] = [heading, pick, drop, recentHeading];
+    const body: HTMLElement[] = [heading, pick, pickFile, drop, recentHeading];
     if (entries.length === 0) {
       const none = document.createElement("p");
       none.textContent = "まだありません。";
@@ -79,8 +79,18 @@ export class StartView {
     this.#el.hidden = true;
   }
 
-  async #pick(): Promise<void> {
-    const path = await pickFolder({ directory: true, title: "ゴーストのフォルダを選ぶ" });
+  #pickButton(label: string, directory: boolean): HTMLButtonElement {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.addEventListener("click", () => void this.pick(directory));
+    return b;
+  }
+
+  /** フォルダか、ゴーストの中のファイルを選んで開く。ファイルを選ぶと、そのゴーストを開いてからそのファイルを開く（窓へのドロップと同じ） */
+  async pick(directory: boolean): Promise<void> {
+    const path = directory
+      ? await pickFolder({ directory: true, title: "ゴーストのフォルダを選ぶ" })
+      : await pickFolder({ title: "ゴーストのファイルを選ぶ", filters: [{ name: "ゴーストのファイル", extensions: ["pasta", "lua", "toml", "txt"] }] });
     if (typeof path === "string") this.#onOpen(path, "dialog");
   }
 
