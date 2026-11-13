@@ -11,6 +11,7 @@ import type { Report } from './devSession.ts';
 export type DumpOutcome =
   | { kind: 'shown'; text: string; path: string; mtime: number }
   | { kind: 'stale'; path: string; reasons: readonly string[] } // 無い・書き換わらない（6.3）
+  | { kind: 'unreadable'; path: string } // 書き出されたのに読めない（6.5）
   | { kind: 'failed'; result: CallResult };
 
 export async function dumpVariables(ctx: FlowContext): Promise<DumpOutcome> {
@@ -27,6 +28,7 @@ export async function dumpVariables(ctx: FlowContext): Promise<DumpOutcome> {
 
   // 台本・台本なし・応答が無い のどれでも、上限まで更新時刻を見る（6.2・6.3）
   const maxSleeps = Math.ceil(timing.dumpWaitMs / timing.pollIntervalMs);
+  let writtenButUnreadable = false;
   for (let slept = 0; ; slept++) {
     const mtime = await mtimeOf(io, file);
     if (mtime !== undefined && (before === undefined || mtime > before)) {
@@ -34,11 +36,15 @@ export async function dumpVariables(ctx: FlowContext): Promise<DumpOutcome> {
       if (text !== undefined) {
         return { kind: 'shown', text, path: file, mtime };
       }
+      writtenButUnreadable = true;
     }
     if (slept >= maxSleeps) {
       break;
     }
     await ctx.sleep(timing.pollIntervalMs);
+  }
+  if (writtenButUnreadable) {
+    return { kind: 'unreadable', path: file };
   }
   const lines = (await readNewLines(io, cursor))?.lines ?? [];
   return { kind: 'stale', path: file, reasons: lines.filter((l) => l.includes('OnPastaDumpVariables:')) };
@@ -56,6 +62,10 @@ export function formatDump(outcome: DumpOutcome): { lines: string[]; notice?: st
         ],
         notice: DEBUG_HINT,
       };
+    case 'unreadable': {
+      const text = `${outcome.path} は書き出されましたが、読めませんでした（ファイルを開けない）`;
+      return { lines: [text], notice: text };
+    }
     case 'failed': {
       const text = `保存変数の書き出しを頼めませんでした: ${describeResult(outcome.result)}`;
       return { lines: [text], notice: text };

@@ -244,6 +244,21 @@ test('書き出しの待ち: 更新時刻が進まなければ古いとして、
   assert.equal(f.notice, DEBUG_HINT);
 });
 
+test('書き出しの待ち: 書き出されたのに読めなければ、デバッグの案内でなく読めなかったと場所を出す（6.5）', async () => {
+  const { io, ctx } = setup({ 1: (io) => io.setFile(VARS, 'new = 1\n') });
+  io.setFile(VARS, 'old = 1\n');
+  const read = io.read.bind(io);
+  // 書き出しの後は開けない（ロックなど）
+  let locked = false;
+  Object.assign(io, { read: (p: string, s: number) => (locked && p === VARS ? Promise.resolve(undefined) : read(p, s)) });
+  io.queuePost(okAfter(NO_SCRIPT, () => { locked = true; }));
+  const o = await dumpVariables(ctx);
+  assert.equal(o.kind, 'unreadable');
+  const f = formatDump(o);
+  assert.ok(f.lines[0].includes(VARS) && f.lines[0].includes('読めませんでした'), f.lines[0]);
+  assert.notEqual(f.notice, DEBUG_HINT);
+});
+
 // ---- 書き換えの頼み ----
 
 test('書き換えの頼み: references は名前・値・型、204 は成功', async () => {
