@@ -10,6 +10,7 @@ import {
   MARKER_SEVERITY_ERROR,
   scenesToItems,
   tokensToData,
+  treeRows,
   visibleFindings,
   type TreeNode,
 } from "./mapping.ts";
@@ -167,4 +168,40 @@ test("言語は拡張子で決め、.pasta・.lua 以外は色なし（5.1・5.2
   assert.equal(languageOf("scripts/A.LUA"), "lua");
   assert.equal(languageOf("pasta.toml"), "plaintext");
   assert.equal(languageOf("lua"), "plaintext");
+});
+
+test("ツリーの見える行: 開いた所だけ・階層・親・シーンは今のファイルの rel へ（4.1・4.4・4.6）", () => {
+  const root = buildTree({ files: ["dic/挨拶.pasta", "dic/b.lua", "top.txt"], dirs: ["dic"] });
+  const scenes = new Map([
+    ["DIC/挨拶.PASTA", [{ kind: "scene" as const, rel: "古い/挨拶.pasta", name: "挨拶", sceneKind: "global" as const, line: 1, children: [{ kind: "scene" as const, rel: "古い/挨拶.pasta", name: "朝", sceneKind: "local" as const, line: 2, children: [] }] }]],
+  ]);
+  const view = (expanded: string[]) =>
+    treeRows(root, scenes, new Set(expanded)).map((r) => [r.key, r.level, r.kind, r.name, r.parent, r.expanded]);
+  assert.deepEqual(view([]), [["", 1, "dir", "", null, false]]);
+  assert.deepEqual(view([""]), [
+    ["", 1, "dir", "", null, true],
+    ["dic", 2, "dir", "dic", "", false],
+    ["top.txt", 2, "file", "top.txt", "", null],
+  ]);
+  const rows = treeRows(root, scenes, new Set(["", "dic", "dic/挨拶.pasta", "dic/挨拶.pasta|挨拶|0"]));
+  assert.deepEqual(rows.map((r) => [r.key, r.level, r.parent, r.expanded]), [
+    ["", 1, null, true],
+    ["dic", 2, "", true],
+    ["dic/b.lua", 3, "dic", null],
+    ["dic/挨拶.pasta", 3, "dic", true],
+    ["dic/挨拶.pasta|挨拶|0", 4, "dic/挨拶.pasta", true],
+    ["dic/挨拶.pasta|挨拶|0|朝|0", 5, "dic/挨拶.pasta|挨拶|0", null],
+    ["top.txt", 2, "", null],
+  ]);
+  // 押すと開くのはツリーの今の rel（名前の変更の後も古い rel へ行かない）と見出しの行
+  assert.deepEqual([rows[5].rel, rows[5].line, rows[5].name], ["dic/挨拶.pasta", 2, "朝"]);
+  assert.equal(rows[3].line, null);
+  // シーンのキーは名前と同じ名前の中の順。前にシーンを足しても開いた所がずれない（4.5・4.10）
+  const two = { kind: "scene" as const, rel: "x", name: "挨拶", sceneKind: "global" as const, line: 9, children: [] };
+  const more = new Map([["DIC/挨拶.PASTA", [{ ...two, name: "前", line: 1 }, two, two]]]);
+  assert.deepEqual(treeRows(root, more, new Set(["", "dic", "dic/挨拶.pasta"])).filter((r) => r.kind === "scene").map((r) => r.key), [
+    "dic/挨拶.pasta|前|0",
+    "dic/挨拶.pasta|挨拶|0",
+    "dic/挨拶.pasta|挨拶|1",
+  ]);
 });

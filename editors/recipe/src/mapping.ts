@@ -118,3 +118,50 @@ export function languageOf(rel: string): "pasta" | "lua" | "plaintext" {
   const ext = rel.slice(rel.lastIndexOf("/") + 1).match(/\.([^.]+)$/)?.[1].toLowerCase();
   return ext === "pasta" || ext === "lua" ? ext : "plaintext";
 }
+
+/** ツリーの見える 1 行（aria-level で階層を表す平らな並び。キーで差分を描き、上下のキーはこの順に動く） */
+export interface TreeRow {
+  /** フォルダ・ファイルは rel（最上位は空）、シーンは親のキー＋`|名前|同じ名前の中の順`（`|` はファイル名に使えない。前にシーンを足しても開いた所がずれない） */
+  key: string;
+  /** 1 始まり */
+  level: number;
+  kind: "dir" | "file" | "scene";
+  name: string;
+  /** 開くファイル。シーンもツリーの今の rel（項目が覚えた rel は名前の変更で古くなる） */
+  rel: string;
+  /** シーンの見出しの行（1 始まり）。それ以外は null */
+  line: number | null;
+  parent: string | null;
+  /** 子が無ければ null */
+  expanded: boolean | null;
+}
+
+/** scenes は rel を大文字にしたキー（Rust の to_uppercase と同じ揃え）。expanded は開いた行のキー */
+export function treeRows(root: TreeNode, scenes: ReadonlyMap<string, readonly TreeItem[]>, expanded: ReadonlySet<string>): TreeRow[] {
+  const rows: TreeRow[] = [];
+  const add = (row: Omit<TreeRow, "expanded">, hasChildren: boolean): boolean => {
+    const open = hasChildren && expanded.has(row.key);
+    rows.push({ ...row, expanded: hasChildren ? open : null });
+    return open;
+  };
+  const sceneRows = (rel: string, items: readonly TreeItem[], level: number, parent: string) => {
+    const seen = new Map<string, number>();
+    for (const item of items) {
+      const n = seen.get(item.name) ?? 0;
+      seen.set(item.name, n + 1);
+      const key = `${parent}|${item.name}|${n}`;
+      if (add({ key, level, kind: "scene", name: item.name, rel, line: item.line, parent }, item.children.length > 0)) {
+        sceneRows(rel, item.children, level + 1, key);
+      }
+    }
+  };
+  const walk = (node: TreeNode, level: number, parent: string | null): void => {
+    const items = node.kind === "file" ? (scenes.get(node.rel.toUpperCase()) ?? []) : [];
+    const kids = node.kind === "dir" ? node.children.length : items.length;
+    if (!add({ key: node.rel, level, kind: node.kind, name: node.name, rel: node.rel, line: null, parent }, kids > 0)) return;
+    if (node.kind === "dir") node.children.forEach((c) => walk(c, level + 1, node.rel));
+    else sceneRows(node.rel, items, level + 1, node.rel);
+  };
+  walk(root, 1, null);
+  return rows;
+}
