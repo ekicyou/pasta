@@ -166,7 +166,7 @@
   - _Boundary: recipe.md_
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 7. 確かめ
+- [x] 7. 確かめ
 - [x] 7.1 全部の関門を通す
   - アプリ: 型の検査・`npm test`・ビルド・`cargo test`・clippy・依存の検査・第三者の表示に足した依存が入る
   - 拡張: `npm test`・`.vsix` を作れる
@@ -174,7 +174,7 @@
   - 全部が通った結果を記録する
   - _Requirements: 9.2, 10.4, 13.3, 13.5_
 
-- [ ] 7.2 実機で確かめる
+- [x] 7.2 実機で確かめる
   - SSP と areka の両方で、▶・リロード・保存変数の表示と書き換え・削除・追加・値を入れて実行が通る。2 つのベースウェアを動かして選ぶ窓が出る
   - 1000×680 で動かす面を出してもエディタに書ける高さが残る。明暗の両方で読める
   - 操作の途中で別のゴーストを開いても、結果は前のゴーストの見出しの下に出る
@@ -194,3 +194,8 @@
 - 5.3: 設計の changeVariable(name, change) は editVariable(row)・deleteVariable(row)・addVariable() と非公開の #change に分けた（窓を DevActions の中で開くため）。窓の間にゴーストが替わると黙って戻る（出力に 1 行出すのは任意の改善）。merge は後だけが失敗なら後の知らせを採る。
 - 7.1（2026-11-13・9cdd6216 の上）: アプリは tsc・npm test（121 本）・npm run build・cargo test（69＋3＋4）・clippy -D warnings・cargo deny（advisories・bans・licenses・sources ok）・触った Rust 5 ファイルの rustfmt --check が通り、cargo about generate の出力に reqwest 0.13.5 と pasta_dsl 0.5.2 が入る。拡張は tsc・lint・npm test（grammar・unit・e2e 全部 0 failed）・build-wasm.ps1 -Release → compile → vsce package（18 files）が通る。つながない確かめは目で: 画面で外へ出る口は ipc.ts の tauriGhostIO.post（dev_post）だけで、それを使うのは DevActions の操作（リロード・▶・表の表示と書き換え）だけ。Rust で reqwest・TcpStream を使うのは dev.rs だけ（宛先は 127.0.0.1 と候補のポートに固定）。CSP の connect-src は ipc: と http://ipc.localhost のまま、capabilities は core:default・dialog:allow-open・core:window:allow-destroy だけ（http の許可なし）。自動の見張りの試験は足していない。
 - 7.1 のレビューで: dev_post の reqwest は既定で転送（redirect）に従い宛先の固定が崩れうるので、Policy::none() を足し試験 redirect_is_not_followed で縛った（cargo test 70 本）。
+- 7.2（2026-11-13・実機）: 試験用の SSP（readonly・9802 と 9803）と areka（debug・9802、排他テストの机で 1 回）で、▶（ツリーと CodeLens）・リロード・保存変数の表示・追加・書き換え・削除・失敗の表記の警告・値を入れて実行（引用符と `\` もそのまま届く）が通った。普段の SSP には触れていない。
+- 7.2: SSP の MCP は SSTP と同じポートで待つので、試験用の SSP は `--sstp-listen` に候補のポート（9802 など）を指定する（9900 では届かない）。環境の PASTA_DEBUG=1 は SSP が受け継ぐので、デバッグ無効の案内を見るときは外して立てる。
+- 7.2: 選ぶ窓は areka（9802）と SSP（9803）を並べて出た。Esc なら何も送らず、選んだ相手を覚える。同じアプリで前に 1 つだけ見つけた相手は覚えた相手へ送るので窓は出ない（3.5）。
+- 7.2: 1000×680 で動かす面を出したときエディタは 400px（21 行）。明暗の両方で表・出力・警告・窓が読める。操作の途中で別のゴーストを開いても、結果は前のゴーストの見出しの下に出て、表は消えた。4.3〜4.6 で 7.2 に回した窓の DOM の振る舞い（閉じる前の確かめ・理由の表示・Tab の回り・焦点・F1 の CodeLens の操作）はすべて通った。
+- 7.2 で直した不具合: 追加の窓で名前と値の入力を目で見分けられなかったので、placeholder（「名前」「値」）を足した（devDialogs.ts）。

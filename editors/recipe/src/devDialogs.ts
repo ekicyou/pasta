@@ -42,6 +42,7 @@ function kindValue(kind: Kind, value: string) {
   const text = document.createElement("input");
   text.type = "text";
   text.setAttribute("aria-label", "値");
+  text.placeholder = "値"; // 見える名前（追加の窓は空の入力が 2 つ並ぶ）
   const bool = document.createElement("select");
   bool.setAttribute("aria-label", "値");
   bool.add(new Option("true", "true"));
@@ -70,6 +71,7 @@ export async function editVariable(
   const name = document.createElement("input");
   name.type = "text";
   name.setAttribute("aria-label", "名前");
+  name.placeholder = "名前";
   const kv = kindValue(row?.kind ?? "string", row?.value ?? "");
   const message = row === null ? "保存変数を足します" : `＄＊${row.name} を書き換えます`;
   const rv = await open(message, [["ok", row === null ? "足す" : "書き換える"], ["cancel", "取り消す"]], {
@@ -99,6 +101,7 @@ export async function localsDialog(
     const name = document.createElement("input");
     name.type = "text";
     name.setAttribute("aria-label", "名前");
+    name.placeholder = "名前";
     name.value = pair.name;
     const kv = kindValue(pair.kind, pair.value);
     const del = document.createElement("button");
