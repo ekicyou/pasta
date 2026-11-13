@@ -32,7 +32,7 @@
   - light-plus・dark-plus の両方で、写し先が色を持つ種類すべてに規則が付き、同じスコープへ写す種類が同じ色になることを `node --test` で確かめ、緑になっている
   - _Requirements: 6.6, 6.7, 13.5_
 
-- [ ] 2.3 エディタ・着色・解析のコマンドを用意し、色の重なりを実物で確かめる（関門）
+- [x] 2.3 エディタ・着色・解析のコマンドを用意し、色の重なりを実物で確かめる（関門）
   - Monaco（言語なしの核と worker 1 つ）に `pasta`・`lua` を登録し、拡張の文法 2 つ（読むだけ）と shiki の Lua で下地を塗り、2.2 のテーマを明暗の設定に合わせて切り替える
   - コマンドの表のモジュールを作り、解析（別のスレッドで走らせ、パニックを `Err` に写す）と凡例を返すコマンドだけを置いて仮に登録する
   - セマンティックトークンの提供者を登録する。この段では今のモデルを直に解析する仮のつなぎにし、6.3 で Documents の結果を読む形へ差し替える
@@ -239,3 +239,4 @@
 ## Implementation Notes
 - 2.1: exe は 6,225,408 B（--no-bundle・+crt-static はルートの .cargo/config.toml を受け継ぐ）。vcruntime/msvcp は引かず UCRT（api-ms-win-crt-*）だけ。全依存を先に入れたので、使い始めるまで cargo の unused dependency 警告が出る（clippy -D warnings は止まらない）。cargo は env -u NoDefaultCurrentDirectoryInExePath で走らせる。
 - 2.2: npm test は明示の glob（"src/**/*.test.ts"）で走らせる。Node 22 で裸のフォルダの引数は .ts を拾う保証が無い。テストの型のため @types/node を devDependency に置いた。
+- 2.3: 関門は合格（shiki の下地＋セマンティックトークンの重なり、自前の提供者へは切り替えず）。monaco 0.57 には edcore.main が無く monaco-editor/editor＋features/register.all を使う。register.all は documentSemanticTokens・suggestController・goToCommands などを読まないので、要る部品は明示で import する。規則の無い種類のトークンは theme.ts の keepTokens で落とす（6.3 でも使う）。U+3000 は unicodeHighlight.allowedCharacters で許す。monaco 0.57 が引く dompurify の脆弱性は package.json の overrides で 3.4.17 に上げた。exe 8,066,048 B・zip 3,561,221 B。

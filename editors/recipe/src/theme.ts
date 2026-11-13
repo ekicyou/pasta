@@ -1,4 +1,5 @@
 // 純粋: TextMate のテーマに、セマンティックトークンの種類ごとの色の規則を足す（DOM・Monaco を import しない）
+import type { SemanticToken } from "./ipc.ts";
 
 export interface TmStyle {
   foreground?: string;
@@ -18,12 +19,39 @@ export type SemanticTokenScopes = Readonly<Record<string, readonly string[]>>;
 
 /** テーマに、セマンティックトークンの種類ごとの規則（scope に種類の名前・色は写し先のスコープの色）を足した新しいテーマを返す */
 export function withSemanticRules(theme: TmTheme, scopes: SemanticTokenScopes): TmTheme {
+  return { ...theme, tokenColors: [...theme.tokenColors, ...semanticRules(theme, scopes)] };
+}
+
+/** 足す規則だけ（scope は種類の名前）。写し先が色を持たない種類は含まない */
+export function semanticRules(theme: TmTheme, scopes: SemanticTokenScopes): TmThemeRule[] {
   const added: TmThemeRule[] = [];
   for (const [kind, kindScopes] of Object.entries(scopes)) {
     const style = kindScopes.map((s) => resolveScopeStyle(theme, s)).find((s) => s?.foreground);
     if (style) added.push({ scope: kind, settings: style });
   }
-  return { ...theme, tokenColors: [...theme.tokenColors, ...added] };
+  return added;
+}
+
+/**
+ * `keep` が偽の種類のトークンを落とし、残りの差分を付け直す。
+ * Monaco はテーマに規則の無い種類も既定の文字の色で塗り、下地の色を消すので、規則の無い種類は渡さない（拡張と同じ見た目・6.6）
+ */
+export function keepTokens(tokens: readonly SemanticToken[], keep: (tokenType: number) => boolean): SemanticToken[] {
+  const out: SemanticToken[] = [];
+  let line = 0;
+  let char = 0;
+  let keptLine = 0;
+  let keptChar = 0;
+  for (const t of tokens) {
+    line += t.deltaLine;
+    char = t.deltaLine ? t.deltaStartCharacter : char + t.deltaStartCharacter;
+    if (!keep(t.tokenType)) continue;
+    const deltaLine = line - keptLine;
+    out.push({ ...t, deltaLine, deltaStartCharacter: deltaLine ? char : char - keptChar });
+    keptLine = line;
+    keptChar = char;
+  }
+  return out;
 }
 
 /** TextMate のスコープ 1 つの色: 規則の選択子（カンマで分け、空白を含む子孫の選択子は使わない）のうち、点で区切った先頭一致の最も長いもの */

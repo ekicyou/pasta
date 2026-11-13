@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import lightPlus from "@shikijs/themes/light-plus";
 import darkPlus from "@shikijs/themes/dark-plus";
 import vscodePackage from "../../vscode/package.json" with { type: "json" };
-import { resolveScopeStyle, withSemanticRules, type TmTheme } from "./theme.ts";
+import { keepTokens, resolveScopeStyle, withSemanticRules, type TmTheme } from "./theme.ts";
 
 const scopes = vscodePackage.contributes.semanticTokenScopes.find(
   (entry) => entry.language === "pasta",
@@ -74,3 +74,22 @@ for (const theme of [lightPlus, darkPlus] as unknown as TmTheme[]) {
     );
   });
 }
+
+const tok = (deltaLine: number, deltaStartCharacter: number, tokenType: number) => ({
+  deltaLine,
+  deltaStartCharacter,
+  length: 1,
+  tokenType,
+  tokenModifiers: 0,
+});
+
+test("落としたトークンの差分を、次に残るトークンへ足して付け直す", () => {
+  // 絶対の位置: (0,1)a (0,4)x (0,9)a (2,3)x (2,6)a (5,0)x
+  const tokens = [tok(0, 1, 0), tok(0, 3, 9), tok(0, 5, 0), tok(2, 3, 9), tok(0, 3, 0), tok(3, 0, 9)];
+  const kept = keepTokens(tokens, (t) => t !== 9);
+  // 同じ行の真ん中を落とす: (0,9) は (0,1) から 8。行をまたぐ: (2,6) は行の頭から 6
+  assert.deepEqual(kept, [tok(0, 1, 0), tok(0, 8, 0), tok(2, 6, 0)]);
+  // 先頭を落とすと、最初に残るトークンの位置は文書の頭からになる
+  assert.deepEqual(keepTokens([tok(1, 2, 9), tok(0, 3, 0)], (t) => t !== 9), [tok(1, 5, 0)]);
+  assert.deepEqual(keepTokens(tokens, () => true), tokens);
+});

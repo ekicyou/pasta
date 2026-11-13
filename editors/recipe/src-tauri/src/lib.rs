@@ -12,6 +12,7 @@ use tauri::Manager;
 /// 窓を作って動かす。題名は設定では版を埋められないので、ここで `pasta-recipe {版}` にする（1.6）。
 pub fn run() {
     tauri::Builder::default()
+        .invoke_handler(commands::handler())
         .setup(|app| {
             let title = format!("pasta-recipe {}", app.package_info().version);
             if let Some(window) = app.get_webview_window("main") {

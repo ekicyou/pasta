@@ -15,6 +15,14 @@
     "vite": "8.3.8"
   },
   "dependencies": {
-    "@shikijs/themes": "4.6.0"
+    "@shikijs/langs": "4.6.0",
+    "@shikijs/monaco": "4.6.0",
+    "@shikijs/themes": "4.6.0",
+    "@tauri-apps/api": "2.12.4",
+    "monaco-editor": "0.57.0",
+    "shiki": "4.6.0"
+  },
+  "overrides": {
+    "dompurify": "3.4.17"
   }
 }
