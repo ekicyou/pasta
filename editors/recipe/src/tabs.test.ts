@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { afterChoice, findSame, needsConfirm, retargetTabs, saveAll, type TabRef } from "./tabs.ts";
+import { afterChoice, findSame, needsConfirm, retargetTabs, sameMaster, saveAll, type TabRef } from "./tabs.ts";
 
 const t = (id: number, rel: string, dirty = false): TabRef => ({ id, rel, dirty });
 
@@ -61,4 +61,13 @@ test("同じファイルは大文字・小文字を区別せずに 1 つのタ�
   assert.equal(findSame(tabs, "DIC/A.PASTA")?.id, 1);
   assert.equal(findSame(tabs, "dic/ｂ.pasta")?.id, 2);
   assert.equal(findSame(tabs, "dict/a.pasta"), undefined);
+});
+
+test("同じ master かは大文字・小文字を区別せず、開いていなければ別のゴースト（2.8）", () => {
+  const a = String.raw`C:\g\a\ghost\master`;
+  assert.equal(a.includes("\\"), true); // 本物の区切り（\a・\g の文字に化けていない）
+  assert.equal(sameMaster(String.raw`C:\g\Hello\ghost\master`, String.raw`c:\G\hello\GHOST\MASTER`), true);
+  assert.equal(sameMaster(a, String.raw`C:\g\b\ghost\master`), false);
+  assert.equal(sameMaster(a, String.raw`C:\g\a\ghost\master2`), false);
+  assert.equal(sameMaster(null, a), false);
 });

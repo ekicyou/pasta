@@ -64,6 +64,14 @@ export class TreeView {
     this.#render();
   }
 
+  /** 別のゴーストへ移るとき、前のゴーストのシーンと開いた所を捨てて読み直す */
+  async reset(): Promise<void> {
+    this.#scenes.clear();
+    this.#expanded = new Set([""]);
+    this.#current = "";
+    await this.refresh();
+  }
+
   /** そのファイルのシーンの項目を置き換える（書き換え中は 6.3 の onAnalyzed、ほかは開く流れ 7.1 が読んで渡す） */
   setScenes(rel: string, items: TreeItem[]): void {
     this.#scenes.set(rel.toUpperCase(), items);

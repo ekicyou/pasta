@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CoalescingRunner, type Clock } from "./scheduler.ts";
+import { CoalescingRunner, eachLimit, type Clock } from "./scheduler.ts";
 
 /** 手で進める時計 */
 function fakeClock() {
@@ -129,4 +129,19 @@ test("run がその場で投げても止まらない", async () => {
   advance(300);
   await flush();
   assert.equal(calls, 2);
+});
+
+test("eachLimit はすべてを 1 回ずつ、同時に limit 個までで走らせる（Performance）", async () => {
+  let running = 0;
+  let peak = 0;
+  const seen: number[] = [];
+  await eachLimit([1, 2, 3, 4, 5, 6, 7], 3, async (n) => {
+    running++;
+    peak = Math.max(peak, running);
+    await new Promise((r) => setTimeout(r, 1));
+    seen.push(n);
+    running--;
+  });
+  assert.deepEqual(seen.sort(), [1, 2, 3, 4, 5, 6, 7]);
+  assert.equal(peak, 3);
 });

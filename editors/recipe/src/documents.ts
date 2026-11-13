@@ -3,7 +3,7 @@ import { monaco, semanticSource } from "./editor.ts";
 import { analyze, listTree, readText, writeText, type AnalysisResult, type TextFile } from "./ipc.ts";
 import { diagnosticsToMarkers, languageOf } from "./mapping.ts";
 import { CoalescingRunner } from "./scheduler.ts";
-import { afterChoice, findSame, needsConfirm, retargetTabs } from "./tabs.ts";
+import { afterChoice, findSame, needsConfirm, retargetTabs, saveAll } from "./tabs.ts";
 import { decideExternal, failedRead, type DiskState } from "./sync.ts";
 import { confirm3, notify } from "./dialog.ts";
 
@@ -50,6 +50,10 @@ export class Documents {
   readonly tabs: Tab[] = [];
   active: Tab | null = null;
   #nextId = 1;
+  /** beginSwitch（別のゴーストへ移る）のたびに進める。読む前と後で違えば、その結果は前のゴーストのもの */
+  #generation = 0;
+  /** beginSwitch から endSwitch まで。Rust の master が替わる途中なので、どちらの master を読むか決まらず、タブを開かない */
+  #switching = false;
   #editor: monaco.editor.IStandaloneCodeEditor;
   #bar: HTMLElement;
   #notices: HTMLElement;
@@ -81,15 +85,18 @@ export class Documents {
 
   /** 同じファイルのタブがあればそこへ（5.4）。無ければ読んで開く。UTF-8 でない等は理由を出して開かない（5.3） */
   async open(rel: string, pos?: monaco.IPosition): Promise<Tab | null> {
+    if (this.#switching) return null;
     let tab = findSame(this.tabs, rel);
     if (!tab) {
+      const generation = this.#generation;
       let file;
       try {
         file = await readText(rel);
       } catch (reason) {
-        notify(String(reason));
+        if (generation === this.#generation) notify(String(reason));
         return null;
       }
+      if (generation !== this.#generation || this.#switching) return null; // 読む間に別のゴーストへ移った。前のゴーストの中身でタブを作らない
       // 読んでいる間に同じファイルが開かれていたらそちらを使う
       tab = findSame(this.tabs, rel);
       if (!tab) {
@@ -136,6 +143,8 @@ export class Documents {
 
   /** モデルの改行のまま・開いたときの BOM のまま書く（5.7）。失敗は理由を出し、中身と印を残す（5.8） */
   save(tab: Tab): Promise<boolean> {
+    // 移る途中の保存は、書く時にどちらの master かが決まらないので受けない（3 択で保存しないを選んだ後の Ctrl+S など）
+    if (this.#switching) return Promise.resolve(false);
     // 前の保存が終わってから始め、そこで今の中身を読むので最新の中身が最後に書かれる。前が投げても（onSaved など）鎖は切らない
     const write = () => this.#write(tab);
     tab.saving = tab.saving.then(write, write);
@@ -304,6 +313,40 @@ export class Documents {
     this.#renderNotices();
     this.#hooks.onClosed?.(tab);
     return true;
+  }
+
+  /** 別のゴーストを開く・窓を閉じる前の 1 回の 3 択（保存する＝未保存を全部保存し、失敗した所で止める）。進めてよければ true（2.8・5.10） */
+  async confirmUnsaved(): Promise<boolean> {
+    const refs = this.tabs.map((t) => ({ id: t.id, rel: t.rel, dirty: isDirty(t) }));
+    if (!needsConfirm(refs)) return true;
+    const choice = await confirm3("保存していない変更があります。保存しますか？");
+    const saved = choice === "save" ? await saveAll(refs.filter((r) => r.dirty), (r) => this.save(this.tabs.find((t) => t.id === r.id)!)) : null;
+    return afterChoice(choice, saved) === "proceed";
+  }
+
+  /**
+   * 別のゴーストへ移り始める（confirmUnsaved の後、open_ghost の前）。保存の途中を待ってから、確かめずに全部のタブを閉じ、
+   * endSwitch までタブを開かない（替わった後に前の中身を新しい master へ書かない）。onClosed は呼ばない（前のゴーストのシーンを読み直さない）
+   */
+  async beginSwitch(): Promise<void> {
+    this.#switching = true;
+    await Promise.all(this.tabs.map((t) => t.saving.catch(() => {})));
+    this.#generation++;
+    for (const tab of this.tabs) {
+      monaco.editor.setModelMarkers(tab.model, "pasta", []);
+      tab.model.dispose();
+      tab.pending = null;
+    }
+    this.tabs.length = 0;
+    this.active = null;
+    this.#editor.setModel(null);
+    this.#render();
+    this.#renderNotices();
+  }
+
+  /** open_ghost が終わったら（成功でも失敗でも）呼ぶ */
+  endSwitch(): void {
+    this.#switching = false;
   }
 
   #render(): void {

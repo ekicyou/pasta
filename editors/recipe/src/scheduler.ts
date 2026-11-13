@@ -45,3 +45,12 @@ export class CoalescingRunner {
       });
   }
 }
+
+/** items をそれぞれ fn に渡し、同時に走るのは limit 個まで（全部の .pasta の解析で IPC と解析の線を埋め尽くさない） */
+export async function eachLimit<T>(items: readonly T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) await fn(items[next++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}

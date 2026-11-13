@@ -46,3 +46,8 @@ export function findSame<T extends { rel: string }>(tabs: readonly T[], rel: str
   const key = rel.toUpperCase();
   return tabs.find((t) => t.rel.toUpperCase() === key);
 }
+
+/** 開いているゴーストと同じ master か（Rust の to_uppercase と同じく大文字に揃えて比べる・2.8）。開いていなければ別のもの */
+export function sameMaster(current: string | null, master: string): boolean {
+  return current !== null && current.toUpperCase() === master.toUpperCase();
+}
