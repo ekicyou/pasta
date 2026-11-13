@@ -48,7 +48,7 @@
 - 拡張は共有を相対パス（`../../shared/*.ts`）で取り込み、esbuild で束ねる。npm のワークスペースは作らない。
 - アプリの画面は共有を相対パス（`../../shared/*.ts`）で取り込み、Vite で束ねる。
 - アプリの Rust は、既に `Cargo.lock` にある `reqwest 0.13`（`default-features = false`）と `pasta_dsl`（パスの依存）を直接の依存に足す。新しい crate・npm の部品は足さない。
-- 依存の向き: `GhostIO` の型 → 共有の流れ（`mcpClient` → `ghostFiles` → `reloadShiori` → `runSceneAtCursor`・`dumpVariables` → `devSession`）→ 入出力の実装（`nodeGhostIO`・`ipc.ts` の `tauriGhostIO`）→ 糊（`devCommands`・`devActions`）→ 画面（`devPanels`・`devDialogs`・`sceneLens`・`tree`・`panels`・`main`）。左は右を import しない。
+- 依存の向き: `GhostIO` の型 → 共有の流れ（`mcpClient` → `ghostFiles` → `reloadShiori` → `runSceneAtCursor`・`dumpVariables` → `devSession`）→ 入出力の実装（`nodeGhostIO`・`ipc.ts` の `tauriGhostIO`）→ 糊（`devCommands`・`devActions`）→ 画面（`devPanels`・`devDialogs`・`sceneLens`・`tree`・`panels`・`main`）。左は右を import しない。決めて置いた例外は 3 つ: `dumpVariables.ts` は `devSession.ts` の `Report` を、`devPanels.ts` は `panels.ts` の `PanelSection` を、どちらも `import type` で型だけ取る（束ねた後に実行の依存は残らない）。`devDialogs.ts` はローカル変数の窓の確かめのために入出力の `ipc.buildLocals` を呼ぶ。
 
 ### Revalidation Triggers
 
@@ -180,7 +180,8 @@ editors/
     │   ├── sceneLens.ts            # 新しい: 見出しの上の「▶ シーンを実行」「値を入れて実行…」（CodeLens）
     │   ├── panels.ts               # 変える: 下の欄を 2 つの面の切り替えにする（書く面＝診断｜検査・動かす面＝出力｜保存変数）
     │   ├── dialog.ts               # 変える: open に複数の部品と「閉じる前の確かめ」を足し、choose・confirm を出す
-    │   ├── mapping.ts              # 変える: ScenePath（シーンの名前と同じ名前の中の順）・scenePaths・sceneLine
+    │   ├── mapping.ts              # 変える: ScenePath（シーンの名前と同じ名前の中の順）・scenePaths・sceneLine・SceneTarget・sceneLabel・sceneTargets・writeFaceLabel
+    │   ├── tabs.ts                 # 変える: isDirty を documents.ts から移し、isDevSource（保存する範囲）を足す
     │   ├── tree.ts                 # 変える: シーンの行のメニューに ▶ と「値を入れて実行…」
     │   ├── main.ts                 # 変える: リロードのボタン・DevActions の組み立て・ゴーストを開いた後の setGhost
     │   ├── style.css               # 変える: 下の欄の切り替え・出力の行・誤りと警告の印・表
@@ -311,7 +312,7 @@ sequenceDiagram
 | 6.2 | 型を 4 つに分ける | Variables | `VarRow.kind` | - |
 | 6.3 | 表の値は中身を出し、操作を出さない | Variables・VariablesPanel | `VarRow.kind = table` | - |
 | 6.4 | 書き出されなかったとき | DumpVariables | `formatDump` の `stale` | 書き換え |
-| 6.5 | 読めない・TOML でないとき | DevActions・Variables | `variable_rows` の Err | 書き換え |
+| 6.5 | 読めない・TOML でないとき | DumpVariables・DevActions・Variables | `formatDump` の `unreadable`・`variable_rows` の Err | 書き換え |
 | 6.6 | 変数が無いとき | VariablesPanel | 空の行 | - |
 | 6.7 | メモリと終了時の書き出しの注記 | VariablesPanel | 固定の文 | - |
 | 6.8 | 開いただけでは読まない | DevActions | `setGhost` | - |
@@ -493,6 +494,11 @@ export function sceneReferences(fileFsPath: string, line1: number, locals?: stri
 export function runScene(ctx: FlowContext, fileFsPath: string, line1: number, locals?: string): Promise<SceneOutcome>;
 
 // dumpVariables.ts
+export type DumpOutcome =
+  | { kind: 'shown'; text: string; path: string; mtime: number }
+  | { kind: 'stale'; path: string; reasons: readonly string[] } // 無い・書き換わらない（6.4）
+  | { kind: 'unreadable'; path: string }                         // 書き出されたのに読めない（6.5）。「{パス} は書き出されましたが、読めませんでした」
+  | { kind: 'failed'; result: CallResult };
 export type SaveVariableType = 'string' | 'number' | 'boolean';
 export type SetOutcome =
   | { kind: 'set' }                                   // 204（OnPastaSetSaveVariable は成功で台本を返さない）
@@ -629,12 +635,12 @@ export const buildLocals: (pairs: LocalPair[]) => Promise<LocalsOutcome>;
 
 **Responsibilities & Constraints**
 - `DevHost` の実装: `write`・`notify`・`progress` は `OutputPanel` へ、`pick` は `pickEndpoint`、`save` は開いているゴーストの未保存のタブ（`.pasta`・`.lua`・名前が `pasta.toml`）を `Documents.save` で順に保存し、失敗を `io.join(master, rel)` で返す。
-- 操作はアプリ全体で 1 つずつ。`session.running` があれば `session.refuseBusy(title, running)` で止める（5.1）。
+- 操作はアプリ全体で 1 つずつ。`DevActions` 自身の印 `#busy`（進んでいる操作のゴーストの名前）を、確かめと同期に立てて `finally` で外す（`devBegin`・`ghostTarget` の await が間に入るので `session.running` では速い 2 回押しが両方通る）。立っていれば `session.stop` で `BUSY` の行と知らせを出して止める（5.1）。
 - 操作の始めに `ghostTarget(io, info.root, info.master, info.name)` を作る。`undefined` なら「ghost/master に descript.txt が無いので、ゴーストのフォルダとして扱えません（{master}）」で止める（3.6）。
 - ▶ の流れ（`run`）: `cmd.run` の中で、保存した中身（タブがあれば保存の後の `diskText`、無ければ `readText(rel)`）を `analyze` し、`sceneLine(scenes, path)` で行を引く。タブも `readText` も今開いているゴーストのものなので、読む前と読んだ後に今のゴーストが操作のゴーストでなければ、読まずに（読んだ中身を使わずに）「操作の途中で別のゴーストを開いたので、保存した中身を読めません」で止める（5.2。切り替えの始めに `setGhost(null)` を渡し、開けなければ前のものに戻す）。見つからなければ「シーン「{名前}」が保存した中身に見つかりません（{rel}）」で止める（1.4）。見つかれば `runScene(ctx, io.join(master, ...rel.split('/')), line, locals)`。
 - 値を入れて実行（`runWithLocals`）: 覚えた組（無ければ空）で `localsDialog` を開く。閉じたら何もしない。組が 0 なら `locals` なし（8.5）、あれば `buildLocals` のインライン表（窓の中で弾き済み）。鳴らすと決めた組を覚える（8.10）。▶ は覚えた組を使わない（8.11）。
 - 表の読み直し: 表の状態が「読めた」なら、▶ と値を入れて実行の `cmd.run` の終わり（`notPlayed` 以外）で `dumpVariables(ctx)` を呼ぶ（6.9）。書き換え・削除・追加は `setSaveVariable` の後に必ず呼ぶ（7.6）。
-- 表へ当てる: `dumpVariables` の `shown` を `variableRows` で行にして当てる。投げたら「{パス} を TOML として読めませんでした: {理由}」と知らせ（警告）を出し、表を「読めない」にする（6.5）。`stale`・`failed` は `formatDump` の行のまま出し、表を「読めない」にする（6.4）。当てる前に、操作のゴーストの鍵が今のゴーストと同じかを見て、違えば捨てる（5.3）。
+- 表へ当てる: `dumpVariables` の `shown` を `variableRows` で行にして当てる。投げたら「{パス} を TOML として読めませんでした: {理由}」と知らせ（警告）を出し、表を「読めない」にする（6.5）。`stale`・`unreadable`・`failed` は `formatDump` の行のまま出し、表を「読めない」にする（6.4・6.5）。当てる前に、操作のゴーストの鍵が今のゴーストと同じかを見て、違えば捨てる（5.3）。
 - `setGhost(info | null)`: ゴーストが替わったら表を消す（5.3）。表は読みに行かない（6.8）。
 
 **Contracts**: Service [x] / State [x]
@@ -642,30 +648,38 @@ export const buildLocals: (pairs: LocalPair[]) => Promise<LocalsOutcome>;
 ##### Service Interface
 
 ```typescript
-export interface SceneTarget {
-  readonly rel: string;           // master からの相対・'/' 区切り
-  readonly path: ScenePath;       // mapping.ts
-  readonly label: string;         // 見出しの行に出す名前（＊挨拶・・朝）
+export type { SceneTarget };   // mapping.ts（rel・path・label）
+
+export interface DevActionsDeps {
+  readonly docs: Pick<Documents, "tabs" | "save">;
+  readonly output: Pick<OutputPanel, "append" | "notify" | "progress">;
+  readonly vars: Pick<VariablesPanel, "state" | "clear" | "setRows" | "setUnreadable">;
+  readonly panels: Pick<Panels, "show">;
+  /** 試験で窓を差し替える。無ければ devDialogs.ts のもの */
+  readonly dialogs?: { editVariable: typeof editVariable; confirmDelete: typeof confirmDelete; localsDialog: typeof localsDialog };
 }
-export type VariableChange = { type: SaveVariableType; value: string } | { type: 'delete' };
 
 export class DevActions {
-  constructor(deps: { docs: Documents; output: OutputPanel; vars: VariablesPanel; panels: Panels });
+  constructor(deps: DevActionsDeps);
   setGhost(info: GhostInfo | null): void;
+  get current(): GhostInfo | null;
   run(target: SceneTarget): Promise<void>;
   runWithLocals(target: SceneTarget): Promise<void>;
   reload(): Promise<void>;
   showVariables(): Promise<void>;
-  changeVariable(name: string, change: VariableChange): Promise<void>;
+  /** 窓は DevActions の中で開く。3 つとも非公開の #change(master, name, SaveVariableChange) へ寄せる */
+  editVariable(row: VarRow): Promise<void>;
+  deleteVariable(row: VarRow): Promise<void>;
+  addVariable(): Promise<void>;
 }
 ```
 
 ##### State Management
-- `current: GhostInfo | null`・`localsMemory: Map<string, LocalPair[]>`（鍵は `{ghost.key}|{rel を大文字}|{ScenePath}`。ファイルに残さない）。
+- `#current: GhostInfo | null`（`current` で読める）・`#busy: string | null`・`#locals: Map<string, LocalPair[]>`（鍵は `{ghost.key}|{rel を大文字}|{ScenePath}`。ファイルに残さない）。
 - 表の状態は `VariablesPanel` が持ち、`DevActions` は「読めたか」だけを見る。
 
 **Implementation Notes**
-- Integration: 操作は `devBegin()` → `session.execute(…)` → `finally` で `devEnd()` の順で包む。`ghostTarget` を作る読み取りも、この中で行う。
+- Integration: 操作は `#busy` を立てる → `devBegin()` → `session.execute(…)` → `finally` で `devEnd()`・`#busy` を外す、の順で包む。`ghostTarget` を作る読み取りも、この中で行う。
 - Risks: 切り替えの後も、前のゴーストの操作は最後まで走る（最長で読み込みの終わり 20 秒＋頼み 15 秒）。その間、新しいゴーストの開発の操作は `BUSY` で始まらない（5.1）。
 
 #### DevPanels（`devPanels.ts`）・Panels（`panels.ts`）
@@ -689,7 +703,7 @@ export class DevActions {
 | Intent | 開発の操作の 4 つの窓 |
 | Requirements | 3.4, 7.2, 7.3, 7.4, 7.5, 7.10, 8.1, 8.2, 8.6, 8.7, 8.8, 11.4 |
 
-- `dialog.ts` の `open` を、部品の並び（今の 1 つの `input` を含む）と、決めるボタンで閉じる前の確かめ `accept`（`false` なら閉じずに窓に理由を出す）を取れるようにする。今の `confirm3`・`prompt`・`notify` の振る舞いは変えない。`choose(message, labels)`（番号か `null`）と `confirm(message, okLabel)` を足す。
+- `dialog.ts` の `open` を、部品の並び（今の 1 つの `input` を含む）と、決めるボタンで閉じる前の確かめ `accept: () => boolean | string | Promise<boolean | string>` を取れるようにする（`true` で閉じる・`false` は閉じないだけ・文字列は閉じずに `role="alert"` の段落に理由として出す。`accept` があるときだけ送りを止めて答えを待ち、待つ間の決めるは重ねない）。今の `confirm3`・`prompt`・`notify` の振る舞いは変えない。`choose(message, labels)`（番号か `null`）と `confirm(message, okLabel)` を足す。
 - `pickEndpoint(placeHolder, items)`: `choose` で相手のボタンを並べる。取り消す・Esc は `undefined`（3.4）。
 - `editVariable(row | null)`: 名前（追加のときだけ。空なら閉じずに「名前が要ります」。7.5）・型の `select`（文字列・数・真偽。初めは今の型。7.2）・値（真偽は `true`・`false` の `select`、ほかは `input type=text`。7.10）。
 - 削除は `confirm('＄＊{名前} をゴーストの保存変数から消します', '消す')`（7.3）。
@@ -707,7 +721,8 @@ export class DevActions {
 
 #### TreeView（`tree.ts`）・mapping.ts・main.ts
 
-- `mapping.ts`: `ScenePath = readonly { readonly name: string; readonly n: number }[]`（グローバルなら 1 つ、ローカルなら 2 つ。`n` は同じ名前の中の順で、ツリーの行の鍵と同じ数え方）。`TreeRow` に `scene: ScenePath | null` を足す。`scenePaths(scenes)` は見出しの行と `ScenePath` の組を平らに返し、`sceneLine(scenes, path)` はその行（1 始まり）か `undefined` を返す。純粋で、`mapping.test.ts` で試す。
+- `mapping.ts`: `ScenePath = readonly { readonly name: string; readonly n: number }[]`（グローバルなら 1 つ、ローカルなら 2 つ。`n` は同じ名前の中の順で、ツリーの行の鍵と同じ数え方）。`TreeRow` に `scene: ScenePath | null` を足す。`scenePaths(scenes)` は見出しの行と `ScenePath` の組を平らに返し、`sceneLine(scenes, path)` はその行（1 始まり）か `undefined` を返す。▶ に渡す `SceneTarget`（`rel`・`path`・`label`）と、`sceneLabel(path)`（＊挨拶・朝）・`sceneTargets(rel, scenes)`（見出しの行と `SceneTarget` の組）、下の欄の帯のボタンの名前 `writeFaceLabel` もここに置く。純粋で、`mapping.test.ts` で試す。
+- `tabs.ts`: `isDirty` を `documents.ts` から移し（`devActions.ts` の保存でも使う）、保存する範囲 `isDevSource(rel)`（`.pasta`・`.lua`・名前が `pasta.toml`）を足す。
 - `tree.ts`: `#openMenu` のシーンの行に「▶ シーンを実行」「値を入れて実行…」を足す（作成・名前の変更と同じ並び。11.3）。押したら `DevActions.run`・`runWithLocals` へ `SceneTarget` を渡す。
 - `main.ts`: 「SHIORI をリロード」のボタンを `#toolbar` へ足す（`primary` にしない。開始の画面では今の CSS が隠す。2.5）。`openGhost` の成功の後に `devActions.setGhost(info)` を呼ぶ。`registerSceneLens(docs, devActions)` を呼ぶ。
 
@@ -721,7 +736,7 @@ export class DevActions {
 | Requirements | 3.1, 3.9, 5.2, 7.9, 9.1, 9.2, 9.3, 9.4, 9.6, 13.4 |
 
 **Responsibilities & Constraints**
-- `dev_post`: `port` が候補（9801〜9810・9821〜9830）でなければ送らずに `unreachable`。宛先は `http://127.0.0.1:{port}/api/mcp/v1` の固定。頭は `Content-Type: application/json`・`Accept: application/json, text/event-stream`（`Content-Length` は reqwest が付ける）で、`Origin` は付けない。`reqwest::Client` は `no_proxy()`・`http1_only()`・`pool_max_idle_per_host(0)`・`retry(reqwest::retry::never())` で作り、時間は `timeout_ms`。接続の失敗（`is_connect`）は `unreachable`、時間切れは `noResponse`（`no response within {ms} ms`）、ほかの失敗は `noResponse`。本文は UTF-8 で読む（壊れたバイトは置き換える）。
+- `dev_post`: `port` が候補（9801〜9810・9821〜9830）でなければ送らずに `unreachable`。宛先は `http://127.0.0.1:{port}/api/mcp/v1` の固定。頭は `Content-Type: application/json`・`Accept: application/json, text/event-stream`（`Content-Length` は reqwest が付ける）で、`Origin` は付けない。`reqwest::Client` は `no_proxy()`・`http1_only()`・`pool_max_idle_per_host(0)`・`retry(reqwest::retry::never())`・`redirect(reqwest::redirect::Policy::none())`（転送に従わず宛先の固定を崩さない）で作り、時間は `timeout_ms`。接続の失敗（`is_connect`）は `unreachable`、時間切れは `noResponse`（`no response within {ms} ms`）、ほかの失敗は `noResponse`。本文は UTF-8 で読む（壊れたバイトは置き換える）。
 - `dev_path(master, abs, want)`: `abs` が今の `master` の下で、部品が普通の名前だけ（`..`・ドライブ・根を含まない）のとき、次だけを通す。`want = List` は `master` そのもの。`want = Read` は (a) 直下の `descript.txt`（大文字・小文字を問わない）、(b) 直下の `pasta.toml`（同じ）、(c) 直下の `profile`（同じ）の下のファイル（`pasta.log` の場所の決まり＝最初の部品が `profile` で後に部品がある、をそのまま門にする。`variables.toml` もここ）。途中・目的のリンクは断る（`resolve_rel` と同じ）。ほかは `Err`（「開いているゴーストの外は読みません」）。
 - `dev_begin()` は、そのとき開いている master を `AppState` の「進んでいる操作の master」に覚える（ゴーストを開いていなければ `Err`。前の覚えが残っていれば上書きする）。`dev_end()` は消す。画面は master を渡さない。
 - `dev_list(path)`・`dev_stat(path)`・`dev_read(path, start)` は、「進んでいる操作の master」と `dev_path` を必ず通す。操作が進んでいなければ `Err`（開発の読み取りは、操作の中でしか起きない）。`dev_read` は `tauri::ipc::Response` でバイト列を返す。書くコマンドは足さない（7.9）。
