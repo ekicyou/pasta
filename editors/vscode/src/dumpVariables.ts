@@ -3,9 +3,8 @@
 //
 // vscode に触らない純粋なモジュール。読み込み直しも保存もしない（6.4）。時計を持たず、待ちは ctx.sleep の回数で数える。
 
-import * as path from 'path';
-import { CallResult, callTool, describeResult, readRaiseEvent } from './mcpClient';
-import { DEBUG_HINT, mtimeOf, openLogCursor, pastaLogPath, readNewLines, readText, variablesPath } from './ghostFiles';
+import { type CallResult, callTool, describeResult, readRaiseEvent } from '../../shared/mcpClient.ts';
+import { DEBUG_HINT, mtimeOf, openLogCursor, pastaLogPath, readNewLines, readText, variablesPath } from '../../shared/ghostFiles.ts';
 import type { FlowContext } from './reloadShiori';
 
 export type DumpOutcome =
@@ -14,11 +13,11 @@ export type DumpOutcome =
   | { kind: 'failed'; result: CallResult };
 
 export async function dumpVariables(ctx: FlowContext): Promise<DumpOutcome> {
-  const { endpoint: { port }, ghost: { root, master }, timing } = ctx;
-  const file = variablesPath(master);
-  const before = await mtimeOf(file);
-  const cursor = await openLogCursor(pastaLogPath(master, await readText(path.join(master, 'pasta.toml'))).path);
-  const reply = readRaiseEvent(await callTool(port, 'raise_event', {
+  const { io, endpoint: { port }, ghost: { root, master }, timing } = ctx;
+  const file = variablesPath(io, master);
+  const before = await mtimeOf(io, file);
+  const cursor = await openLogCursor(io, pastaLogPath(io, master, await readText(io, io.join(master, 'pasta.toml'))).path);
+  const reply = readRaiseEvent(await callTool(io, port, 'raise_event', {
     event: 'OnPastaDumpVariables', references: [], ghost_name: root,
   }, timing.callTimeoutMs));
   if (reply.kind === 'failed') {
@@ -28,9 +27,9 @@ export async function dumpVariables(ctx: FlowContext): Promise<DumpOutcome> {
   // 台本・台本なし・応答が無い のどれでも、上限まで更新時刻を見る（6.2・6.3）
   const maxSleeps = Math.ceil(timing.dumpWaitMs / timing.pollIntervalMs);
   for (let slept = 0; ; slept++) {
-    const mtime = await mtimeOf(file);
+    const mtime = await mtimeOf(io, file);
     if (mtime !== undefined && (before === undefined || mtime > before)) {
-      const text = await readText(file);
+      const text = await readText(io, file);
       if (text !== undefined) {
         return { kind: 'shown', text, path: file, mtime };
       }
@@ -40,7 +39,7 @@ export async function dumpVariables(ctx: FlowContext): Promise<DumpOutcome> {
     }
     await ctx.sleep(timing.pollIntervalMs);
   }
-  const lines = (await readNewLines(cursor))?.lines ?? [];
+  const lines = (await readNewLines(io, cursor))?.lines ?? [];
   return { kind: 'stale', path: file, reasons: lines.filter((l) => l.includes('OnPastaDumpVariables:')) };
 }
 

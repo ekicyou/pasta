@@ -3,8 +3,8 @@
 //
 // vscode に触らない純粋なモジュール。時計を持たず、待ちは ctx.sleep の回数で数える。
 
-import { CallResult, LogEntry, callTool, describeResult, lastLogId, parseLogEntries, readRaiseEvent } from './mcpClient';
-import { DEBUG_HINT, openLogCursor, parsePastaLogLine, readNewLines } from './ghostFiles';
+import { type CallResult, type LogEntry, callTool, describeResult, lastLogId, parseLogEntries, readRaiseEvent } from '../../shared/mcpClient.ts';
+import { DEBUG_HINT, openLogCursor, parsePastaLogLine, readNewLines } from '../../shared/ghostFiles.ts';
 import { FlowContext, ReloadOutcome, blocksPlayback, formatReload, reloadAndWait } from './reloadShiori';
 
 /** [fsPath, String(line1)]。line1 は 1 から数えた行（4.6） */
@@ -36,13 +36,13 @@ export async function runScene(ctx: FlowContext, fileFsPath: string, line1: numb
   if (reload.kind !== 'done' || blocksPlayback(reload)) {
     return { kind: 'notPlayed', reload };
   }
-  const { endpoint: { port }, ghost: { root }, timing } = ctx;
-  const sinceId = await lastLogId(port, 'script', root, timing.callTimeoutMs);
+  const { io, endpoint: { port }, ghost: { root }, timing } = ctx;
+  const sinceId = await lastLogId(io, port, 'script', root, timing.callTimeoutMs);
   if (typeof sinceId !== 'number') {
     return { kind: 'failed', result: sinceId, reload };
   }
-  const cursor = await openLogCursor(reload.pastaLog.path); // この再生で増えた分だけを理由に使う
-  const reply = readRaiseEvent(await callTool(port, 'raise_event', {
+  const cursor = await openLogCursor(io, reload.pastaLog.path); // この再生で増えた分だけを理由に使う
+  const reply = readRaiseEvent(await callTool(io, port, 'raise_event', {
     event: 'OnPastaSceneAt', references: sceneReferences(fileFsPath, line1), ghost_name: root,
   }, timing.callTimeoutMs));
 
@@ -52,7 +52,7 @@ export async function runScene(ctx: FlowContext, fileFsPath: string, line1: numb
     case 'failed':
       return { kind: 'failed', result: reply.result, reload };
     case 'noScript': {
-      const lines = (await readNewLines(cursor))?.lines ?? [];
+      const lines = (await readNewLines(io, cursor))?.lines ?? [];
       const reasons = lines.filter((l) => parsePastaLogLine(l).level === 'WARN' && l.includes('OnPastaSceneAt:'));
       return { kind: 'noScript', reasons, reload };
     }
@@ -62,7 +62,7 @@ export async function runScene(ctx: FlowContext, fileFsPath: string, line1: numb
   let last = reply.detail;
   const maxSleeps = Math.ceil(timing.scriptLogWaitMs / timing.pollIntervalMs);
   for (let slept = 0; ; slept++) {
-    const r = await callTool(port, 'get_log', { log_type: 'script', ghost_name: root, since_id: sinceId }, timing.callTimeoutMs);
+    const r = await callTool(io, port, 'get_log', { log_type: 'script', ghost_name: root, since_id: sinceId }, timing.callTimeoutMs);
     if (r.kind === 'ok') {
       const script = findPlayedScript(parseLogEntries(r.text));
       if (script !== undefined) {

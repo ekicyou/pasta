@@ -5,8 +5,9 @@
 
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { CANDIDATE_PORTS, CallResult, Endpoint, HOST, findBasewares, identify } from './mcpClient';
-import { GhostTarget, resolveGhost } from './ghostFiles';
+import { CANDIDATE_PORTS, type CallResult, type Endpoint, HOST, findBasewares, identify } from '../../shared/mcpClient.ts';
+import type { GhostTarget } from '../../shared/ghostFiles.ts';
+import { nodeGhostIO as io, resolveGhost } from './nodeGhostIO';
 import { findGhostMaster } from './ghostValidator';
 import { DEFAULT_TIMING, FlowContext, Timing, formatReload, reloadAndWait } from './reloadShiori';
 import { formatScene, runScene } from './runSceneAtCursor';
@@ -134,13 +135,13 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps: Part
     const found = await vscode.window.withProgress(progress, async () => {
       const known = remembered.get(ghost.key);
       if (known) {
-        const now = await identify(known.port, ghost.root);
+        const now = await identify(io, known.port, ghost.root);
         if (now?.basewareName === known.basewareName) {
           return [known];
         }
         remembered.delete(ghost.key);
       }
-      return findBasewares(ghost.root, ports);
+      return findBasewares(io, ghost.root, ports);
     });
     if (found.length === 0) {
       stop([head, `${NOT_FOUND}（${ghost.displayName}・${ghost.root}）`, NOT_FOUND_CHECKS],
@@ -168,7 +169,7 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps: Part
       stop([`${clock()} ${cmd.title} — ${BAD_DOCUMENT}`], BAD_DOCUMENT);
       return;
     }
-    const ghost = await resolveGhost(doc.uri.fsPath, findGhostMaster(doc.uri)?.fsPath);
+    const ghost = await resolveGhost(io, doc.uri.fsPath, findGhostMaster(doc.uri)?.fsPath);
     if (!ghost) {
       stop([`${clock()} ${cmd.title} — ${NOT_IN_GHOST}: ${doc.uri.fsPath}`], `${NOT_IN_GHOST}: ${doc.uri.fsPath}`);
       return;
@@ -192,7 +193,7 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps: Part
         return;
       }
       const progress = { location: vscode.ProgressLocation.Window, title: `Pasta: ${cmd.title}` };
-      const report = await vscode.window.withProgress(progress, () => cmd.run({ endpoint, ghost, timing, sleep }, target));
+      const report = await vscode.window.withProgress(progress, () => cmd.run({ io, endpoint, ghost, timing, sleep }, target));
       if (report.notice) {
         stop(report.lines, report.notice, report.failure !== undefined && ERROR_KINDS.has(report.failure.kind));
       } else {

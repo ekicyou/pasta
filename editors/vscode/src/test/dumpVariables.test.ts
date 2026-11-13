@@ -12,7 +12,8 @@ import * as path from 'path';
 import { startFakeMcpServer, FakeMcpServer, FakeState } from './fakeMcpServer';
 import { DEFAULT_TIMING, FlowContext } from '../reloadShiori';
 import { DumpOutcome, dumpVariables, formatDump } from '../dumpVariables';
-import { GhostTarget, variablesPath } from '../ghostFiles';
+import { type GhostTarget, variablesPath } from '../../../shared/ghostFiles.ts';
+import { nodeGhostIO } from '../nodeGhostIO';
 
 let passed = 0;
 let failed = 0;
@@ -41,7 +42,7 @@ function makeGhost(): GhostTarget {
 
 /** An old variables.toml, dated well in the past so a rewrite is clearly newer. */
 function writeOld(g: GhostTarget, text = '[old]\nvalue = 0\n') {
-  const p = variablesPath(g.master);
+  const p = variablesPath(nodeGhostIO, g.master);
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, text);
   const past = new Date(Date.now() - 60_000);
@@ -53,6 +54,7 @@ async function dump(server: FakeMcpServer, g: GhostTarget, setup: Partial<FakeSt
   server.state.runningRoots = [g.root];
   const waits: number[] = [];
   const ctx: FlowContext = {
+    io: nodeGhostIO,
     endpoint: { port: server.port, basewareName: 'SSP' }, ghost: g, timing: DEFAULT_TIMING,
     sleep: async (ms) => { waits.push(ms); await new Promise((r) => setTimeout(r, 1)); },
   };
@@ -78,7 +80,7 @@ async function main() {
     const { outcome, calls } = await dump(server, g, { variablesText: '[new]\nvalue = 2\n' });
     const o = is(outcome, 'shown');
     assert.strictEqual(o.text, '[new]\nvalue = 2\n');
-    assert.strictEqual(o.path, variablesPath(g.master));
+    assert.strictEqual(o.path, variablesPath(nodeGhostIO, g.master));
     assert.deepStrictEqual(calls.map((c) => c.name), ['raise_event']);
     assert.deepStrictEqual(calls[0].arguments, { event: 'OnPastaDumpVariables', references: [], ghost_name: g.root });
     const f = formatDump(o);
@@ -121,14 +123,14 @@ async function main() {
     const g = makeGhost();
     const o = is((await dump(server, g, { writeVariables: false })).outcome, 'stale');
     assert.deepStrictEqual(o.reasons, []);
-    assert.strictEqual(o.path, variablesPath(g.master));
+    assert.strictEqual(o.path, variablesPath(nodeGhostIO, g.master));
     assert.match(formatDump(o).notice ?? '', HINT);
   });
 
   await test('failed: NG (ghost not running), unreachable and bad shape are failures, not stale', async () => {
     const g = makeGhost();
     server.state.runningRoots = [];
-    const ctx: FlowContext = { endpoint: { port: server.port, basewareName: 'SSP' }, ghost: g, timing: DEFAULT_TIMING, sleep: async () => {} };
+    const ctx: FlowContext = { io: nodeGhostIO, endpoint: { port: server.port, basewareName: 'SSP' }, ghost: g, timing: DEFAULT_TIMING, sleep: async () => {} };
     const ng = is(await dumpVariables(ctx), 'failed');
     assert.strictEqual(ng.result.kind, 'ng');
     assert.match(formatDump(ng).notice ?? '', /NG:/);

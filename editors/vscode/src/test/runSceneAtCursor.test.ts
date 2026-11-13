@@ -12,7 +12,8 @@ import * as path from 'path';
 import { startFakeMcpServer, FakeMcpServer, FakeState } from './fakeMcpServer';
 import { DEFAULT_TIMING, FlowContext, Timing } from '../reloadShiori';
 import { SceneOutcome, findPlayedScript, formatScene, runScene, sceneReferences } from '../runSceneAtCursor';
-import { GhostTarget } from '../ghostFiles';
+import type { GhostTarget } from '../../../shared/ghostFiles.ts';
+import { nodeGhostIO } from '../nodeGhostIO';
 
 let passed = 0;
 let failed = 0;
@@ -60,6 +61,7 @@ async function play(
   server.state.runningRoots = [ghost.root];
   const file = path.join(ghost.master, 'dic', 'pose.pasta');
   const ctx: FlowContext = {
+    io: nodeGhostIO,
     endpoint: { port: server.port, basewareName: 'SSP' }, ghost,
     timing: { ...DEFAULT_TIMING, ...opts.timing }, sleep: opts.sleep ?? countingSleep().sleep,
   };
@@ -123,7 +125,7 @@ async function main() {
   await test('not sent when the reload is refused (ghost not running there)', async () => {
     const g = makeGhost();
     server.state.runningRoots = [];
-    const ctx: FlowContext = { endpoint: { port: server.port, basewareName: 'SSP' }, ghost: g, timing: DEFAULT_TIMING, sleep: countingSleep().sleep };
+    const ctx: FlowContext = { io: nodeGhostIO, endpoint: { port: server.port, basewareName: 'SSP' }, ghost: g, timing: DEFAULT_TIMING, sleep: countingSleep().sleep };
     const before = server.state.calls.length;
     const o = is(await runScene(ctx, path.join(g.master, 'dic', 'a.pasta'), 1), 'notPlayed');
     assert.ok(!server.state.calls.slice(before).some((c) => c.name === 'raise_event'));
