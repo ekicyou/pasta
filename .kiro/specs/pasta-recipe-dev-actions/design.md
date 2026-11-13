@@ -814,12 +814,12 @@ export class DevActions {
 - **共有の流れ（`editors/shared/flows.test.ts`・偽の入出力。13.1）**
   - 読み込み直し: 印の行で終わる・`loaded=false` で止める・時間切れ（`sleep` の回数）・ベースウェアの誤りの記録の足し込み・`pasta.log` が読めないときの要約。
   - 再生: 台本・204 の案内と `OnPastaSceneAt:` の警告・応答が無いときの記録の引き直し（見つかる・見つからない）・Reference2 を付けたときの `references` が 3 つで、付けないときは 2 つ。
-  - 書き出しの待ち: 更新時刻が進むまで待つ・進まなければ `stale` と `OnPastaDumpVariables:` の行。
+  - 書き出しの待ち: 更新時刻が進むまで待つ・進まなければ `stale` と `OnPastaDumpVariables:` の行・書き出されたのに `variables.toml` を読めなければ `unreadable` と場所（6.5）。
   - 書き換えの頼み: `references` が `[名前, 値, 型]`・削除は `[名前, "", "delete"]`・204 は `set`・表記は `refusedByGhost`。
 - **DevSession（`devSession.test.ts`）**: 覚えた相手の 1 回の確かめ・名前が変わったら探し直す・2 つ以上で `pick`・閉じたら `run` を呼ばない・同じゴーストの重なりの止め・保存の失敗で止める・`ERROR_KINDS` で誤りと警告を分ける・見出しの行の形。
 - **拡張（`editors/vscode/src/test/`・`npm test`。13.3）**: 今の試験を、共有と `nodeGhostIO` に向け直して全部通す（実物の一時フォルダと `fakeMcpServer`。Node の入出力の実装の試験を兼ねる）。`devCommands.e2e` は振る舞いの固定として変えずに通す。`npm test`（grammar・unit・e2e。e2e も偽の `vscode` で Node だけで走る）を CI の job `vscode-test` で走らせ、移した後の取りこぼしを main で見つけられるようにする。ランナーで走らない試験があれば、実装のときにその試験だけを理由を付けて外す。
-- **アプリの Rust（`cargo test`。13.2・13.4）**: `dev.rs`（ポートの検査・宛先・`Origin` なし・1 回だけ・失敗の分け）、`paths.rs`（`dev_path` の通す・断る）、`variables.rs`（組み立てと読み直し・弾き・表の行）。
-- **アプリの画面（`node --test`）**: `mapping.test.ts`（`scenePaths`・`sceneLine`: 同じ名前のグローバル・ローカル、書き換えで行がずれたときに新しい行を返す、消えたら `undefined`）、`dialog.test.ts`（`choose` の戻り値）。
+- **アプリの Rust（`cargo test`。13.2・13.4）**: `dev.rs`（ポートの検査・宛先・`Origin` なし・1 回だけ・転送に従わない `redirect_is_not_followed`・失敗の分け）、`paths.rs`（`dev_path` の通す・断る）、`variables.rs`（組み立てと読み直し・弾き・表の行）。
+- **アプリの画面（`node --test`）**: `mapping.test.ts`（`scenePaths`・`sceneLine`: 同じ名前のグローバル・ローカル、書き換えで行がずれたときに新しい行を返す、消えたら `undefined`）、`dialog.test.ts`（`choose` の戻り値）、`devActions.test.ts`（`merge` は後だけが失敗なら誤りの知らせを残す・窓の間に別のゴーストを開いたら何も送らず前のゴーストの名前を添えて止める（5.2）・窓を閉じたときに別の操作が進んでいれば重なりの文言で止めて何も送らない（5.1））。
 - **手で確かめる（実機）**: SSP と areka で ▶・リロード・表の書き換え・値を入れて実行が通ること、2 つのベースウェアで選ぶ窓が出ること、1000×680 でエディタに書ける高さが残ること、明暗の両方で読めること。
 
 ## Security Considerations
