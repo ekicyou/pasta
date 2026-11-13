@@ -6,6 +6,7 @@ html,
 body {
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 body {
   display: flex;
@@ -30,6 +31,8 @@ body {
 }
 #editor {
   flex: 1;
+  /* 無いと Monaco の高さが窓を押し広げ、タブとツールバーが外へ押し出される */
+  min-height: 0;
 }
 dialog {
   max-width: 32em;
@@ -45,4 +48,21 @@ dialog input {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 12px;
+}
+#tabs {
+  display: flex;
+  overflow-x: auto;
+}
+.tab {
+  display: flex;
+  white-space: nowrap;
+}
+.tab button {
+  border: none;
+  background: none;
+  color: inherit;
+  padding: 4px 8px;
+}
+.tab-name[aria-pressed="true"] {
+  border-bottom: 2px solid Highlight;
 }

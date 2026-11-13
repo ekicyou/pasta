@@ -40,3 +40,9 @@ export function afterChoice(choice: "save" | "discard" | "cancel", saved: "ok" |
   if (choice === "discard") return "proceed";
   return choice === "save" && saved === "ok" ? "proceed" : "stay";
 }
+
+/** 同じファイルのタブ（Rust の to_uppercase と同じく大文字に揃えて比べる・5.4） */
+export function findSame<T extends { rel: string }>(tabs: readonly T[], rel: string): T | undefined {
+  const key = rel.toUpperCase();
+  return tabs.find((t) => t.rel.toUpperCase() === key);
+}

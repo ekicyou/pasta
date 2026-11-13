@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Finding, Report, SceneNode } from "./ipc.ts";
 import {
+  languageOf,
   buildTree,
   diagnosticsToMarkers,
   findingPosition,
@@ -159,4 +160,11 @@ test("検査の項目の位置は 1 始まりのまま、行の無い項目は�
   assert.deepEqual(findingPosition(finding("a.pasta", "x", 3, 5)), { lineNumber: 3, column: 5 });
   assert.deepEqual(findingPosition(finding("a.pasta", "x", null, null)), { lineNumber: 1, column: 1 });
   assert.deepEqual(findingPosition(finding("a.pasta", "x", 7, null)), { lineNumber: 7, column: 1 });
+});
+
+test("言語は拡張子で決め、.pasta・.lua 以外は色なし（5.1・5.2・8.1）", () => {
+  assert.equal(languageOf("dic/挨拶.pasta"), "pasta");
+  assert.equal(languageOf("scripts/A.LUA"), "lua");
+  assert.equal(languageOf("pasta.toml"), "plaintext");
+  assert.equal(languageOf("lua"), "plaintext");
 });

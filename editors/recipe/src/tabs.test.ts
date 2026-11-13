@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { afterChoice, needsConfirm, retargetTabs, saveAll, type TabRef } from "./tabs.ts";
+import { afterChoice, findSame, needsConfirm, retargetTabs, saveAll, type TabRef } from "./tabs.ts";
 
 const t = (id: number, rel: string, dirty = false): TabRef => ({ id, rel, dirty });
 
@@ -54,4 +54,11 @@ test("3 択の後: 保存の成功と保存しないは進み、失敗と取り�
   assert.equal(afterChoice("discard", null), "proceed");
   assert.equal(afterChoice("save", "failed"), "stay");
   assert.equal(afterChoice("cancel", null), "stay");
+});
+
+test("同じファイルは大文字・小文字を区別せずに 1 つのタブにする（5.4）", () => {
+  const tabs = [t(1, "dic/a.pasta"), t(2, "Dic/Ｂ.pasta")];
+  assert.equal(findSame(tabs, "DIC/A.PASTA")?.id, 1);
+  assert.equal(findSame(tabs, "dic/ｂ.pasta")?.id, 2);
+  assert.equal(findSame(tabs, "dict/a.pasta"), undefined);
 });

@@ -112,3 +112,9 @@ export function visibleFindings(report: Report, openRels: ReadonlySet<string>): 
 export function findingPosition(f: Finding): { lineNumber: number; column: number } {
   return { lineNumber: f.line ?? 1, column: f.line === null ? 1 : (f.column ?? 1) };
 }
+
+/** タブの言語は拡張子で決める。.pasta・.lua 以外は色なし（5.2） */
+export function languageOf(rel: string): "pasta" | "lua" | "plaintext" {
+  const ext = rel.slice(rel.lastIndexOf("/") + 1).match(/\.([^.]+)$/)?.[1].toLowerCase();
+  return ext === "pasta" || ext === "lua" ? ext : "plaintext";
+}
