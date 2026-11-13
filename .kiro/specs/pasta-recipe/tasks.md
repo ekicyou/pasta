@@ -74,7 +74,7 @@
   - _Depends: 1.2_
   - _Requirements: 9.4, 9.5, 9.10, 9.11, 9.12, 13.6_
 
-- [ ] 3.5 (P) ファイルの見張りを作る
+- [x] 3.5 (P) ファイルの見張りを作る
   - 開いている master を再帰で見張り、最初の知らせから 200 ms ためて、重なりのない相対パスの集まりを 1 回知らせる
   - 最上位の `profile` の下の知らせは捨てる。Tauri に依らず、知らせは閉包で受ける
   - 試しのフォルダでファイルを足す・変える・消すと 1 回にまとまった知らせが届き、`profile` の下の変更では届かないことをテストで確かめ、緑になっている
@@ -241,3 +241,4 @@
 - 2.2: npm test は明示の glob（"src/**/*.test.ts"）で走らせる。Node 22 で裸のフォルダの引数は .ts を拾う保証が無い。テストの型のため @types/node を devDependency に置いた。
 - 2.3: 関門は合格（shiki の下地＋セマンティックトークンの重なり、自前の提供者へは切り替えず）。monaco 0.57 には edcore.main が無く monaco-editor/editor＋features/register.all を使う。register.all は documentSemanticTokens・suggestController・goToCommands などを読まないので、要る部品は明示で import する。規則の無い種類のトークンは theme.ts の keepTokens で落とす（6.3 でも使う）。U+3000 は unicodeHighlight.allowedCharacters で許す。monaco 0.57 が引く dompurify の脆弱性は package.json の overrides で 3.4.17 に上げた。exe 8,066,048 B・zip 3,561,221 B。
 - 3.1: 大文字・小文字を区別しない比べは ASCII だけでなく to_uppercase の両側で（NTFS は全角・アクセントも区別しない）。ASCII だけの比べで重なりを見逃すと fs::rename が上書きして失う。resolve_rel は途中と目的そのもののリンクを拒む（設計 438 行を合わせた）。この機械では symlink の作成が os error 1314 で、試験はジャンクション（mklink /J）で毎回確かめる。
+- 3.5: 見張りの知らせにはフォルダの名前（例 dic）や名前の変更の新旧の両方も入る。drop の直後に古い master の on_batch が 1 回来うるので、4.1 の配線は今の master と違う知らせを捨てる。
