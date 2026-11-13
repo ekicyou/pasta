@@ -2,7 +2,7 @@
 //! 相対パスを取るコマンドは、状態の master と paths::resolve_rel（files の各関数の中）を必ず通す（11.2）。
 
 use crate::files::{self, EntryKind, TextFile, TreeListing};
-use crate::{check, paths, recent, watch};
+use crate::{check, paths, recent, variables, watch};
 use pasta_check::validate::Report;
 use pasta_lsp::analysis::{AnalysisEngine, AnalysisResult, TOKEN_MODIFIERS, TOKEN_TYPES};
 use serde::Serialize;
@@ -75,6 +75,14 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static 
         check_ghost,
         recent_list,
         recent_remove,
+        crate::dev::dev_post,
+        crate::dev::dev_begin,
+        crate::dev::dev_end,
+        crate::dev::dev_list,
+        crate::dev::dev_stat,
+        crate::dev::dev_read,
+        variable_rows,
+        build_locals,
     ]
 }
 
@@ -138,6 +146,7 @@ pub async fn resolve_ghost(path: String) -> Result<Resolved, String> {
 #[derive(Serialize)]
 pub struct GhostInfo {
     master: String,
+    root: String,
     name: String,
     version: String,
 }
@@ -149,6 +158,15 @@ fn ghost_name(master: &Path) -> String {
         .and_then(Path::parent)
         .and_then(Path::file_name)
         .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// ゴーストのルート（master の 2 つ上。master と同じ綴りなので読み取りの門の strip_prefix が通る。3.2）
+fn ghost_root(master: &Path) -> String {
+    master
+        .parent()
+        .and_then(Path::parent)
+        .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_default()
 }
 
@@ -184,6 +202,7 @@ pub async fn open_ghost(
     })?;
     let info = GhostInfo {
         name: ghost_name(&path),
+        root: ghost_root(&path),
         version: app.package_info().version.to_string(),
         master: path.to_string_lossy().into_owned(),
     };
@@ -266,6 +285,18 @@ pub async fn rename_entry(
 pub async fn check_ghost(state: State<'_, AppState>) -> Result<Report, String> {
     let master = state.master()?;
     run_blocking("検査", move || check::check_ghost(&master)).await?
+}
+
+/// `variables.toml` の文を保存変数の表の行に（6.1・6.5）
+#[tauri::command]
+pub async fn variable_rows(text: String) -> Result<Vec<variables::VarRow>, String> {
+    variables::variable_rows(&text)
+}
+
+/// ローカル変数の組をインライン表に組む（8.3〜8.8）
+#[tauri::command]
+pub async fn build_locals(pairs: Vec<variables::LocalPair>) -> variables::LocalsOutcome {
+    variables::build_locals(&pairs)
 }
 
 fn recent_entries(list: Vec<String>) -> Vec<recent::RecentEntry> {
@@ -455,6 +486,11 @@ mod tests {
         assert!(!state.is_current(&old));
         assert!(state.is_current(&other));
         assert_eq!(ghost_name(&other), "emo2");
+    }
+
+    #[test]
+    fn ghost_root_is_two_above_master() {
+        assert_eq!(ghost_root(Path::new(r"C:\x\ghost\master")), r"C:\x");
     }
 
     #[test]
