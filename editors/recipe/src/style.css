@@ -66,3 +66,11 @@ dialog input {
 .tab-name[aria-pressed="true"] {
   border-bottom: 2px solid Highlight;
 }
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: Mark;
+  color: MarkText;
+}

@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { decideExternal, type DiskState, type TabSnapshot } from "./sync.ts";
+import { decideExternal, failedRead, type DiskState, type TabSnapshot } from "./sync.ts";
 
 const tab = (over: Partial<TabSnapshot> = {}): TabSnapshot => ({
   diskText: "a",
@@ -55,4 +55,9 @@ test("消えた後に戻ってきた: エディタと同じ中身なら何もし
   assert.equal(decideExternal(gone, text("b")), "ask");
   // 未保存の印が無くても、戻ってきた違う中身は黙って読み直さない
   assert.equal(decideExternal({ ...gone, dirty: false }, text("b")), "ask");
+});
+
+test("読めないときはツリーに無ければ消えた・あれば読めない（大文字・小文字を区別しない）", () => {
+  assert.deepEqual(failedRead("dic/a.pasta", ["dic/b.pasta"], "x"), missing);
+  assert.deepEqual(failedRead("dic/a.pasta", ["DIC/A.pasta"], "使用中"), unreadable);
 });

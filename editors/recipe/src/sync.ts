@@ -24,3 +24,9 @@ export function decideExternal(tab: TabSnapshot, disk: DiskState): ExternalActio
   if (tab.deleted) return disk.text === tab.editorText ? "none" : "ask"; // 消えた後に戻ってきた
   return tab.dirty ? "ask" : "reload"; // 10.3・10.2
 }
+
+/** read_text の失敗を DiskState へ。理由の文では消えたか分からないので、ツリーの一覧に無ければ消えた（10.4） */
+export function failedRead(rel: string, files: readonly string[], reason: string): DiskState {
+  const key = rel.toUpperCase();
+  return files.some((f) => f.toUpperCase() === key) ? { kind: "unreadable", reason } : { kind: "missing" };
+}
