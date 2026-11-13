@@ -257,3 +257,4 @@
 - 8.1: cargo-deny 0.20 は --config を check の前に置く（cargo deny --manifest-path editors/recipe/src-tauri/Cargo.toml --config editors/recipe/src-tauri/deny.toml check）。JS の第三者の表示は editors/recipe/build/js-licenses.txt（dist の外）。
 - 8.3: workflow_dispatch（run 43365624957）で pasta-recipe の job と cargo deny check (pasta-recipe) は緑。build-x64・build-x86 は pasta_shiori の free_library_test が「pasta.dll not next to test exe」で赤。Rust 1.100（2026-11-09）でテストの実行ファイルの置き場が変わったためで、この spec の変更とは関係なく手元の 1.100 でも同じに落ちる。
 - 10.1: 実物の hello-pasta の写しで端から端まで合格（波線 234 ms・消え 226 ms・保存はバイト一致・開いてからツリーとシーンまで 177〜249 ms）。プロセスの起動からツリーまでは WebView2 とエディタの用意で 2.3〜4.8 秒（設計の「ゴーストを開いてから」の外）。拡張との見比べは解析器の段（同じ pasta_lsp の WASM）で 14 文書が一致。
+- 完了時にその場で解決（開発者が実物を触って指摘・0e2e71d2）: 面を帯・脇・書く所の 3 段と橙のアクセントに分けた。ツールバーに「フォルダを開く」「ファイルを開く (Ctrl+O)」、開始の画面に「ファイルを選ぶ」を足した（ファイルを選ぶとそのゴーストを開いてからそのファイルを開く）。起動の窓を 1000×680 で中央に（200% 表示の 1440×900 で 1200×800 は下がはみ出した）。
