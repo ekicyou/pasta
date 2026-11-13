@@ -193,7 +193,7 @@
   - _Requirements: 4.9, 5.10, 9.2, 9.3, 9.9, 10.1, 10.5_
 
 - [ ] 8. 日々の CI・第三者の表示・リリース
-- [ ] 8.1 (P) 画面の第三者の表示と、アプリ専用のライセンスと依存の検査の設定を作る
+- [x] 8.1 (P) 画面の第三者の表示と、アプリ専用のライセンスと依存の検査の設定を作る
   - Vite の plugin で、束ねに入ったパッケージの名前・版・ライセンスと本文を名前の順にビルドの出力の外へ書き、どちらも無いパッケージがあればビルドを止める。モジュールの id から根を取り出すテストを置く
   - アプリ専用の cargo-about と cargo-deny の設定を、ルートの並びに実際に出たもの（MPL-2.0・CC0-1.0）だけを足して作る。出た勧告は 1 件ずつ読んで判断する
   - `npm run build` で第三者の表示の文が出て、アプリの lock で `cargo about generate` と `cargo deny check` が通り、ルートの設定は変わっていない
@@ -239,7 +239,7 @@
 ## Implementation Notes
 - 2.1: exe は 6,225,408 B（--no-bundle・+crt-static はルートの .cargo/config.toml を受け継ぐ）。vcruntime/msvcp は引かず UCRT（api-ms-win-crt-*）だけ。全依存を先に入れたので、使い始めるまで cargo の unused dependency 警告が出る（clippy -D warnings は止まらない）。cargo は env -u NoDefaultCurrentDirectoryInExePath で走らせる。
 - 2.2: npm test は明示の glob（"src/**/*.test.ts"）で走らせる。Node 22 で裸のフォルダの引数は .ts を拾う保証が無い。テストの型のため @types/node を devDependency に置いた。
-- 2.3: 関門は合格（shiki の下地＋セマンティックトークンの重なり、自前の提供者へは切り替えず）。monaco 0.57 には edcore.main が無く monaco-editor/editor＋features/register.all を使う。register.all は documentSemanticTokens・suggestController・goToCommands などを読まないので、要る部品は明示で import する。規則の無い種類のトークンは theme.ts の keepTokens で落とす（6.3 でも使う）。U+3000 は unicodeHighlight.allowedCharacters で許す。monaco 0.57 が引く dompurify の脆弱性は package.json の overrides で 3.4.17 に上げた。exe 8,066,048 B・zip 3,561,221 B。
+- 2.3: 関門は合格（shiki の下地＋セマンティックトークンの重なり、自前の提供者へは切り替えず）。monaco 0.57 には edcore.main が無く monaco-editor/editor＋features/register.all を使う。register.all は documentSemanticTokens・suggestController・goToCommands などを読まないので、要る部品は明示で import する。規則の無い種類のトークンは theme.ts の keepTokens で落とす（6.3 でも使う）。U+3000 は unicodeHighlight.allowedCharacters で許す。package.json の overrides で node_modules の dompurify は 3.4.17 にしたが、束ねに入るのは monaco が自分の中に写し込んだ DOMPurify 3.4.15 で、overrides は効かない（8.1 で判明）。monaco は IN_PLACE を使わず、渡すのはアプリ自身の文だけだが、勧告は残っている。monaco の版を上げるときに見直す。exe 8,066,048 B・zip 3,561,221 B。
 - 3.1: 大文字・小文字を区別しない比べは ASCII だけでなく to_uppercase の両側で（NTFS は全角・アクセントも区別しない）。ASCII だけの比べで重なりを見逃すと fs::rename が上書きして失う。resolve_rel は途中と目的そのもののリンクを拒む（設計 438 行を合わせた）。この機械では symlink の作成が os error 1314 で、試験はジャンクション（mklink /J）で毎回確かめる。
 - 3.5: 見張りの知らせにはフォルダの名前（例 dic）や名前の変更の新旧の両方も入る。drop の直後に古い master の on_batch が 1 回来うるので、4.1 の配線は今の master と違う知らせを捨てる。
 - 4.1: 画面からの入力は信用しない。open_ghost も Rust の中で find_master を通し直す（open_in）。run_blocking は文の頭（解析・検査）を引数で受ける。
@@ -254,3 +254,4 @@
 - 6.6: Panels.setReport(report | 理由) は 7.2 の検査のまとめ役から呼ぶ。名前の変更の後は DocumentsHooks.onRenamed で panels.update()。検査の一覧の古い rel は次の検査（7.2 の見張りの知らせ）で直る。
 - 7.1: write_text は Rust の今の master で rel を解くので、ゴーストを替えるときは Documents.beginSwitch（保存の鎖を待ってから全タブを捨て、替わる間は open と save を断る）→ openGhost → finally で endSwitch。読みは世代の番号で、替わる前に始まったものを捨てる。新しい import の後の tauri dev で vite の依存の作り直しが EPERM なら node_modules/.vite を消す。
 - 7.2: 窓を閉じるのは onCloseRequested（@tauri-apps/api 2.12 は handler を await してから preventDefault が無ければ destroy する）。閉じる前に全タブの保存の鎖を待つ。window.close() は core:window:allow-close が無いので拒まれる（確かめは WM_CLOSE を送る）。
+- 8.1: cargo-deny 0.20 は --config を check の前に置く（cargo deny --manifest-path editors/recipe/src-tauri/Cargo.toml --config editors/recipe/src-tauri/deny.toml check）。JS の第三者の表示は editors/recipe/build/js-licenses.txt（dist の外）。
