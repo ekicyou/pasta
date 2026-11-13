@@ -1,17 +1,17 @@
 // DevCommands - 3 つのコマンドの vscode の糊（vscode-mcp-client の設計の DevCommands）
 //
-// 対象の文書（2.5）・ゴースト（2.4）・送る相手の選び方と覚え（3.2〜3.7）・出力と通知（7.1〜7.3）・
-// 進み具合（7.4）・重なりの止め（7.5）を受け持つ。流れの中身は reloadShiori・runSceneAtCursor・dumpVariables。
+// 対象の文書（2.5）・ゴースト（2.4）を決め、画面（出力・通知・選ぶ窓・進み具合）と保存を DevHost として DevSession へ渡す。
+// 相手の選び方と覚え・重なりの止め・見出し・保存の手順・通知の分けは共有の devSession。流れの中身は reloadShiori・runSceneAtCursor・dumpVariables。
 
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { CANDIDATE_PORTS, type CallResult, type Endpoint, HOST, findBasewares, identify } from '../../shared/mcpClient.ts';
-import type { GhostTarget } from '../../shared/ghostFiles.ts';
+import { CANDIDATE_PORTS } from '../../shared/mcpClient.ts';
 import { nodeGhostIO as io, resolveGhost } from './nodeGhostIO';
 import { findGhostMaster } from './ghostValidator';
-import { DEFAULT_TIMING, FlowContext, Timing, formatReload, reloadAndWait } from '../../shared/reloadShiori.ts';
+import { DEFAULT_TIMING, type FlowContext, type Timing, formatReload, reloadAndWait } from '../../shared/reloadShiori.ts';
 import { formatScene, runScene } from '../../shared/runSceneAtCursor.ts';
 import { dumpVariables, formatDump } from '../../shared/dumpVariables.ts';
+import { type DevHost, DevSession, type Report, clock } from '../../shared/devSession.ts';
 
 export interface DevCommandDeps {
   readonly ports: readonly number[];   // 既定 CANDIDATE_PORTS（試験だけが差し替える）
@@ -23,15 +23,6 @@ export const OUTPUT_CHANNEL = 'Pasta 開発';
 
 const BAD_DOCUMENT = 'ゴーストを特定できません（ディスク上の .pasta・.lua・pasta.toml を開いてください）';
 const NOT_IN_GHOST = 'ゴーストのフォルダの中のファイルではありません';
-const BUSY = 'このゴーストへのコマンドが進んでいます';
-const NOT_FOUND = 'このゴーストが動いている SSP・areka が見つかりません';
-const NOT_FOUND_CHECKS = '確かめること: ベースウェアでこのゴーストを起動しているか・ベースウェアの MCP の窓口が有効か';
-const SAVE_FAILED = '保存できなかったファイルがあるので止めました';
-
-/** 誤りの通知で出す失敗（7.3。それ以外の止まり方は警告） */
-const ERROR_KINDS: ReadonlySet<CallResult['kind']> = new Set(['unreachable', 'badShape', 'rpcError', 'ng']);
-
-type Report = { lines: string[]; notice?: string; failure?: CallResult };
 
 /** コマンドの対象（文書と、1 から数えた行） */
 interface Target {
@@ -61,6 +52,7 @@ const isPasta = (doc: vscode.TextDocument) => doc.languageId === 'pasta';
 const isGhostSource = (doc: vscode.TextDocument) =>
   isPasta(doc) || doc.languageId === 'lua' || path.basename(doc.uri.fsPath).toLowerCase() === 'pasta.toml';
 
+// 拡張はローカル変数も書き換えも送らない（3 つのコマンドだけ）
 const COMMANDS: readonly Command[] = [
   {
     id: 'pasta.runSceneAtCursor', title: '▶ シーンを実行', accepts: isPasta, saves: true,
@@ -104,104 +96,44 @@ async function saveGhostDocuments(root: string): Promise<string[]> {
   return failed;
 }
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const clock = (d = new Date()) => `[${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}]`;
-
 export function registerDevCommands(context: vscode.ExtensionContext, deps: Partial<DevCommandDeps> = {}): void {
-  const ports = deps.ports ?? CANDIDATE_PORTS;
-  const timing = deps.timing ?? DEFAULT_TIMING;
-  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  // この窓の間だけ（保存しない。3.5）
-  const remembered = new Map<string, Endpoint>();
-  const busy = new Set<string>();
   const output = vscode.window.createOutputChannel(OUTPUT_CHANNEL);
   context.subscriptions.push(output);
 
-  const write = (lines: readonly string[]) => {
-    for (const l of lines) {
-      output.appendLine(l);
-    }
-    output.show(true); // フォーカスを奪わない（7.1）
-  };
-  const stop = (lines: readonly string[], notice: string, asError = false) => {
-    write(lines);
-    void (asError ? vscode.window.showErrorMessage(notice) : vscode.window.showWarningMessage(notice));
-  };
-
-  /** 覚えた相手を 1 回で確かめ、外れたら探し直す（3.6）。0 個・閉じたら undefined */
-  async function chooseEndpoint(cmd: Command, ghost: GhostTarget): Promise<Endpoint | undefined> {
-    const head = `${clock()} ${cmd.title} — ${ghost.displayName}（${ghost.root}）`;
-    const progress = { location: vscode.ProgressLocation.Window, title: `Pasta: ${cmd.title}` };
-    const found = await vscode.window.withProgress(progress, async () => {
-      const known = remembered.get(ghost.key);
-      if (known) {
-        const now = await identify(io, known.port, ghost.root);
-        if (now?.basewareName === known.basewareName) {
-          return [known];
-        }
-        remembered.delete(ghost.key);
+  const host: DevHost = {
+    io,
+    ports: deps.ports ?? CANDIDATE_PORTS,
+    timing: deps.timing ?? DEFAULT_TIMING,
+    sleep: deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))),
+    write: (lines) => {
+      for (const l of lines) {
+        output.appendLine(l);
       }
-      return findBasewares(io, ghost.root, ports);
-    });
-    if (found.length === 0) {
-      stop([head, `${NOT_FOUND}（${ghost.displayName}・${ghost.root}）`, NOT_FOUND_CHECKS],
-        `${NOT_FOUND}: ${ghost.displayName}（${ghost.root}）。${NOT_FOUND_CHECKS}`);
-      return undefined;
-    }
-    let chosen = found[0];
-    if (found.length > 1) {
-      const items = found.map((e) => ({ label: `${e.basewareName}（${HOST}:${e.port}）`, endpoint: e }));
-      const pick = await vscode.window.showQuickPick(items, { placeHolder: `${ghost.displayName} へ送る相手を選んでください` });
-      if (!pick) {
-        return undefined; // 閉じたら何も送らない（3.4）
-      }
-      chosen = pick.endpoint;
-    }
-    remembered.set(ghost.key, chosen);
-    return chosen;
-  }
+      output.show(true); // フォーカスを奪わない（7.1）
+    },
+    notify: (level, text) => {
+      void (level === 'error' ? vscode.window.showErrorMessage(text) : vscode.window.showWarningMessage(text));
+    },
+    pick: async (_ghost, items, placeHolder) => (await vscode.window.showQuickPick([...items], { placeHolder }))?.endpoint,
+    progress: async (title, work) => vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: `Pasta: ${title}` }, work),
+    save: (ghost) => saveGhostDocuments(ghost.root),
+  };
+  const session = new DevSession(host);
 
   async function execute(cmd: Command, args: readonly unknown[]): Promise<void> {
-    // この await は busy の確かめより前（7.5 の決まりは崩れない）
+    // この await は重なりの確かめ（session.execute の頭）より前（7.5 の決まりは崩れない）
     const target = await resolveTarget(args);
     const doc = target?.document;
     if (!target || !doc || doc.uri.scheme !== 'file' || doc.isUntitled || !cmd.accepts(doc)) {
-      stop([`${clock()} ${cmd.title} — ${BAD_DOCUMENT}`], BAD_DOCUMENT);
+      session.stop([`${clock()} ${cmd.title} — ${BAD_DOCUMENT}`], BAD_DOCUMENT);
       return;
     }
     const ghost = await resolveGhost(io, doc.uri.fsPath, findGhostMaster(doc.uri)?.fsPath);
     if (!ghost) {
-      stop([`${clock()} ${cmd.title} — ${NOT_IN_GHOST}: ${doc.uri.fsPath}`], `${NOT_IN_GHOST}: ${doc.uri.fsPath}`);
+      session.stop([`${clock()} ${cmd.title} — ${NOT_IN_GHOST}: ${doc.uri.fsPath}`], `${NOT_IN_GHOST}: ${doc.uri.fsPath}`);
       return;
     }
-    // 確かめと足し込みの間に await を挟まないので、同じゴーストの 2 本目はここで止まる（7.5）
-    if (busy.has(ghost.key)) {
-      stop([`${clock()} ${cmd.title} — ${BUSY}（${ghost.displayName}）`], BUSY);
-      return;
-    }
-    busy.add(ghost.key);
-    try {
-      const endpoint = await chooseEndpoint(cmd, ghost);
-      if (!endpoint) {
-        return;
-      }
-      write([`${clock()} ${cmd.title} — ${ghost.displayName}（${ghost.root}）→ ${endpoint.basewareName} ${HOST}:${endpoint.port}`]);
-      // 古い辞書を読ませない（4.2・5.2）。確かめずに保存し、1 つでも保存できなければ送らない
-      const unsaved = cmd.saves ? await saveGhostDocuments(ghost.root) : [];
-      if (unsaved.length > 0) {
-        stop([SAVE_FAILED, ...unsaved.map((f) => `  ${f}`)], `${SAVE_FAILED}: ${unsaved.join('、')}`);
-        return;
-      }
-      const progress = { location: vscode.ProgressLocation.Window, title: `Pasta: ${cmd.title}` };
-      const report = await vscode.window.withProgress(progress, () => cmd.run({ io, endpoint, ghost, timing, sleep }, target));
-      if (report.notice) {
-        stop(report.lines, report.notice, report.failure !== undefined && ERROR_KINDS.has(report.failure.kind));
-      } else {
-        write(report.lines); // 成功は通知しない（7.2）
-      }
-    } finally {
-      busy.delete(ghost.key);
-    }
+    await session.execute({ title: cmd.title, saves: cmd.saves, run: (ctx) => cmd.run(ctx, target) }, ghost);
   }
 
   for (const cmd of COMMANDS) {

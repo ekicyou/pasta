@@ -6,6 +6,7 @@
 import { type CallResult, callTool, describeResult, readRaiseEvent } from './mcpClient.ts';
 import { DEBUG_HINT, mtimeOf, openLogCursor, pastaLogPath, readNewLines, readText, variablesPath } from './ghostFiles.ts';
 import type { FlowContext } from './reloadShiori.ts';
+import type { Report } from './devSession.ts';
 
 export type DumpOutcome =
   | { kind: 'shown'; text: string; path: string; mtime: number }
@@ -86,7 +87,7 @@ export async function setSaveVariable(ctx: FlowContext, name: string, change: Sa
   }
 }
 
-export function formatSet(name: string, change: SaveVariableChange, outcome: SetOutcome): { lines: string[]; notice?: string; failure?: CallResult } {
+export function formatSet(name: string, change: SaveVariableChange, outcome: SetOutcome): Report {
   switch (outcome.kind) {
     case 'set':
       return { lines: [change.type === 'delete' ? `＄＊${name} を消しました` : `＄＊${name} を ${change.value}（${change.type}）にしました`] };
