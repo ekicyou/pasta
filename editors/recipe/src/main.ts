@@ -5,6 +5,7 @@ import { analyze, checkGhost, initialPath, listTree, onGhostChanged, openGhost, 
 import { scenesToItems } from "./mapping.ts";
 import { Panels } from "./panels.ts";
 import { CoalescingRunner } from "./scheduler.ts";
+import { StartView } from "./start.ts";
 import { findSame } from "./tabs.ts";
 import { TreeView } from "./tree.ts";
 
@@ -49,6 +50,11 @@ saveButton.addEventListener("click", () => {
 });
 document.getElementById("toolbar")!.append(saveButton);
 
+// shortcut: 押された入口を知らせるだけの仮の口。7.1 の openPath(path, origin) が置き換える
+const start = new StartView(document.getElementById("start")!, document.getElementById("toolbar")!, (path, origin) =>
+  console.info("open", origin, path),
+);
+
 // shortcut: 開発の窓で CDP からタブの状態を見るための口。開発のビルドだけ
 if (import.meta.env.DEV) Object.assign(globalThis, { recipeDocs: docs, recipePanels: panels });
 // shortcut: 見張りの知らせを外の変更の適用へ直につなぐ仮の口。開発のビルドだけ。7.2 の ghost-changed の流れ（ツリー・シーン・検査・今の master の知らせだけ）が置き換える
@@ -67,7 +73,5 @@ if (path) {
   if (rel) await docs.open(rel);
   checker.request();
 } else {
-  const start = document.getElementById("start")!;
-  start.textContent = "ゴーストを開いていません";
-  start.hidden = false;
+  await start.show();
 }

@@ -153,3 +153,42 @@ dialog input {
   outline: 1px solid Highlight;
   outline-offset: -1px;
 }
+/* 開始の画面の間は、開いたゴーストの部品（ツールバー・ツリー・エディタ・一覧）を出さない（焦点も入らない） */
+body:has(#start:not([hidden])) > :not(#start, #dialog-root, script) {
+  display: none;
+}
+#start {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 24px;
+}
+#start ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.recent-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  padding: 6px 8px;
+  font: inherit;
+}
+.recent-entry:focus,
+.recent-entry:hover {
+  background: Highlight;
+  color: HighlightText;
+}
+.recent-name {
+  font-weight: bold;
+}
+.recent-path {
+  font-size: 0.85em;
+  /* 日本語の字体は \ を ¥ に描く。メニューと同じくパスを \ で見せる */
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
