@@ -70,7 +70,7 @@
   - _Depends: 1.1_
   - _Requirements: 3.1, 3.9, 9.1, 9.2, 9.3, 13.4_
 
-- [ ] 3.2 進んでいる操作の master の下の決まったファイルだけを読む門を作る
+- [x] 3.2 進んでいる操作の master の下の決まったファイルだけを読む門を作る
   - 読み取りの門: master の下の普通の名前の部品だけで、直下の `descript.txt`・`pasta.toml`（大文字・小文字を問わない）と、直下の `profile` の下のファイルだけを通す。一覧は master そのものだけ。リンクは断る
   - アプリの状態に「進んでいる操作の master」を足し、操作の始めに今開いている master を覚え、終わりに消す。一覧・状態・読み取りは、覚えた master と門を必ず通し、操作の外では断る
   - 状態の形は 1.1 の型（`size`・`mtimeMs`・`isFile`）と同じ。読み取りは開始の位置からのバイト列を返す。書くコマンドは足さない。ツリーとタブの `profile` の扱いは変えない
@@ -185,3 +185,4 @@
 
 - 2.3: DevSession の重なりの印は execute の最初の await より前に立つ。アプリの糊（5.1）で「running を確かめる → await devBegin() → await ghostTarget → execute」と組むと間に await が入り速い 2 回押しが両方通るので、DevActions 側で確かめと同期に自前の印（inFlight）を立て finally で外す。
 - 2.6: build.yml の vscode-test（ubuntu）は wasm/ を作らないので、本物の WASM を読む 3 本は PASTA_VSCODE_NO_WASM=1 で外す。手元では wasm/ が要る（scripts/build-wasm.ps1 を pwsh で）。CI run 43392810868 で全 job 緑。
+- 3.2: 読み取りの門は master の綴りで strip_prefix するので、画面は open_ghost／3.4 のルートと同じ綴りで join したパスを渡す（違えば断られるだけで外へは出ない）。断り・無い・読めないは Err(String)、TS 側で undefined に写す。

@@ -16,9 +16,10 @@ pub struct Ghost {
     pub watcher: watch::Watcher,
 }
 
-/// 1 つの窓に 1 つ。ロックはパスを取り出す・置き換える間だけ持つ
+/// 1 つの窓に 1 つ。ロックはパスを取り出す・置き換える間だけ持つ。
+/// 2 つ目は進んでいる開発の操作の master（dev_begin が覚え、dev_end が消す。5.2）
 #[derive(Default)]
-pub struct AppState(Mutex<Option<Ghost>>);
+pub struct AppState(Mutex<Option<Ghost>>, Mutex<Option<PathBuf>>);
 
 impl AppState {
     fn lock(&self) -> MutexGuard<'_, Option<Ghost>> {
@@ -26,7 +27,7 @@ impl AppState {
         self.0.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    fn master(&self) -> Result<PathBuf, String> {
+    pub(crate) fn master(&self) -> Result<PathBuf, String> {
         self.lock()
             .as_ref()
             .map(|g| g.master.clone())
@@ -38,8 +39,21 @@ impl AppState {
         self.lock().as_ref().is_some_and(|g| g.master == master)
     }
 
+    /// 進んでいる開発の操作の master を置き換える（None で消す）
+    pub(crate) fn set_dev_master(&self, master: Option<PathBuf>) {
+        *self.1.lock().unwrap_or_else(|e| e.into_inner()) = master;
+    }
+
+    pub(crate) fn dev_master(&self) -> Result<PathBuf, String> {
+        self.1
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+            .ok_or_else(|| "開発の操作が進んでいません".into())
+    }
+
     /// 置き換える。古い見張りはロックを放してから落とす
-    fn replace(&self, ghost: Ghost) {
+    pub(crate) fn replace(&self, ghost: Ghost) {
         let old = self.lock().replace(ghost);
         drop(old);
     }
@@ -65,7 +79,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static 
 }
 
 /// 画面の入力と別のスレッドで走らせ、パニックを `Err` に写す（7.7・6.5）
-async fn run_blocking<T: Send + 'static>(
+pub(crate) async fn run_blocking<T: Send + 'static>(
     what: &str,
     work: impl FnOnce() -> T + Send + 'static,
 ) -> Result<T, String> {
