@@ -44,6 +44,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip) — SHIORI の本体（`pasta.dll` とライセンス表示）
 - [`pasta_check.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip) — 辞書の検査とゴーストの配布物を作る CLI（64 ビット版の `pasta_check.exe` とライセンス表示）
 - [`pasta-skills.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-skills.zip) — AI にゴーストを書かせるときの pasta のスキル 3 つ（`.claude/skills/` に展開する）
+- [`pasta-recipe.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.zip) — VSCode を使わずに `.pasta` を書くアプリ（64 ビット版の `pasta-recipe.exe` とライセンス表示。[マニュアル](https://ekicyou.github.io/pasta/debug/recipe.html)）
 - [Pasta DSL VSCode 拡張](https://marketplace.visualstudio.com/items?itemName=ekicyou.pasta-vscode) — 構文ハイライト・診断・動いているゴーストへの開発支援コマンド
 
 ---
