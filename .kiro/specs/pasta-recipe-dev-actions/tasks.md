@@ -15,7 +15,7 @@
   - 偽の入出力だけで、ファイルを読む・POST を受ける小さな自己確認の試験が `node --test` で通る
   - _Requirements: 13.1_
 
-- [ ] 2. 実行の流れを共有へ移す（拡張の振る舞いは変えない）
+- [x] 2. 実行の流れを共有へ移す（拡張の振る舞いは変えない）
 - [x] 2.1 MCP の頼みとゴーストのファイルの読み取りを共有へ移し、拡張に Node の入出力を差す
   - MCP の頼みの 1 回・相手の探し方・記録の読み取りを、入出力の面の POST を 1 回呼ぶ形で移す。送り手の名前は入出力の面から取る（拡張は今の名前）
   - 書き換えの頼み（`OnPastaSetSaveVariable`）を頼める事件の名前に足す
@@ -52,7 +52,7 @@
   - アプリの `npm test` でこの試験が通る
   - _Requirements: 3.3, 3.4, 3.5, 4.1, 4.3, 5.1, 1.6, 13.1_
 
-- [ ] 2.6 拡張の試験を CI で走らせ、拡張の配布物を作れることを確かめる
+- [x] 2.6 拡張の試験を CI で走らせ、拡張の配布物を作れることを確かめる
   - 日々の CI に、ubuntu・Node 22 で `editors/vscode` の `npm ci` と `npm test` を走らせる job を足す
   - ランナーで走らない試験があれば、その試験だけを理由を付けて外す
   - 拡張の esbuild の束ねが共有を取り込み、`.vsix` を作れる（手元で作って確かめる）
@@ -184,3 +184,4 @@
 ## Implementation Notes
 
 - 2.3: DevSession の重なりの印は execute の最初の await より前に立つ。アプリの糊（5.1）で「running を確かめる → await devBegin() → await ghostTarget → execute」と組むと間に await が入り速い 2 回押しが両方通るので、DevActions 側で確かめと同期に自前の印（inFlight）を立て finally で外す。
+- 2.6: build.yml の vscode-test（ubuntu）は wasm/ を作らないので、本物の WASM を読む 3 本は PASTA_VSCODE_NO_WASM=1 で外す。手元では wasm/ が要る（scripts/build-wasm.ps1 を pwsh で）。CI run 43392810868 で全 job 緑。
