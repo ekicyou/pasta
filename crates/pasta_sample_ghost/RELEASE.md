@@ -42,7 +42,7 @@ GitHub の「Actions」→「Release」の実行を開きます。job は次の�
 | build | 配る pasta のスキルに入れたマニュアルの写しが最新かを照合して、`pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.zip` を作る |
 | publish-crates | crates.io へ 5 クレートを公開 |
 | publish-vsce | VSCode Marketplace へ拡張を公開 |
-| github-release | 詳しいリリースノートを作り、見どころを本文とする GitHub Release `pasta vX.Y.Z` を作成して、配布物 5 つと詳しいリリースノートの 6 つを添付 |
+| github-release | 詳しいリリースノートを作り、見どころを本文とする GitHub Release `pasta vX.Y.Z` を作成して、配布物 6 つと詳しいリリースノートの 7 つを添付 |
 | report | 公開先ごとの結果と Release の URL を表にまとめる |
 
 report job の Summary の表で、公開先ごとの結果を確かめます。

@@ -836,4 +836,4 @@ interface OpenRequest { path: string | null }
 - **Risk: アプリの lock への `cargo deny`**: Tauri の木の勧告で止まることがある。1 件ずつ判断する。
 - **Risk: 大きさ**: 上限 30 MB は見積もり（zip 5 MB 前後）の 6 倍。最初のビルドの実測が 15 MB を超えたら、何が大きいかを調べる（Monaco の言語・shiki の言語の取り込み漏れなど）。
 - **Known limit**: `pasta_check` の集めは最上位の `profile` を大文字・小文字を区別して飛ばす（移す前の振る舞いのまま）。アプリはツリー（`list_tree`）と範囲の門（`resolve_rel`）で大文字・小文字を区別せずに除くので、綴りが `Profile` でもツリーに出ず開けない（4.3・11.4）。検査の集めとの差は、`pasta.toml` の選び方に `Profile` の下が入る場合だけに残る。
-- **Known limit**: BOM 付きのファイルの 1 行目の検査の項目の列は、拡張と同じく BOM を 1 文字に数えた位置になる（拡張と同じ結果を優先）。
+- BOM 付きのファイルの検査の項目の列は、BOM を外した本文で数える（`parse_str` も BOM を外して数えるので、拡張と同じ位置になる）。
