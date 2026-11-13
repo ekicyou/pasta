@@ -631,7 +631,7 @@ export const buildLocals: (pairs: LocalPair[]) => Promise<LocalsOutcome>;
 - `DevHost` の実装: `write`・`notify`・`progress` は `OutputPanel` へ、`pick` は `pickEndpoint`、`save` は開いているゴーストの未保存のタブ（`.pasta`・`.lua`・名前が `pasta.toml`）を `Documents.save` で順に保存し、失敗を `io.join(master, rel)` で返す。
 - 操作はアプリ全体で 1 つずつ。`session.running` があれば `session.refuseBusy(title, running)` で止める（5.1）。
 - 操作の始めに `ghostTarget(io, info.root, info.master, info.name)` を作る。`undefined` なら「ghost/master に descript.txt が無いので、ゴーストのフォルダとして扱えません（{master}）」で止める（3.6）。
-- ▶ の流れ（`run`）: `cmd.run` の中で、保存した中身（タブがあれば保存の後の `diskText`、無ければ `readText(rel)`）を `analyze` し、`sceneLine(scenes, path)` で行を引く。見つからなければ「シーン「{名前}」が保存した中身に見つかりません（{rel}）」で止める（1.4）。見つかれば `runScene(ctx, io.join(master, ...rel.split('/')), line, locals)`。
+- ▶ の流れ（`run`）: `cmd.run` の中で、保存した中身（タブがあれば保存の後の `diskText`、無ければ `readText(rel)`）を `analyze` し、`sceneLine(scenes, path)` で行を引く。タブも `readText` も今開いているゴーストのものなので、読む前と読んだ後に今のゴーストが操作のゴーストでなければ、読まずに（読んだ中身を使わずに）「操作の途中で別のゴーストを開いたので、保存した中身を読めません」で止める（5.2。切り替えの始めに `setGhost(null)` を渡し、開けなければ前のものに戻す）。見つからなければ「シーン「{名前}」が保存した中身に見つかりません（{rel}）」で止める（1.4）。見つかれば `runScene(ctx, io.join(master, ...rel.split('/')), line, locals)`。
 - 値を入れて実行（`runWithLocals`）: 覚えた組（無ければ空）で `localsDialog` を開く。閉じたら何もしない。組が 0 なら `locals` なし（8.5）、あれば `buildLocals` のインライン表（窓の中で弾き済み）。鳴らすと決めた組を覚える（8.10）。▶ は覚えた組を使わない（8.11）。
 - 表の読み直し: 表の状態が「読めた」なら、▶ と値を入れて実行の `cmd.run` の終わり（`notPlayed` 以外）で `dumpVariables(ctx)` を呼ぶ（6.9）。書き換え・削除・追加は `setSaveVariable` の後に必ず呼ぶ（7.6）。
 - 表へ当てる: `dumpVariables` の `shown` を `variableRows` で行にして当てる。投げたら「{パス} を TOML として読めませんでした: {理由}」と知らせ（警告）を出し、表を「読めない」にする（6.5）。`stale`・`failed` は `formatDump` の行のまま出し、表を「読めない」にする（6.4）。当てる前に、操作のゴーストの鍵が今のゴーストと同じかを見て、違えば捨てる（5.3）。

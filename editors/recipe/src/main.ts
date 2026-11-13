@@ -14,6 +14,7 @@ import { notify } from "./dialog.ts";
 import { TreeView } from "./tree.ts";
 import { DevActions } from "./devActions.ts";
 import { OutputPanel, VariablesPanel } from "./devPanels.ts";
+import { registerSceneLens } from "./sceneLens.ts";
 
 const editor = await createEditor(document.getElementById("editor")!);
 const docs = new Documents(editor, document.getElementById("tabs")!, document.getElementById("notices")!, {
@@ -33,15 +34,16 @@ const docs = new Documents(editor, document.getElementById("tabs")!, document.ge
     if (tab.rel.toLowerCase().endsWith(".pasta") || tab.rel.toLowerCase() === "pasta.toml") checker.request();
   },
 });
-const tree = new TreeView(document.getElementById("tree")!, docs);
 const panels = new Panels(document.getElementById("panels")!, docs);
-// 開発の操作の糊を 1 つ組み、下の欄の動かす面とつなぐ。保存変数の表の操作は 5.2・5.3 でつなぐ
+// 開発の操作の糊を 1 つ組み、下の欄の動かす面・ツリーのメニュー・見出しの上の操作とつなぐ。表の書き換え・削除・追加は 5.3 でつなぐ
 const devActions = new DevActions({
   docs,
   output: new OutputPanel(panels.output),
-  vars: new VariablesPanel(panels.variables, { onRefresh() {}, onEdit() {}, onDelete() {}, onAdd() {} }),
+  vars: new VariablesPanel(panels.variables, { onRefresh: () => void devActions.showVariables(), onEdit() {}, onDelete() {}, onAdd() {} }),
   panels,
 });
+const tree = new TreeView(document.getElementById("tree")!, docs, devActions);
+registerSceneLens(docs, devActions);
 // 保存の後と見張りの知らせの検査の求めを 300 ms で 1 回にまとめる（9.9）
 const checker = new CoalescingRunner(async () => panels.setReport(await checkGhost().catch((reason: unknown) => String(reason))), 300, globalThis);
 
@@ -119,12 +121,16 @@ async function openNow(path: string, origin: string): Promise<void> {
     // 開けなかったときはタブを閉じたまま今のゴーストに留まる（保存する／しないは選び終えている）
     switching = true;
     generation++;
+    // 進んでいる開発の操作に、Rust の master が替わり始めたことを先に知らせる（新しいゴーストのファイルを読ませない。5.2）
+    const before = devActions.current;
+    devActions.setGhost(null);
     await docs.beginSwitch();
     panels.update();
     let info;
     try {
       info = await openGhost(found.master);
     } catch (reason) {
+      devActions.setGhost(before);
       notify(String(reason));
       return;
     } finally {

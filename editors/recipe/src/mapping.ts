@@ -179,6 +179,23 @@ export function sceneLine(scenes: readonly SceneNode[], path: ScenePath): number
   )?.line;
 }
 
+/** ▶・値を入れて実行に渡すシーン（ツリーの行と見出しの上の操作が作る） */
+export interface SceneTarget {
+  /** master からの相対・'/' 区切り */
+  readonly rel: string;
+  readonly path: ScenePath;
+  /** 見出しの行に出す名前（＊挨拶・朝） */
+  readonly label: string;
+}
+
+/** ＊グローバル、ローカルなら ＊グローバル・ローカル */
+export const sceneLabel = (path: ScenePath): string => "＊" + path.map((p) => p.name).join("・");
+
+/** 見出しの上の操作の並び（1.2）。行は 1 始まり */
+export function sceneTargets(rel: string, scenes: readonly SceneNode[]): { line: number; target: SceneTarget }[] {
+  return scenePaths(scenes).map(({ line, path }) => ({ line, target: { rel, path, label: sceneLabel(path) } }));
+}
+
 /** ツリーの見える 1 行（aria-level で階層を表す平らな並び。キーで差分を描き、上下のキーはこの順に動く） */
 export interface TreeRow {
   /** フォルダ・ファイルは rel（最上位は空）、シーンは親のキー＋`|名前|同じ名前の中の順`（`|` はファイル名に使えない。前にシーンを足しても開いた所がずれない） */

@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 import { createFakeGhostIO, type FakeGhostIO, type PostRequest } from "../../shared/fakeGhostIO.ts";
 import type { PostOutcome } from "../../shared/ghostIO.ts";
 import { BUSY, SAVE_FAILED } from "../../shared/devSession.ts";
-import { DevActions, noDescript } from "./devActions.ts";
+import { DevActions, noDescript, notFoundInSaved, notToml, switchedMidOp } from "./devActions.ts";
 import { isDevSource } from "./tabs.ts";
+import { sceneLabel, sceneTargets } from "./mapping.ts";
+import type { SceneNode, VarRow } from "./ipc.ts";
 
 const info = { master: "C:\\g\\ghost\\master", root: "C:\\g", name: "g", version: "1" };
 const LOG = "C:\\g\\ghost\\master\\profile\\pasta\\logs\\pasta.log";
@@ -13,8 +15,11 @@ const DONE = "2026-11-13T00:00:00Z  INFO pasta::windows: SHIORI load entry compl
 const reply = (result: unknown): PostOutcome => ({ kind: "response", status: 200, body: JSON.stringify({ jsonrpc: "2.0", id: 1, result }) });
 const text = (t: string) => reply({ content: [{ type: "text", text: t }], isError: false });
 
-/** 9801 で SSP がこのゴーストを動かしている。reload で pasta.log に読み込みの終わりの行が出る */
-function serve(fio: FakeGhostIO) {
+const VARS = "C:\\g\\ghost\\master\\profile\\pasta\\debug\\variables.toml";
+type RaiseArgs = { event: string; references: string[]; ghost_name: string };
+
+/** 9801 で SSP がこのゴーストを動かしている。reload で pasta.log に読み込みの終わりの行が出る。raise_event は raise に任せる */
+function serve(fio: FakeGhostIO, raise?: (a: RaiseArgs) => PostOutcome) {
   return (req: PostRequest): PostOutcome => {
     if (req.port !== 9801) return { kind: "unreachable", detail: "ECONNREFUSED" };
     const { method, params } = JSON.parse(req.body);
@@ -25,14 +30,36 @@ function serve(fio: FakeGhostIO) {
       fio.appendFile(LOG, DONE);
       return text("OK");
     }
+    if (params.name === "raise_event" && raise) return raise(params.arguments);
     throw new Error(`筋書きに無い頼み: ${req.body}`);
   };
 }
 
-function setup(opts: { descript?: boolean; begin?: Promise<void> } = {}) {
+/** 見出しの行（1 始まり）だけを持つシーン */
+const scene = (name: string, line: number, kind: "global" | "local" = "global", children: SceneNode[] = []): SceneNode => {
+  const r = { start: { line: line - 1, character: 0 }, end: { line: line - 1, character: 1 } };
+  return { name, kind, heading: r, range: r, children };
+};
+
+interface SetupOpts {
+  descript?: boolean;
+  begin?: Promise<void>;
+  raise?: (a: RaiseArgs, fio: FakeGhostIO) => PostOutcome;
+  /** 解析: 中身 → シーン */
+  analyze?: (source: string) => SceneNode[];
+  /** ディスクの中身（read_text） */
+  disk?: Record<string, string>;
+  /** variable_rows: 文字列なら Err として投げる */
+  rows?: (text: string) => VarRow[] | string;
+}
+
+function setup(opts: SetupOpts = {}) {
   const fio = createFakeGhostIO("pasta-recipe");
   if (opts.descript !== false) fio.setFile(`${info.master}\\descript.txt`, "charset,UTF-8\r\nname,ゴースト\r\n");
-  fio.queuePost(...Array.from({ length: 100 }, () => serve(fio)));
+  const raise = opts.raise;
+  fio.queuePost(...Array.from({ length: 100 }, () => serve(fio, raise && ((a) => raise(a, fio)))));
+  const analyzed: string[] = [];
+  const rowTexts: string[] = [];
   const cmds: string[] = [];
   const orThrow = <T>(v: T | undefined): T => {
     if (v === undefined) throw "無い";
@@ -40,9 +67,21 @@ function setup(opts: { descript?: boolean; begin?: Promise<void> } = {}) {
   };
   (globalThis as unknown as { window: unknown }).window = {
     __TAURI_INTERNALS__: {
-      invoke: async (cmd: string, a: { path: string; start: number; port: number; body: string; timeoutMs: number }) => {
+      invoke: async (cmd: string, a: { path: string; start: number; port: number; body: string; timeoutMs: number; source: string; rel: string; text: string }) => {
         cmds.push(cmd);
         switch (cmd) {
+          case "analyze":
+            analyzed.push(a.source);
+            return { tokens: [], diagnostics: [], scenes: opts.analyze?.(a.source) ?? [] };
+          case "read_text":
+            state.during?.();
+            return { text: orThrow(opts.disk?.[a.rel]), bom: false };
+          case "variable_rows": {
+            rowTexts.push(a.text);
+            const r = opts.rows?.(a.text) ?? [];
+            if (typeof r === "string") throw r;
+            return r;
+          }
           case "dev_begin":
             return opts.begin ?? null;
           case "dev_end":
@@ -64,15 +103,21 @@ function setup(opts: { descript?: boolean; begin?: Promise<void> } = {}) {
   const notices: string[] = [];
   const shown: string[] = [];
   let cleared = 0;
-  const tabs: { rel: string; deleted: boolean; savedVersionId: number; model: { getAlternativeVersionId(): number } }[] = [];
+  const table: (readonly VarRow[] | "unreadable")[] = [];
+  type FakeTab = { rel: string; deleted: boolean; savedVersionId: number; diskText: string | null; model: { getAlternativeVersionId(): number }; editorText?: string };
+  const tabs: FakeTab[] = [];
   const saved: string[] = [];
-  const state = { saveOk: true as boolean | "throw", progressThrows: false };
+  /** during: 保存と read_text の途中で呼ぶ（操作の途中でゴーストを開いたときを作る） */
+  const state = { saveOk: true as boolean | "throw", progressThrows: false, during: undefined as (() => void) | undefined };
   const actions = new DevActions({
     docs: {
       tabs: tabs as never,
       save: async (tab) => {
         saved.push(tab.rel);
+        state.during?.();
         if (state.saveOk === "throw") throw new Error("壊れた");
+        const t = tab as unknown as FakeTab;
+        if (state.saveOk && t.editorText !== undefined) t.diskText = t.editorText;
         return state.saveOk;
       },
     },
@@ -84,14 +129,21 @@ function setup(opts: { descript?: boolean; begin?: Promise<void> } = {}) {
         return work();
       },
     },
-    vars: { clear: () => void cleared++ },
+    vars: {
+      clear: () => void cleared++,
+      setRows: (rows) => void table.push(rows),
+      setUnreadable: () => void table.push("unreadable"),
+    },
     panels: { show: (f) => void shown.push(f) },
   });
   actions.setGhost(info);
-  const dirty = (rel: string) => tabs.push({ rel, deleted: false, savedVersionId: 1, model: { getAlternativeVersionId: () => 2 } });
+  const dirty = (rel: string, diskText: string | null = null, editorText?: string) =>
+    tabs.push({ rel, deleted: false, savedVersionId: 1, diskText, editorText, model: { getAlternativeVersionId: () => 2 } });
   const count = (cmd: string) => cmds.filter((c) => c === cmd).length;
   const tools = () => fio.posts.map((p) => JSON.parse(p.body).params?.name).filter(Boolean);
-  return { actions, lines, notices, shown, saved, state, dirty, count, tools, cleared: () => cleared };
+  const raises = () =>
+    fio.posts.map((p) => JSON.parse(p.body).params).filter((p) => p?.name === "raise_event").map((p) => p.arguments as RaiseArgs);
+  return { actions, fio, lines, notices, shown, saved, state, dirty, count, tools, raises, analyzed, rowTexts, table, cleared: () => cleared };
 }
 
 test("リロードは見出しの行と拡張と同じ要約を出し、動かす面を見せ、devBegin・devEnd で包む（2.1・4.2）", async () => {
@@ -177,4 +229,129 @@ test("ゴーストを開いていなければ何もしない・替わったら�
 test("開発の操作の前に保存するのは .pasta・.lua・名前が pasta.toml（大文字・小文字を問わない）", () => {
   assert.ok(isDevSource("dic/a.PASTA") && isDevSource("x.lua") && isDevSource("PASTA.TOML"));
   assert.ok(!isDevSource("dic/pasta.toml.bak") && !isDevSource("descript.txt"));
+});
+
+const SCRIPT = "\\h\\s[0]おはよう\\e";
+const OTHER = { master: "C:\\h\\ghost\\master", root: "C:\\h", name: "h", version: "1" };
+const played = (a: RaiseArgs) => (a.event === "OnPastaSceneAt" ? text(`Script: ${SCRIPT}`) : text("OK:the ghost returned no script."));
+const morning = { rel: "dic/a.pasta", path: [{ name: "挨拶", n: 1 }, { name: "朝", n: 0 }], label: "＊挨拶・朝" };
+
+test("▶ は保存の後の中身を解析し直し、道から今の行を引いて送る。ローカル変数（Reference2）は送らない（1.1・1.4・8.11）", async () => {
+  const s = setup({
+    raise: played,
+    analyze: (src) => (src === "NEW" ? [scene("挨拶", 3), scene("挨拶", 7, "global", [scene("朝", 9, "local")])] : []),
+  });
+  s.dirty("dic/a.pasta", "OLD", "NEW");
+  await s.actions.run(morning);
+  assert.deepEqual(s.saved, ["dic/a.pasta"]);
+  assert.deepEqual(s.analyzed, ["NEW"]);
+  assert.deepEqual(s.raises(), [{ event: "OnPastaSceneAt", references: [`${info.master}\\dic\\a.pasta`, "9"], ghost_name: info.root }]);
+  assert.match(s.lines[0], /▶ シーンを実行 — ゴースト/);
+  assert.ok(s.lines.includes("台本:") && s.lines.includes(SCRIPT));
+  assert.deepEqual(s.notices, []);
+  assert.equal(s.count("dev_end"), 1);
+});
+
+test("▶ はタブで開いていないファイルならディスクの中身を解析し、道が無ければ読み込み直しも再生も頼まずに止める（1.4）", async () => {
+  const s = setup({ raise: played, disk: { "dic/b.pasta": "DISK" }, analyze: () => [scene("挨拶", 2)] });
+  const target = { rel: "dic/b.pasta", path: [{ name: "挨拶", n: 1 }], label: "＊挨拶" };
+  await s.actions.run(target);
+  assert.deepEqual(s.analyzed, ["DISK"]);
+  assert.ok(s.lines.includes(notFoundInSaved("＊挨拶", "dic/b.pasta")));
+  assert.deepEqual(s.notices, [`warning: ${notFoundInSaved("＊挨拶", "dic/b.pasta")}`]);
+  assert.ok(!s.tools().includes("reload") && s.raises().length === 0);
+});
+
+test("▶ の保存の途中で別のゴーストを開いたら、中身を読まずに前のゴーストの見出しの下で止める（5.2）", async () => {
+  const s = setup({ raise: played, disk: { "dic/a.pasta": "DISK" }, analyze: () => [scene("挨拶", 7, "global", [scene("朝", 9, "local")])] });
+  s.dirty("dic/a.pasta", "OLD", "NEW");
+  s.state.during = () => s.actions.setGhost(OTHER);
+  await s.actions.run(morning);
+  assert.equal(s.count("read_text") + s.count("analyze"), 0);
+  assert.equal(s.raises().length, 0);
+  assert.match(s.lines[0], /▶ シーンを実行 — ゴースト（C:\\g）/);
+  assert.ok(s.lines.includes(switchedMidOp));
+  assert.deepEqual(s.notices, [`warning: ${switchedMidOp}`]);
+  assert.equal(s.count("dev_end"), 1);
+});
+
+test("▶ のディスクの読みの途中で別のゴーストを開いたら、読んだ中身を使わずに止める（5.2）", async () => {
+  const s = setup({ raise: played, disk: { "dic/a.pasta": "DISK" }, analyze: () => [scene("挨拶", 7, "global", [scene("朝", 9, "local")])] });
+  s.state.during = () => s.actions.setGhost(null); // 切り替えの始め（main.ts の openNow）
+  await s.actions.run(morning);
+  assert.equal(s.count("analyze"), 0);
+  assert.equal(s.raises().length, 0);
+  assert.deepEqual(s.notices, [`warning: ${switchedMidOp}`]);
+});
+
+const dumped =(a: RaiseArgs, fio: FakeGhostIO) => {
+  if (a.event === "OnPastaDumpVariables") fio.setFile(VARS, "a = 1\n");
+  return text("OK:the ghost returned no script.");
+};
+
+test("保存変数を表示は書き出しを待って表の行にし、表へ当てる。保存も読み込み直しもしない（6.1）", async () => {
+  const row: VarRow = { name: "a", kind: "number", value: "1" };
+  const s = setup({ raise: dumped, rows: () => [row] });
+  s.dirty("dic/a.pasta");
+  await s.actions.showVariables();
+  assert.deepEqual(s.raises(), [{ event: "OnPastaDumpVariables", references: [], ghost_name: info.root }]);
+  assert.deepEqual(s.rowTexts, ["a = 1\n"]);
+  assert.deepEqual(s.table, [[row]]);
+  assert.deepEqual(s.saved, []);
+  assert.ok(!s.tools().includes("reload"));
+  assert.deepEqual(s.notices, []);
+});
+
+test("TOML として読めなければ表を読めなかったにして、場所と理由を出す（6.5）", async () => {
+  const s = setup({ raise: dumped, rows: () => "expected `=`" });
+  await s.actions.showVariables();
+  assert.deepEqual(s.table, ["unreadable"]);
+  assert.ok(s.lines.includes(notToml(VARS, "expected `=`")));
+  assert.deepEqual(s.notices, [`warning: ${notToml(VARS, "expected `=`")}`]);
+});
+
+test("書き出しを頼めなければ表を読めなかったにして、誤りとして出す（6.4）", async () => {
+  const s = setup({ raise: () => ({ kind: "unreachable", detail: "ECONNREFUSED" }) });
+  await s.actions.showVariables();
+  assert.deepEqual(s.table, ["unreadable"]);
+  assert.equal(s.notices.length, 1);
+  assert.match(s.notices[0], /^error: 保存変数の書き出しを頼めませんでした/);
+});
+
+test("操作の間に別のゴーストへ移ったら、前のゴーストの表の行は当てずに捨てる（5.3）", async () => {
+  const other = OTHER;
+  const holder: { s?: ReturnType<typeof setup> } = {};
+  holder.s = setup({
+    raise: (a, fio) => {
+      holder.s!.actions.setGhost(other);
+      return dumped(a, fio);
+    },
+    rows: () => [{ name: "a", kind: "number", value: "1" }],
+  });
+  const s = holder.s;
+  await s.actions.showVariables();
+  assert.deepEqual(s.table, []);
+  assert.equal(s.cleared(), 2);
+});
+
+test("別のゴーストを渡すと表を消し、表は読みに行かない（5.3・6.8）", () => {
+  const s = setup();
+  s.actions.setGhost(OTHER);
+  assert.equal(s.cleared(), 2);
+  assert.equal(s.count("dev_begin") + s.count("dev_read") + s.tools().length, 0);
+});
+
+test("見出しの上の操作は解析のシーンごとに、道と見出しの名前を付けて並ぶ（1.2）", () => {
+  const scenes = [scene("挨拶", 1, "global", [scene("朝", 2, "local"), scene("朝", 4, "local")]), scene("挨拶", 6)];
+  assert.deepEqual(
+    sceneTargets("dic/a.pasta", scenes).map((t) => [t.line, t.target.label, t.target.path.map((p) => p.n).join(",")]),
+    [
+      [1, "＊挨拶", "0"],
+      [2, "＊挨拶・朝", "0,0"],
+      [4, "＊挨拶・朝", "0,1"],
+      [6, "＊挨拶", "1"],
+    ],
+  );
+  assert.equal(sceneLabel([{ name: "a", n: 0 }]), "＊a");
+  assert.ok(sceneTargets("dic/a.pasta", scenes).every((t) => t.target.rel === "dic/a.pasta"));
 });

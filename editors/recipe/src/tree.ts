@@ -1,9 +1,10 @@
 // ファイルとシーンのツリー（4.1〜4.7・4.14〜4.17）。並びは mapping.ts の treeRows、ここは描いて操作を Documents と Rust へ渡すだけ。
 // 名前はディスクから来るので textContent だけで書く。描き直しは行のキーで差分にし、焦点と開いた所を保つ。
 import { createEntry, listTree, renameEntry, type EntryKind, type TreeListing } from "./ipc.ts";
-import { buildTree, treeRows, type TreeItem, type TreeNode, type TreeRow } from "./mapping.ts";
+import { buildTree, sceneLabel, treeRows, type TreeItem, type TreeNode, type TreeRow } from "./mapping.ts";
 import { retargetTabs } from "./tabs.ts";
 import { notify, prompt } from "./dialog.ts";
+import type { DevActions } from "./devActions.ts";
 
 /** Documents のうちツリーが使う所 */
 export interface TreeDocs {
@@ -13,6 +14,7 @@ export interface TreeDocs {
 
 export class TreeView {
   #docs: TreeDocs;
+  #dev: Pick<DevActions, "run" | "runWithLocals">;
   #list: HTMLUListElement;
   #root: TreeNode | null = null;
   /** rel を大文字にしたキー（Rust の to_uppercase と同じ揃え）→ シーンの項目 */
@@ -25,8 +27,9 @@ export class TreeView {
   #current = "";
   #menu: HTMLElement | null = null;
 
-  constructor(el: HTMLElement, docs: TreeDocs) {
+  constructor(el: HTMLElement, docs: TreeDocs, dev: Pick<DevActions, "run" | "runWithLocals">) {
     this.#docs = docs;
+    this.#dev = dev;
     this.#list = document.createElement("ul");
     this.#list.setAttribute("role", "tree");
     this.#list.setAttribute("aria-label", "ファイルとシーン");
@@ -174,12 +177,16 @@ export class TreeView {
     e.preventDefault();
   }
 
-  /** フォルダ（最上位を含む）は作成、ファイル・フォルダは名前の変更。削除は置かない（4.17）。シーンには無い */
+  /** フォルダ（最上位を含む）は作成、ファイル・フォルダは名前の変更。削除は置かない（4.17）。シーンは ▶ と値を入れて実行（1.1・8.1・11.3） */
   #openMenu(row: TreeRow, x: number, y: number): void {
     this.#closeMenu(false);
     const actions: [string, () => Promise<void>][] = [];
     if (row.kind === "dir") {
       actions.push(["新しいファイル", () => this.#create(row, "file")], ["新しいフォルダ", () => this.#create(row, "dir")]);
+    }
+    if (row.scene) {
+      const target = { rel: row.rel, path: row.scene, label: sceneLabel(row.scene) };
+      actions.push(["▶ シーンを実行", () => this.#dev.run(target)], ["値を入れて実行…", () => this.#dev.runWithLocals(target)]);
     }
     if (row.kind !== "scene" && row.key !== "") actions.push(["名前の変更", () => this.#rename(row)]);
     if (actions.length === 0) return;
