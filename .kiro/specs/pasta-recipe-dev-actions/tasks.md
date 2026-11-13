@@ -77,7 +77,7 @@
   - 試験: master の外・`..`・別のドライブ・`dic/a.pasta`・リンクを断り、`descript.txt`（`DESCRIPT.TXT` も）・`pasta.toml`・`profile/pasta/logs/pasta.log`・`profile/pasta/debug/variables.toml` を通す。始めの後に別の master を開いても前の master は終わりまで読め、新しい master は断る。始めの前・終わりの後は断る。これが `cargo test` で通る
   - _Requirements: 5.2, 7.9, 9.4, 9.5, 9.6, 13.4_
 
-- [ ] 3.3 保存変数の表の行とローカル変数のインライン表を組む TOML の部品を作る
+- [x] 3.3 保存変数の表の行とローカル変数のインライン表を組む TOML の部品を作る
   - `variables.toml` の文を最上位のキーごとの行（名前の順・型は文字列・数・真偽・表の 4 つ・値の書き方）にし、TOML でなければ理由で断る
   - ローカル変数の組を、ランタイムと同じ名前の決まり・重なり・数として読めるかで全部見て、問題があれば組の番号と理由（日本語）を返す。無ければキーと文字列をいつも引用符で包んだインライン表を組む
   - 試験: 日本語のキー・`'`・`"`・`\`・空白・タブを含む文字列と数・真偽を組み立てて読み直すと入れたとおりに戻る。弾く名前（空・数字だけ・`__x__`・`a b`・`a-b`・`a.b`）と通す名前（日本語・`name_1`）・重なり・数でない値（`abc`・`inf`・空）を弾く。表の行の 4 つの型・入れ子・配列・引用符付きのキー・TOML でない文。これが `cargo test` で通る
@@ -186,3 +186,4 @@
 - 2.3: DevSession の重なりの印は execute の最初の await より前に立つ。アプリの糊（5.1）で「running を確かめる → await devBegin() → await ghostTarget → execute」と組むと間に await が入り速い 2 回押しが両方通るので、DevActions 側で確かめと同期に自前の印（inFlight）を立て finally で外す。
 - 2.6: build.yml の vscode-test（ubuntu）は wasm/ を作らないので、本物の WASM を読む 3 本は PASTA_VSCODE_NO_WASM=1 で外す。手元では wasm/ が要る（scripts/build-wasm.ps1 を pwsh で）。CI run 43392810868 で全 job 緑。
 - 3.2: 読み取りの門は master の綴りで strip_prefix するので、画面は open_ghost／3.4 のルートと同じ綴りで join したパスを渡す（違えば断られるだけで外へは出ない）。断り・無い・読めないは Err(String)、TS 側で undefined に写す。
+- 3.3: LocalsOutcome の problems[].index は 0 起点（窓の組の並びの位置）。窓で番号を文字として見せるなら +1 する。
