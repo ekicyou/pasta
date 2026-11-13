@@ -35,11 +35,16 @@ const docs = new Documents(editor, document.getElementById("tabs")!, document.ge
   },
 });
 const panels = new Panels(document.getElementById("panels")!, docs);
-// 開発の操作の糊を 1 つ組み、下の欄の動かす面・ツリーのメニュー・見出しの上の操作とつなぐ。表の書き換え・削除・追加は 5.3 でつなぐ
+// 開発の操作の糊を 1 つ組み、下の欄の動かす面（表の読み直し・書き換え・削除・追加）・ツリーのメニュー・見出しの上の操作とつなぐ
 const devActions = new DevActions({
   docs,
   output: new OutputPanel(panels.output),
-  vars: new VariablesPanel(panels.variables, { onRefresh: () => void devActions.showVariables(), onEdit() {}, onDelete() {}, onAdd() {} }),
+  vars: new VariablesPanel(panels.variables, {
+    onRefresh: () => void devActions.showVariables(),
+    onEdit: (row) => void devActions.editVariable(row),
+    onDelete: (row) => void devActions.deleteVariable(row),
+    onAdd: () => void devActions.addVariable(),
+  }),
   panels,
 });
 const tree = new TreeView(document.getElementById("tree")!, docs, devActions);

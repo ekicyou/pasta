@@ -4,10 +4,10 @@ import assert from "node:assert/strict";
 import { createFakeGhostIO, type FakeGhostIO, type PostRequest } from "../../shared/fakeGhostIO.ts";
 import type { PostOutcome } from "../../shared/ghostIO.ts";
 import { BUSY, SAVE_FAILED } from "../../shared/devSession.ts";
-import { DevActions, noDescript, notFoundInSaved, notToml, switchedMidOp } from "./devActions.ts";
+import { DevActions, merge, noDescript, notFoundInSaved, notToml, switchedMidOp } from "./devActions.ts";
 import { isDevSource } from "./tabs.ts";
 import { sceneLabel, sceneTargets } from "./mapping.ts";
-import type { SceneNode, VarRow } from "./ipc.ts";
+import type { LocalPair, SceneNode, VarRow } from "./ipc.ts";
 
 const info = { master: "C:\\g\\ghost\\master", root: "C:\\g", name: "g", version: "1" };
 const LOG = "C:\\g\\ghost\\master\\profile\\pasta\\logs\\pasta.log";
@@ -19,7 +19,7 @@ const VARS = "C:\\g\\ghost\\master\\profile\\pasta\\debug\\variables.toml";
 type RaiseArgs = { event: string; references: string[]; ghost_name: string };
 
 /** 9801 で SSP がこのゴーストを動かしている。reload で pasta.log に読み込みの終わりの行が出る。raise_event は raise に任せる */
-function serve(fio: FakeGhostIO, raise?: (a: RaiseArgs) => PostOutcome) {
+function serve(fio: FakeGhostIO, raise?: (a: RaiseArgs) => PostOutcome, refuseReload = () => false) {
   return (req: PostRequest): PostOutcome => {
     if (req.port !== 9801) return { kind: "unreachable", detail: "ECONNREFUSED" };
     const { method, params } = JSON.parse(req.body);
@@ -27,6 +27,7 @@ function serve(fio: FakeGhostIO, raise?: (a: RaiseArgs) => PostOutcome) {
     if (params.name === "get_property") return text("SSP");
     if (params.name === "get_log") return text("(no log entries)");
     if (params.name === "reload") {
+      if (refuseReload()) return { kind: "unreachable", detail: "ECONNRESET" };
       fio.appendFile(LOG, DONE);
       return text("OK");
     }
@@ -51,13 +52,17 @@ interface SetupOpts {
   disk?: Record<string, string>;
   /** variable_rows: 文字列なら Err として投げる */
   rows?: (text: string) => VarRow[] | string;
+  /** 窓の答え（無ければ閉じた＝null・false） */
+  edit?: { name: string; kind: LocalPair["kind"]; value: string } | null;
+  confirm?: boolean;
+  locals?: (label: string, initial: readonly LocalPair[]) => { pairs: LocalPair[]; table: string | undefined } | null;
 }
 
 function setup(opts: SetupOpts = {}) {
   const fio = createFakeGhostIO("pasta-recipe");
   if (opts.descript !== false) fio.setFile(`${info.master}\\descript.txt`, "charset,UTF-8\r\nname,ゴースト\r\n");
   const raise = opts.raise;
-  fio.queuePost(...Array.from({ length: 100 }, () => serve(fio, raise && ((a) => raise(a, fio)))));
+  fio.queuePost(...Array.from({ length: 100 }, () => serve(fio, raise && ((a) => raise(a, fio)), () => state.refuseReload)));
   const analyzed: string[] = [];
   const rowTexts: string[] = [];
   const cmds: string[] = [];
@@ -107,8 +112,9 @@ function setup(opts: SetupOpts = {}) {
   type FakeTab = { rel: string; deleted: boolean; savedVersionId: number; diskText: string | null; model: { getAlternativeVersionId(): number }; editorText?: string };
   const tabs: FakeTab[] = [];
   const saved: string[] = [];
+  const dialogs: string[] = [];
   /** during: 保存と read_text の途中で呼ぶ（操作の途中でゴーストを開いたときを作る） */
-  const state = { saveOk: true as boolean | "throw", progressThrows: false, during: undefined as (() => void) | undefined };
+  const state = { saveOk: true as boolean | "throw", progressThrows: false, refuseReload: false, during: undefined as (() => void) | undefined };
   const actions = new DevActions({
     docs: {
       tabs: tabs as never,
@@ -130,11 +136,20 @@ function setup(opts: SetupOpts = {}) {
       },
     },
     vars: {
+      get state() {
+        const t = table.at(-1);
+        return t === undefined ? { kind: "none" as const } : t === "unreadable" ? { kind: "unreadable" as const } : { kind: "rows" as const, rows: t };
+      },
       clear: () => void cleared++,
       setRows: (rows) => void table.push(rows),
       setUnreadable: () => void table.push("unreadable"),
     },
     panels: { show: (f) => void shown.push(f) },
+    dialogs: {
+      editVariable: async (row) => (dialogs.push(`edit:${row?.name ?? "(新)"}`), opts.edit ?? null),
+      confirmDelete: async (name) => (dialogs.push(`delete:${name}`), opts.confirm ?? false),
+      localsDialog: async (label, initial) => (dialogs.push(`locals:${label}:${JSON.stringify(initial)}`), opts.locals?.(label, initial) ?? null),
+    },
   });
   actions.setGhost(info);
   const dirty = (rel: string, diskText: string | null = null, editorText?: string) =>
@@ -143,7 +158,7 @@ function setup(opts: SetupOpts = {}) {
   const tools = () => fio.posts.map((p) => JSON.parse(p.body).params?.name).filter(Boolean);
   const raises = () =>
     fio.posts.map((p) => JSON.parse(p.body).params).filter((p) => p?.name === "raise_event").map((p) => p.arguments as RaiseArgs);
-  return { actions, fio, lines, notices, shown, saved, state, dirty, count, tools, raises, analyzed, rowTexts, table, cleared: () => cleared };
+  return { actions, fio, lines, notices, shown, saved, state, dirty, count, tools, raises, analyzed, rowTexts, table, dialogs, cleared: () => cleared };
 }
 
 test("リロードは見出しの行と拡張と同じ要約を出し、動かす面を見せ、devBegin・devEnd で包む（2.1・4.2）", async () => {
@@ -354,4 +369,122 @@ test("見出しの上の操作は解析のシーンごとに、道と見出し�
   );
   assert.equal(sceneLabel([{ name: "a", n: 0 }]), "＊a");
   assert.ok(sceneTargets("dic/a.pasta", scenes).every((t) => t.target.rel === "dic/a.pasta"));
+});
+
+const ROW_A: VarRow = { name: "a", kind: "number", value: "1" };
+/** 書き換えの答えを set に任せ、書き出しは variables.toml を書く */
+const setAnd = (set: () => PostOutcome) => (a: RaiseArgs, fio: FakeGhostIO) => (a.event === "OnPastaSetSaveVariable" ? set() : dumped(a, fio));
+const ok = () => text("OK:the ghost returned no script.");
+const dumps = (s: ReturnType<typeof setup>) => s.raises().filter((r) => r.event === "OnPastaDumpVariables").length;
+
+test("書き換えは窓の後に名前・値・型を送り、同じ操作の中で表を読み直す。ファイルは書かない（7.1・7.6・7.9）", async () => {
+  const s = setup({ raise: setAnd(ok), rows: () => [{ ...ROW_A, value: "2" }], edit: { name: "a", kind: "number", value: "2" } });
+  await s.actions.editVariable(ROW_A);
+  assert.deepEqual(s.dialogs, ["edit:a"]);
+  assert.deepEqual(s.raises(), [
+    { event: "OnPastaSetSaveVariable", references: ["a", "2", "number"], ghost_name: info.root },
+    { event: "OnPastaDumpVariables", references: [], ghost_name: info.root },
+  ]);
+  assert.deepEqual(s.table, [[{ ...ROW_A, value: "2" }]]);
+  assert.equal(s.lines.filter((l) => /— ゴースト/.test(l)).length, 1);
+  assert.equal(s.count("dev_begin"), 1);
+  assert.equal(s.count("dev_end"), 1);
+  assert.ok(s.lines.includes("＄＊a を 2（number）にしました"));
+  assert.deepEqual(s.notices, []);
+  assert.deepEqual(s.saved, []);
+});
+
+test("ゴーストの断りは警告として出し、表を読み直す（7.7）", async () => {
+  const s = setup({ raise: setAnd(() => text("Script: 【数にできない値：x】")), rows: () => [ROW_A], edit: { name: "a", kind: "number", value: "x" } });
+  await s.actions.editVariable(ROW_A);
+  assert.deepEqual(s.notices, ["warning: 保存変数を書き換えられませんでした"]);
+  assert.deepEqual(s.table, [[ROW_A]]);
+  assert.equal(s.count("dev_begin"), 1);
+});
+
+test("頼みが届かない・形が違うときは誤りとして出し、表の読み直しも同じ操作の中で試みる（7.8）", async () => {
+  for (const set of [(): PostOutcome => ({ kind: "unreachable", detail: "ECONNREFUSED" }), () => reply({ nope: 1 })]) {
+    const s = setup({ raise: setAnd(set), rows: () => [ROW_A], edit: { name: "a", kind: "number", value: "2" } });
+    await s.actions.editVariable(ROW_A);
+    assert.equal(s.notices.length, 1);
+    assert.match(s.notices[0], /^error: 保存変数の書き換えを頼めませんでした/);
+    assert.equal(dumps(s), 1);
+    assert.equal(s.count("dev_begin"), 1);
+  }
+});
+
+test("削除は確かめた後に型 delete で送り、取り消せば何も送らない（7.3）", async () => {
+  const s = setup({ raise: setAnd(ok), confirm: true });
+  await s.actions.deleteVariable(ROW_A);
+  assert.deepEqual(s.dialogs, ["delete:a"]);
+  assert.deepEqual(s.raises()[0].references, ["a", "", "delete"]);
+  assert.equal(dumps(s), 1);
+  const c = setup({ raise: setAnd(ok), confirm: false });
+  await c.actions.deleteVariable(ROW_A);
+  assert.equal(c.count("dev_begin") + c.raises().length, 0);
+});
+
+test("追加は窓で入れた名前で送り、窓を閉じたら何も送らない（7.4）", async () => {
+  const s = setup({ raise: setAnd(ok), edit: { name: "pasta_talk_interval_min", kind: "number", value: "5" } });
+  await s.actions.addVariable();
+  assert.deepEqual(s.dialogs, ["edit:(新)"]);
+  assert.deepEqual(s.raises()[0].references, ["pasta_talk_interval_min", "5", "number"]);
+  const c = setup({ raise: setAnd(ok) });
+  await c.actions.addVariable();
+  await c.actions.editVariable(ROW_A);
+  assert.equal(c.count("dev_begin") + c.raises().length, 0);
+});
+
+const morningScenes = () => [scene("挨拶", 3), scene("挨拶", 7, "global", [scene("朝", 9, "local")])];
+
+test("値を入れて実行はシーンごとに組を覚え、組があればインライン表を Reference2 に、0 なら付けない。▶ は組を送らない（8.3・8.5・8.10・8.11）", async () => {
+  const PAIRS: LocalPair[] = [{ name: "x", kind: "number", value: "1" }];
+  let answer: { pairs: LocalPair[]; table: string | undefined } = { pairs: PAIRS, table: "{ x = 1 }" };
+  const s = setup({ raise: played, disk: { "dic/a.pasta": "DISK" }, analyze: morningScenes, locals: () => answer });
+  await s.actions.runWithLocals(morning);
+  answer = { pairs: [], table: undefined };
+  await s.actions.runWithLocals(morning);
+  await s.actions.runWithLocals({ ...morning, path: [{ name: "挨拶", n: 1 }], label: "＊挨拶" });
+  assert.deepEqual(s.dialogs, ["locals:＊挨拶・朝:[]", `locals:＊挨拶・朝:${JSON.stringify(PAIRS)}`, "locals:＊挨拶:[]"]);
+  const refs = s.raises().map((r) => r.references);
+  assert.deepEqual(refs[0], [`${info.master}\\dic\\a.pasta`, "9", "{ x = 1 }"]);
+  assert.deepEqual(refs[1], [`${info.master}\\dic\\a.pasta`, "9"]);
+  assert.match(s.lines[0], /値を入れて実行 — ゴースト/);
+  await s.actions.run(morning);
+  assert.deepEqual(s.raises().at(-1)!.references, [`${info.master}\\dic\\a.pasta`, "9"]);
+});
+
+test("値を入れて実行の窓を閉じたら何も送らない（8.1）", async () => {
+  const s = setup({ raise: played, disk: { "dic/a.pasta": "DISK" }, analyze: morningScenes });
+  await s.actions.runWithLocals(morning);
+  assert.equal(s.count("dev_begin") + s.raises().length, 0);
+});
+
+test("表を読めている間は、▶・値を入れて実行で鳴らした後に同じ操作の中で表を読み直す（6.9）", async () => {
+  const raise = (a: RaiseArgs, fio: FakeGhostIO) => (a.event === "OnPastaDumpVariables" ? dumped(a, fio) : played(a));
+  const s = setup({ raise, disk: { "dic/a.pasta": "DISK" }, analyze: morningScenes, rows: () => [ROW_A], locals: () => ({ pairs: [], table: undefined }) });
+  await s.actions.run(morning); // まだ読んでいない間は読み直さない
+  assert.equal(dumps(s), 0);
+  await s.actions.showVariables();
+  await s.actions.run(morning);
+  await s.actions.runWithLocals(morning);
+  assert.deepEqual(s.raises().map((r) => r.event), ["OnPastaSceneAt", "OnPastaDumpVariables", "OnPastaSceneAt", "OnPastaDumpVariables", "OnPastaSceneAt", "OnPastaDumpVariables"]);
+  assert.equal(s.table.length, 3);
+  assert.equal(s.count("dev_begin"), 4);
+});
+
+test("鳴らせなかったとき（読み込み直しを頼めない）は表を読み直さない（6.9）", async () => {
+  const s = setup({ raise: dumped, disk: { "dic/a.pasta": "DISK" }, analyze: morningScenes, rows: () => [ROW_A] });
+  await s.actions.showVariables();
+  s.state.refuseReload = true;
+  await s.actions.run(morning);
+  assert.equal(dumps(s), 1);
+});
+
+test("merge は先の知らせを採るが、後だけが失敗なら誤りを警告へ下げないよう後を採る", () => {
+  const warn = { lines: ["a"], notice: "断り" };
+  const err = { lines: ["b"], notice: "届かない", failure: { kind: "unreachable" as const, detail: "x" } };
+  assert.deepEqual(merge(warn, err), { ...err, lines: ["a", "b"] });
+  assert.deepEqual(merge(warn, { lines: ["b"] }), { ...warn, lines: ["a", "b"] });
+  assert.deepEqual(merge({ lines: ["x"] }, warn), { ...warn, lines: ["x", "a"] });
 });

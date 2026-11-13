@@ -4,13 +4,13 @@
 // 操作はアプリ全体で 1 つずつ（5.1）。始めたときのゴーストのまま、devBegin → execute → devEnd で包む（5.2）。
 import { CANDIDATE_PORTS } from "../../shared/mcpClient.ts";
 import { ghostTarget } from "../../shared/ghostFiles.ts";
-import { DEFAULT_TIMING, formatReload, reloadAndWait } from "../../shared/reloadShiori.ts";
-import { BUSY, type DevCommand, type DevHost, DevSession, clock } from "../../shared/devSession.ts";
+import { DEFAULT_TIMING, type FlowContext, formatReload, reloadAndWait } from "../../shared/reloadShiori.ts";
+import { BUSY, type DevCommand, type DevHost, DevSession, type Report, clock } from "../../shared/devSession.ts";
 import type { GhostTarget } from "../../shared/ghostFiles.ts";
 import { formatScene, runScene } from "../../shared/runSceneAtCursor.ts";
-import { dumpVariables, formatDump } from "../../shared/dumpVariables.ts";
-import { analyze, devBegin, devEnd, readText, tauriGhostIO as io, variableRows, type GhostInfo } from "./ipc.ts";
-import { pickEndpoint } from "./devDialogs.ts";
+import { dumpVariables, formatDump, formatSet, setSaveVariable, type SaveVariableChange } from "../../shared/dumpVariables.ts";
+import { analyze, devBegin, devEnd, readText, tauriGhostIO as io, variableRows, type GhostInfo, type LocalPair, type VarRow } from "./ipc.ts";
+import { confirmDelete, editVariable, localsDialog, pickEndpoint } from "./devDialogs.ts";
 import { findSame, isDevSource, isDirty } from "./tabs.ts";
 import { sceneLine, type SceneTarget } from "./mapping.ts";
 import type { Documents } from "./documents.ts";
@@ -29,9 +29,17 @@ export const notToml =(path: string, reason: string): string => `${path} を TOM
 export interface DevActionsDeps {
   readonly docs: Pick<Documents, "tabs" | "save">;
   readonly output: Pick<OutputPanel, "append" | "notify" | "progress">;
-  readonly vars: Pick<VariablesPanel, "clear" | "setRows" | "setUnreadable">;
+  readonly vars: Pick<VariablesPanel, "state" | "clear" | "setRows" | "setUnreadable">;
   readonly panels: Pick<Panels, "show">;
+  /** 窓（試験で差し替える） */
+  readonly dialogs?: { editVariable: typeof editVariable; confirmDelete: typeof confirmDelete; localsDialog: typeof localsDialog };
 }
+
+/** 2 つの報告を 1 つの操作の行に。知らせは先のものを採る。ただし後だけが失敗なら、誤りを警告へ下げないよう後を採る */
+export const merge = (a: Report, b: Report): Report =>
+  a.notice !== undefined && (a.failure !== undefined || b.failure === undefined)
+    ? { ...a, lines: [...a.lines, ...b.lines] }
+    : { ...b, lines: [...a.lines, ...b.lines] };
 
 const RELOAD: DevCommand = {
   title: "SHIORI をリロード",
@@ -48,9 +56,13 @@ export class DevActions {
   #current: GhostInfo | null = null;
   /** 進んでいる操作のゴーストの名前。確かめと同期に立てる（間に await がある。tasks の 2.3 の注） */
   #busy: string | null = null;
+  #dialogs: NonNullable<DevActionsDeps["dialogs"]>;
+  /** シーンごとに最後に鳴らした組（鍵は ghost.key|rel を大文字|道。ファイルに残さない 8.10） */
+  #locals = new Map<string, LocalPair[]>();
 
   constructor(deps: DevActionsDeps) {
     this.#deps = deps;
+    this.#dialogs = deps.dialogs ?? { editVariable, confirmDelete, localsDialog };
     const { output, panels } = deps;
     const host: DevHost = {
       io,
@@ -88,8 +100,23 @@ export class DevActions {
 
   /** ▶: 保存の後の中身を解析し直し、道から今の行を引いて鳴らす（1.1・1.2・1.4）。ローカル変数は送らない（8.11） */
   run(target: SceneTarget): Promise<void> {
+    return this.#play("▶ シーンを実行", target);
+  }
+
+  /** 値を入れて実行: 覚えた組で窓を開き、決めた組を覚えて鳴らす。組が 0 なら Reference2 を付けない（8.1・8.3・8.5・8.10） */
+  async runWithLocals(target: SceneTarget): Promise<void> {
+    const info = this.#current;
+    if (info === null) return;
+    const key = `${info.root.toLowerCase()}|${target.rel.toUpperCase()}|${JSON.stringify(target.path)}`;
+    const r = await this.#dialogs.localsDialog(target.label, this.#locals.get(key) ?? []);
+    if (r === null || this.#current?.master !== info.master) return; // 窓の間に別のゴーストを開いたら鳴らさない
+    this.#locals.set(key, r.pairs);
+    return this.#play("値を入れて実行", target, r.table);
+  }
+
+  #play(title: string, target: SceneTarget, locals?: string): Promise<void> {
     return this.#execute({
-      title: "▶ シーンを実行",
+      title,
       saves: true,
       run: async (ctx) => {
         // 保存は済んでいる。タブがあれば保存の後の中身、無ければディスクの中身。
@@ -104,19 +131,44 @@ export class DevActions {
           const msg = notFoundInSaved(target.label, target.rel);
           return { lines: [msg], notice: msg };
         }
-        const o = await runScene(ctx, io.join(ctx.ghost.master, ...target.rel.split("/")), line);
+        const o = await runScene(ctx, io.join(ctx.ghost.master, ...target.rel.split("/")), line, locals);
         const failure = o.kind === "failed" ? o.result : o.reload.kind === "refused" ? o.reload.result : undefined;
-        return { ...formatScene(o), failure };
+        const report = { ...formatScene(o), failure };
+        // 表を読めている間は、鳴らした後に読み直す（6.9）
+        return o.kind !== "notPlayed" && this.#deps.vars.state.kind === "rows" ? merge(report, await this.#readTable(ctx)) : report;
       },
     });
   }
 
-  /** 値を入れて実行（8.1） */
-  runWithLocals(_target: SceneTarget): Promise<void> {
-    // shortcut: 窓と組の覚えは 5.3 で入れる。それまでは使えないことを出力に出すだけ
-    const msg = "値を入れて実行は、まだ使えません";
-    this.#session.stop([`${clock()} 値を入れて実行 — ${msg}`], msg);
-    return Promise.resolve();
+  /** 書き換え（7.1・7.2） */
+  async editVariable(row: VarRow): Promise<void> {
+    if (row.kind === "table") return; // 表の行には操作が出ない（6.3）
+    const master = this.#current?.master;
+    const v = await this.#dialogs.editVariable({ ...row, kind: row.kind });
+    if (v) await this.#change(master, v.name, { type: v.kind, value: v.value });
+  }
+
+  /** 削除: 確かめてから型 delete で送る（7.3） */
+  async deleteVariable(row: VarRow): Promise<void> {
+    const master = this.#current?.master;
+    if (await this.#dialogs.confirmDelete(row.name)) await this.#change(master, row.name, { type: "delete" });
+  }
+
+  /** 追加: 入れた名前で送る（7.4・7.5 は窓の中） */
+  async addVariable(): Promise<void> {
+    const master = this.#current?.master;
+    const v = await this.#dialogs.editVariable(null);
+    if (v) await this.#change(master, v.name, { type: v.kind, value: v.value });
+  }
+
+  /** 書き換えを頼み、成功でも断りでも届かなくても同じ操作の中で表を読み直す（7.6〜7.8）。ファイルは書かない（7.9） */
+  async #change(master: string | undefined, name: string, change: SaveVariableChange): Promise<void> {
+    if (this.#current?.master !== master) return; // 窓の間に別のゴーストを開いたら、前の表の名前を送らない
+    return this.#execute({
+      title: "保存変数を書き換え",
+      saves: false,
+      run: async (ctx) => merge(formatSet(name, change, await setSaveVariable(ctx, name, change)), await this.#readTable(ctx)),
+    });
   }
 
   /** 保存変数を表示: 書き出しを待って表へ当てる（6.1・6.4・6.5）。操作の間にゴーストが替わっていれば当てない（5.3） */
@@ -124,26 +176,29 @@ export class DevActions {
     return this.#execute({
       title: "保存変数を表示",
       saves: false,
-      run: async (ctx) => {
-        const o = await dumpVariables(ctx);
-        const current = () => this.#current?.master === ctx.ghost.master;
-        const unreadable = () => current() && this.#deps.vars.setUnreadable();
-        if (o.kind !== "shown") {
-          unreadable();
-          return { ...formatDump(o), failure: o.kind === "failed" ? o.result : undefined };
-        }
-        let rows;
-        try {
-          rows = await variableRows(o.text);
-        } catch (reason) {
-          unreadable();
-          const msg = notToml(o.path, String(reason));
-          return { lines: [msg], notice: msg };
-        }
-        if (current()) this.#deps.vars.setRows(rows);
-        return { lines: [`保存変数（${o.path}）を表に出しました`] };
-      },
+      run: (ctx) => this.#readTable(ctx),
     });
+  }
+
+  /** 書き出しを待って表へ当てる。操作のゴーストが今のものでなければ当てない（5.3） */
+  async #readTable(ctx: FlowContext): Promise<Report> {
+    const o = await dumpVariables(ctx);
+    const current = () => this.#current?.master === ctx.ghost.master;
+    const unreadable = () => current() && this.#deps.vars.setUnreadable();
+    if (o.kind !== "shown") {
+      unreadable();
+      return { ...formatDump(o), failure: o.kind === "failed" ? o.result : undefined };
+    }
+    let rows;
+    try {
+      rows = await variableRows(o.text);
+    } catch (reason) {
+      unreadable();
+      const msg = notToml(o.path, String(reason));
+      return { lines: [msg], notice: msg };
+    }
+    if (current()) this.#deps.vars.setRows(rows);
+    return { lines: [`保存変数（${o.path}）を表に出しました`] };
   }
 
   async #execute(cmd: DevCommand): Promise<void> {
