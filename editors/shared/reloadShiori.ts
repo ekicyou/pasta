@@ -3,11 +3,11 @@
 //
 // vscode に触らない純粋なモジュール。再生は頼まない（5.9）。時計を持たず、待ちは ctx.sleep の回数で数える。
 
-import { CALL_TIMEOUT_MS, type CallResult, type Endpoint, callTool, describeResult, lastLogId, parseLogEntries } from '../../shared/mcpClient.ts';
-import type { GhostIO } from '../../shared/ghostIO.ts';
+import { CALL_TIMEOUT_MS, type CallResult, type Endpoint, callTool, describeResult, lastLogId, parseLogEntries } from './mcpClient.ts';
+import type { GhostIO } from './ghostIO.ts';
 import {
   type GhostTarget, type PastaLogLocation, loadCompletion, openLogCursor, parsePastaLogLine, pastaLogPath, readNewLines, readText,
-} from '../../shared/ghostFiles.ts';
+} from './ghostFiles.ts';
 
 export interface Timing {
   readonly loadTimeoutMs: number;     // 20000

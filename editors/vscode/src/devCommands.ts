@@ -9,9 +9,9 @@ import { CANDIDATE_PORTS, type CallResult, type Endpoint, HOST, findBasewares, i
 import type { GhostTarget } from '../../shared/ghostFiles.ts';
 import { nodeGhostIO as io, resolveGhost } from './nodeGhostIO';
 import { findGhostMaster } from './ghostValidator';
-import { DEFAULT_TIMING, FlowContext, Timing, formatReload, reloadAndWait } from './reloadShiori';
-import { formatScene, runScene } from './runSceneAtCursor';
-import { dumpVariables, formatDump } from './dumpVariables';
+import { DEFAULT_TIMING, FlowContext, Timing, formatReload, reloadAndWait } from '../../shared/reloadShiori.ts';
+import { formatScene, runScene } from '../../shared/runSceneAtCursor.ts';
+import { dumpVariables, formatDump } from '../../shared/dumpVariables.ts';
 
 export interface DevCommandDeps {
   readonly ports: readonly number[];   // 既定 CANDIDATE_PORTS（試験だけが差し替える）

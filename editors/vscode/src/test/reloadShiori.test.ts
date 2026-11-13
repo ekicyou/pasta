@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { startFakeMcpServer, FakeMcpServer } from './fakeMcpServer';
-import { DEFAULT_TIMING, FlowContext, ReloadOutcome, blocksPlayback, formatReload, reloadAndWait } from '../reloadShiori';
+import { DEFAULT_TIMING, FlowContext, ReloadOutcome, blocksPlayback, formatReload, reloadAndWait } from '../../../shared/reloadShiori.ts';
 import { DEFAULT_PASTA_LOG, type GhostTarget } from '../../../shared/ghostFiles.ts';
 import { nodeGhostIO } from '../nodeGhostIO';
 

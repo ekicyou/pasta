@@ -3,13 +3,13 @@
 //
 // vscode に触らない純粋なモジュール。時計を持たず、待ちは ctx.sleep の回数で数える。
 
-import { type CallResult, type LogEntry, callTool, describeResult, lastLogId, parseLogEntries, readRaiseEvent } from '../../shared/mcpClient.ts';
-import { DEBUG_HINT, openLogCursor, parsePastaLogLine, readNewLines } from '../../shared/ghostFiles.ts';
-import { FlowContext, ReloadOutcome, blocksPlayback, formatReload, reloadAndWait } from './reloadShiori';
+import { type CallResult, type LogEntry, callTool, describeResult, lastLogId, parseLogEntries, readRaiseEvent } from './mcpClient.ts';
+import { DEBUG_HINT, openLogCursor, parsePastaLogLine, readNewLines } from './ghostFiles.ts';
+import { type FlowContext, type ReloadOutcome, blocksPlayback, formatReload, reloadAndWait } from './reloadShiori.ts';
 
-/** [fsPath, String(line1)]。line1 は 1 から数えた行（4.6） */
-export function sceneReferences(fileFsPath: string, line1: number): readonly [string, string] {
-  return [fileFsPath, String(line1)];
+/** [fsPath, String(line1)]。line1 は 1 から数えた行（4.6）。locals（TOML のインライン表）があれば 3 つ目に付ける（8.3・8.5） */
+export function sceneReferences(fileFsPath: string, line1: number, locals?: string): readonly string[] {
+  return locals === undefined ? [fileFsPath, String(line1)] : [fileFsPath, String(line1), locals];
 }
 
 export type SceneOutcome =
@@ -31,7 +31,7 @@ export function findPlayedScript(entries: readonly LogEntry[]): string | undefin
   return undefined;
 }
 
-export async function runScene(ctx: FlowContext, fileFsPath: string, line1: number): Promise<SceneOutcome> {
+export async function runScene(ctx: FlowContext, fileFsPath: string, line1: number, locals?: string): Promise<SceneOutcome> {
   const reload = await reloadAndWait(ctx);
   if (reload.kind !== 'done' || blocksPlayback(reload)) {
     return { kind: 'notPlayed', reload };
@@ -43,7 +43,7 @@ export async function runScene(ctx: FlowContext, fileFsPath: string, line1: numb
   }
   const cursor = await openLogCursor(io, reload.pastaLog.path); // この再生で増えた分だけを理由に使う
   const reply = readRaiseEvent(await callTool(io, port, 'raise_event', {
-    event: 'OnPastaSceneAt', references: sceneReferences(fileFsPath, line1), ghost_name: root,
+    event: 'OnPastaSceneAt', references: sceneReferences(fileFsPath, line1, locals), ghost_name: root,
   }, timing.callTimeoutMs));
 
   switch (reply.kind) {
