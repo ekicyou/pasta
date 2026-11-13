@@ -412,6 +412,8 @@ export interface FileStat {
 }
 
 export interface GhostIO {
+  /** initialize の clientInfo.name（拡張 'pasta-vscode'・アプリ 'pasta-recipe'） */
+  readonly clientName: string;
   /** 127.0.0.1:{port}/api/mcp/v1 へ 1 回だけ POST する。宛先・パス・頭は実装が固定し、Origin は付けない */
   post(port: number, body: string, timeoutMs: number): Promise<PostOutcome>;
   /** フォルダの中の名前。無い・読めない・断られたら undefined */
@@ -437,10 +439,10 @@ export interface GhostIO {
 | Requirements | 1.3, 1.7, 1.8, 1.9, 1.10, 1.11, 2.1, 2.2, 2.3, 2.4, 3.1, 3.6, 3.7, 3.8, 3.9, 6.1, 6.4, 7.1, 7.7, 7.8, 8.3, 8.9 |
 
 **Responsibilities & Constraints**
-- 文言・待ちの長さ・ポートの順・止め方・`clientInfo`（`pasta-vscode`）は変えない。
+- 文言・待ちの長さ・ポートの順・止め方は変えない。`initialize` の `clientInfo.name` は `io.clientName`（拡張は今の `pasta-vscode`、アプリは `pasta-recipe`。ベースウェアの記録で、どちらから来た頼みか分かるようにする）。
 - `rpc` は本文を組み、`io.post` を 1 回呼び、`response` の状態の番号と本文から今と同じ `CallResult` を作る（200 以外は `badShape`、空は `noResponse`、JSON の直しは `fixEscapes`）。
 - `readNewLines` は `io.stat` で大きさとファイルかを見て、縮んでいれば頭から、`io.read` で増えた分を読み、最後の改行までを `TextDecoder('utf-8')` で行にする（`Buffer` の `lastIndexOf` と `toString` を置き換える）。
-- `readText` は `io.read(p, 0)` を `TextDecoder('utf-8', { ignoreBOM: true })` で読む（Node の `readFile(p, 'utf8')` と同じく BOM を残す）。
+- `readText` は `io.read(p, 0)` を `TextDecoder('utf-8')` で読む（先頭の BOM を外す）。今の拡張は BOM を残すため、BOM 付きの `pasta.toml` の 1 行目の `[logging]` を読み落として既定の場所へ落ちる。共有の 1 本で直し、`flows.test.ts` に BOM 付きの `pasta.toml` の試験を足す（要件 10.2 の但し書き）。
 - `resolveGhost` の上りの検査（ファイルから `MAX_ASCENT` までたどる）は拡張に残し、共有は `ghostTarget` だけを持つ。
 
 **Contracts**: Service [x]

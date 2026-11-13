@@ -149,7 +149,7 @@ brief で決まっていなかった点は、次のとおり決めた。
 6. When グローバル変数が 1 つも無いとき, the アプリ shall 表の代わりに、保存変数が無いことを出す。
 7. The アプリ shall 表のそばに、書き換えはランタイムのメモリの上で効き、ファイル（`profile/pasta/save/` の保存先）へはランタイムの終了時（ゴーストの終了・SHIORI の読み込み直し）に書かれることを示す。
 8. The アプリ shall ゴーストを開いただけでは表を読みに行かない。
-9. While 保存変数の表を出している間, when ▶ か「値を入れて実行…」でシーンを鳴らし終えたとき, the アプリ shall 1 と同じく表を読み直す。
+9. While 保存変数の表を読めている間（下の欄でどれを見ているかによらない）, when ▶ か「値を入れて実行…」でシーンを鳴らし終えたとき, the アプリ shall 1 と同じく表を読み直す。
 
 ### Requirement 7: 保存変数の書き換え・削除・追加
 
@@ -196,7 +196,7 @@ brief で決まっていなかった点は、次のとおり決めた。
 1. The アプリ shall 頼みを送る先を 127.0.0.1 の候補のポート（Requirement 3.1）だけに限り、宛先を変える設定を持たない。
 2. The アプリ shall 開発の操作のほかでは、どこにもつながない（編集・色分け・診断・検査は、これまでどおりつながずに動く）。
 3. The アプリ shall 1 つの頼みを 1 回だけ送り、失敗しても送り直さない（台本を 2 回鳴らさない）。
-4. The アプリ shall 開発の操作で読むファイルを、開いている `ghost/master` の中の `descript.txt`・`pasta.toml`・`pasta.log`（Requirement 2.4 の場所）・`profile/pasta/debug/variables.toml` に限り、読むだけで書かない。
+4. The アプリ shall 開発の操作で読むファイルを、開いている `ghost/master` の中の 直下の `descript.txt`・`pasta.toml` と、`profile` の下のファイル（`pasta.log`（Requirement 2.4 の場所）・`profile/pasta/debug/variables.toml`）に限り、読むだけで書かない（`pasta.log` の場所は `pasta.toml` で `profile` の下のどこにでも置けるため、`profile` の下は読むだけで通す）。
 5. The アプリ shall `profile` フォルダを、これまでどおりツリーに出さず、タブで開かない。
 6. If 画面から、開いている `ghost/master` の外のファイルを読む求めが来たとき, the アプリ shall 読まずに断る（これまでの読み書きの範囲の決まりと同じ）。
 
@@ -207,7 +207,7 @@ brief で決まっていなかった点は、次のとおり決めた。
 #### Acceptance Criteria
 
 1. The 実行の流れ（MCP の頼みと応答の読み取り・相手の探し方・読み込み直しの待ち方・再生と台本の取り出し・保存変数の書き出しの読み取り・`pasta.log` と `descript.txt` の読み取り・出力の行と案内の文言） shall 拡張とアプリで同じ 1 つの実装を使う。
-2. The VS Code 拡張 shall 3 つのコマンド（▶ シーンを実行・SHIORI をリロード・保存変数を表示）の振る舞いを変えない（ポートの順・`Origin` を送らないこと・待ちの長さ・保存の範囲・相手の覚え方・出力の行と通知の文言・`executeCommand(id, uri, line0)` の受け取り）。
+2. The VS Code 拡張 shall 3 つのコマンド（▶ シーンを実行・SHIORI をリロード・保存変数を表示）の振る舞いを変えない（ポートの順・`Origin` を送らないこと・待ちの長さ・保存の範囲・相手の覚え方・出力の行と通知の文言・`executeCommand(id, uri, line0)` の受け取り）。ただし、BOM 付きの `pasta.toml` の 1 行目の `[logging]` を読み落とす今の不具合は、共有の 1 本で直す（拡張でも直る）。
 3. The VS Code 拡張 shall 保存変数の書き換えと、ローカル変数を入れた実行を足さない（`OnPastaSceneAt` に Reference2 を送らないまま）。
 4. The VS Code 拡張 shall 今と同じく配布物（`.vsix`）を作れる。
 
