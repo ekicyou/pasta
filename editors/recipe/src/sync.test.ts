@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { decideExternal, failedRead, type DiskState, type TabSnapshot } from "./sync.ts";
+import { decideExternal, failedRead, planGhostChanged, type DiskState, type TabSnapshot } from "./sync.ts";
 
 const tab = (over: Partial<TabSnapshot> = {}): TabSnapshot => ({
   diskText: "a",
@@ -60,4 +60,21 @@ test("消えた後に戻ってきた: エディタと同じ中身なら何もし
 test("読めないときはツリーに無ければ消えた・あれば読めない（大文字・小文字を区別しない）", () => {
   assert.deepEqual(failedRead("dic/a.pasta", ["dic/b.pasta"], "x"), missing);
   assert.deepEqual(failedRead("dic/a.pasta", ["DIC/A.pasta"], "使用中"), unreadable);
+});
+
+test("見張りの知らせ: 消えた・知らせの・新しく出た .pasta のシーンを読み直す（10.1・10.5）", () => {
+  const plan = planGhostChanged(["dic/a.pasta", "dic/b.pasta", "x.txt"], ["dic/B.pasta", "dic/c.pasta", "x.txt"], ["dic/b.pasta", "dic", "x.txt"]);
+  assert.deepEqual(plan.scenes, ["dic/a.pasta", "dic/b.pasta", "dic/c.pasta"]);
+});
+
+test("見張りの知らせ: .pasta・.lua・pasta.toml が含まれるか、その並びが変われば検査する（9.3）", () => {
+  const files = ["dic/a.pasta", "scripts/m.lua", "x.txt"];
+  assert.equal(planGhostChanged(files, files, ["x.txt"]).check, false);
+  assert.equal(planGhostChanged(files, files, ["dic"]).check, false);
+  assert.equal(planGhostChanged(files, files, ["dic/A.PASTA"]).check, true);
+  assert.equal(planGhostChanged(files, files, ["scripts/m.lua"]).check, true);
+  assert.equal(planGhostChanged(files, files, ["pasta.toml"]).check, true);
+  // フォルダの名前の変更は知らせにフォルダしか来なくても、並びが変わる
+  assert.equal(planGhostChanged(files, ["dic2/a.pasta", "scripts/m.lua", "x.txt"], ["dic", "dic2"]).check, true);
+  assert.equal(planGhostChanged(files, ["dic/a.pasta", "scripts/m.lua", "x.txt", "y.txt"], ["y.txt"]).check, false);
 });

@@ -1,6 +1,6 @@
 // ファイルとシーンのツリー（4.1〜4.7・4.14〜4.17）。並びは mapping.ts の treeRows、ここは描いて操作を Documents と Rust へ渡すだけ。
 // 名前はディスクから来るので textContent だけで書く。描き直しは行のキーで差分にし、焦点と開いた所を保つ。
-import { createEntry, listTree, renameEntry, type EntryKind } from "./ipc.ts";
+import { createEntry, listTree, renameEntry, type EntryKind, type TreeListing } from "./ipc.ts";
 import { buildTree, treeRows, type TreeItem, type TreeNode, type TreeRow } from "./mapping.ts";
 import { retargetTabs } from "./tabs.ts";
 import { notify, prompt } from "./dialog.ts";
@@ -53,23 +53,26 @@ export class TreeView {
     });
   }
 
-  /** ツリーを読み直す（作成・名前の変更の後。見張りの知らせからは 7.2 が呼ぶ） */
-  async refresh(): Promise<void> {
+  /** ツリーを読み直す（作成・名前の変更の後と見張りの知らせ）。読めた一覧を返し、読めなければ理由を出して null */
+  async refresh(): Promise<TreeListing | null> {
+    let listing;
     try {
-      this.#root = buildTree(await listTree());
+      listing = await listTree();
     } catch (reason) {
       notify(String(reason));
-      return;
+      return null;
     }
+    this.#root = buildTree(listing);
     this.#render();
+    return listing;
   }
 
   /** 別のゴーストへ移るとき、前のゴーストのシーンと開いた所を捨てて読み直す */
-  async reset(): Promise<void> {
+  async reset(): Promise<TreeListing | null> {
     this.#scenes.clear();
     this.#expanded = new Set([""]);
     this.#current = "";
-    await this.refresh();
+    return this.refresh();
   }
 
   /** そのファイルのシーンの項目を置き換える（書き換え中は 6.3 の onAnalyzed、ほかは開く流れ 7.1 が読んで渡す） */

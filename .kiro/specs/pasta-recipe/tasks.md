@@ -185,7 +185,7 @@
   - 5 つの入口のどれでも hello-pasta の同じ master が開き、題名に名前が出て、無くなったフォルダを最近開いたものから選ぶと知らせて一覧から消える
   - _Requirements: 2.1, 2.2, 2.3, 2.6, 2.7, 2.8, 2.11, 3.5, 4.8, 9.1_
 
-- [ ] 7.2 見張りの知らせ・保存の後の検査・窓を閉じるときの確かめを結ぶ
+- [x] 7.2 見張りの知らせ・保存の後の検査・窓を閉じるときの確かめを結ぶ
   - `ghost-changed` で、ツリーを読み直し、消えた・知らせに含まれる・新しく出た `.pasta` のシーンを読み直し、外の変更を適用し、`.pasta`・`.lua`・`pasta.toml` が含まれるかツリーの並びが変わったら検査を求める
   - 保存の後の検査の求めと合わせ、5.3 の仕組み（300 ms）で 1 回にまとめる
   - 窓を閉じるとき、未保存があれば 3 択で確かめ、取り消せば閉じない
@@ -253,3 +253,4 @@
 - 6.5: ツリーの setScenes(rel, items) は 7.1・7.2 が全 .pasta のシーンを流し込む口。閉じているファイルが名前の変更で .pasta になったときのシーンの読み込みは 7.2 の「新しく出た rel」で拾う。
 - 6.6: Panels.setReport(report | 理由) は 7.2 の検査のまとめ役から呼ぶ。名前の変更の後は DocumentsHooks.onRenamed で panels.update()。検査の一覧の古い rel は次の検査（7.2 の見張りの知らせ）で直る。
 - 7.1: write_text は Rust の今の master で rel を解くので、ゴーストを替えるときは Documents.beginSwitch（保存の鎖を待ってから全タブを捨て、替わる間は open と save を断る）→ openGhost → finally で endSwitch。読みは世代の番号で、替わる前に始まったものを捨てる。新しい import の後の tauri dev で vite の依存の作り直しが EPERM なら node_modules/.vite を消す。
+- 7.2: 窓を閉じるのは onCloseRequested（@tauri-apps/api 2.12 は handler を await してから preventDefault が無ければ destroy する）。閉じる前に全タブの保存の鎖を待つ。window.close() は core:window:allow-close が無いので拒まれる（確かめは WM_CLOSE を送る）。

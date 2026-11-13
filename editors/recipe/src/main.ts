@@ -2,12 +2,14 @@ import "./style.css";
 import { createEditor } from "./editor.ts";
 import { Documents } from "./documents.ts";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { analyze, checkGhost, initialPath, listTree, onGhostChanged, onOpenRequest, openGhost, readText, recentRemove, resolveGhost } from "./ipc.ts";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { analyze, checkGhost, initialPath, onGhostChanged, onOpenRequest, openGhost, readText, recentRemove, resolveGhost } from "./ipc.ts";
 import { scenesToItems } from "./mapping.ts";
 import { Panels } from "./panels.ts";
 import { CoalescingRunner, eachLimit } from "./scheduler.ts";
 import { StartView, type OpenOrigin } from "./start.ts";
 import { findSame, sameMaster } from "./tabs.ts";
+import { planGhostChanged } from "./sync.ts";
 import { notify } from "./dialog.ts";
 import { TreeView } from "./tree.ts";
 
@@ -24,25 +26,27 @@ const docs = new Documents(editor, document.getElementById("tabs")!, document.ge
     panels.update();
   },
   onRenamed: () => panels.update(),
-  // shortcut: .pasta・直下の pasta.toml の保存で検査し直す仮の口（9.2）。7.2 の保存の後の検査が置き換える
+  // .pasta・直下の pasta.toml の保存で検査し直す（9.2）。見張りの知らせの求めと同じ checker で 1 回にまとまる（9.9）
   onSaved: (tab) => {
     if (tab.rel.toLowerCase().endsWith(".pasta") || tab.rel.toLowerCase() === "pasta.toml") checker.request();
   },
 });
 const tree = new TreeView(document.getElementById("tree")!, docs);
 const panels = new Panels(document.getElementById("panels")!, docs);
-// shortcut: 検査の求めをまとめる仮の口（9.9）。7.2 が見張りの知らせと保存の後の検査でこれを持つ
+// 保存の後と見張りの知らせの検査の求めを 300 ms で 1 回にまとめる（9.9）
 const checker = new CoalescingRunner(async () => panels.setReport(await checkGhost().catch((reason: unknown) => String(reason))), 300, globalThis);
 
 /** ディスクの中身からシーンを作る。開いているタブはその解析が正なので触らない。読めない（UTF-8 でない等）ものはシーン無し（4.8） */
 async function loadScenes(rel: string): Promise<void> {
   if (!rel.toLowerCase().endsWith(".pasta") || findSame(docs.tabs, rel)) return;
+  const gen = generation;
+  let items: ReturnType<typeof scenesToItems> = [];
   try {
-    const { scenes } = await analyze((await readText(rel)).text);
-    if (!findSame(docs.tabs, rel)) tree.setScenes(rel, scenesToItems(rel, scenes));
+    items = scenesToItems(rel, (await analyze((await readText(rel)).text)).scenes);
   } catch {
-    tree.setScenes(rel, []);
+    // 消えた・読めない
   }
+  if (gen === generation && !findSame(docs.tabs, rel)) tree.setScenes(rel, items); // 読む間に別のゴーストへ移ったら捨てる
 }
 
 const saveButton = document.createElement("button");
@@ -58,6 +62,14 @@ const start = new StartView(document.getElementById("start")!, document.getEleme
 let current: string | null = null;
 /** 開く流れを 1 つずつ（2 つの入口が重なっても確かめと開き直しを交ぜない） */
 let opening: Promise<void> = Promise.resolve();
+/** 別のゴーストへ移り始めるたびに進める。前のゴーストの知らせ・読みの結果を捨てる */
+let generation = 0;
+/** beginSwitch から open_ghost が終わるまで。この間の見張りの知らせは前のゴーストのものなので捨てる */
+let switching = false;
+/** 最後に見たツリーの一覧のファイル（見張りの知らせで、消えた・新しく出たものと並びの変わりを見る） */
+let files: string[] = [];
+/** 見張りの知らせを 1 つずつ */
+let changes: Promise<void> = Promise.resolve();
 
 /** 5 つの入口が入る 1 本の開く流れ（2.1・2.2・2.3・2.6〜2.8・2.11） */
 function openPath(path: string, origin: OpenOrigin | "arg" | "second" | "drop"): Promise<void> {
@@ -83,6 +95,8 @@ async function openNow(path: string, origin: string): Promise<void> {
     if (!(await docs.confirmUnsaved())) return;
     // 前のゴーストのタブは Rust の master が替わる前に片付け、替わる間はタブを開かない。
     // 開けなかったときはタブを閉じたまま今のゴーストに留まる（保存する／しないは選び終えている）
+    switching = true;
+    generation++;
     await docs.beginSwitch();
     panels.update();
     let info;
@@ -93,12 +107,12 @@ async function openNow(path: string, origin: string): Promise<void> {
       return;
     } finally {
       docs.endSwitch();
+      switching = false;
     }
     current = info.master;
     start.hide();
-    await tree.reset();
     // すべての .pasta のシーンを作る（4.8）。一覧が読めなければ tree.reset が理由を出している
-    const files = await listTree().then((t) => t.files, () => []);
+    files = (await tree.reset())?.files ?? [];
     await eachLimit(files, 8, loadScenes);
     checker.request(); // 9.1
   }
@@ -107,8 +121,41 @@ async function openNow(path: string, origin: string): Promise<void> {
 
 // shortcut: 開発の窓で CDP からタブの状態を見るための口。開発のビルドだけ
 if (import.meta.env.DEV) Object.assign(globalThis, { recipeDocs: docs, recipePanels: panels });
-// shortcut: 見張りの知らせを外の変更の適用へ直につなぐ仮の口。開発のビルドだけ。7.2 の ghost-changed の流れ（ツリー・シーン・検査・今の master の知らせだけ）が置き換える
-if (import.meta.env.DEV) await onGhostChanged(() => void (docs.applyExternal(), tree.refresh()));
+
+/** 見張りの知らせ: ツリー → シーン（10.1・10.5）→ 開いているタブ（10.2〜10.4）→ 検査（9.3） */
+async function ghostChanged(paths: string[], gen: number): Promise<void> {
+  const listing = await tree.refresh();
+  if (gen !== generation) return;
+  const now = listing?.files ?? files; // 一覧が読めなければ前の一覧のまま（理由は tree.refresh が出した）
+  const plan = planGhostChanged(files, now, paths);
+  files = now;
+  await eachLimit(plan.scenes, 8, loadScenes);
+  if (gen !== generation) return;
+  await docs.applyExternal();
+  if (plan.check && gen === generation) checker.request();
+}
+// Rust は今の master の知らせだけを送るが、移る前に送られて届くのが遅れたものはここで捨てる
+await onGhostChanged((e) => {
+  if (switching || current === null) return;
+  const gen = generation;
+  const run = () => (gen === generation ? ghostChanged(e.paths, gen) : undefined);
+  changes = changes.then(run, run);
+});
+
+// 窓を閉じる: 未保存があれば 1 回の 3 択。取り消し・保存の失敗では閉じない（5.10）。
+// handler の後で preventDefault が無ければ @tauri-apps/api が destroy() する（2.12 の onCloseRequested）
+let closing = false;
+await getCurrentWindow().onCloseRequested(async (e) => {
+  if (closing) return e.preventDefault(); // 3 択の途中にもう一度閉じようとしても 2 つ目の 3 択は出さない
+  closing = true;
+  try {
+    if (!(await docs.confirmUnsaved())) e.preventDefault();
+    // 書いている途中で閉じない（fs::write は空にしてから書くので、途中で終わると中身を失う）
+    else await Promise.all(docs.tabs.map((t) => t.saving.catch(() => {})));
+  } finally {
+    closing = false;
+  }
+});
 
 // 2 つ目の起動（2.11。パスが無ければ Rust が窓を前に出すだけ）・窓へのドロップ（2.2。複数なら最初の 1 つ）
 await onOpenRequest((e) => {

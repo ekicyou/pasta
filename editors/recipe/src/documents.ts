@@ -152,6 +152,7 @@ export class Documents {
   }
 
   async #write(tab: Tab): Promise<boolean> {
+    if (tab.model.isDisposed()) return false; // 鎖で待つ間にタブが閉じられた（保存しないを選んだ）。書かず、投げない
     const text = tab.model.getValue();
     const versionId = tab.model.getAlternativeVersionId();
     try {
