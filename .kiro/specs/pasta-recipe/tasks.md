@@ -132,7 +132,7 @@
   - _Requirements: 2.8, 4.15, 5.9, 5.10, 13.5_
 
 - [ ] 6. 画面の部品
-- [ ] 6.1 3 択の確かめ・名前の入力・知らせの小さな窓を作る
+- [x] 6.1 3 択の確かめ・名前の入力・知らせの小さな窓を作る
   - HTML の窓で、`Esc` は取り消し、キーボードで操作でき、焦点を窓の中に閉じる
   - 開発の窓で 3 つの窓を出し、マウスとキーボードの両方で選べ、取り消しが `cancel`・`null` になる
   - _Requirements: 2.7, 2.8, 4.16, 5.3, 5.8, 5.9, 5.10, 10.3, 10.4_
@@ -246,3 +246,4 @@
 - 4.2: WebView2 は窓が後ろに隠れていると描画しない。PrintWindow で撮るときは窓を前に出す。動作確認で open_ghost を呼ぶと、利用者の %APPDATA% の下の io.github.ekicyou.pasta-recipe フォルダの recent.toml に記録が残る。
 - 5.1: 画面でファイルが同じかの判定は toUpperCase で両側をそろえる（Rust の to_uppercase と同じ）。並べ方だけは設計どおり toLowerCase。
 - 5.3: node --test は型を取り除くだけなので、コンストラクタの引数に書くプロパティ（parameter properties）や enum は使えない。#private のフィールドで書く。CoalescingRunner は run の失敗を握りつぶすので、知らせは呼ぶ側の run の中で出す。
+- 6.1: 画面の部品の確かめは computer-use でなく CDP（WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333 で npx tauri dev）で本物のキーとマウスを送る。<dialog> の showModal だけでは Tab が端で文書へ抜けるので dialog.ts の回しを使う。

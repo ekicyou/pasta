@@ -31,3 +31,18 @@ body {
 #editor {
   flex: 1;
 }
+dialog {
+  max-width: 32em;
+  background: Canvas;
+  color: CanvasText;
+}
+dialog input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
