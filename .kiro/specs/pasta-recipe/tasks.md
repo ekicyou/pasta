@@ -205,7 +205,7 @@
   - 手元で走らせると `release/pasta-recipe.zip` ができ、中身が exe と `THIRD_PARTY_LICENSES.txt` の 2 つで、表示に `monaco-editor` と `tauri` の名前が両方ある
   - _Requirements: 12.1, 12.2, 12.4, 12.5_
 
-- [ ] 8.3 (P) 日々の CI にアプリの job と、アプリの lock の依存の検査を足す
+- [x] 8.3 (P) 日々の CI にアプリの job と、アプリの lock の依存の検査を足す
   - 型の確かめ・画面のテスト・ビルド・Rust のテストと clippy・`tauri build --no-bundle` を走らせる job を足し、依存の検査の job にアプリの lock の step を足す
   - 既存の job は変えず、ルートのワークスペースの検査の対象にアプリが入らない
   - `gh workflow run build.yml --ref <branch>` で回して、新しい job と依存の検査の step が緑になり、既存の job も緑のまま
@@ -255,3 +255,4 @@
 - 7.1: write_text は Rust の今の master で rel を解くので、ゴーストを替えるときは Documents.beginSwitch（保存の鎖を待ってから全タブを捨て、替わる間は open と save を断る）→ openGhost → finally で endSwitch。読みは世代の番号で、替わる前に始まったものを捨てる。新しい import の後の tauri dev で vite の依存の作り直しが EPERM なら node_modules/.vite を消す。
 - 7.2: 窓を閉じるのは onCloseRequested（@tauri-apps/api 2.12 は handler を await してから preventDefault が無ければ destroy する）。閉じる前に全タブの保存の鎖を待つ。window.close() は core:window:allow-close が無いので拒まれる（確かめは WM_CLOSE を送る）。
 - 8.1: cargo-deny 0.20 は --config を check の前に置く（cargo deny --manifest-path editors/recipe/src-tauri/Cargo.toml --config editors/recipe/src-tauri/deny.toml check）。JS の第三者の表示は editors/recipe/build/js-licenses.txt（dist の外）。
+- 8.3: workflow_dispatch（run 43365624957）で pasta-recipe の job と cargo deny check (pasta-recipe) は緑。build-x64・build-x86 は pasta_shiori の free_library_test が「pasta.dll not next to test exe」で赤。Rust 1.100（2026-11-09）でテストの実行ファイルの置き場が変わったためで、この spec の変更とは関係なく手元の 1.100 でも同じに落ちる。
