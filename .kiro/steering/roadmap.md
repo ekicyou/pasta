@@ -122,7 +122,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
 v0.5.2 の次の版で、最優先（開発者「次のリリースにする。最優先事項」）。VS Code を入れたくない作者のために、pasta DSL を編集できる軽いアプリ（仮名 `pasta-recipe`）を出す。0.7.0（ノベル）は動かさない。
 
-- **形**: Tauri 2（2.12.x）＋ Vite ＋ Monaco の、Windows x64 の単一の exe（`tauri build --no-bundle`。WebView2 は OS のもの）。ゴーストのフォルダを exe にドラッグドロップすると、その `ghost/master` を開く。最近開いたフォルダはアプリの置き場に TOML で残す。リリースの成果物に pasta-recipe の zip を足す（`pasta-recipe-multiarch` が `pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` の 2 つにした）。
+- **形**: Tauri 2（2.12.x）＋ Vite ＋ Monaco の、Windows の単一の exe（x64・arm64）（`tauri build --no-bundle`。WebView2 は OS のもの）。ゴーストのフォルダを exe にドラッグドロップすると、その `ghost/master` を開く。最近開いたフォルダはアプリの置き場に TOML で残す。リリースの成果物に pasta-recipe の zip を足す（`pasta-recipe-multiarch` が `pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` の 2 つにした）。
 - **解析**: Tauri の Rust の側が `pasta_lsp`・`pasta_check` をライブラリとして直接呼ぶ（exe に静的にリンク。WASM は通らない）。`editors/recipe/src-tauri` は別の Cargo ワークスペースにし、Tauri の依存をルートの `Cargo.lock` に混ぜない。
 - **ゴーストを動かす機能**: VS Code 拡張の実行の流れ（MCP クライアント・リロード・シーン実行・変数ダンプ）を `editors/shared/` に移して共有し、入出力だけを Node と Tauri で差し込む。保存変数の書き換え（今の `OnPastaSetSaveVariable`）と、ローカル変数を入れたシーンの実行（新しい口）を足す。
 - **退けた案**: Electron（100MB を超える）、PWA（127.0.0.1 の MCP に届かない）、Rust ネイティブの GUI（エディタ部品が無い）、フロントで WASM を動かす案（段が増える。開発者「WASM にはこだわらない」）、実行の流れを Rust へ移植する案（2 本になる）。

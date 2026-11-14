@@ -130,7 +130,7 @@ graph TB
 
 ### Modified Files
 
-- `editors/recipe/scripts/package.ps1` — `-Arch` の引数（`ValidateSet('x64','arm64')`・既定は両方）。arch ごとに triple・exe の置き場・`cargo about --target`・zip の名前を切り替える。
+- `editors/recipe/scripts/package.ps1` — `-Arch` の引数（`x64`・`arm64` を `,` で分けて照合・既定は両方）。arch ごとに triple・exe の置き場・`cargo about --target`・zip の名前を切り替える。
 - `.cargo/config.toml` — `[target.aarch64-pc-windows-msvc]` の `+crt-static` と、頭の説明（出荷の target に aarch64 を足す）。`pasta-dll-multiarch` が先に入れていれば、在るのを確かめるだけ。
 - `editors/recipe/src-tauri/about.toml` — `targets` を x64 と aarch64 の 2 つにし、`package.ps1` が arch ごとに `--target` で置き換えることを説明に書く。
 - `editors/recipe/src-tauri/deny.toml` — `[graph] targets` に `aarch64-pc-windows-msvc` を足す（6.6）。
@@ -194,7 +194,7 @@ sequenceDiagram
 | 3.1, 3.2, 3.3 | 手元の作成と既定 | Package | `-Arch` | |
 | 3.4 | 中身の自己検査 | Package | 今の自己検査を arch ごと | |
 | 3.5 | 失敗で止まり残さない | Package | 終了コード 1 | |
-| 3.6 | 不正な arch | Package | `ValidateSet` | |
+| 3.6 | 不正な arch | Package | `,` で分けて照合 | |
 | 3.7 | もう一方を消さない | Package | 消すのは作る arch の zip だけ | |
 | 3.8 | 手元と CI が同じ | Package | CI も同じスクリプト | |
 | 4.1, 4.2, 4.3, 4.4 | 添付 8 つ | GithubRelease | 名前の一覧・文 | |
@@ -252,7 +252,7 @@ sequenceDiagram
 
 ##### Batch / Job Contract
 - Trigger: `pwsh -NoProfile -File editors/recipe/scripts/package.ps1 [-Arch x64|arm64[,…]]`。既定は `x64`・`arm64` の順で両方。
-- Input / validation: `-Arch` は `ValidateSet('x64','arm64')`。ほかの値は pwsh が受け付ける値を示して終了コード 1（3.6。手元で確認済み）。
+- Input / validation: `-Arch` は `x64`・`arm64` だけを受ける。`pwsh -File` は `x64,arm64` を 1 つの文字列で渡すので、`ValidateSet` でなく `,` で分けて照合し、空の要素も含めほかの値は受け付ける値を示して終了コード 1（3.6。2026-11-14 実装 2.1 で確認）。
 - Output: リポジトリの根の `release/pasta-recipe.<arch>.zip`。中身は `pasta-recipe.exe`・`THIRD_PARTY_LICENSES.txt` の順の 2 つ。成功の行に zip の置き場と大きさ。
 - 失敗: どの段の失敗でも、その arch の zip を消し、`ERROR:` の行を出して終了コード 1。残りの arch は作らない。先に作り終えた arch の zip は残す（3.5・3.7）。
 - Idempotency: 作る arch の zip だけを作り直す。もう一方の zip には触れない（3.7）。
