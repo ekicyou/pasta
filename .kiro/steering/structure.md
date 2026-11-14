@@ -219,11 +219,11 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       └── tests/            # 統合テスト・配布ファイル構成検証・全段階の検証（tutorial_stages_test.rs）・立ち絵と当たり判定の検証（shell_assets_test.rs）
 ├── editors/                  # エディタ拡張
 │   ├── shared/              # 拡張とアプリの共有の実行の流れ（vscode・Node・Tauri を読み込まない・"type": "module"）。ghostIO（入出力の面の型）・mcpClient・ghostFiles・reloadShiori・runSceneAtCursor・dumpVariables・devSession（相手の覚えと選び・重なりの止め・見出し・保存の手順）と、偽の入出力 fakeGhostIO による *.test.ts（アプリの npm test が拾う）
-│   ├── recipe/              # pasta-recipe（VS Code を使わずに書く Windows x64 のアプリ・Tauri 2 ＋ Vite ＋ Monaco。別の Cargo ワークスペース）
+│   ├── recipe/              # pasta-recipe（VS Code を使わずに書く Windows（x64・arm64）のアプリ・Tauri 2 ＋ Vite ＋ Monaco。別の Cargo ワークスペース）
 │   │   ├── src/             # 画面（TypeScript）。純粋な判断（mapping・sync・tabs・scheduler・theme）は *.test.ts を node --test で
 │   │   ├── src-tauri/       # Rust の殻（自前の Cargo.lock・deny.toml・about.toml）。paths（ghost/master の探し方と範囲の門・開発の読み取りの門 dev_path）・files・recent・check・watch・commands・dev（127.0.0.1 の候補のポートへだけ送る POST と、進んでいる操作の master の下だけを読む門）・variables（保存変数の表の行・ローカル変数のインライン表）
 │   │   │   └── tests/       # repo_parity_test.rs（lock の版・凡例・版の置き場がルートや拡張と一致）
-│   │   ├── scripts/         # package.ps1（release/pasta-recipe.zip を作る）・js-licenses.mjs（画面の部品の第三者の表示）
+│   │   ├── scripts/         # package.ps1（`-Arch x64,arm64`。release/pasta-recipe.x64.zip・release/pasta-recipe.arm64.zip を作る。引数なしで両方）・js-licenses.mjs（画面の部品の第三者の表示）
 │   │   └── tauri.conf.json  # 版は ../vscode/package.json を指す・CSP・窓
 │   └── vscode/              # VSCode拡張（TypeScript + WASM統合）
 │       ├── package.json     # 拡張マニフェスト
@@ -267,14 +267,14 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 ├── .vscode/                 # VS Code 設定
 ├── .github/                 # GitHub Actions
 │   ├── workflows/
-│   │   ├── build.yml        # Rust/WASM ビルド・検査（push/PR・release.yml から workflow_call）
+│   │   ├── build.yml        # Rust/WASM ビルド・検査、pasta-recipe の 2 つの zip の作成と検査・arm64 のランナーの試験と煙試験（push/PR・release.yml から workflow_call）
 │   │   ├── manual.yml       # 利用者マニュアルの検査と GitHub Pages 公開
 │   │   ├── release.yml      # リリース CI（vX.Y.Z タグ契機・OIDC で crates.io/Marketplace へ公開・GitHub Release 作成）
 │   │   └── release-setup-check.yml # リリース CI のセットアップ確認（手動起動・公開しない）
-│   ├── scripts/release/     # リリース CI の job 補助スクリプト（verify-tag/publish-crate/publish-vsix/release-notes/github-release の .ps1）と、その検査 release-scripts-test.ps1（build.yml の release-scripts job で実行）
+│   ├── scripts/release/     # リリース CI の job 補助スクリプト（verify-tag/publish-crate/publish-vsix/release-notes/github-release の .ps1。pasta-recipe の 2 つの zip の検査 verify-recipe-zips.ps1（main の CI の job recipe とリリース CI が呼ぶ）・ツールの導入 install-tools.ps1）と、その検査 release-scripts-test.ps1（build.yml の release-scripts job で実行）
 │   └── release-ci-setup.md  # リリース CI の一回限りのセットアップ手順書
 ├── img/                     # README のロゴ・スクリーンショット
-├── release/                 # release.ps1 と editors/recipe/scripts/package.ps1 の出力先（pasta_check.zip・.nar・pasta.dll.zip・pasta-skills.zip・pasta-recipe.zip。.gitignore 済み・コミットしない）
+├── release/                 # release.ps1 と editors/recipe/scripts/package.ps1 の出力先（pasta_check.zip・.nar・pasta.dll.zip・pasta-skills.zip・pasta-recipe.x64.zip・pasta-recipe.arm64.zip。.gitignore 済み・コミットしない）
 ├── Cargo.lock               # 依存の解決結果（コミット対象・リリース CI の build で不変を検査）
 ├── README.md                # プロジェクト概要
 ├── LICENSE                  # ライセンス

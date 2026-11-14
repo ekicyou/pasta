@@ -92,7 +92,7 @@
   - _Boundary: Docs-User_
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-- [ ] 6.2 (P) 配布物の名前を使う所と steering を 2 つの名前にそろえる
+- [x] 6.2 (P) 配布物の名前を使う所と steering を 2 つの名前にそろえる
   - `crates/pasta_sample_ghost/RELEASE.md`・`.claude/skills/pasta-check/SKILL.md` の配布物の一覧の名前を 2 つの zip にする（`.claude/skills/` が拒まれたら 4.2 と同じく開発者に戻す）
   - `.kiro/steering/tech.md`・`structure.md` に、配布物 7・添付 8、2 つの zip の中身と検査の項目（機械の種類・VC++ の DLL）、job `recipe` と arm64 の 2 つの job の形、`release/` の中身を書く
   - `.kiro/steering/roadmap.md` の配布物の数と名前を直す（この spec の行は名前を変えた説明として残す）
