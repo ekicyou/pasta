@@ -1298,7 +1298,7 @@ log('\n== (K) checkReleaseAssetLinks（最新版の固定リンクの名前と�
     // (1) 一致するリンク（リンク記法・自動リンク・裸の URL と末尾の句点）は 0 件。
     writeFile(root, '.github/workflows/release.yml', RELEASE_YML);
     writeFile(root, 'book/src/a.md',
-      `# a\n\n[dll](${LATEST}pasta.dll.zip) と <${LATEST}hello-pasta.nar>。\n裸の ${LATEST}pasta.dll.zip。\n`);
+      `# a\n\n[dll](${LATEST}pasta.dll.zip) と <${LATEST}hello-pasta.nar>。\n裸の ${LATEST}pasta.dll.zip。\nSee ${LATEST}hello-pasta.nar.\n`);
     broken = checkReleaseAssetLinks(root);
     check('K-1 一致するリンク（リンク記法・<…>・裸の URL の末尾の句点）は 0 件', broken.length === 0, JSON.stringify(broken));
 
