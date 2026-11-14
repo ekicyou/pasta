@@ -76,7 +76,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_core` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -108,7 +108,7 @@
   - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
   - 対象: crates/pasta_dsl/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
   - 次元グループ:
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_dsl` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -131,7 +131,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -154,7 +154,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -177,7 +177,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -200,7 +200,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -223,7 +223,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -255,7 +255,7 @@
   - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
   - 対象: crates/pasta_lua/src/runtime/**, crates/pasta_lua/tests/{runtime,shiori}/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
   - 次元グループ:
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -278,7 +278,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -301,7 +301,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -324,7 +324,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -347,7 +347,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -379,7 +379,7 @@
   - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
   - 対象: crates/pasta_lua/src/debug/session.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
   - 次元グループ:
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -402,7 +402,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -434,7 +434,7 @@
   - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
   - 対象: crates/pasta_lua/src/debug/wiring.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
   - 次元グループ:
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -475,7 +475,7 @@
   - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
   - 対象: crates/pasta_shiori/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
   - 次元グループ:
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_shiori` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
   - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
@@ -507,7 +507,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lsp` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -530,7 +530,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_check` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -553,7 +553,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
     - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_sample_ghost` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -576,7 +576,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: luacheck lint（CLI 未導入 — D-6 ポリシーで dev 環境へ導入可・導入不能なら N/A（ツール不可）を matrix.md に記録）・未使用関数/変数/require の除去
     - G3 ハードニング（D3+D6）: 不正入力（SHIORI イベント・設定値）の検証強化・error() 経路の整理。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: pasta_scripts README・関連ドキュメントとの同期確認
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -599,7 +599,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: luacheck lint（CLI 未導入 — D-6 ポリシーで dev 環境へ導入可・導入不能なら N/A（ツール不可）を matrix.md に記録）・未使用関数/変数/require の除去
     - G3 ハードニング（D3+D6）: 不正入力（SHIORI イベント・設定値）の検証強化・error() 経路の整理。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: pasta_scripts README・関連ドキュメントとの同期確認
   - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -691,7 +691,7 @@
   - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
   - 対象: editors/vscode/**（node_modules/・out/ を除く）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
   - 次元グループ:
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: 拡張 README・package.json メタデータ・依存の整合確認
   - スコープ検証: `npm --prefix C:/home/maz/git/pasta/editors/vscode run test` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -723,7 +723,7 @@
   - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
   - 対象: book/tools/*.mjs（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
   - 次元グループ:
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: book/AUTHORING.md・ツール README との整合確認
   - スコープ検証: `node C:/home/maz/git/pasta/book/tools/drift-check-test.mjs && node C:/home/maz/git/pasta/book/tools/tutorial-check-test.mjs` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -746,7 +746,7 @@
   - 次元グループ:
     - G2 静的衛生（D4+D5）: lint 基盤なし（N/A を matrix.md に記録）・デッドコード/未使用関数の手動点検と除去
     - G3 ハードニング（D3+D6）: 外部入力（ファイルパス・HTML・検索クエリ）検証の強化。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: book/AUTHORING.md・ツール README との整合確認
   - スコープ検証: `node C:/home/maz/git/pasta/book/tools/highlight/highlight-html-test.mjs && node C:/home/maz/git/pasta/book/tools/highlight/tokenizer-test.mjs && node C:/home/maz/git/pasta/book/tools/highlight/neutralizer-test.mjs && node C:/home/maz/git/pasta/book/tools/highlight/scope-map-test.mjs` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
@@ -760,7 +760,7 @@
     - G1 テスト網羅（D1）: 対応する *-test.mjs への不足テスト追加。不要テストの除外は根拠明記の上で慎重に行う
     - G2 静的衛生（D4+D5）: lint 基盤なし（N/A を matrix.md に記録）・デッドコード/未使用関数の手動点検と除去
     - G3 ハードニング（D3+D6）: 外部入力（ファイルパス・HTML・検索クエリ）検証の強化。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
-    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G4 簡素化（D2）: ponytail 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
     - G5 文書/依存整合（D7 領域分）: book/AUTHORING.md・ツール README との整合確認
   - スコープ検証: `node C:/home/maz/git/pasta/book/tools/bigram-index/build-index-test.mjs && node C:/home/maz/git/pasta/book/tools/bigram-index/poc-test.mjs` / コミット前: 正準全体検証
   - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う

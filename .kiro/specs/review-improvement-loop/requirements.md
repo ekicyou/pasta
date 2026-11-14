@@ -28,7 +28,7 @@
 
 - **In scope**: 全レビュー領域（Rust クレート・Lua ランタイム資産・VSCode 拡張・`book/tools` を含む全ソース資産）× 全 7 次元のマトリクス改善を 1 実装指示で完走するループ。領域の自己発見（ギャップ分析）、サブエージェント委譲、サイクル毎コミット、破壊検知、巻き戻し、最終レポート。既存の品質検証インフラ（本リポジトリでは Rust=`cargo test`/`cargo clippy`/`cargo-audit`/`cargo-deny`/`insta`、Lua=`luacheck`/`lua_test`、TypeScript/JS=型検査・lint・`npm` テスト、横断=`TEST_COVERAGE.md`・`book` link-check・tutorial-check・スキル生成同期検査 `gen-skill-refs --check`）の活用と必要に応じた追加
 - **Out of scope**: 新機能の追加・外部仕様の変更（挙動保存が前提）。完了済み `audit-pasta-*` spec の改変・再オープン。性能チューニングを主目的とする作業（簡素化の副次効果は可）。CI 設定そのものの再設計（既存ワークフローとの整合確認は可）。Kiro ワークフロー自体（spec/skill 群）の改修。pasta DSL 文法・Lua API の仕様変更。リリース・配布フロー（`release` スキルの領分）。マニュアル `book/` の内容拡充（ドキュメント整合次元での同期確認は In）
-- **Adjacent expectations**: 既存スキル `karpathy-guidelines`（簡素化基準）・`kiro-review`（敵対的レビュー）・`kiro-debug`（根本原因デバッグ）・`kiro-verify-completion`（完了前検証）が利用可能であることを前提とする。`workflow.md` の DoD・回帰責任・危険 Git 操作禁止・MVP 禁止ルールに整合する。本リポジトリでは `cargo` 実行前に環境変数 `NoDefaultCurrentDirectoryInExePath` の解除が必要（既知のビルド環境制約）
+- **Adjacent expectations**: 既存スキル `ponytail`（簡素化基準・user scope のプラグイン）・`kiro-review`（敵対的レビュー）・`kiro-debug`（根本原因デバッグ）・`kiro-verify-completion`（完了前検証）が利用可能であることを前提とする。`workflow.md` の DoD・回帰責任・危険 Git 操作禁止・MVP 禁止ルールに整合する。本リポジトリでは `cargo` 実行前に環境変数 `NoDefaultCurrentDirectoryInExePath` の解除が必要（既知のビルド環境制約）
 
 ---
 
@@ -55,7 +55,7 @@
 1. The Review Improvement Loop shall 各レビュー領域に対し、次の 7 次元をレビュー内容として適用する: (1) テスト網羅性 (2) コード簡素化 (3) 脆弱性対策 (4) lint 徹底 (5) デッドコード/未使用除去 (6) パニック経路削減 (7) ドキュメント/依存整合
 2. When テスト網羅性次元のセルを実行する, the Review Improvement Loop shall 不足しているテストを特定して追加する
 3. If テスト網羅性次元で不要なテストを除外する, the Review Improvement Loop shall 慎重に判断したうえで除外の根拠を明記する
-4. When コード簡素化次元のセルを実行する, the Review Improvement Loop shall 簡素化ガイドライン（`karpathy-guidelines`）への準拠を検証し、逸脱を是正する
+4. When コード簡素化次元のセルを実行する, the Review Improvement Loop shall 簡素化ガイドライン（`ponytail`・user scope のプラグイン）への準拠を検証し、逸脱を是正する
 5. When 脆弱性対策次元のセルを実行する, the Review Improvement Loop shall 脆弱性レビューを実施し、必要な対策コードを投入する
 6. When lint 徹底次元のセルを実行する, the Review Improvement Loop shall 対象プロジェクト標準の lint（本リポジトリでは `cargo clippy`）を警告ゼロ相当の水準で通過させ、慣用句からの逸脱を是正する
 7. When デッドコード/未使用除去次元のセルを実行する, the Review Improvement Loop shall 未使用の公開エクスポート・関数・依存を検出して除去する

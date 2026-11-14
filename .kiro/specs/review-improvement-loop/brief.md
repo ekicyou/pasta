@@ -96,7 +96,7 @@
 ## Upstream / Downstream
 - **Upstream（依存・前提）**:
   - 既存品質インフラ: `cargo test/clippy`、`cargo-audit`、`cargo-deny`、`insta`、`TEST_COVERAGE.md`。
-  - 既存スキル: `karpathy-guidelines`、`kiro-review`、`kiro-debug`、`kiro-verify-completion`。
+  - 既存スキル: `ponytail`（user scope のプラグイン）、`kiro-review`、`kiro-debug`、`kiro-verify-completion`。
   - `workflow.md` の DoD・回帰責任・危険Git操作禁止・MVP禁止ルール。
   - ビルド地雷回避（`NoDefaultCurrentDirectoryInExePath` 環境変数）。
 - **Downstream（消費者・後続）**:
