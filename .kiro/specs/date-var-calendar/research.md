@@ -194,3 +194,72 @@ requirements.md の「未決の論点」1〜9 に加え、コードを調べて�
 
 1. **`クリスマス` と `クリスマスイブ` の前方一致の衝突（Req 10.1・10.2）**: Call は前方一致で候補を集める（`book/src/grammar/call-jump.md`「前方一致によるターゲット解決」）。Req 10.1 が求める `1225,クリスマス` と `1224,クリスマスイブ` を Req 10.2 どおり `＊行事_クリスマス`・`＊行事_クリスマスイブ` で受けると、12 月 25 日に `＞「行事_」＆＄行事`（＝`＞行事_クリスマス`）が `＊行事_クリスマスイブ` も候補にし、クリスマスの日にイブのトークがランダムに混ざる。あわせて hello-pasta の `scene_names_do_not_prefix_collide`（入門ガイドの spec の不変条件）が落ちる。直すには要件の表の名前を変える（例: `1224,イブ`）か、条件の属性で逃がす（`＊行事_クリスマスイブ　＆＄行事＝「クリスマスイブ」`。不変条件のテストは落ちたまま・回避のレシピになる）かで、どちらも Req 10.1 の文言か、ほかの spec の不変条件に手が入る。**作者が自分の表に付ける名前（`誕生日` と `誕生日前日` など）でも同じことが起きる**が、Req 9（マニュアル）にこの注意が無い（`＄節句`・`＄祝日` の名前どうしは前方一致しないので、今まで要らなかった）。
 2. **入門ガイドへの波及が範囲に無い（Req 10.2・Boundary Context）**: hello-pasta の辞書は入門ガイドの段階の辞書なので、行事のシーンを足すと、段階表（`STAGES.md`）・入門の章（`book/src/getting-started/*.md` の逐語の作例）・段階の検査に必ず手が入る（新しい段を作るか、既存の段の辞書と章を育てるか）。Boundary Context の In scope は hello-pasta の `calendar.csv` とトークだけを挙げ、入門ガイドの章と段階表を挙げていない。どの段に入れるか（新しい段を作るか）は入門の構成の決定で、要件で決める必要がある。
+
+## 10. 設計の調べ（2 回目・2026-11-15。design.md を書いた）
+
+### 10.1 要約
+
+- **Feature**: `date-var-calendar`
+- **Discovery Scope**: Extension（light discovery）。今の型（`[scene.alias]`・`[actor].font`・`＄節句`・`@pasta_log` の登録）に沿って足す。外部の調べは 9.1 の結果（CKAN の `license_id` `cc-by`・版の記載なし）をそのまま使い、やり直していない。
+- **Key Findings**:
+  - 祝日の規則も `pasta_core::calendar` に置けば、答え合わせは `pasta_core` の結合テストだけで閉じ、Lua へは `@pasta_calendar`（`holiday`・`event`）1 つで表と祝日を渡せる（案 C の「Lua の祝日の関数＋テストへのデータの受け渡し」が要らない）。
+  - 表はローダから `RuntimeConfig::with_calendar`（`with_scene_aliases` と同じ組み立て方）で基底のランタイムへ渡し、`@pasta_log`・`@toml` と同じく常に登録する。`act.lua` は `@pasta_search` の前例どおり呼び出しごとに `pcall(require)` で取るので、`@pasta_calendar` を登録しない多数のその場の Lua の環境（`tests/common` など 10 か所余り）は壊れない。
+  - `pasta_check` の 3 つの殻は `select_dictionary_files` の返すパスを読むだけなので、核がそこに表のパスを加えれば殻は変えずに済む。`FindingKind::CalendarInvalid` を `skip_reasons` に入れなければ、辞書の検査は省かれない。
+
+### 10.2 調べたこと
+
+- **ローダの段の番号**: `load_with_config` は 1（設定）→ 1.5（ロガー）→ 1.7（`LoaderContext`・パスの文字の検査）→ 2 …。表の読み込みは 1.6 に置ける（ロガーの後・ディレクトリの作成の前）。`book/src/internals/loader.md` の段階表もこの番号に合わせている。
+- **Rust のモジュールの登録**: `with_config_and_source_map`（`runtime/mod.rs`）が `@pasta_search`・`@pasta_log`・`@toml` を常に登録し、ローダ経由の `from_loader_with_scene_dic` が `@pasta_config` などを足す。`RuntimeConfig` の構築の struct literal は `runtime_config.rs` の 4 か所だけ。
+- **Lua のテストの実行器**: `tests/lua_unittest_runner.rs` は `pasta_lua::runtime::persistence::register`・`log::register` などの公開の関数で登録する。`@pasta_calendar` も `runtime::calendar::register` を公開すれば同じ並びで登録できる。
+- **`pasta_check` の核**: `validate_ghost` は `config::read_config` → 集め方 → 構文 → シーン → `skip_reasons` → 飛び先・条件の順。`GhostInput` は `entries`（ファイル）と `dirs`（フォルダ）を別に持つので、`calendar.csv` という名前のフォルダも核で見分けられる（ローダの `read_dir` と同じ数え方にできる）。
+- **VSCode**: `ghostValidator.ts` の再検査のきっかけは `.pasta`・`.lua` の作成・削除と、`.pasta`・master の直下の `pasta.toml` の保存。`calendar.csv` は条件を 1 つずつ足せばよい。
+- **入門ガイド（9.2 の続き）**: `13-nar.md` への参照は `SUMMARY.md`・`getting-started/index.md`・`06-hour.md`・`debug/recipe.md`・`AUTHORING.md`・`tutorial-check-test.mjs` にある。`tutorial_stages_test.rs` は段の数（13）・ファイルの無い段（13）・検証イベント表の範囲（1〜12）を数で持つ。`verify-content.mjs` は段の章を名前の形で数えるので数を持たない。`crates/pasta_sample_ghost/src/scripts.rs` の単体テストは `dic/*.pasta` の全部の表情を表情の表と照らすので、13 段目は既存の表情だけを使う。
+- **crates.io**: `pasta_core` は `publish = true` で `include`／`exclude` が無い。答え合わせのデータとそのテストのファイルを `exclude` に入れる（テストのファイルも外さないと、パッケージを展開して `cargo test` したときに落ちる）。
+- **春分・秋分の式**: `floor(20.8431 + 0.242194·(y−1980) − floor((y−1980)/4))`（秋分は 23.2488）を手で計算し、2022〜2028 年の春分（3/21・3/21・3/20・3/20・3/20・3/21・3/20）と秋分（9/23・9/23・9/22・9/23・9/23・9/23）が既知の日と合うことを確かめた。`(y−1980)/4` は 1980 年より前で負になるので、切り下げ（`div_euclid`）で書く。
+
+### 10.3 Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| B'（採用） | 表も祝日も `pasta_core::calendar`。Lua へは `@pasta_calendar` | 判定の一致を構造で守る・答え合わせが Rust だけ・Lua の変更は 2 行 | Rust のモジュールが 1 つ増える | ギャップ分析の案 B の「祝日も Rust」の形 |
+| C | 表は Rust、祝日は Lua | `＄節句` と同じ層に祝日 | 答え合わせのデータを Lua へ渡す口か、Rust から Lua を全日呼ぶテストが要る | 規則が 2 言語に分かれる |
+| A | 全部 Lua | Lua だけで閉じる | 読み込みのエラーの見え方・`pasta_check` との二重実装 | ギャップ分析で退けた |
+
+### 10.4 Design Decisions
+
+- **祝日も Rust に置く**: 上の表のとおり。祝日は `pasta_check` には要らないが、テストとモジュールの口を 1 つにできる。
+- **春分・秋分の式は 1980〜2099 年向けの近似式を全部の年に**（Req 2.3）: 範囲で区切らない。2028 年以降は見込み（マニュアルに書く）。
+- **振替休日と国民の休日の両方に当たる日は `振替休日`**: 法律の条の順。今の規則では起こらない。
+- **メモ化しない**: 1 回の転記は定数の計算と行の数に比例する照合だけ。日付が変わったかの管理と仮想時刻の飛びの扱いを増やす得が無い。
+- **`@pasta_calendar` が無い環境では 2 変数を入れない**: 本番は必ず登録する。登録しないその場の Lua の環境の振る舞いを今と同じにする。
+- **1 行につき最初の誤り 1 つ・全部の行を報告**: `ActorFont` が全部の誤りを返す前例に揃え、直す手戻りを減らす。
+- **行頭の空白の後の `#` も注釈**: 「空白だけの行」と同じく空白を外してから見る。
+- **ファイル名は一覧で探す**: OS の大文字・小文字の扱いに任せず、ローダは `read_dir`、核は `entries`・`dirs` で同じ規則（`is_calendar_file_name`）を使う。フォルダの `calendar.csv` は「あるのに読めない」になり、Req 5.7 を権限を使わずにテストできる。
+- **大文字・小文字だけ違う表が 2 つ以上なら誤り**（前提。OPEN QUESTION 3）: 辞書のモジュール名の衝突を誤りにする前例に揃える。
+- **`select_dictionary_files` の名前は変えない**: 殻 3 つを変えないため。文書の説明だけ「辞書ファイルと行事の表」に直す。
+- **答え合わせのデータに `.gitattributes` を足さない**: テストが CRLF と LF のどちらも読むので、作業ツリーの改行の変換に影響されない。
+- **13 段目の振り分けの場面は同名の `＊会話`**（前提。OPEN QUESTION 2）: 1〜12 段目を変えず、条件の属性（まだ教えていない）も使わない。`＊行事_なし` にふだんの台詞を持たせ、ランダムトークが黙らないようにする。
+- **入門の `csv` ブロックも逐語で照合する**: Req 10.6 の「段階の検査を `calendar.csv` に合わせて更新」を、`pasta` ブロックと同じ規則の対で満たす。
+
+### 10.5 Synthesis
+
+- **Generalization**: 「設定ファイルの誤りを `pasta_core` の規則で読み込みのエラーと `pasta_check` の報告の両方にする」は 3 例目（`[scene.alias]`・`[actor].font` に続く）。共通の枠は作らず、同じ層の分け方をなぞるだけにした（枠を作る得はまだ無い）。
+- **Build vs. Adopt**: `chrono`／`time` と `csv` クレートは足さない。日付の算術は通日の整数算術（Howard Hinnant の式）で十数行、表の書式は 1 行 1 件・引用符なしで `split(',')` で足りる（brief の開発者の指示「csv を自前で読む」）。holidays-jp は答え合わせに使わない（要件の確定した論点 7）。
+- **Simplification**: 表そのものを Lua に出さず、関数 2 つだけにした（Lua 側の照合とその単体テストが要らない）。メモ化・ログの追加・`pasta-recipe` の再検査のきっかけは入れない。`calendar.csv` を段階の組み立てで 13 段目だけに置く仕掛けも入れない（1〜12 段目は `＄行事` を使わないので応答は同じ）。
+
+### 10.6 Risks & Mitigations
+
+- 2028 年以降の春分・秋分が官報と食い違う — 答え合わせのデータの毎年の更新で気づける。マニュアルに見込みと書く。
+- `.claude/skills/pasta-ghost-authoring/references/variables.md` の再生成が分類器に止められる — 回避の手を探さず、開発者の許可を求める（開発の記録）。
+- 内閣府の CSV の URL が変わる — データカタログ（CKAN の API）から辿る手順を出典の文書に書く。
+
+### 10.7 使ったスキル・文書
+
+- `kiro-spec-design`（`rules/design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）、テンプレート `.kiro/settings/templates/specs/design.md`・`research.md`。
+- マニュアルの `grammar/variables.md`（日時変数の表と `＊節句_なし` の例）・`internals/loader.md`（段階表）・`internals/execution-model.md`（モジュールの登録）・`debug/validate.md`（報告の表）、`crates/pasta_sample_ghost/STAGES.md`・`book/AUTHORING.md`（入門の章の規則）。
+- `pasta-ghost-authoring` は読んでいない（13 段目の台詞の文言は実装で決め、emo2 の開発の知見に照らすため）。
+
+### 10.8 設計の関門
+
+- 機械の確かめ: requirements.md の数の ID（1.1〜10.7 の 80 個）はすべて追跡の表にある。Boundary の 4 節・File Structure Plan は具体のパスで埋まり、部品はすべてファイルに対応する。
+- 判断の確かめ（直し 1 回）: `pasta_check` の核のフォルダと重複の数え方をローダと同じ言い方に、`validate_ghost` での呼ぶ位置を具体に、`STAGES.md` の「`dic/` だけが変わる」規則の例外と `AUTHORING.md` の `csv` ブロックの規則を変えるファイルに足した。要件の穴は見つからなかった。
