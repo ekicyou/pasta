@@ -16,6 +16,7 @@ accepted = [
     "MPL-2.0",
     "CC0-1.0",
 ]
-targets = ["x86_64-pc-windows-msvc"]
+# package.ps1 は arch ごとに `cargo about generate --target <triple>` で呼び、この targets を置き換える。
+targets = ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"]
 ignore-dev-dependencies = true
 ignore-build-dependencies = true

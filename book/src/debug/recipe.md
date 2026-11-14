@@ -14,15 +14,20 @@ pasta-recipe の色分け・書きながらの診断・ゴースト全体の検�
 
 ## 入手と置き方
 
-pasta-recipe は、GitHub の Release から `pasta-recipe.zip` を落として入れる。最新版は次の固定のリンクで落とせる。
+pasta-recipe は、GitHub の Release から zip を落として入れる。zip は Windows の種類ごとに 2 つあり、最新版は次の固定のリンクで落とせる。
 
-<https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.zip>
+- x64 版（`pasta-recipe.x64.zip`）: <https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.x64.zip>
+- arm64 版（`pasta-recipe.arm64.zip`）: <https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.arm64.zip>
 
-落とした zip を好きなフォルダに展開する。中身は次の 2 つである。
+自分の Windows の種類は、Windows の「設定」→「システム」→「バージョン情報」の「システムの種類」で分かる。「x64 ベース プロセッサ」と出ていれば x64 版を、「ARM ベース プロセッサ」と出ていれば arm64 版を選ぶ。
+
+配布の対象は、x64 と arm64 の Windows（Windows 10 の 1803 以降・Windows 11）である。32 ビットの Windows・mac・Linux 向けは無い。
+
+落とした zip を好きなフォルダに展開する。中身は、どちらの zip も次の 2 つである。
 
 | ファイル | 中身 |
 | -------- | ---- |
-| `pasta-recipe.exe` | アプリ本体。64 ビット版の Windows（Windows 10 の 1803 以降・Windows 11）向け |
+| `pasta-recipe.exe` | アプリ本体。落とした zip の種類（x64 か arm64）の Windows 向け |
 | `THIRD_PARTY_LICENSES.txt` | アプリに含まれる第三者の部品のライセンスの表示 |
 
 インストールの手順は無い。展開した `pasta-recipe.exe` を、そのまま起動すればよい。VC++ の再頒布可能パッケージも要らない。画面の部品と着色の文法はすべて exe に入っている。ネットワークへは、開発の操作（[ゴーストを動かす](#ゴーストを動かす)）のときだけ、同じ PC の `127.0.0.1` のベースウェアにつなぐ。ほかへはつながない。
@@ -290,7 +295,7 @@ pasta-recipe は、書いたシーンを、同じ PC で動いているゴース
 - **`.lua` の診断**: `.lua` には色が付くだけで、構文の誤りの波線は出ない。
 - **ファイルとフォルダの削除**: ツリーからは消せない。消すときはエクスプローラーで消す（ごみ箱に入る）。
 - **改行の混ざったファイル**: 1 つのファイルに CRLF と LF が混ざっているときは、開いたときに多いほうへそろう。保存すると、そろった改行で書かれる。
-- **ほかの環境**: 配布は 64 ビット版の Windows だけである。インストーラ・自動更新・複数の窓は無い。`.nar` の作成は [配布の章](../getting-started/13-nar.md) を参照する。
+- **ほかの環境**: 配布は x64 と arm64 の Windows だけである（32 ビットの Windows・mac・Linux 向けは無い）。インストーラ・自動更新・複数の窓は無い。`.nar` の作成は [配布の章](../getting-started/13-nar.md) を参照する。
 
 ---
 

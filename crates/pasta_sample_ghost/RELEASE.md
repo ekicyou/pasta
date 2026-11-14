@@ -3,7 +3,7 @@
 > このドキュメントは AI と相談しながらリリースを進めるためのガイドです。
 
 リリースは、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）が行います。
-ビルド・crates.io への公開・VSCode Marketplace への公開・GitHub Release の作成（`pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-X.Y.Z.vsix`・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.zip` の添付）は、すべて CI の中で行われます。手元で公開や Release の作成をする必要はありません。
+ビルド・crates.io への公開・VSCode Marketplace への公開・GitHub Release の作成（`pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-X.Y.Z.vsix`・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` の添付）は、すべて CI の中で行われます。手元で公開や Release の作成をする必要はありません。
 
 ## 前提条件
 
@@ -39,10 +39,10 @@ GitHub の「Actions」→「Release」の実行を開きます。job は次の�
 |-----|------|
 | verify | タグの形・版の一致・`main` からの到達・見どころのファイルの有無を検査 |
 | gate | `build.yml` の検査（test・clippy・deny・luacheck・WASM）をタグのコミットで実行 |
-| build | 配る pasta のスキルに入れたマニュアルの写しが最新かを照合して、`pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.zip` を作る |
+| build | 配る pasta のスキルに入れたマニュアルの写しが最新かを照合して、`pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` を作る |
 | publish-crates | crates.io へ 5 クレートを公開 |
 | publish-vsce | VSCode Marketplace へ拡張を公開 |
-| github-release | 詳しいリリースノートを作り、見どころを本文とする GitHub Release `pasta vX.Y.Z` を作成して、配布物 6 つと詳しいリリースノートの 7 つを添付 |
+| github-release | 詳しいリリースノートを作り、見どころを本文とする GitHub Release `pasta vX.Y.Z` を作成して、配布物 7 つと詳しいリリースノートの 8 つを添付 |
 | report | 公開先ごとの結果と Release の URL を表にまとめる |
 
 report job の Summary の表で、公開先ごとの結果を確かめます。

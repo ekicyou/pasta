@@ -119,3 +119,17 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 ## 申し送り（2026-11-14 の discovery「pasta-recipe-multiarch」より）
 
 - `pasta-recipe-multiarch` も、ルートの `.cargo/config.toml` に `[target.aarch64-pc-windows-msvc]` の `crt-static` を要る。先に入った方が足し、後の方は在るのを確かめる（二重に足さない）。`release.yml` も共有するので、同じウェーブに置かない。
+
+## 申し送り（pasta-recipe-multiarch の要件より・2026-11-14）
+
+- **版**: 0.5.2 の次の版は 0.6.0 になった（開発者の決定。pasta-recipe の版。0.5.3 は出さない）。ノベルゲームは 0.7.0 へ送った。この spec の推奨の版は、ノベルゲーム・areka の版 4 の対応と揃えて 0.7.0 と読む（上の 2026-10-29 の申し送りの「0.6.0」も同じ。版は判断待ちのまま）。
+- **静的 CRT**: `pasta-recipe-multiarch` は、arm64 の pasta-recipe の exe も静的 CRT で作る（要件 1.6）。ルートの `.cargo/config.toml` の `[target.aarch64-pc-windows-msvc]` の `crt-static` は、先に入った方が足す（前の申し送りのとおり）。あちらは exe が VC++ ランタイムの DLL を取り込まないことを CI で検査する（要件 2.11）。pasta.dll にも同じ検査を当てるなら、検査のスクリプトを共有できる。
+- **添付の数**: GitHub Release の添付は 8 つになる（配布物 7 つ＋詳しいリリースノート）。`pasta-recipe.zip` は無くなり、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` になる（0.6.0 から）。`release-state.ps1` は `n/8` で数える。この spec が配布物を足す・形を変えるときは、そこから数える。上の 2026-11-12 の「6 → 7」と `github-release.ps1` 72 行・`release-state.ps1` 84 行・`release-scripts-test.ps1` 項目 10 の並びは古くなる。
+- **`release.yml` と `build.yml`**: あちらは `release.yml` の build の job の rust の `targets:` に `aarch64-pc-windows-msvc` を足し、2 つの zip の検査（中身・版・PE ヘッダの機械の種類・ライセンスの表示・大きさ・VC++ ランタイム）を足す。`build.yml` の job `recipe` は、package.ps1 で 2 つの arch を作って同じ検査を通す形になり、arm64 のランナー（`windows-11-arm`）の job も増える（Rust のテストと起動の煙試験）。この spec が `targets:` や arm64 のランナーを足すときは、あちらの形を読んでから重ねる。2026-11-12 に書いた `release.yml` の行番号（75・77・82・145〜148・182 行）は、あちらが入ると古くなる。
+- **道具の取得**（2026-11-14 の設計で確定）: `release.yml` の build の job の wasm-pack・cargo-about の取得の loop と、`env` の `WASM_PACK_VERSION`・`WASM_PACK_SHA256`・`CARGO_ABOUT_VERSION`・`CARGO_ABOUT_SHA256`（2026-11-12 に書いた env の 25・26 行）は、新しい `.github/scripts/release/install-tools.ps1`（`-Name wasm-pack,cargo-about`）へ移る。`build.yml` の job `recipe` も同じスクリプトで cargo-about を取る。この spec で道具を足す・版を上げるときは、このスクリプトの固定値を直す。
+
+## 申し送り（pasta-recipe-multiarch の実装より・2026-11-14）
+
+- **静的 CRT**: ルートの `.cargo/config.toml` の `[target.aarch64-pc-windows-msvc]` の `crt-static` は、pasta-recipe-multiarch が入れた（8e588187）。この spec は在るのを確かめるだけで、足し直さない。
+- **`release.yml`**: build の job の rust の `targets:` に `aarch64-pc-windows-msvc` が入り、rust-cache の key は `i686-x86_64-aarch64-pc-windows-msvc` になった。道具の取得は `install-tools.ps1 -Name wasm-pack,cargo-about` の 1 行。
+- **VC++ ランタイムの検査**: `.github/scripts/release/verify-recipe-zips.ps1` は、`dumpbin /dependents` で `vcruntime*`・`msvcp*`・`vccorlib*`・`concrt*`・`msvcr<数字>*` を数える（UCRT は数えない）。`-DumpbinCommand` で偽の道具を渡せる。pasta.dll に同じ検査を当てるなら、この判定を参考にできる。

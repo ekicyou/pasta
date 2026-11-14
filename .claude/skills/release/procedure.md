@@ -149,7 +149,7 @@ pasta のリリース 1 回分の手順（段 1〜9）。段・コマンド・�
 | S8 | 無し | 0/7、かつ `GitHub Release` が `無し` | — | `VREQ` が `V_MAIN` と違う | main に未リリースの版があるのに、別の版が指定された | 止まる。`V_MAIN` を先に出すか、飛ばすかを開発者に確かめる |
 | S9 | 無し | 上以外 | — | — | タグが無いのに公開済みのものがある | 止まる。公開済みの行を示し、開発者に確かめる |
 
-- `V_MAIN` が 0.5.2 以下で、`GitHub Release` だけが `添付不足`（0.4.1 以下は `公開・添付 4/7`、0.4.2〜0.5.2 は `公開・添付 6/7`。5 クレートと Marketplace は `あり`）のときは、`集計` の公開済みを 7/7 と読み替えて表に当てる（S1・S3 に入る）。0.4.1 までの配布物は 3 つで、`pasta_check.zip`・`pasta-skills.zip` は 0.4.2 から、`pasta-recipe.zip` は 0.5.3 から添付する。
+- `V_MAIN` が 0.5.2 以下で、`GitHub Release` だけが `添付不足`（0.4.1 以下は `公開・添付 4/8`、0.4.2〜0.5.2 は `公開・添付 6/8`。5 クレートと Marketplace は `あり`）のときは、`集計` の公開済みを 7/7 と読み替えて表に当てる（S1・S3 に入る）。0.4.1 までの配布物は 3 つで、`pasta_check.zip`・`pasta-skills.zip` は 0.4.2 から、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` は 0.6.0 から添付する。
 - S4・S5 で `VREQ` が `V_MAIN` と違うときは、`V_MAIN` のリリースが未完了なので先に続きを行うこと、`VREQ` は始めていないことを開発者に示す。
 - 段 3 を飛ばす行（S4・S5・S7）では、`V` を `V_MAIN` とし、開発者に示す。段 6 も飛ばす行（S4・S5）では、`RUN` と `ATTEMPT` を、定型コマンド A の `run` の行の ID と `attempt` から取る。
 - 判定は毎回やり直す。前回の実行の会話の記録を使わない（8.4）。
@@ -583,13 +583,13 @@ gh run view {RUN} --log-failed | tail -n 60
 | `tag` | `tag \| 最大 <版> \| v{V} <状態>` | `あり <コミットの SHA>`・`無し`。照会できなければ `tag \| 不明` |
 | `crates.io` | `crates.io \| <クレート> \| 最大 <版> \| {V} <状態>`（5 行） | `あり`・`無し`・`不明（HTTP <コード>）` |
 | `Marketplace` | `Marketplace \| ekicyou.pasta-vscode \| 最大 <版> \| {V} <状態>` | `あり`・`無し`。照会できなければ `不明` |
-| `GitHub Release` | `GitHub Release \| 最大 <版> \| v{V} <状態>` | `あり（公開・添付 7/7） <URL>`・`下書き（添付 n/7）`・`添付不足（公開・添付 n/7） <URL>`・`無し`・`不明` |
+| `GitHub Release` | `GitHub Release \| 最大 <版> \| v{V} <状態>` | `あり（公開・添付 8/8） <URL>`・`下書き（添付 n/8）`・`添付不足（公開・添付 n/8） <URL>`・`無し`・`不明` |
 | `run` | `run \| <ID> \| <status> \| <conclusion> \| attempt <n> \| <URL>` | 無ければ `run \| 無し`。照会できなければ `run \| 不明` |
 | `PR` | `PR \| 未統合 \| #<番号> \| <ブランチ> \| <URL>` | 無ければ `PR \| 無し` |
 | `集計` | `集計 \| {V} の公開済み <n>/7 \| 不明 <m>` | 7 = 5 クレート + Marketplace + GitHub Release |
 | `提案` | `提案 \| <版>（すべての出どころの最大 <版> の PATCH + 1）` | `不明` があれば `提案 \| 出せない（不明がある）` |
 
-「公開済み」に数えるのは、crates.io と Marketplace の `あり`、GitHub Release の `あり（公開・添付 7/7）` だけである。下書きと添付不足は数えない。添付は配布物の `pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-{V}.vsix`・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.zip` の 6 つと、詳しいリリースノート `release-notes-v{V}.md` の 7 つで、`pasta-recipe.zip` を添付していない 0.4.2〜0.5.2 の版は `添付不足（公開・添付 6/7）`、さらに `pasta_check.zip`・`pasta-skills.zip` も添付していない 0.4.1 までの版は `添付不足（公開・添付 4/7）` と出る。
+「公開済み」に数えるのは、crates.io と Marketplace の `あり`、GitHub Release の `あり（公開・添付 8/8）` だけである。下書きと添付不足は数えない。添付は配布物の `pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-{V}.vsix`・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` の 7 つと、詳しいリリースノート `release-notes-v{V}.md` の 8 つで、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` を添付していない 0.4.2〜0.5.2 の版は `添付不足（公開・添付 6/8）`、さらに `pasta_check.zip`・`pasta-skills.zip` も添付していない 0.4.1 までの版は `添付不足（公開・添付 4/8）` と出る。
 
 ## 定型コマンド B の出力（リリース CI の結果）
 
@@ -639,7 +639,7 @@ gh run view {RUN} --log-failed | tail -n 60
 - 版の表記の置き場所（`Cargo.toml` の節の構成、`package.json`、マニュアルの対象バージョン行の書式）と、版の更新のコミットに入るファイル（段 4 の「7 ファイル」。段 1 の手順 3・4、段 5 の手順 1 にも出る）。
 - 見どころのファイルの置き場所と名前、書き方の決まり（`doc/release-notes/README.md`）、詳しいリリースノートの見出し「動きが変わる変更」（定型コマンド C・D と、段 4 の節「見どころを書く」）。
 - リリース CI の「Generate release notes」の引数（「公開の後に見どころの直しを頼まれたら」の手順 3 が同じ引数で本文を作る）。
-- 配布物の名前・個数（定型コマンド A の「添付 7/7」の判定）。
+- 配布物の名前・個数（定型コマンド A の「添付 8/8」の判定）。
 - main のブランチ保護・統合方式（squash）、`gh` の `run`・`pr` サブコマンドの出力の形。
 - この文書の節の名前（「止まり方」「タグの付け直し」「公開の後に見どころの直しを頼まれたら」「開発者の設定」「定型コマンドの呼び出し方」）。`SKILL.md` が名前で指している。
 

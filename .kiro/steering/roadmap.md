@@ -2,20 +2,20 @@
 
 ## 概要
 
-pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトランスパイルし、組込 LuaJIT で実行する「伺か」の SHIORI（`pasta.dll`）と、その周辺ツール（`pasta_check`・LSP・VSCode 拡張・利用者マニュアル）からなる。Phase 1〜11 で、プロパティアクセス・監査・マニュアル・ソースレベルデバッグ・アクターモデル駆動・配布物の形・現行実装の不具合の一掃までを完了した。2026-10-09 までに、リリースの CI 化、シーン名の別名、式の中の値なしの扱い、マニュアルの着せ替え、段階ごとに学べる hello-pasta の辞書も入った（下の「完了フェーズ」）。2026-10-11 までに、hello-pasta の新しいシェル、9 段目の選択肢の表示の直し、マニュアルの見出しへのリンクの検査も入った。2026-10-15 に、リリースの本文を見どころの紹介にした。2026-10-17 までに、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、SSP を起動しない辞書の検査、シェルの説明の章、印刷用のページの廃止、結合テストの古いランタイムの写しの撤去も入った。同じ日に、止まる実行時エラーのバルーン表示と入門ガイドの絵 16 枚が入り、v0.4.0（主題「入門者にやさしく」）を出した。2026-10-18 に、辞書の検査の端のケース、入門ガイドと SSP のずれ（SSP の仮想の時刻を時報に効かせる）、窓際のぱすたさん（ghost_dev）からの要望の 2 本（アクターごとの表示の装い・縦書きのバルーンの列の扱い）が入り、v0.4.1 を出した。2026-10-19 までに、ゴーストから DLL の関数を LuaJIT の FFI で呼ぶ仕組み（`[loader] ffi`）、デバッグのポートが取れないときにデバッグなしで起動を続ける直し、pasta.dll のアイコンが入った。2026-10-23 までに、`pasta_check` を GitHub Release から単体で落とせるようにする直し（`pasta_check.zip`）、シーンからランダムトークと時報を止めたり再開したりする関数（`自動トーク停止`／`自動トーク再開`）、MCP から名前か位置で指名したシーンを再生するイベント（`OnPastaScene`・`OnPastaSceneAt`）が入った。同じ日に、外から `＞名前` の呼び出しとグローバル変数の代入ができるイベント（`OnPastaCallFunction`・`OnPastaSetSaveVariable`）、`REG:register` で 1 つのイベントにハンドラを重ねる仕組み、台詞を出さないイベントでチェイントークの続きが消えない直し、台詞の自動ウェイトと budoux の改行を書記素クラスタ単位にする直しも入った。同じ日に、pasta のスキル 3 本を `pasta-skills.zip` にしてリリースに添える直しが入り、v0.4.2 を出した。2026-10-24 に依存を更新した（PR#187）。同じ日に、0.4.3 の 4 本（セーブ・ログの表・サイドカーの TOML 化、mlua-stdlib の撤去と `@toml`、おすすめメニューをシーンで書く仕組み、`pasta_check release` が作者のフォルダを消す不具合の直し）と mlua 0.12 が入り、2026-10-25 に shiori4 の SHIORI3 互換モード（Windows 以外でも動く）が入って、v0.4.3 を出した。2026-10-31 に、日時変数の `＄季節`・`＄節句` を緊急の v0.4.4 として出した。2026-11-02 に、ponytail の 1 本目（`ponytail-lua-loader`）が入った。同じ日に 0.4.5 を廃止し、ponytail の残りを 0.5.0 へまとめた（開発者の決定）。2026-11-03 までに、ponytail の残りの 7 本（DSL のパーサ・シーン表と単語表・Lua のトランスパイラ・Lua のランタイム・エディタの道具・マニュアルの CI・SHIORI）が入り、ponytail は全部済んだ。同じ日に、シーンの属性を書いた順・型のまま実行時まで運んで Lua から読む仕組み（`SCENE.attrs`）、シーン名にぶら下がるシーンの数を読む関数（`シーン数`・`シーン数完全一致`）、DAP とキックの撤去（開発用のイベントとシーンマップに縮めた）、VSCode 拡張の開発の道具の SSP・areka の MCP への移行が入った。2026-11-04〜05 に、属性の残りの 2 本（場面の側の条件と `＆優先`・同名シーンの `＆重み`・`＆順番` と単語の値の重み）が入って v0.5.0 を、2026-11-06 に同じ話し手が続く行の前の改行を入れて v0.5.1 を、2026-11-07 に VSCode の着色の直しで v0.5.2 を出した。2026-11-12 に、VS Code を使わないエディタ `pasta-recipe` を 0.5.3 に決め、その前に要る 2 本（見出しの上の「▶ シーンを実行」とシーンのアウトライン・シーンを再生するイベントにローカル変数を渡す口）が入った。2026-11-14 に、VSCode 拡張の公開の道具 `@vscode/vsce` を 4.1.1 へ上げた（`vsce-4-upgrade`・PR #258。公開の道は main の `release-setup-check.yml` で確かめた）。
+pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトランスパイルし、組込 LuaJIT で実行する「伺か」の SHIORI（`pasta.dll`）と、その周辺ツール（`pasta_check`・LSP・VSCode 拡張・利用者マニュアル）からなる。Phase 1〜11 で、プロパティアクセス・監査・マニュアル・ソースレベルデバッグ・アクターモデル駆動・配布物の形・現行実装の不具合の一掃までを完了した。2026-10-09 までに、リリースの CI 化、シーン名の別名、式の中の値なしの扱い、マニュアルの着せ替え、段階ごとに学べる hello-pasta の辞書も入った（下の「完了フェーズ」）。2026-10-11 までに、hello-pasta の新しいシェル、9 段目の選択肢の表示の直し、マニュアルの見出しへのリンクの検査も入った。2026-10-15 に、リリースの本文を見どころの紹介にした。2026-10-17 までに、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、SSP を起動しない辞書の検査、シェルの説明の章、印刷用のページの廃止、結合テストの古いランタイムの写しの撤去も入った。同じ日に、止まる実行時エラーのバルーン表示と入門ガイドの絵 16 枚が入り、v0.4.0（主題「入門者にやさしく」）を出した。2026-10-18 に、辞書の検査の端のケース、入門ガイドと SSP のずれ（SSP の仮想の時刻を時報に効かせる）、窓際のぱすたさん（ghost_dev）からの要望の 2 本（アクターごとの表示の装い・縦書きのバルーンの列の扱い）が入り、v0.4.1 を出した。2026-10-19 までに、ゴーストから DLL の関数を LuaJIT の FFI で呼ぶ仕組み（`[loader] ffi`）、デバッグのポートが取れないときにデバッグなしで起動を続ける直し、pasta.dll のアイコンが入った。2026-10-23 までに、`pasta_check` を GitHub Release から単体で落とせるようにする直し（`pasta_check.zip`）、シーンからランダムトークと時報を止めたり再開したりする関数（`自動トーク停止`／`自動トーク再開`）、MCP から名前か位置で指名したシーンを再生するイベント（`OnPastaScene`・`OnPastaSceneAt`）が入った。同じ日に、外から `＞名前` の呼び出しとグローバル変数の代入ができるイベント（`OnPastaCallFunction`・`OnPastaSetSaveVariable`）、`REG:register` で 1 つのイベントにハンドラを重ねる仕組み、台詞を出さないイベントでチェイントークの続きが消えない直し、台詞の自動ウェイトと budoux の改行を書記素クラスタ単位にする直しも入った。同じ日に、pasta のスキル 3 本を `pasta-skills.zip` にしてリリースに添える直しが入り、v0.4.2 を出した。2026-10-24 に依存を更新した（PR#187）。同じ日に、0.4.3 の 4 本（セーブ・ログの表・サイドカーの TOML 化、mlua-stdlib の撤去と `@toml`、おすすめメニューをシーンで書く仕組み、`pasta_check release` が作者のフォルダを消す不具合の直し）と mlua 0.12 が入り、2026-10-25 に shiori4 の SHIORI3 互換モード（Windows 以外でも動く）が入って、v0.4.3 を出した。2026-10-31 に、日時変数の `＄季節`・`＄節句` を緊急の v0.4.4 として出した。2026-11-02 に、ponytail の 1 本目（`ponytail-lua-loader`）が入った。同じ日に 0.4.5 を廃止し、ponytail の残りを 0.5.0 へまとめた（開発者の決定）。2026-11-03 までに、ponytail の残りの 7 本（DSL のパーサ・シーン表と単語表・Lua のトランスパイラ・Lua のランタイム・エディタの道具・マニュアルの CI・SHIORI）が入り、ponytail は全部済んだ。同じ日に、シーンの属性を書いた順・型のまま実行時まで運んで Lua から読む仕組み（`SCENE.attrs`）、シーン名にぶら下がるシーンの数を読む関数（`シーン数`・`シーン数完全一致`）、DAP とキックの撤去（開発用のイベントとシーンマップに縮めた）、VSCode 拡張の開発の道具の SSP・areka の MCP への移行が入った。2026-11-04〜05 に、属性の残りの 2 本（場面の側の条件と `＆優先`・同名シーンの `＆重み`・`＆順番` と単語の値の重み）が入って v0.5.0 を、2026-11-06 に同じ話し手が続く行の前の改行を入れて v0.5.1 を、2026-11-07 に VSCode の着色の直しで v0.5.2 を出した。2026-11-12 に、VS Code を使わないエディタ `pasta-recipe` を 0.5.3 に決め（2026-11-14 に 0.6.0 へ上げた）、その前に要る 2 本（見出しの上の「▶ シーンを実行」とシーンのアウトライン・シーンを再生するイベントにローカル変数を渡す口）が入った。2026-11-14 に、VSCode 拡張の公開の道具 `@vscode/vsce` を 4.1.1 へ上げた（`vsce-4-upgrade`・PR #258。公開の道は main の `release-setup-check.yml` で確かめた）。
 
 現在の主題は次のとおり。
 
-- **0.5.3: VS Code を使わないエディタ pasta-recipe**（2026-11-12 開発者の決定「次のリリースにする。最優先事項」）。2026-11-12 にウェーブ 1 の 2 本（`vscode-scene-outline-play`・`scene-play-locals`）が入り、2026-11-13 にウェーブ 2 の `pasta-recipe` と、ウェーブ 3 の `pasta-recipe-dev-actions`（アプリのシーンの ▶・リロード・保存変数の表と書き換え・値を入れて実行）が入った。0.5.3 の spec は揃い、残りはリリース（下の「0.5.3 の範囲」と棚卸）。
+- **0.6.0: VS Code を使わないエディタ pasta-recipe**（2026-11-12 開発者の決定「次のリリースにする。最優先事項」）。2026-11-12 にウェーブ 1 の 2 本（`vscode-scene-outline-play`・`scene-play-locals`）が入り、2026-11-13 にウェーブ 2 の `pasta-recipe` と、ウェーブ 3 の `pasta-recipe-dev-actions`（アプリのシーンの ▶・リロード・保存変数の表と書き換え・値を入れて実行）が入った。2026-11-14 に `pasta-recipe-multiarch`（x64・arm64 の 2 つの zip）が入った。0.6.0 の spec は揃い、残りはリリース（下の「0.6.0 の範囲」と棚卸）。
 - **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`。まとめは下の「版がまだ決まっていないもの」にある。
-- **Phase 13: areka でノベルゲーム（0.6.0。2026-10-29 に 0.5.0 から順延）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性の 2 本（`scene-attribute-store`・`scene-condition-attributes`）は、2026-10-29 に 0.5.0 へ移した。
+- **Phase 13: areka でノベルゲーム（0.7.0。2026-10-29 に 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性の 2 本（`scene-attribute-store`・`scene-condition-attributes`）は、2026-10-29 に 0.5.0 へ移した。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
 Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイドの絵で完了した（「完了フェーズ」）。
 
 このほか、リリース手順（spec `release-workflow`）の CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ（2026-10-10）。リリース手順は `release` スキル（`/release`）へ移し、spec `release-workflow` は完了にした（2026-10-11）。
 
-**優先順位（開発者の方針）**: 0.4.0（主題「入門者にやさしく」）は 2026-10-17 に、0.4.1（致命的でない不具合と、窓際のぱすたさんからの要望の 2 本）は 2026-10-18 に出した。0.4.2（致命的でない不具合。2026-10-18 に範囲を決めた）は 2026-10-23 に出した。0.4.3（セーブの TOML 化・mlua 0.12・おすすめメニュー・SHIORI3 互換モード）は 2026-10-25 に、0.4.4（日時変数の `＄季節`・`＄節句`。緊急）は 2026-10-31 に出した。0.5.0（ponytail 監査の指摘の修正と属性関係の整備。2026-11-02 に 0.4.5 を廃止してまとめた）は 2026-11-05 に、0.5.1（同じ話し手が続く行の改行。即時の版）は 2026-11-06 に、0.5.2（着色の直し）は 2026-11-07 に出した。次の節目は 0.5.3（VS Code を使わないエディタ `pasta-recipe`。最優先）、0.6.0 の目標は、areka でノベルゲームが作れるようになること（2026-10-10。2026-10-29 に 0.5.0 から順延）。ponytail 監査の指摘の修正は、2026-10-22 に版に縛らない隙間の spec にしたが、2026-10-23 に 0.4.3 に入れると決め直した。2026-10-24 に、0.4.3 をセーブの TOML 化（致命的な不具合）と mlua 0.12 の版に組み替え、ponytail は 0.4.5 へ移した（`ponytail-check-release` だけ 0.4.3 に残す）。ウェーブは、今のゴールの範囲の spec だけで組む（2026-10-16）。致命的な不具合は、見つかりしだい割り込ませる。致命的でない不具合は、次の 0.4.x に入れるかを開発者が決める（2026-10-17 に 0.4.1 へ回した方針の続き。2026-10-18 に `lua-cmodule-robustness` を 0.4.2 に入れた）。2026-10-29 に、0.4.5（ponytail）の次の 0.5.0 を「属性関係の整備」にし、ノベルゲームを 0.6.0 へ順延した（開発者の決定。属性は窓際のぱすたさんの「開示の階段」とノベルの分岐の両方の土台で、早めに仕上げておきたい）。
+**優先順位（開発者の方針）**: 0.4.0（主題「入門者にやさしく」）は 2026-10-17 に、0.4.1（致命的でない不具合と、窓際のぱすたさんからの要望の 2 本）は 2026-10-18 に出した。0.4.2（致命的でない不具合。2026-10-18 に範囲を決めた）は 2026-10-23 に出した。0.4.3（セーブの TOML 化・mlua 0.12・おすすめメニュー・SHIORI3 互換モード）は 2026-10-25 に、0.4.4（日時変数の `＄季節`・`＄節句`。緊急）は 2026-10-31 に出した。0.5.0（ponytail 監査の指摘の修正と属性関係の整備。2026-11-02 に 0.4.5 を廃止してまとめた）は 2026-11-05 に、0.5.1（同じ話し手が続く行の改行。即時の版）は 2026-11-06 に、0.5.2（着色の直し）は 2026-11-07 に出した。次の節目は 0.6.0（VS Code を使わないエディタ `pasta-recipe`。最優先）、0.7.0 の目標は、areka でノベルゲームが作れるようになること（2026-10-10。2026-10-29 に 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）。ponytail 監査の指摘の修正は、2026-10-22 に版に縛らない隙間の spec にしたが、2026-10-23 に 0.4.3 に入れると決め直した。2026-10-24 に、0.4.3 をセーブの TOML 化（致命的な不具合）と mlua 0.12 の版に組み替え、ponytail は 0.4.5 へ移した（`ponytail-check-release` だけ 0.4.3 に残す）。ウェーブは、今のゴールの範囲の spec だけで組む（2026-10-16）。致命的な不具合は、見つかりしだい割り込ませる。致命的でない不具合は、次の 0.4.x に入れるかを開発者が決める（2026-10-17 に 0.4.1 へ回した方針の続き。2026-10-18 に `lua-cmodule-robustness` を 0.4.2 に入れた）。2026-10-29 に、0.4.5（ponytail）の次の 0.5.0 を「属性関係の整備」にし、ノベルゲームを 0.6.0 へ順延した（開発者の決定。属性は窓際のぱすたさんの「開示の階段」とノベルの分岐の両方の土台で、早めに仕上げておきたい）。2026-11-14 に、0.5.2 の次の版を 0.6.0 にした（開発者の決定。pasta-recipe の版。0.5.3 は出さない）。ノベルゲームは 0.7.0 へ送った。
 
 ## 運用ルール
 
@@ -35,7 +35,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 - **LuaJIT 2.1**: `coroutine.close`・`<close>` が無い。中断したコルーチンは参照を外して GC に任せる。
 - **シーン名の別名**: pasta.toml の `[scene.alias]` で定義する。既定の表は 7 件（`会話 → OnTalk`・おすすめメニューのシーン 3 件・ボタンの名前 3 件）で、書いたキーだけ既定を置き換える（空の配列で消す・見出しだけなら既定のまま・既定とぶつかれば読み込みエラー。2026-10-24 `recommend-menu-scenes`）。完全一致の 1 段だけで、キー正規化の前段で登録・検索の両側に効く。
 - **式の中の値なし**: 式の中の nil は、算術なら 0、連結なら空文字列とみなし、ログを出さない。
-- **リリース**: タグ `vX.Y.Z` の push で `.github/workflows/release.yml` が検証・ビルド・公開まで行う。ビルドした成果物は git で追跡しない。シェルの画像は追跡を続ける。配布物は `pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.zip` の 6 つで、GitHub Release には、それにリリースの全件の一覧を足した 7 つを添える（`pasta-skills.zip` は 0.4.2 で `pasta-skills-release-asset` が、`pasta-recipe.zip` は `pasta-recipe` が足した）。
+- **リリース**: タグ `vX.Y.Z` の push で `.github/workflows/release.yml` が検証・ビルド・公開まで行う。ビルドした成果物は git で追跡しない。シェルの画像は追跡を続ける。配布物は `pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` の 7 つで、GitHub Release には、それにリリースの全件の一覧を足した 8 つを添える（`pasta-skills.zip` は 0.4.2 で `pasta-skills-release-asset` が、pasta-recipe の zip は `pasta-recipe` が足し、`pasta-recipe-multiarch` が x64・arm64 の 2 つに分けた）。
 - **hello-pasta の辞書**: 1 段 1 ファイル（`dic/01-boot.pasta`〜`12-lua.pasta`）で、段階表は `crates/pasta_sample_ghost/STAGES.md`。全段が起動することをテストが確かめる。
 - **入門ガイド**: Claudia が全編を語る（`getting-started` に限った執筆規約の例外）。段の章と段階辞書を逐語で照合する（`book/tools/tutorial-check.mjs`）。辞書を変える spec は、同じ変更で入門の章の作例を直す。絵は `book/SCREENSHOTS.md` の手順で撮り直す。
 - **マニュアルの見た目**: mdBook のまま「Claudia のマニュアル」。台詞は顔アイコン付きの部品で書く（記法は `book/AUTHORING.md`）。印刷用のページ（`print.html`）は作らず、章の印刷はテーマが受け持つ。
@@ -88,7 +88,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 | —（0.5.0） | ponytail 監査（2026-10-19。8 つの領域を正しさ・安全・負荷・テスト・速さ・無駄の順に見た）の指摘の修正。ローダのキャッシュと同じモジュール名、解析を辞書の大きさに比例させて括弧と演算子に上限、シーン表・単語表の死んだ API と `fast_radix_trie` の撤去、Lua ブロックを書いたとおりに出す、Lua のランタイムの不具合と写し、構文の誤りを本当の位置に 1 件・tower-lsp の撤去、マニュアルの検査を全部の PR とリリースの関門に、unload なしの FreeLibrary・`Key:` の行（2026-11-02〜11-03。2026-11-05 リリース。`ponytail-check-release` は 0.4.3、`ponytail-lua-debug` は DAP を捨てるので閉じた） | ponytail-lua-loader, ponytail-shiori, ponytail-dsl-parser, ponytail-editor-tooling, ponytail-lua-scripts, ponytail-lua-transpiler, ponytail-core-registry, ponytail-manual-ci |
 | —（0.5.0） | シーンの属性を書いた順・型のまま実行時まで運び、Lua から `SCENE.attrs` で読む（宣言・条件・フラグを 1 つの倉に。受け継ぎは `merge_attrs` の 1 か所）。場面の側の条件（`＆＄＊経験値≧500`）と `＆優先` で、名前で選ぶ候補をそのときの変数の値で絞る（選ぶ前に Reference と日時を自動で転記）。同名シーンを `＆重み`・`＆順番` で選び、単語の値に `＠数` の重みを付ける。シーン名にぶら下がるシーンの数を読む `シーン数`・`シーン数完全一致`。DAP とキックを撤去し、`[debug] enabled` を開発用のイベント（`OnPastaSceneAt`・`OnPastaDumpVariables`）を許す旗とシーンマップに縮めた。VSCode 拡張の開発の道具を SSP・areka の MCP へ移した（2026-11-05 リリース） | scene-attribute-store, scene-count, debug-mcp-runtime, vscode-mcp-client, scene-condition-attributes, scene-pick-modes |
 | —（0.5.1・0.5.2） | 同じ話し手が続く行（継続行と、同じアクターを書き直した行）の前に `[actor."名前"] line_newlines` の幅の改行を入れる（2026-11-06 リリース）。0.5.2 は spec なしの VSCode の着色の直し（2026-11-07 リリース） | actor-line-newlines |
-| —（0.5.3・途中） | VSCode 拡張で、見出しの上の「▶ シーンを実行」と、グローバル ＞ ローカルの 2 階層のアウトライン（並びは `pasta_lsp` の解析結果の `scenes`）。`OnPastaScene`・`OnPastaSceneAt` の Reference2 に TOML のインライン表を付けると、ローカル変数に値が入った状態でシーンが始まる（2026-11-12。リリースはまだ） | vscode-scene-outline-play, scene-play-locals |
+| —（0.6.0・途中） | VSCode 拡張で、見出しの上の「▶ シーンを実行」と、グローバル ＞ ローカルの 2 階層のアウトライン（並びは `pasta_lsp` の解析結果の `scenes`）。`OnPastaScene`・`OnPastaSceneAt` の Reference2 に TOML のインライン表を付けると、ローカル変数に値が入った状態でシーンが始まる（2026-11-12。リリースはまだ） | vscode-scene-outline-play, scene-play-locals |
 | —（0.4.2） | ゴーストから DLL の関数を LuaJIT の FFI で呼ぶ（`[loader] ffi`・`ffi.load` の置き換え。深いパス・ANSI に無い文字のフォルダ・隣の依存 DLL）、`pasta_check` を GitHub Release から単体で配る（`pasta_check.zip`）、シーンから自動トークを止める・再開する（`自動トーク停止`／`自動トーク再開`）、MCP から指名したシーンを再生する（`OnPastaScene`・`OnPastaSceneAt`）、外から `＞名前` を呼ぶ・変数を書く（`OnPastaCallFunction`・`OnPastaSetSaveVariable`）、`REG:register` でハンドラを重ねる、台詞を出さないイベントでチェイントークの続きを捨てない（割り込みには `＊チェイントーク中断`）、台詞の自動ウェイトと改行を書記素クラスタ単位にする、pasta のスキル 3 本を `pasta-skills.zip` で配る（2026-10-23 リリース） | lua-cmodule-robustness, pasta-check-release-asset, ontalk-suppression, scene-play-event, external-control-events, reg-handler-chain, chain-talk-interrupt, talk-grapheme-clusters, pasta-skills-release-asset |
 
 ロードマップを置く前の初期開発（DSL・トランスパイラ・ランタイム・SHIORI・alpha リリースなど）の spec も `.kiro/specs/completed/` にある。
@@ -118,11 +118,11 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
   `book/src/debug/source-level.md` の「切り替えても `.pasta` のブレークポイントは有効」は事実と違うが、`vscode-mcp-client` がその頁ごと消すので、0.5.0 の外へは出ない。`ponytail-editor-tooling` が範囲から外した DAP の側の直し（`host` の廃止など）は、`vscode-mcp-client` が受け継ぐ。この spec の brief は git の `ae04a28b` で読める。
 
-## 0.5.3 の範囲：VS Code を使わないエディタ pasta-recipe（2026-11-12 開発者の決定）
+## 0.6.0 の範囲：VS Code を使わないエディタ pasta-recipe（2026-11-12 開発者の決定）
 
-v0.5.2 の次の版で、最優先（開発者「次のリリースにする。最優先事項」）。VS Code を入れたくない作者のために、pasta DSL を編集できる軽いアプリ（仮名 `pasta-recipe`）を出す。0.6.0（ノベル）は動かさない。
+v0.5.2 の次の版で、最優先（開発者「次のリリースにする。最優先事項」）。VS Code を入れたくない作者のために、pasta DSL を編集できる軽いアプリ（仮名 `pasta-recipe`）を出す。0.7.0（ノベル）は動かさない。
 
-- **形**: Tauri 2（2.12.x）＋ Vite ＋ Monaco の、Windows x64 の単一の exe（`tauri build --no-bundle`。WebView2 は OS のもの）。ゴーストのフォルダを exe にドラッグドロップすると、その `ghost/master` を開く。最近開いたフォルダはアプリの置き場に TOML で残す。リリースの成果物に `pasta-recipe.zip` を足す。
+- **形**: Tauri 2（2.12.x）＋ Vite ＋ Monaco の、Windows の単一の exe（x64・arm64）（`tauri build --no-bundle`。WebView2 は OS のもの）。ゴーストのフォルダを exe にドラッグドロップすると、その `ghost/master` を開く。最近開いたフォルダはアプリの置き場に TOML で残す。リリースの成果物に pasta-recipe の zip を足す（`pasta-recipe-multiarch` が `pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` の 2 つにした）。
 - **解析**: Tauri の Rust の側が `pasta_lsp`・`pasta_check` をライブラリとして直接呼ぶ（exe に静的にリンク。WASM は通らない）。`editors/recipe/src-tauri` は別の Cargo ワークスペースにし、Tauri の依存をルートの `Cargo.lock` に混ぜない。
 - **ゴーストを動かす機能**: VS Code 拡張の実行の流れ（MCP クライアント・リロード・シーン実行・変数ダンプ）を `editors/shared/` に移して共有し、入出力だけを Node と Tauri で差し込む。保存変数の書き換え（今の `OnPastaSetSaveVariable`）と、ローカル変数を入れたシーンの実行（新しい口）を足す。
 - **退けた案**: Electron（100MB を超える）、PWA（127.0.0.1 の MCP に届かない）、Rust ネイティブの GUI（エディタ部品が無い）、フロントで WASM を動かす案（段が増える。開発者「WASM にはこだわらない」）、実行の流れを Rust へ移植する案（2 本になる）。
@@ -133,21 +133,21 @@ v0.5.2 の次の版で、最優先（開発者「次のリリースにする。�
 | -- | ---- | -------- | ---- | -------------- |
 | 3 | pasta-recipe | Opus | 34 | **入った（2026-11-13）**。アプリの本体（ツリー・エディタ・着色・診断・ゴースト全体の検査・`.lua`・保存・最近開いたもの・リリース CI・マニュアル）
 | 4 | pasta-recipe-dev-actions | Opus | 22 | **入った（2026-11-13）**。実行の流れを `editors/shared/` へ移し、アプリにシーンの ▶・リロード・保存変数の表と書き換え・ローカル変数を入れた実行を足す。3 番の後（先に要った 1 番・2 番は入った）
-| 5 | 0.5.3 のリリース（`release` スキル） | Opus | — | 上の全部の後（ウェーブ 3 の見込み） |
+| 5 | 0.6.0 のリリース（`release` スキル） | Opus | — | 上の全部の後（ウェーブ 3 の見込み） |
 
 ## 棚卸（2026-11-12・main `2381bf52`）
 
-前回（2026-11-03・main `b03a1ca5`）の後に、5 本が入り、3 つの版を出した。`scene-condition-attributes`（PR#237）・`scene-pick-modes`（PR#238）で v0.5.0（2026-11-05）、`actor-line-newlines`（PR#242）で v0.5.1（2026-11-06）、VSCode の着色で Lua ブロックの閉じ柵より後ろが白くなる不具合の直し（PR#244。spec なし）で v0.5.2（2026-11-07）を出した。2026-11-12 に 0.5.3（VS Code を使わないエディタ `pasta-recipe`）を決め、そのウェーブ 1 の 2 本（`vscode-scene-outline-play`（PR#252）・`scene-play-locals`（PR#253））が入った。ほかに spec なしで、ルートの Rust のワークスペースの整理（PR#249）、leak probe を使うテストの直列化（PR#251）、cc-sdd の記事の直し（PR#246・PR#247）が入った。未完了は 18 本（常駐の `review-improvement-loop` を除く）、完了は 208 本。作業中のブランチは無い（ほかのワークツリーとブランチは、どれも main に入った後のもの）。今のゴールは 0.5.3 である（v0.5.3 のタグはまだ無い）。前回の記録は git の履歴にある。
+前回（2026-11-03・main `b03a1ca5`）の後に、5 本が入り、3 つの版を出した。`scene-condition-attributes`（PR#237）・`scene-pick-modes`（PR#238）で v0.5.0（2026-11-05）、`actor-line-newlines`（PR#242）で v0.5.1（2026-11-06）、VSCode の着色で Lua ブロックの閉じ柵より後ろが白くなる不具合の直し（PR#244。spec なし）で v0.5.2（2026-11-07）を出した。2026-11-12 に 0.5.3（VS Code を使わないエディタ `pasta-recipe`）を決め（2026-11-14 に 0.6.0 へ上げた）、そのウェーブ 1 の 2 本（`vscode-scene-outline-play`（PR#252）・`scene-play-locals`（PR#253））が入った。ほかに spec なしで、ルートの Rust のワークスペースの整理（PR#249）、leak probe を使うテストの直列化（PR#251）、cc-sdd の記事の直し（PR#246・PR#247）が入った。未完了は 18 本（常駐の `review-improvement-loop` を除く）、完了は 208 本。作業中のブランチは無い（ほかのワークツリーとブランチは、どれも main に入った後のもの）。今のゴールは 0.6.0 である（v0.6.0 のタグはまだ無い）。前回の記録は git の履歴にある。
 
-- 早道は使わなかった。前回の後に、discovery が 0.5.3 と 4 本を起票したため。測り直したのは 17 本で、0.5.3 の残りの 2 本と、触るファイルが変わった 15 本である（入った 5 本が `act.lua`・`sakura_builder.lua`・`scene.lua`・`choice_select.lua`・`scene_table.rs`・`search/context.rs`・単語の値の文法を書き換えた）。brief を書き直したのは 15 本で、`hello-novel-sample`・`manual-novel-guide` は変わらなかった。
+- 早道は使わなかった。前回の後に、discovery が 0.5.3（今の 0.6.0）と 4 本を起票したため。測り直したのは 17 本で、0.6.0 の残りの 2 本と、触るファイルが変わった 15 本である（入った 5 本が `act.lua`・`sakura_builder.lua`・`scene.lua`・`choice_select.lua`・`scene_table.rs`・`search/context.rs`・単語の値の文法を書き換えた）。brief を書き直したのは 15 本で、`hello-novel-sample`・`manual-novel-guide` は変わらなかった。
 - `pasta-recipe` は 18〜21。一度分けた spec（実行の流れを `pasta-recipe-dev-actions` へ分けた）なので、分けない。要件で 22 を超えたら、リリースの段（`release.yml`・`build.yml`・`github-release.ps1`・`release` スキルの `release-state.ps1`・`release-scripts-test.ps1`・第三者のライセンス・マニュアルの「入手」の節。約 4 タスク）を `pasta-recipe-release` に分ける。リリースに足す成果物は 6 つから 7 つになり、`github-release.ps1`・`release-state.ps1`・`release-scripts-test.ps1` の名前の一覧も直す（brief の範囲には `release.yml`・`build.yml` しか書いていなかった）。
 - `pasta-recipe-dev-actions` は 11〜14。分け目は今も保つ（共有へ移す 5 つのファイルは、まだ vscode を読み込まない。`runScene(ctx, fsPath, line1)` も brief のとおり）。入出力の差し込み口は brief の見立て（POST・読み取り・更新時刻）より広い（フォルダの一覧・バイトの読み取り・大きさ・ログの末尾の読み取り・Node の `path`）。`OnPastaSetSaveVariable` はデバッグを有効にしなくても使える（brief の Constraints の 1 文は事実と違う。再測定の節に書いた）。
-- 柱の属性（0.6.0 の `cue-command-runtime`）は、選び方の予約の 6 つの名前（`優先`・`priority`・`重み`・`weight`・`順番`・`index`。`pasta_core` の `scene_types.rs`）とぶつかる。`＄` で始まる条件と同じく、柱として流さない（下の Phase 13 の「検証で分かった制約」）。
+- 柱の属性（0.7.0 の `cue-command-runtime`）は、選び方の予約の 6 つの名前（`優先`・`priority`・`重み`・`weight`・`順番`・`index`。`pasta_core` の `scene_types.rs`）とぶつかる。`＄` で始まる条件と同じく、柱として流さない（下の Phase 13 の「検証で分かった制約」）。
 
 ### 即時修正（spec なし・本棚卸で実施して閉じた）
 
-- この roadmap — 入った 5 本を「完了フェーズ」に畳み、出した 0.5.0・0.5.1 の節を消した。0.5.3 の表から入った 2 本の行を消し、残りの時期を書き直した。閉じた `call-attribute-filter` を相手に書いていた Phase 11・Phase 13 の境界の記述、`sakura_builder.lua`（557 → 690 行）・`act.lua`（812 → 857 行）の行数、`shiori4-v4-host` の台帳の行の「キックの即時化」、入った spec を Dependencies に書いていた行（`scene-anchor-link`・`hello-novel-sample`・`pasta-recipe`・`pasta-recipe-dev-actions`）を直した。リリースの節に v0.5.0〜v0.5.2 の run を足した。
-- `steering/product.md` — 完了の数（208）、現在地（v0.5.2・次は 0.5.3）、VSCode 拡張の節に `vscode-scene-outline-play` の行。
+- この roadmap — 入った 5 本を「完了フェーズ」に畳み、出した 0.5.0・0.5.1 の節を消した。0.6.0 の表から入った 2 本の行を消し、残りの時期を書き直した。閉じた `call-attribute-filter` を相手に書いていた Phase 11・Phase 13 の境界の記述、`sakura_builder.lua`（557 → 690 行）・`act.lua`（812 → 857 行）の行数、`shiori4-v4-host` の台帳の行の「キックの即時化」、入った spec を Dependencies に書いていた行（`scene-anchor-link`・`hello-novel-sample`・`pasta-recipe`・`pasta-recipe-dev-actions`）を直した。リリースの節に v0.5.0〜v0.5.2 の run を足した。
+- `steering/product.md` — 完了の数（208）、現在地（v0.5.2・次は 0.6.0）、VSCode 拡張の節に `vscode-scene-outline-play` の行。
 - `pasta-recipe` の brief — 申し送りの節（6 行）の改行が LF だったのを、ほかの行と同じ CRLF にした。
 - 確かめて閉じたもの: 入った 5 本の申し送りは、どれも相手の brief に入っている（`actor-line-newlines` → `cue-command-runtime`・`novel-checkpoint-rollback`・`novel-talk-flow`・`scene-anchor-link`、`scene-pick-modes` → `scene-exact-match`・`novel-variable-scope`、`scene-play-locals` → `pasta-recipe-dev-actions`）。`vscode-scene-outline-play` が開発者の判断に回した `editors/vscode/README.md` の 1 行は、もう入っている。入った spec の古いパスの参照は残っていない。
 
@@ -165,7 +165,7 @@ v0.5.2 の次の版で、最優先（開発者「次のリリースにする。�
 
 ### ウェーブ（2026-11-12）
 
-今のゴール（0.5.3）の先頭の 1 本を、1 つのウェーブにする。`pasta-recipe-dev-actions` は `editors/recipe/` とマニュアルの章を共有するので、このウェーブの後に入る。
+今のゴール（0.6.0）の先頭の 1 本を、1 つのウェーブにする。`pasta-recipe-dev-actions` は `editors/recipe/` とマニュアルの章を共有するので、このウェーブの後に入る。
 
 | spec | 子孫 | 種別 | 規模 | 要件定義 |
 | ---- | ---- | ---- | ---- | -------- |
@@ -185,12 +185,12 @@ Opus
 
 ### その先のウェーブ（2026-11-12 の見込み）
 
-見込みで、前のウェーブが入った後の棚卸で確かめてから始める（`/kiro-wave` が始めるのは、上の「ウェーブ」だけ）。0.5.3 は、このウェーブの後に spec のウェーブが 1 つ（2）と、リリースのウェーブ（3）で出せる見込み。
+見込みで、前のウェーブが入った後の棚卸で確かめてから始める（`/kiro-wave` が始めるのは、上の「ウェーブ」だけ）。0.6.0 は、このウェーブの後に spec のウェーブが 1 つ（2）と、リリースのウェーブ（3）で出せる見込み。
 
 | ウェーブ | spec | 入る条件 | 要件定義 |
 | -------- | ---- | -------- | -------- |
 | 2 | pasta-recipe-dev-actions | `pasta-recipe` が入った後（`editors/recipe/` とマニュアルの章を共有する。先に要った `vscode-scene-outline-play`・`scene-play-locals` は入った） | Opus |
-| 3 | 0.5.3 のリリース | 0.5.3 の spec が全部入った後 | Opus |
+| 3 | 0.6.0 のリリース | 0.6.0 の spec が全部入った後 | Opus |
 
 ```
 Wave 2（見込み）1本
@@ -199,15 +199,15 @@ Opus
 ```
 
 ```
-Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
-/release 0.5.3
+Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
+/release 0.6.0
 ```
 
-ゴールの後: 版の決まっていないもの: `scene-exact-match`、`scene-anchor-link`（先に置いた条件の spec は入った。`scene-exact-match` と文法・`act.lua`・`choice_select.lua`・`references.rs` を共有する）、`pasta-dll-multiarch`（`pasta-recipe` とリリースの席を共有する）。0.6.0: `novel-areka-contract`・`novel-variable-scope`・`cue-command-runtime`・`shiori4-v4-host`（先頭。先に要るものはどれも入った）。
+ゴールの後: 版の決まっていないもの: `scene-exact-match`、`scene-anchor-link`（先に置いた条件の spec は入った。`scene-exact-match` と文法・`act.lua`・`choice_select.lua`・`references.rs` を共有する）、`pasta-dll-multiarch`（`pasta-recipe` とリリースの席を共有する）。0.7.0: `novel-areka-contract`・`novel-variable-scope`・`cue-command-runtime`・`shiori4-v4-host`（先頭。先に要るものはどれも入った）。
 
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
-- 前回からの持ち越し（推奨は前回のまま）: `pasta-dll-multiarch` の版（推奨 0.6.0）、`scene-exact-match` の版（遅くとも 0.6.0）、`scene-anchor-link` の版、会えた日数を数える spec を起票するか（`scene-condition-attributes` の研究の記録。推奨: 起票する）、`SOUL.md` §2・§5 の記述（§「Radix Trie 等」の例も古い）、`steering/structure.md` の作り直し、ghost_dev の emo2 開発のフォルダに残る撮影の保存データとログ。
+- 前回からの持ち越し（推奨は前回のまま）: `pasta-dll-multiarch` の版（推奨 0.7.0）、`scene-exact-match` の版（遅くとも 0.7.0）、`scene-anchor-link` の版、会えた日数を数える spec を起票するか（`scene-condition-attributes` の研究の記録。推奨: 起票する）、`SOUL.md` §2・§5 の記述（§「Radix Trie 等」の例も古い）、`steering/structure.md` の作り直し、ghost_dev の emo2 開発のフォルダに残る撮影の保存データとログ。
 - `review-improvement-loop`（常駐）が次に回るときは、v0.5.2 の後のコードを基準にする。
 
 ### 人手の確認が残っている項目
@@ -249,9 +249,9 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 - **飛び先が無いとき**: 選択肢と同じく 204 を返す。失敗の見せ方は `pasta/failure.lua` の出口に乗せる。飛び先の無いリンクの検査は、この spec が `pasta_check validate` に足す（選択肢の飛び先の検査 `validate/references.rs` を使える）。
 - **ウェーブ**: `grammar.pest`・`parse_action.rs`・`element_gen.rs`・`act.lua`・`choice_select.lua`・`references.rs` を、`scene-exact-match` と共有する。そのため 1 本ずつ入れる。名前が当たって条件に合わないとき（今の選択肢は止まるエラー `SCENE_UNMET` を出す）に、それを受け継ぐか、決めてあった 204 にするかは、要件の議題（2026-11-12 の再測定）。
 
-## Phase 13: areka でノベルゲーム（0.6.0。2026-10-29 に 0.5.0 から順延）
+## Phase 13: areka でノベルゲーム（0.7.0。2026-10-29 に 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）
 
-> **版の読み替え（2026-10-29 開発者の決定）**: ノベルゲームは 0.6.0 へ順延した。この節で「0.5.0」と書いてあるのは、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」になった（上の「0.5.0 の範囲」）。`scene-attribute-store`・`scene-condition-attributes` は 0.5.0 へ移したので、下の順番の 2 番と 7 番は、0.6.0 の時点では入っている前提で読む。
+> **版の読み替え（2026-10-29 開発者の決定）**: ノベルゲームは 0.6.0 へ順延した（2026-11-14 に 0.7.0 へ送った）。この節で「0.5.0」と書いてあるのは、ノベルゲームの版のことで、今は 0.7.0 と読む。0.5.0 は「属性関係の整備」になった（上の「0.5.0 の範囲」）。`scene-attribute-store`・`scene-condition-attributes` は 0.5.0 へ移したので、下の順番の 2 番と 7 番は、0.7.0 の時点では入っている前提で読む。
 
 2026-10-10 の `/kiro-discovery` で起こした（main `88c4bc0e`）。国産 10 系統・欧米 9 系統のノベルゲームのスクリプト仕様を調べ、pasta と areka の現在地と照らした。調査ノートは `.kiro/specs/novel-areka-contract/` の `research-jp-engines.md` と `research-western-engines.md` にある。0.5.0 の目標（2026-10-10 開発者の決定）は、別リポジトリで開発中の areka で、ノベルゲームが作れるようになること。
 
@@ -298,7 +298,7 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 
 | 順 | spec | 要件定義 | 規模 | 先に要るもの |
 | -- | ---- | -------- | ---- | ------------ |
-| 1 | novel-areka-contract | Opus | 6〜9（文書だけ） | なし。**0.6.0 のゴールの先頭**（areka の側が早く動けるよう、最初に始める） |
+| 1 | novel-areka-contract | Opus | 6〜9（文書だけ） | なし。**0.7.0 のゴールの先頭**（areka の側が早く動けるよう、最初に始める） |
 | 3 | novel-variable-scope（2026-10-17 に `novel-checkpoint-rollback` から分けた） | Fable | 8〜10 | なし（文法と `element_gen.rs` を触るので、`scene-exact-match`・`scene-anchor-link`・`cue-command-runtime` と同じウェーブに置かない） |
 | 4 | cue-command-runtime（ト書きと柱。2026-10-17 に `scene-stage-attributes` をまとめた） | Fable | 17〜21（超えるならト書きと柱に分け直す） | `scene-attribute-store`（柱の分。2026-11-03 に入った）。語彙の名前は `novel-areka-contract` から引く |
 | 5 | shell-element-click | Opus | 5〜8 | `novel-areka-contract`（完全一致の場面選びは `touch-poke-shortcuts` が入れてある）。`scene-anchor-link` とは `choice_select.lua` を共有する |
@@ -309,7 +309,7 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 | 11 | manual-novel-guide | Opus | 8〜12 | `hello-novel-sample` |
 | 12 | shiori4-v4-host（2026-10-23 起票。同じ日の棚卸で Rust の土台だけにした） | Opus | 14〜17 | `shiori4-v3-portable`（2026-10-25 に入った）・0.5.0 の `ponytail-shiori`（2026-11-03 に入った）。ファイルの順番で 0.5.0 の `debug-mcp-runtime` の後（`actor/`・`shiori.rs` のキックの道。2026-11-03 に入った）。shiori4 の `abi-conventions`・`host-protocol` は 2026-10-24 の 0.1.0 で crates.io に出た。ノベルの合格には要らないので、ほかの 0.5.0 の spec を待たせない |
 | 13 | shiori4-v4-lua-api（2026-10-23 の棚卸で `shiori4-v4-host` から分けた） | Fable | 11〜13 | `shiori4-v4-host` |
-| 14 | 0.6.0 のリリース（`release` スキル） | Opus | — | 上の全部 |
+| 14 | 0.7.0 のリリース（`release` スキル） | Opus | — | 上の全部 |
 
 2 番の `scene-attribute-store` と 7 番の `scene-condition-attributes` は、2026-10-29 に 0.5.0 へ移した（0.5.0 の 1 番・2 番。2026-11-02 の棚卸で表から外した）。
 
@@ -337,10 +337,10 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 
 どの版に入れるかを、開発者がまだ決めていない spec（2026-10-24 の棚卸で、出した 0.4.2 の節から移してまとめた）。ウェーブには入れない。推奨は、上の棚卸の「開発者の判断が要るもの」にある。
 
-- `pasta-dll-multiarch`（2026-10-23 起票）: x64 版と arm64 版の pasta.dll をビルドし、32bit 版と同じリリースで出す。見本ゴーストの .nar には、areka の探し方（x64 は `pasta.x64.dll` → `pasta.dll`、arm64 は `pasta.arm64.dll` → `pasta.x64.dll` → `pasta.dll`）に合う名前で同梱する。接尾辞の無い `pasta.dll` は SSP 向けの 32bit 版のまま。`pasta_check` は名前も arch も気にしないので今のまま使える。手を入れるのは `release.ps1`・`.cargo/config.toml`（aarch64 の `crt-static`）・配布物とリリース CI の検査・マニュアル（`[loader] ffi` で作者の DLL の arch が合わないと読めない注意）。aarch64 で LuaJIT がビルドできるかは確かめていない。`shiori4-v3-portable` の後（areka は shiori4 の入口で読むため）。版は開発者が後で決める（2026-10-23）。推奨は 0.5.0（2026-10-24 の棚卸）だったが、2026-10-29 にノベルゲームを 0.6.0 へ順延したので、推奨は 0.6.0。
-- `scene-exact-match`（2026-10-21 起票。ghost_dev のヒアリング）: 中身は台帳の行にある。0.6.0 の `novel-talk-flow` が前提にするので、遅くとも 0.6.0。選び方の `scene-pick-modes` は 0.5.0 で入った。
+- `pasta-dll-multiarch`（2026-10-23 起票）: x64 版と arm64 版の pasta.dll をビルドし、32bit 版と同じリリースで出す。見本ゴーストの .nar には、areka の探し方（x64 は `pasta.x64.dll` → `pasta.dll`、arm64 は `pasta.arm64.dll` → `pasta.x64.dll` → `pasta.dll`）に合う名前で同梱する。接尾辞の無い `pasta.dll` は SSP 向けの 32bit 版のまま。`pasta_check` は名前も arch も気にしないので今のまま使える。手を入れるのは `release.ps1`・`.cargo/config.toml`（aarch64 の `crt-static`）・配布物とリリース CI の検査・マニュアル（`[loader] ffi` で作者の DLL の arch が合わないと読めない注意）。aarch64 で LuaJIT がビルドできるかは確かめていない。`shiori4-v3-portable` の後（areka は shiori4 の入口で読むため）。版は開発者が後で決める（2026-10-23）。推奨は 0.5.0（2026-10-24 の棚卸）だったが、2026-10-29 にノベルゲームを 0.6.0 へ、2026-11-14 に 0.7.0 へ順延したので、推奨は 0.7.0。
+- `scene-exact-match`（2026-10-21 起票。ghost_dev のヒアリング）: 中身は台帳の行にある。0.7.0 の `novel-talk-flow` が前提にするので、遅くとも 0.7.0。選び方の `scene-pick-modes` は 0.5.0 で入った。
 - `scene-anchor-link`（2026-10-08 起票）: 中身は上の「Phase 11 の残り」の「文中のシーンリンク」にある。先に置いた `scene-condition-attributes` は入った。
-- `pasta-recipe-multiarch`（2026-11-14 起票）: 中身は台帳の行にある。推奨は 0.5.3（リリースの前に入れれば `pasta-recipe.zip` の名前は一度も出ない）。
+- `pasta-recipe-multiarch`（2026-11-14 起票）: 中身は台帳の行にある。版は 0.6.0（2026-11-14 開発者の決定。リリースの前に入れれば `pasta-recipe.zip` の名前は一度も出ない）。
 
 ## 依存の更新（2026-10-24 起票）
 
@@ -368,8 +368,8 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 
 ## Specs (dependency order)
 
-- [ ] shiori4-v4-host -- 版 4 に本格対応する Rust の土台。ホストのテーブルを受け、アクタースレッドからの `host->request` を SHIORI のスレッドへ中継する。post（SSTP に揃えた `SEND`＋`Script`・`Option: nobreak`、`NOTIFY`）と `Tag` の Rust の側、unload での無効化、ホストの `log` への転送、Lua への低い入口と「版 4 で読まれた」の印（キックの即時化は、0.5.0 の `debug-mcp-runtime` がキックを消したので要らない）。取り決めの正本は shiori4 の `abi-conventions`・`host-protocol`（2026-10-23 起票。2 段の 2 段目。同じ日の棚卸で、Lua と DSL の口を `shiori4-v4-lua-api` へ分けた）。0.5.0 に入れる（2026-10-23 開発者の方針。ノベルゲームと同じリリース。2026-10-29 にノベルゲームとともに 0.6.0 へ順延）。`debug-mcp-runtime` と同じウェーブに置かない（`actor/`・`shiori.rs` のキックの道を共有する。あちらは 2026-11-03 に入った）。Dependencies: none（`shiori4-v3-portable`・`ponytail-shiori`・`debug-mcp-runtime` は入った）
-- [ ] shiori4-v4-lua-api -- 版 4 のホストの機能を Lua と DSL から使う口。ホストのプロパティの読み出し（今の `act:get_property` と `CALLBACK.pending` の上に作る）、シーンからの SEND・NOTIFY、終わりを待って `OnHostComplete` で待っているシーンを再開する書き方（`REG:register` との並び・チェイントークの `STORE.co_preempt` との関係・待っている間の unload）、SHIORI3 だけのときの扱い、`pasta_check` の組み込みの名前、マニュアル（2026-10-23 の棚卸で `shiori4-v4-host` から分けた）。0.6.0（2026-10-29 にノベルゲームとともに 0.5.0 から順延）。Dependencies: shiori4-v4-host
+- [ ] shiori4-v4-host -- 版 4 に本格対応する Rust の土台。ホストのテーブルを受け、アクタースレッドからの `host->request` を SHIORI のスレッドへ中継する。post（SSTP に揃えた `SEND`＋`Script`・`Option: nobreak`、`NOTIFY`）と `Tag` の Rust の側、unload での無効化、ホストの `log` への転送、Lua への低い入口と「版 4 で読まれた」の印（キックの即時化は、0.5.0 の `debug-mcp-runtime` がキックを消したので要らない）。取り決めの正本は shiori4 の `abi-conventions`・`host-protocol`（2026-10-23 起票。2 段の 2 段目。同じ日の棚卸で、Lua と DSL の口を `shiori4-v4-lua-api` へ分けた）。0.5.0 に入れる（2026-10-23 開発者の方針。ノベルゲームと同じリリース。2026-10-29 にノベルゲームとともに 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）。`debug-mcp-runtime` と同じウェーブに置かない（`actor/`・`shiori.rs` のキックの道を共有する。あちらは 2026-11-03 に入った）。Dependencies: none（`shiori4-v3-portable`・`ponytail-shiori`・`debug-mcp-runtime` は入った）
+- [ ] shiori4-v4-lua-api -- 版 4 のホストの機能を Lua と DSL から使う口。ホストのプロパティの読み出し（今の `act:get_property` と `CALLBACK.pending` の上に作る）、シーンからの SEND・NOTIFY、終わりを待って `OnHostComplete` で待っているシーンを再開する書き方（`REG:register` との並び・チェイントークの `STORE.co_preempt` との関係・待っている間の unload）、SHIORI3 だけのときの扱い、`pasta_check` の組み込みの名前、マニュアル（2026-10-23 の棚卸で `shiori4-v4-host` から分けた）。0.7.0（2026-10-29 にノベルゲームとともに 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）。Dependencies: shiori4-v4-host
 - [ ] pasta-dll-multiarch -- x64・arm64 版の pasta.dll をビルドし、32bit 版と同じリリースで出す。見本ゴーストの .nar に areka の探し方に合う名前（`pasta.x64.dll`・`pasta.arm64.dll`）で同梱し、接尾辞の無い `pasta.dll` は SSP 向けの 32bit 版のまま残す。`release.ps1`・`.cargo/config.toml`・配布物とリリース CI の検査・マニュアル。aarch64 の LuaJIT のビルドは要確認（2026-10-23 起票。3 者会談の後の areka の相談から）。版は未定。`vsce-4-upgrade`（`release.yml`）・`shiori4-v4-host`（`build.yml`）と同じウェーブに置かない。Dependencies: none（先に要った `shiori4-v3-portable`・`ponytail-manual-ci`・`ponytail-shiori` は入った）
 - [ ] novel-areka-contract -- pasta と areka の取り決め（台本に載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票）。Dependencies: none
 - [ ] novel-variable-scope -- 変数の保存の範囲を、セーブごとと全セーブ共通の 2 つに分ける書き方。今の `＄＊x` と保存ファイルとの互換、保存できない値の扱い（2026-10-17 の棚卸で `novel-checkpoint-rollback` から分割）。Dependencies: none
@@ -379,14 +379,14 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 - [ ] novel-talk-flow -- ノベル向けの出力に切り替える設定。台詞ごとのクリック待ち、話者名と声と変わらない行 ID、ランダムトークと時報の停止、起動時の場面、「次の場面へ」、完全一致の場面選びの切り替え（2026-10-21 に仕組みを `scene-exact-match` へ移した。こちらは設定を入れるだけ）。Dependencies: novel-areka-contract, cue-command-runtime, scene-exact-match
 - [ ] novel-checkpoint-rollback -- 台本に目印の ID を埋め、応答ごとに状態と台本を控える。areka が知らせた ID の時点へ戻す（変数の保存の範囲は 2026-10-17 に `novel-variable-scope` へ分けた）。Dependencies: novel-talk-flow, novel-variable-scope
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
-- [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.6.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, novel-areka-contract（areka の側の実装も要る）
+- [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.7.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, novel-areka-contract（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 - [ ] scene-exact-match -- 完全一致でシーンを呼ぶ `＞＞シーン名`（同名が複数ならランダム。既存の `search_scene_exact` を使う）と、`pasta.toml` の `[scene] match = "exact"`（`＞`・イベントの受け口・OnTalk・時報・選択肢の飛び先を全部完全一致にする。既定は前方一致）を足す。既定のモードでも、イベントの受け口はイベント ID の直後が英大文字で続く候補（`＊OnInstallCompleteAll` など）を外す。`novel-talk-flow` の完全一致の切り替えを引き取る（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者が承認して `event-scene-exact-match` から広げた）。版は未定。`scene-anchor-link` と同じウェーブに置かない（文法・`act.lua`・`choice_select.lua` を共有する）。Dependencies: none
 - [x] vsce-4-upgrade -- `@vscode/vsce` を 4.x に上げる。リリース CI の Node は `ponytail-manual-ci` が 22 にした。`--azure-credential` の公開の道を `release-setup-check.yml` で確かめる。だめなら 4.x の OIDC の口へ移すかを決める（2026-10-24 起票。`/update` から）。版は未定。`pasta-dll-multiarch`・`pasta-recipe`（`release.yml`）、`pasta-recipe-dev-actions` は入った（`editors/vscode/package.json`・lock は変えず、`build.yml` に job `vscode-test` を足した）。Dependencies: none（`ponytail-manual-ci` は入った）
-- [x] pasta-recipe -- VS Code を使わない pasta DSL のエディタ（仮名）。Tauri 2 ＋ Vite ＋ Monaco の Windows x64 の単一の exe。ゴーストのフォルダのドラッグドロップで `ghost/master` を開き、最近開いたものを TOML で残す。ファイルとシーンのツリー、`.pasta` の着色（TextMate ＋ セマンティックトークン）と診断、ゴースト全体の検査、コードブロックの Lua の着色と `.lua` の編集、保存。解析は Rust の側で `pasta_lsp`・`pasta_check` を直接呼ぶ。`editors/recipe/`（`src-tauri` は別の Cargo ワークスペース）。リリースの成果物 `pasta-recipe.zip` とマニュアル（2026-11-12 起票。開発者の依頼「最優先事項」）。0.5.3 のウェーブ 1（2026-11-12 の棚卸）。`pasta-dll-multiarch`・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`vscode-scene-outline-play` は入った）
-- [x] pasta-recipe-dev-actions -- VS Code 拡張の実行の流れ（MCP クライアント・リロード・シーン実行・変数ダンプ）を `editors/shared/` へ移し、入出力（HTTP の POST・ファイルの読み取り・更新時刻）だけを Node と Tauri で差し込む。拡張の振る舞いは変えない。`pasta-recipe` に、シーンの ▶・リロード・出力の欄・保存変数の表（`OnPastaSetSaveVariable` で書き換え・削除。表は見るだけ）・ローカル変数を入れた実行を足す（2026-11-12 起票。`pasta-recipe` から分けた）。0.5.3 のウェーブ 2 の見込み。`vsce-4-upgrade`（`editors/vscode/package.json`）と同じウェーブに置かない。Dependencies: pasta-recipe（`scene-play-locals`・`vscode-scene-outline-play` は入った）
+- [x] pasta-recipe -- VS Code を使わない pasta DSL のエディタ（仮名）。Tauri 2 ＋ Vite ＋ Monaco の Windows x64 の単一の exe。ゴーストのフォルダのドラッグドロップで `ghost/master` を開き、最近開いたものを TOML で残す。ファイルとシーンのツリー、`.pasta` の着色（TextMate ＋ セマンティックトークン）と診断、ゴースト全体の検査、コードブロックの Lua の着色と `.lua` の編集、保存。解析は Rust の側で `pasta_lsp`・`pasta_check` を直接呼ぶ。`editors/recipe/`（`src-tauri` は別の Cargo ワークスペース）。リリースの成果物（今は `pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip`）とマニュアル（2026-11-12 起票。開発者の依頼「最優先事項」）。0.6.0 のウェーブ 1（2026-11-12 の棚卸）。`pasta-dll-multiarch`・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`vscode-scene-outline-play` は入った）
+- [x] pasta-recipe-dev-actions -- VS Code 拡張の実行の流れ（MCP クライアント・リロード・シーン実行・変数ダンプ）を `editors/shared/` へ移し、入出力（HTTP の POST・ファイルの読み取り・更新時刻）だけを Node と Tauri で差し込む。拡張の振る舞いは変えない。`pasta-recipe` に、シーンの ▶・リロード・出力の欄・保存変数の表（`OnPastaSetSaveVariable` で書き換え・削除。表は見るだけ）・ローカル変数を入れた実行を足す（2026-11-12 起票。`pasta-recipe` から分けた）。0.6.0 のウェーブ 2 の見込み。`vsce-4-upgrade`（`editors/vscode/package.json`）と同じウェーブに置かない。Dependencies: pasta-recipe（`scene-play-locals`・`vscode-scene-outline-play` は入った）
 
-- [ ] pasta-recipe-multiarch -- pasta-recipe を x64 と arm64 の 2 つで作り、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` としてリリース CI で検査して添付する（`pasta-recipe.zip` の名前は出さない）。x64 のランナーで `--target` を付けて 2 回作る（arm64 はクロス）。`package.ps1`・ルートの `.cargo/config.toml`（aarch64 の `crt-static`）・`release.yml`（PE ヘッダの arch の検査も）・`build.yml` の job `recipe`・`github-release.ps1` と自己テスト・`release` スキルの添付の数え方・マニュアルと README。x64 も含めた CI のビルドの完成までが範囲（開発者の指示）。アプリは LuaJIT を持たない。クロスで通るかは要確認（2026-11-14 起票。開発者「arm64 を起票して」）。版は未定（推奨 0.5.3）。`pasta-dll-multiarch`（`.cargo/config.toml`・`release.yml`）・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`pasta-recipe`・`pasta-recipe-dev-actions` は入った）
+- [x] pasta-recipe-multiarch -- pasta-recipe を x64 と arm64 の 2 つで作り、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` としてリリース CI で検査して添付する（`pasta-recipe.zip` の名前は出さない）。x64 のランナーで `--target` を付けて 2 回作る（arm64 はクロス）。`package.ps1`・ルートの `.cargo/config.toml`（aarch64 の `crt-static`）・`release.yml`（PE ヘッダの arch の検査も）・`build.yml` の job `recipe`・`github-release.ps1` と自己テスト・`release` スキルの添付の数え方・マニュアルと README。x64 も含めた CI のビルドの完成までが範囲（開発者の指示）。アプリは LuaJIT を持たない。クロスで通るかは要確認（2026-11-14 起票。開発者「arm64 を起票して」）。版は 0.6.0（2026-11-14 開発者の決定）。`pasta-dll-multiarch`（`.cargo/config.toml`・`release.yml`）・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`pasta-recipe`・`pasta-recipe-dev-actions` は入った）
 
 ## Existing Spec Updates
 
@@ -426,7 +426,7 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 
 ### その他
 
-- `pasta_novel` アダプタ（ノベルゲーム宿主）— ノベルゲーム（0.6.0。2026-10-29 に 0.5.0 から順延）は、SHIORI とさくらスクリプトのまま作ると決めた（2026-10-10。上の「Phase 13」）。SHIORI を通さない宿主が必要になったら、その動機から起票する。Phase 7 の宿主非依存コアと presentation event stream 契約が土台になる。
+- `pasta_novel` アダプタ（ノベルゲーム宿主）— ノベルゲーム（0.7.0。2026-10-29 に 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）は、SHIORI とさくらスクリプトのまま作ると決めた（2026-10-10。上の「Phase 13」）。SHIORI を通さない宿主が必要になったら、その動機から起票する。Phase 7 の宿主非依存コアと presentation event stream 契約が土台になる。
 - デバッグポートの他プロセスによる奪取（即時修正で判明）— 相手が `SO_REUSEADDR` を立てて bind する場合まで防ぐには、Windows の `SO_EXCLUSIVEADDRUSE` が要る。ゴースト同士の二重 bind は防いだ。取れなかった側は、デバッグなしで起動を続ける（2026-10-19）。
 - 式の木の優先順位（2026-10-07 棚卸、`dsl-codegen-runtime-safety` の調査）— `pasta_dsl` の `parse_action.rs` の `build_left_assoc_expr` は優先順位なしで木を作り、コード生成（`expr_gen.rs`）が組み直している。AST を直接使う別の利用者が出たら直す。
 - 別ファイルの同名シーンのデバッガ索引（2026-10-07 棚卸、`scene-identity-format` の範囲外）— ファイルをまたぐ同名シーンの索引と通し番号は、既存の制約として残した。

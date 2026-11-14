@@ -15,7 +15,7 @@ param(
     [Parameter(Mandatory)][string]$Tag,
     [string]$Title = "pasta $Tag",
     [Parameter(Mandatory)][string]$NotesFile,
-    # pasta.dll.zip・hello-pasta.nar・pasta-vscode-X.Y.Z.vsix・pasta_check.zip・pasta-skills.zip・pasta-recipe.zip・release-notes-vX.Y.Z.md を置いたディレクトリ。呼び出し元のカレントディレクトリからの相対パス可。
+    # pasta.dll.zip・hello-pasta.nar・pasta-vscode-X.Y.Z.vsix・pasta_check.zip・pasta-skills.zip・pasta-recipe.x64.zip・pasta-recipe.arm64.zip・release-notes-vX.Y.Z.md を置いたディレクトリ。呼び出し元のカレントディレクトリからの相対パス可。
     [Parameter(Mandatory)][string]$AssetDir,
     [switch]$DryRun
 )
@@ -68,8 +68,8 @@ function Get-Release {
 try {
     if ($Tag -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+\z') { Complete failed publish "タグ ``$Tag`` が vX.Y.Z の形でない" }
 
-    # (1) 7 つの添付（配布物 6 つと詳しいリリースノート）がそろっていることを先に検査する（6.2）
-    $names = @('pasta.dll.zip', 'hello-pasta.nar', "pasta-vscode-$($Tag.Substring(1)).vsix", 'pasta_check.zip', 'pasta-skills.zip', 'pasta-recipe.zip', "release-notes-$Tag.md")
+    # (1) 8 つの添付（配布物 7 つと詳しいリリースノート）がそろっていることを先に検査する（6.2）
+    $names = @('pasta.dll.zip', 'hello-pasta.nar', "pasta-vscode-$($Tag.Substring(1)).vsix", 'pasta_check.zip', 'pasta-skills.zip', 'pasta-recipe.x64.zip', 'pasta-recipe.arm64.zip', "release-notes-$Tag.md")
     $files = @{}
     foreach ($n in $names) {
         $p = Join-Path $AssetDir $n
@@ -85,8 +85,8 @@ try {
     $uploaded = @($assets | Where-Object state -eq 'uploaded' | ForEach-Object name)
     $missing = @($names | Where-Object { $uploaded -notcontains $_ })
 
-    # 公開済み・7 つ添付済み → 飛ばす。題名・ノートは触らない（6.4・7.3）
-    if ($rel -and -not $rel.isDraft -and -not $missing) { Complete skipped '' '公開済みで 7 つ（配布物 6 つと詳しいリリースノート）が添付済みのため飛ばした' }
+    # 公開済み・8 つ添付済み → 飛ばす。題名・ノートは触らない（6.4・7.3）
+    if ($rel -and -not $rel.isDraft -and -not $missing) { Complete skipped '' '公開済みで 8 つ（配布物 7 つと詳しいリリースノート）が添付済みのため飛ばした' }
 
     # (3) 行う操作を組み立てる
     $ops = [System.Collections.Generic.List[object]]::new()
@@ -100,7 +100,7 @@ try {
     }
     # 足りないものだけを添付する。--clobber は使わない（7.6）
     if ($missing) { $ops.Add(@('release', 'upload', $Tag) + @($missing | ForEach-Object { $files[$_] })) }
-    # 7 つがそろってから公開する（6.5）。公開済みの Release には行わない
+    # 8 つがそろってから公開する（6.5）。公開済みの Release には行わない
     if (-not $rel -or $rel.isDraft) { $ops.Add(@('release', 'edit', $Tag, '--draft=false')) }
 
     if ($DryRun) {

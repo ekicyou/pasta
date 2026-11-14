@@ -8,10 +8,14 @@
 # CI（build.yml）がルートから `cargo build -p pasta_shiori` を実行する構成では、
 # crates/pasta_shiori/.cargo/config.toml は読み込まれない。ルート配置で確実に反映させる。
 #
-# 出荷ターゲットは x86（i686）・x64（x86_64）の両方。両者に crt-static を適用する。
+# 出荷ターゲットは x86（i686）・x64（x86_64）・arm64（aarch64。pasta-recipe の arm64 版）。
+# すべてに crt-static を適用する。
 
 [target.i686-pc-windows-msvc]
 rustflags = ["-Ctarget-feature=+crt-static"]
 
 [target.x86_64-pc-windows-msvc]
+rustflags = ["-Ctarget-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
 rustflags = ["-Ctarget-feature=+crt-static"]
