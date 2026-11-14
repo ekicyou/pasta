@@ -614,6 +614,24 @@ describe("check_hour - all candidates miss", function()
 
         expect(result):toBe(nil)
     end)
+
+    test("next_talk_time is unchanged when no candidate matches", function()
+        setup()
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            return nil
+        end)
+
+        local act = { req = { id = "OnSecondChange", status = "idle", date = { unix = 0, hour = 12 } } }
+        dispatcher.check_hour(act)
+        dispatcher.check_talk(act) -- 初回: 次のおしゃべりの時刻を決める
+        local before = dispatcher._get_internal_state().next_talk_time
+        expect(before ~= 0):toBe(true)
+        act.req.date.unix = 3600
+
+        expect(dispatcher.check_hour(act)):toBe(nil)
+        expect(dispatcher._get_internal_state().next_talk_time):toBe(before)
+    end)
 end)
 
 -- ============================================================================
@@ -975,7 +993,7 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         expect(found):toBe(nil)
     end)
 
-    vtest("実機の順番のスリープ明け（OnSysSuspend → 最初の秒 → OnSysResume）でも時報は 1 回出て、おしゃべりはすぐ出る", function()
+    vtest("実機の順番のスリープ明け（OnSysSuspend → 最初の秒 → OnSysResume）でも時報は 1 回出て、おしゃべりは時報から数え直す", function()
         dispatcher.check_hour(mk_act(R0)) -- 初回: 11:00 を記録
         dispatcher.check_talk(mk_act(R0)) -- 初回: 次のおしゃべりを記録
         local talk_at = dispatcher._get_internal_state().next_talk_time
@@ -984,11 +1002,37 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         expect(type(dispatcher.check_hour(mk_act(real)))):toBe("thread")
         expect(found):toBe("時報" .. hh_of(real))
         expect(talk_at < CLOCK.steady({ date = mk_date(real), dic = {} })):toBe(true)
-        expect(type(dispatcher.check_talk(mk_act(real + 1)))):toBe("thread")
+        expect(dispatcher.check_talk(mk_act(real + 1))):toBe(nil) -- 時報から数え直すので、すぐは出ない
         CLOCK.observe({ id = "OnSysResume", date = mk_date(real + 4), dic = {} }) -- 4 秒遅れて届く
         found = nil
         expect(dispatcher.check_hour(mk_act(real + 5))):toBe(nil)
         expect(found):toBe(nil)
+    end)
+
+    vtest("時報が出たら、次のおしゃべりは時報から数え直す（マージンで見送られた分は時報の直後に出ない）", function()
+        local t0 = BASE + H - 400
+        dispatcher.check_hour(mk_act(t0))
+        dispatcher.check_talk(mk_act(t0)) -- 次のおしゃべりは 10:56:20〜10:58:20 のどこか
+        pass(t0 + 1, BASE + H - 21)
+        expect(dispatcher.check_talk(mk_act(BASE + H - 20))):toBe(nil) -- 時報の 20 秒前: マージンで見送り
+        pass(BASE + H - 19, BASE + H - 1)
+        local act = mk_act(BASE + H)
+        expect(type(dispatcher.check_hour(act))):toBe("thread")
+        local wait = dispatcher._get_internal_state().next_talk_time - CLOCK.steady(act.req)
+        expect(wait >= 180 and wait <= 300):toBe(true)
+        pass(BASE + H + 1, BASE + H + 178)
+        expect(dispatcher.check_talk(mk_act(BASE + H + 179))):toBe(nil)
+    end)
+
+    vtest("時報の候補が 1 つもなければ、次のおしゃべりの時刻は変わらない", function()
+        dispatcher._set_scene_executor(function() return nil end)
+        dispatcher.check_hour(mk_act(R0))
+        dispatcher.check_talk(mk_act(R0))
+        local talk_at = dispatcher._get_internal_state().next_talk_time
+        expect(talk_at ~= 0):toBe(true)
+        pass(R0 + 1, BASE + H - 1)
+        expect(dispatcher.check_hour(mk_act(BASE + H))):toBe(nil)
+        expect(dispatcher._get_internal_state().next_talk_time):toBe(talk_at)
     end)
 
     vtest("hour_margin は仮想の正時までの残りで見る", function()
