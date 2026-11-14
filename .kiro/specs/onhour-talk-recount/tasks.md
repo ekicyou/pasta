@@ -37,7 +37,7 @@
   - _Dispatch: standard — 発行の記録と予約の分岐を書く_
   - _Requirements: 3.1, 3.3, 3.4, 3.5, 3.6, 3.8, 3.9, 6.3_
 
-- [ ] 3. OnSysResume の既定ハンドラ
+- [x] 3. OnSysResume の既定ハンドラ
 - [x] 3.1 OnSysResume の既定ハンドラを新しいモジュールに置き、読み込みに足す
   - ゴーストが先に代入していなければ置く形で、イベント名でシーンを探して見つかればそれを返し、Reference0 が `auto` なら何もせず、それ以外は 2.2 の予約を呼んで何も返さない（応答は 204）
   - `pasta.shiori.event` を require しない。既定ハンドラの読み込みの並びの `recommend` の後に 1 行足す
@@ -46,7 +46,7 @@
   - _Depends: 2.2_
   - _Dispatch: standard — 既定ハンドラの分岐と読み込みの配線_
   - _Requirements: 3.2, 3.7, 4.1, 4.2, 4.3, 4.4, 4.5_
-- [ ] 3.2 EVENT.fire を通すスリープ明けの結合テストを書く
+- [x] 3.2 EVENT.fire を通すスリープ明けの結合テストを書く
   - 新しいスイート `sys_resume_event_test.lua` を、依存の閉包を読み直す形で書き、Lua のテストの一覧（`lua_specs/init.lua`）に spec 名と要件の注釈つきで登録する（シーンの検索は差し替えか、ディスパッチャのシーンの差し替えで OnTalk を返す）
   - 受けていないゴースト: `OnSysSuspend` → 何も出ない最初の秒 → `OnSysResume`（normal）が 204、次の門の開いた秒が OnTalk の 200、Status に `talking` がある秒は 204 で解けた秒に出る
   - 正時をまたいだ復帰: 最初の秒で時報 → `OnSysResume` → `talk_interval_min` 秒より前は OnTalk が出ない
