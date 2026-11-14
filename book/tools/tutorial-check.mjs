@@ -20,7 +20,7 @@
 //      一致する ```pasta ブロックがある（無ければ no-chapter / no-matching-block）。
 //   2. 章から辞書へ: 入門のどの章の ```pasta ブロックも、同じ名前の辞書の全体か、
 //      連続した行の抜き出しである（違えば not-in-dic。辞書の無い章なら no-dic）。
-//      字下げ・引用の中の ```pasta フェンスは抽出できないので indented-fence で失敗にする。
+//      字下げ・引用の中の ```pasta フェンスは抽出できないので indented-fence で、言語名の後ろに飾りの付いた開き（```pasta title など）も attributed-fence で失敗にする。
 //   3. 行事の表 calendar.csv も同じ規則の対で照合する（date-var-calendar 要件 10.6）。
 //      calendar.csv があれば、その全体と一致する ```csv ブロックがどこかの章にある（無ければ
 //      no-matching-block）。どの章の ```csv ブロックも calendar.csv の全体か連続した行の抜き出し
@@ -134,7 +134,8 @@ export function isExcerptOf(dicContent, block) {
 // ---- 字下げ・引用の中にある ```pasta・```csv フェンスの開き行を拾う ----
 // extractPastaBlocks は行頭のフェンスしか抽出しないので、字下げ・引用・リストの中の
 // フェンスは照合をすり抜ける。ここで開き行を拾って失敗にする。
-// 行頭のフェンス（言語を問わない）の中は中身なので見ない。
+// 言語名の後ろに飾りの付いた行頭の開き（```pasta title・```csv,ignore）も抽出されないので、
+// attributed-fence として拾う。行頭のフェンス（言語を問わない）の中は中身なので見ない。
 function findIndentedFences(markdown) {
   const heads = [];
   let fence = null; // 開いている行頭のフェンスのバッククォート列
@@ -144,8 +145,11 @@ function findIndentedFences(markdown) {
       const open = /^(`{3,})[^`]*$/.exec(text);
       if (open) {
         fence = open[1];
+        if (/^`{3,}(?:pasta|csv)(?:[^\S\r\n]+\S|[,{])/.test(text)) {
+          heads.push({ head: text, reason: 'attributed-fence' });
+        }
       } else if (/^(?:[\s>]|[-*+]\s|\d+[.)]\s)+`{3,}(?:pasta|csv)\s*$/.test(text)) {
-        heads.push(text);
+        heads.push({ head: text, reason: 'indented-fence' });
       }
     } else if (/^`+\s*$/.test(text) && text.trimEnd().length >= fence.length) {
       fence = null;
@@ -222,7 +226,7 @@ export function findProseParagraphs(markdown) {
  * @typedef {object} BlockProblem 章のブロックの問題（章から辞書・calendar.csv へ）
  * @property {string} chapter 章（リポジトリルートからの相対）
  * @property {string} head ブロックの先頭行（名指し用。indented-fence はフェンスの開き行）
- * @property {'not-in-dic' | 'no-dic' | 'not-in-calendar' | 'no-calendar' | 'indented-fence'} reason
+ * @property {'not-in-dic' | 'no-dic' | 'not-in-calendar' | 'no-calendar' | 'indented-fence' | 'attributed-fence'} reason
  *
  * @typedef {object} TutorialCheckResult
  * @property {boolean} ok fatal が無く、results がすべて matched で、problems が空
@@ -286,8 +290,8 @@ export function runTutorialCheck(repoRoot = REPO_ROOT) {
         reason: dic === undefined ? 'no-dic' : 'not-in-dic',
       });
     }
-    for (const head of findIndentedFences(markdown)) {
-      problems.push({ chapter, head, reason: 'indented-fence' });
+    for (const { head, reason } of findIndentedFences(markdown)) {
+      problems.push({ chapter, head, reason });
     }
   }
 

@@ -17,7 +17,7 @@
 //   - 辞書の欠落（辞書の無い章のブロック）→ no-dic。
 //   - 旧方式（全部のブロックを 1 枚の章に集める）→ ほかの辞書が no-chapter・余分なブロックが not-in-dic。
 //   - 抜き出しの一致 → ok=true ／ 抜き出しの不一致 → not-in-dic。
-//   - 字下げ・引用の中のフェンス → indented-fence。
+//   - 字下げ・引用の中のフェンス → indented-fence ／ 飾り付きの開き（```pasta title・```csv,ignore） → attributed-fence。
 //   - csv ブロック ↔ calendar.csv（同じ規則の対）: 全体と抜き出し → ok=true ／ 全体の欠落 →
 //     no-matching-block ／ 抜き出しの不一致 → not-in-calendar ／ calendar.csv の無い csv ブロック → no-calendar。
 //   - 致命的な失敗（入門のフォルダ無し・辞書 0 件）→ fatal。
@@ -318,6 +318,26 @@ inSandbox((root) => {
     JSON.stringify(result.problems));
   check('別の言語のフェンスの中の字下げ ```pasta は記録しない',
     result.problems.length === 3, JSON.stringify(result.problems));
+});
+
+log('\n== (B-3h) 飾り付きのフェンス（```pasta title・```csv,ignore） ==');
+// 言語名の後ろに飾りの付いた ```pasta・```csv の開きは抽出されないので、照合をすり抜けないよう失敗にする。
+inSandbox((root) => {
+  append(root, chapterRel(BOOT), '```pasta title\n＊どこにも無い\n```\n');
+  append(root, chapterRel('02-talk.pasta'), '```csv,ignore\n9999,無い\n```\n');
+  append(root, chapterRel('03-face.pasta'), '```pastax\n例\n```\n');
+  const result = runTutorialCheck(root);
+  check('飾り付きのフェンスで ok=false', result.ok === false);
+  check('```pasta title が attributed-fence',
+    result.problems.some((p) => p.reason === 'attributed-fence'
+      && p.chapter === chapterRel(BOOT) && p.head === '```pasta title'),
+    JSON.stringify(result.problems));
+  check('```csv,ignore が attributed-fence',
+    result.problems.some((p) => p.reason === 'attributed-fence'
+      && p.chapter === chapterRel('02-talk.pasta') && p.head === '```csv,ignore'),
+    JSON.stringify(result.problems));
+  check('別の言語名（```pastax）は記録しない',
+    result.problems.length === 2, JSON.stringify(result.problems));
 });
 
 // ============================================================
