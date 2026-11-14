@@ -102,7 +102,7 @@ $MARKER_KEYS  = 'secInventory', 'secWave', 'secNextWaves', 'secLedger', 'secSumm
                 'doneOrder', 'rowSep', 'depsMarker', 'brackets', 'sentenceEnd', 'ellipsis'
 $LABEL_KEYS   = 'title', 'sourceUpdated', 'sourceBlob', 'sourceBlobUnknown', 'bandCount', 'warningCount', 'wave',
                 'done', 'notInLedger', 'notInBand', 'otherBands', 'prereqs', 'notInRoadmap', 'order', 'model', 'size',
-                'noTheme', 'clearFilter', 'completedHeading', 'colPhase', 'colTopic', 'colSpecs', 'completedExtra',
+                'noTheme', 'clearFilter',
                 'what', 'note', 'waveCommands', 'copy', 'copied'
 $SECTION_PREFIX = '## '
 $TABLE_RULE     = '^\|\s*:?-'
@@ -502,55 +502,47 @@ function Read-Roadmap([string]$Text, [pscustomobject]$Markers, [pscustomobject]$
     }
 
     # 台帳に在ってどの帯にも無い未完了の spec は、末尾の帯（名前と目標は空・台帳の順）へ。
-    # 完了の印の付いた行は、完了の表に無ければ「まだ畳んでいない完了」へ
-    $extra = [System.Collections.Generic.List[object]]::new()
+    # 完了の印の付いた行は出さない（前提の完了の判定にだけ置く・areka 開発者 2026-11-04「終わった項目は不要です」）
     $rest = foreach ($r in $ledger) {
         if ($placed.Contains($r.name)) { continue }
         $card = New-Card $r.name $null
         $placed[$r.name] = @{ Band = ''; Card = $card }
-        if (-not $r.done) { $card; continue }
-        if ($summaryBy.ContainsKey($r.name)) { continue }
-        $extra.Add([pscustomobject][ordered]@{ name = $r.name; oneLiner = $card.oneLiner; theme = $card.theme })
+        if (-not $r.done) { $card }
     }
     $rest = [object[]]@($rest)
     if ($rest.Count) { $outBands.Add([pscustomobject][ordered]@{ name = ''; goal = ''; notInBand = $true; cards = $rest }) }
 
-    # 前提の居場所は、置いた帯の名前と完了か（どちらも無い＝roadmap に無い）
+    # 前提の居場所は、置いた帯の名前（無い＝roadmap に無い）。完了した前提は出さない
     foreach ($p in $placed.Values) {
         $card = $p.Card
         $lr = $ledgerBy[$card.name]
         $card.prereqs = [object[]]@(foreach ($n in @(if ($null -ne $lr) { $lr.prereqs })) {
             $q = $placed.Contains($n) ? $placed[$n] : $null
-            [pscustomobject][ordered]@{
-                name = $n; band = ${q}?.Band; done = $summaryBy.ContainsKey($n) -or ($null -ne $q -and $q.Card.done)
-            }
+            if ($summaryBy.ContainsKey($n) -or ($null -ne $q -and $q.Card.done)) { continue }
+            [pscustomobject][ordered]@{ name = $n; band = ${q}?.Band }
         })
         $card.otherBands = [string[]]@($card.otherBands)
     }
 
-    # テーマは見せるもの（帯のカードと、まだ畳んでいない完了）のあるものだけを、節の順に残し、添字を詰める
+    # テーマは見せるもの（帯のカード）のあるものだけを、節の順に残し、添字を詰める
     # （テーマなしは末尾の添字＝テーマの数）
-    $shown = @(foreach ($b in $outBands) { $b.cards }) + @($extra)
+    $shown = @(foreach ($b in $outBands) { $b.cards })
     $used = [System.Collections.Generic.SortedSet[int]]::new()
     foreach ($o in $shown) { if ($o.theme -ge 0) { [void]$used.Add($o.theme) } }
     $map = @{}
     $themes = foreach ($t in $used) { $map[$t] = $map.Count; $themeSecs[$t].Name }
     $themes = [string[]]@($themes)
-    foreach ($o in @($placed.Values | ForEach-Object { $_.Card }) + @($extra)) {
+    foreach ($o in @($placed.Values | ForEach-Object { $_.Card })) {
         $o.theme = $o.theme -ge 0 -and $map.ContainsKey($o.theme) ? $map[$o.theme] : $themes.Count
     }
 
-    $rows = foreach ($r in $summary.Rows) {
-        [pscustomobject][ordered]@{ phase = $r.phase; topic = $r.topic; oneLiner = Get-OneLiner $r.topic $Markers; specs = $r.specs }
-    }
-
+    # 完了の一覧は出さない（完了の表は完了の判定にだけ使う）
     $data = [pscustomobject][ordered]@{
         source = [pscustomobject][ordered]@{ updatedAt = $updatedAt; blob = $Source.blob }
         themes = $themes
         bands = [object[]]$outBands
         waveCommands = $wave.Commands
         nextWaveCommands = Get-NextWaves $lines $Markers
-        completed = [pscustomobject][ordered]@{ rows = [object[]]@($rows); extra = [object[]]$extra }
         warningCount = $warnings.Count
     }
     [pscustomobject]@{ Missing = [string[]]@(); Warnings = [object[]]$warnings; Data = $data }

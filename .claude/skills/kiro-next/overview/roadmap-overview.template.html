@@ -48,16 +48,6 @@ details.card > summary::-webkit-details-marker { display: none; }
 .body { margin: 0; padding: 6px 8px 8px; border-top: 1px solid var(--line); font-size: 13px; }
 .body dt { font-weight: 600; margin-top: 4px; }
 .body dd { margin: 0 0 0 8px; white-space: pre-wrap; }
-section.completed { padding: 0 16px 24px; }
-section.completed h2 { font-size: 16px; }
-.row { border: 1px solid var(--line); border-radius: 6px; margin: 4px 0; background: var(--panel); }
-.row > summary { cursor: pointer; padding: 6px 8px; display: grid;
-  grid-template-columns: 6em minmax(0, 2fr) minmax(0, 1fr); gap: 8px; }
-.row > summary span { overflow-wrap: anywhere; }
-.row .body { white-space: pre-wrap; }
-.head-row { display: grid; grid-template-columns: 6em minmax(0, 2fr) minmax(0, 1fr); gap: 8px;
-  padding: 0 9px; color: var(--muted); font-size: 12px; }
-.extra { margin-top: 12px; }
 .wave-cmds { padding: 12px 16px 0; }
 .wave-cmds .bar { display: flex; align-items: center; gap: 8px; }
 .wave-cmds h2 { margin: 0; font-size: 16px; }
@@ -65,10 +55,6 @@ section.completed h2 { font-size: 16px; }
   background: var(--panel); color: var(--fg); cursor: pointer; }
 .wave-cmds pre { margin: 6px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px;
   background: var(--panel); overflow-x: auto; font: 13px/1.5 ui-monospace, Consolas, monospace; }
-@media (max-width: 640px) {
-  .row > summary, .head-row { grid-template-columns: 1fr; gap: 0; }
-  .head-row { display: none; }
-}
 </style>
 </head>
 <body>
@@ -160,7 +146,6 @@ section.completed h2 { font-size: 16px; }
   document.body.appendChild(legend);
   var used = {};
   D.bands.forEach(function (b) { b.cards.forEach(function (c) { used[c.theme] = true; }); });
-  D.completed.extra.forEach(function (x) { used[x.theme] = true; });
   var selected = {};
   var buttons = [];
   for (var i = 0; i <= noTheme; i++) {
@@ -193,7 +178,6 @@ section.completed h2 { font-size: 16px; }
   function place(p) {
     var where = [];
     if (p.band !== null) where.push(p.band === "" ? L.notInBand : p.band);
-    if (p.done) where.push(L.done);
     if (where.length === 0) where.push(L.notInRoadmap);
     return p.name + " (" + where.join(", ") + ")";
   }
@@ -272,39 +256,6 @@ section.completed h2 { font-size: 16px; }
     });
   }
   apply();
-
-  // Completed area (never filtered)
-  var done = el("section", "completed");
-  done.appendChild(el("h2", null, L.completedHeading));
-  var hr = el("div", "head-row");
-  [L.colPhase, L.colTopic, L.colSpecs].forEach(function (t) { hr.appendChild(el("span", null, t)); });
-  done.appendChild(hr);
-  D.completed.rows.forEach(function (r) {
-    var d = el("details", "row");
-    var s = el("summary");
-    [r.phase, r.oneLiner, r.specs].forEach(function (t) { s.appendChild(el("span", null, t)); });
-    d.appendChild(s);
-    d.appendChild(el("div", "body", r.topic));
-    done.appendChild(d);
-  });
-  if (D.completed.extra.length) {
-    var ex = el("div", "extra");
-    ex.appendChild(el("h3", null, L.completedExtra));
-    D.completed.extra.forEach(function (x) {
-      var d = el("div", "row");
-      paint(d, x.theme);
-      var line = el("div", "body");
-      line.style.borderTop = "0";
-      line.appendChild(el("span", "name", x.name));
-      line.appendChild(tag(x.theme));
-      line.appendChild(el("span", "mark done", L.done));
-      line.appendChild(el("div", "one", x.oneLiner));
-      d.appendChild(line);
-      ex.appendChild(d);
-    });
-    done.appendChild(ex);
-  }
-  document.body.appendChild(done);
 })();
 </script>
 </body>
