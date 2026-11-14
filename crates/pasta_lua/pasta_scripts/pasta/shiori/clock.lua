@@ -237,7 +237,7 @@ function M.offset()
     return _offset
 end
 
---- OnSysSuspend を見た回数。時報のディスパッチャが「前回から変わったか」で数え直しを決める。
+--- OnSysSuspend を見た回数。仮想ディスパッチャの wake_talk が「最後の自動トークはこの回数の後か」を比べる。
 ---@return integer
 function M.suspend_count()
     return _suspend_count
