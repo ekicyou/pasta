@@ -960,3 +960,132 @@ fn static_call_lookup_matches_runtime() {
         assert_eq!(!missing, found_at_runtime, "{global} ＞{key}（{line} 行）");
     }
 }
+
+// ---- (g) 行事の表（calendar.csv） ----
+
+/// 殻（collect）と同じ入力で検査し、行事の表の誤りの有無と行番号（昇順）を返す
+fn calendar_errors(base: &Path) -> (bool, Vec<u32>) {
+    let (input, files) = pasta_check::ghost_files::collect(base).unwrap();
+    let report = validate_ghost(&input, &files);
+    let errors: Vec<_> = report
+        .findings
+        .iter()
+        .filter(|f| f.code == FindingKind::CalendarInvalid && f.severity == Severity::Error)
+        .collect();
+    let mut lines: Vec<u32> = errors.iter().filter_map(|f| f.line).collect();
+    lines.sort();
+    (!errors.is_empty(), lines)
+}
+
+/// pasta.dll の行事の表の読み込み失敗と、検査の CalendarInvalid の誤りが（有無も行番号の集合も）一致する（8.5）
+#[test]
+fn calendar_load_failure_matches_errors() {
+    let toml = TOML.as_bytes();
+    let talk = TALK.as_bytes();
+    let with = |name: &'static str, body: &'static [u8]| -> Vec<File<'static>> {
+        vec![
+            ("pasta.toml", TOML.as_bytes()),
+            ("dic/a.pasta", TALK.as_bytes()),
+            (name, body),
+        ]
+    };
+    let cases: Vec<(&str, Vec<File>, bool)> = vec![
+        (
+            "表が無い",
+            vec![("pasta.toml", toml), ("dic/a.pasta", talk)],
+            false,
+        ),
+        (
+            "正しい表",
+            with(
+                "calendar.csv",
+                "# c\n0101,元日\n0301-0305,春\n20270101,特別\n".as_bytes(),
+            ),
+            false,
+        ),
+        (
+            "Calendar.CSV の誤り",
+            with("Calendar.CSV", b"0101,a\n0230,b\n"),
+            true,
+        ),
+        (
+            "Calendar.CSV（正しい）",
+            with("Calendar.CSV", b"0101,a\n"),
+            false,
+        ),
+        ("引用符", with("calendar.csv", b"# c\n0101,\"a\"\n"), true),
+        ("欄の数", with("calendar.csv", b"# c\n0101\n"), true),
+        ("日付の形", with("calendar.csv", b"# c\n13xx,a\n"), true),
+        ("存在しない日", with("calendar.csv", b"# c\n0230,a\n"), true),
+        ("空の名前", with("calendar.csv", b"# c\n0101,\n"), true),
+        (
+            "複数行の誤り",
+            with("calendar.csv", b"0101,a\n0230,b\n\n0101\n\"x\",y\n"),
+            true,
+        ),
+        (
+            "UTF-8 で読めない",
+            with("calendar.csv", b"0101,\x8c\xb3\n"),
+            true,
+        ),
+        (
+            "calendar.csv という名前のフォルダ",
+            with("calendar.csv/", b""),
+            true,
+        ),
+        (
+            "直下でも名前も当たらない表は読まれない",
+            vec![
+                ("pasta.toml", toml),
+                ("dic/a.pasta", talk),
+                ("dic/calendar.csv", b"bad\n"),
+                ("calendar.csv.bak", b"bad\n"),
+            ],
+            false,
+        ),
+    ];
+    for (name, files, dll_fails) in &cases {
+        let temp = ghost(files);
+        let result = PastaLoader::load(temp.path());
+        assert_eq!(result.is_err(), *dll_fails, "見本の前提が違う: {name}");
+        let (any, lines) = calendar_errors(temp.path());
+        assert_eq!(any, *dll_fails, "{name}");
+        // 行の無い誤り（読めない・重複）は両側で空
+        let runtime_lines = match result {
+            Err(LoaderError::Calendar { errors, .. }) => {
+                let mut v: Vec<u32> = errors.iter().map(|e| e.line as u32).collect();
+                v.sort();
+                v
+            }
+            _ => vec![],
+        };
+        assert_eq!(lines, runtime_lines, "{name}");
+    }
+}
+
+/// 大文字・小文字だけ違う 2 つ（区別するファイルシステムだけ）と、シンボリックリンク（unix）
+#[cfg(unix)]
+#[test]
+fn calendar_duplicate_and_symlink_match_loader() {
+    let temp = ghost(&[
+        ("pasta.toml", TOML.as_bytes()),
+        ("dic/a.pasta", TALK.as_bytes()),
+        ("calendar.csv", b"0101,a\n"),
+        ("Calendar.CSV", b"0101,b\n"),
+    ]);
+    // 大文字・小文字を畳むファイルシステム（macOS）では 2 つにならないので照らさない
+    if fs::read_dir(temp.path()).unwrap().count() == 4 {
+        assert!(PastaLoader::load(temp.path()).is_err());
+        assert!(calendar_errors(temp.path()).0);
+    }
+
+    let temp = ghost(&[
+        ("pasta.toml", TOML.as_bytes()),
+        ("dic/a.pasta", TALK.as_bytes()),
+        ("real.csv", b"0230,bad\n"),
+    ]);
+    let link = temp.path().join("calendar.csv");
+    std::os::unix::fs::symlink(temp.path().join("real.csv"), link).unwrap();
+    assert!(PastaLoader::load(temp.path()).is_ok());
+    assert!(!calendar_errors(temp.path()).0);
+}
