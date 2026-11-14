@@ -26,7 +26,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
   - arm64 版の exe も VC++ ランタイムに頼らない（静的 CRT）こと。
   - リリース CI の 2 つの zip の検査（中身・版・機械の種類・大きさ）と、GitHub Release への添付（添付は 8 つ）。
   - `release` スキルの状態の集計と手順書の添付の数え方（8 つ）。
-  - main の CI で arm64 のビルドの壊れを見つけること。
+  - main の CI で arm64 のビルドの壊れを見つけること。arm64 のランナーでの Rust のテストと、arm64 の exe の起動の煙試験（2026-11-14 議題 3）。
   - タグを打たずに、2 つの zip の作成と検査をリリース CI と同じ形で確かめられること。
   - `pasta-recipe.zip` の名前を使っていた所（`completed/` の spec の記録を除く）を、2 つの新しい名前にそろえること。マニュアルと README での arch の選び方。
 - **Out of scope**:
@@ -35,7 +35,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
   - pasta.dll・見本ゴーストの `.nar`・`release.ps1` の arch（`pasta-dll-multiarch` が持つ）。
   - pasta-recipe の画面と機能の変更（`pasta-recipe`・`pasta-recipe-dev-actions` が作ったもの）。
   - リリースタグを打って本当のリリースを行うこと（`release` スキルが持つ）。
-  - arm64 の exe を arm64 の機械で起動して確かめること（**仮置き**。範囲に入れるかは OPEN QUESTION 3 で決める）。
+  - arm64 のランナーで作った exe を配布物にすること（配布する 2 つの zip は、どちらも x64 のランナーで作る）。
 - **Adjacent expectations**:
   - `pasta-dll-multiarch` も、ルートの静的 CRT の設定に arm64 の 1 段を要る。先に入った方が足し、後の方は在るのを確かめる。この spec は、その段がどちらの spec で入っても、arm64 版の exe が静的 CRT で作られることを求める。
   - `completed/` の下の spec の記録（`completed/pasta-recipe/` など）は、過去の決定の記録として書き換えない。
@@ -75,7 +75,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 8. If 配布物の検査が失敗したとき, the リリース CI shall crates.io・Marketplace・GitHub Release のどこにも公開しない。
 9. If 2 つの zip を作る間に、ルートまたはアプリの `Cargo.lock` が書き換わったとき, the リリース CI shall 失敗する。
 10. When 2 つの zip が検査を通ったとき, the リリース CI shall 2 つの zip を、ほかの配布物と同じく後続の公開の job へ渡す。
-11. If どちらかの zip の exe が VC++ ランタイムの DLL（`vcruntime*.dll`・`msvcp*.dll` など）を読み込む形で作られているとき, the リリース CI shall その zip の名前と読み込む DLL の名前を示して失敗する。（**仮置き**。検査に入れるかは OPEN QUESTION 2 で決める）
+11. If どちらかの zip の exe が VC++ ランタイムの DLL（`vcruntime*.dll`・`msvcp*.dll` など）を読み込む形で作られているとき, the リリース CI shall その zip の名前と読み込む DLL の名前を示して失敗する。
 
 ### Requirement 3: 手元での 2 つの zip の作成
 
@@ -85,7 +85,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 
 1. When 開発者が配布物の作成スクリプトを arch `x64` を指定して実行したとき, the 配布物の作成スクリプト shall リポジトリの根の `release/pasta-recipe.x64.zip` を作る。
 2. When 開発者が配布物の作成スクリプトを arch `arm64` を指定して実行したとき, the 配布物の作成スクリプト shall リポジトリの根の `release/pasta-recipe.arm64.zip` を作る。
-3. When 開発者が配布物の作成スクリプトを arch を指定せずに実行したとき, the 配布物の作成スクリプト shall 2 つの zip をどちらも作る。（**仮置き**。OPEN QUESTION 4）
+3. When 開発者が配布物の作成スクリプトを arch を指定せずに実行したとき, the 配布物の作成スクリプト shall 2 つの zip をどちらも作る。
 4. The 配布物の作成スクリプト shall 作った zip の中身が `pasta-recipe.exe`・`THIRD_PARTY_LICENSES.txt` の 2 つだけであることを自分で確かめる。
 5. If 作成のどの段かが失敗したとき, the 配布物の作成スクリプト shall 終了コード 1 で止まり、その arch の作りかけの zip を残さない。
 6. If `x64`・`arm64` 以外の arch が指定されたとき, the 配布物の作成スクリプト shall 受け付ける arch を示して終了コード 1 で止まり、zip を作らない。
@@ -125,14 +125,15 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 1. When main の CI が push・PR・手動の起動で動くとき, the main の CI shall arm64 の pasta-recipe の exe を作り、作れなければ失敗する。
 2. The main の CI shall pasta-recipe の x64 の型の検査・テスト・静的解析・exe の作成を、今のとおり続ける。
 3. When リリース CI が関門として main の CI を呼ぶとき, the main の CI shall 6.1 の arm64 の作成も関門に含める。
-4. Where arm64 のランナーで pasta-recipe の検査を行う形が選ばれたとき, the main の CI shall arm64 のランナーで pasta-recipe の Rust のテストを走らせる。（**仮置き**。範囲に入れるかは OPEN QUESTION 3 で決める）
-5. The main の CI shall pasta-recipe の依存の検査（脆弱性の勧告・ライセンス・取得元）に、arm64 の exe にだけ入る依存も含める。
+4. When main の CI が動くとき, the main の CI shall arm64 のランナーで pasta-recipe の Rust のテストを走らせ、失敗すれば失敗する。
+5. When main の CI が動くとき, the main の CI shall arm64 のランナーで arm64 の pasta-recipe の exe を起動し、決めた時間のうちに落ちないことを確かめる。煙試験の形（時間・画面の有無・WebView2）は設計で決める。arm64 のランナーで起動できないと分かったときは、黙って外さずに開発者に戻して決め直す。
+6. The main の CI shall pasta-recipe の依存の検査（脆弱性の勧告・ライセンス・取得元）に、arm64 の exe にだけ入る依存も含める。
 
 ### Requirement 7: タグを打たない確かめ
 
 **Objective:** As a 開発者, I want リリースタグを打たずに、2 つの zip の作成と検査をリリース CI と同じ形で確かめられること, so that x64 も含めた CI の作成と検査がそろったことを、本当のリリースの前に確かめて spec を完了できる
 
-リリース CI は今はリリースタグの push でしか動かない。どの CI で、どう起動するかは OPEN QUESTION 5 で決める。
+リリース CI は今はリリースタグの push でしか動かない。確かめの実行は main の CI（`build.yml`）に置き、作業のブランチで `gh workflow run build.yml --ref <branch>` として手動で起動する。毎回の push でも同じ作成と検査が走る（Requirement 6 と同じ仕組み。2026-11-14 議題 4）。
 
 #### Acceptance Criteria
 
