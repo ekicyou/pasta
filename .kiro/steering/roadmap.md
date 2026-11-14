@@ -7,7 +7,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 現在の主題は次のとおり。
 
 - **0.6.0: VS Code を使わないエディタ pasta-recipe**（2026-11-12 開発者の決定「次のリリースにする。最優先事項」）。2026-11-12 にウェーブ 1 の 2 本（`vscode-scene-outline-play`・`scene-play-locals`）が入り、2026-11-13 にウェーブ 2 の `pasta-recipe` と、ウェーブ 3 の `pasta-recipe-dev-actions`（アプリのシーンの ▶・リロード・保存変数の表と書き換え・値を入れて実行）が入った。2026-11-14 に `pasta-recipe-multiarch`（x64・arm64 の 2 つの zip）が入った。0.6.0 の spec は揃い、残りはリリース（下の「0.6.0 の範囲」と棚卸）。
-- **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`。まとめは下の「版がまだ決まっていないもの」にある。
+- **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`、2026-11-14 に起票した `manual-download-page`。まとめは下の「版がまだ決まっていないもの」にある。
 - **Phase 13: areka でノベルゲーム（0.7.0。2026-10-29 に 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性の 2 本（`scene-attribute-store`・`scene-condition-attributes`）は、2026-10-29 に 0.5.0 へ移した。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
@@ -341,6 +341,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 - `scene-exact-match`（2026-10-21 起票。ghost_dev のヒアリング）: 中身は台帳の行にある。0.7.0 の `novel-talk-flow` が前提にするので、遅くとも 0.7.0。選び方の `scene-pick-modes` は 0.5.0 で入った。
 - `scene-anchor-link`（2026-10-08 起票）: 中身は上の「Phase 11 の残り」の「文中のシーンリンク」にある。先に置いた `scene-condition-attributes` は入った。
 - `pasta-recipe-multiarch`（2026-11-14 起票）: 中身は台帳の行にある。版は 0.6.0（2026-11-14 開発者の決定。リリースの前に入れれば `pasta-recipe.zip` の名前は一度も出ない）。
+- `manual-download-page`（2026-11-14 起票。開発者「ダウンロード関係だけ簡潔に説明したページが欲しい」）: 中身は台帳の行にある。マニュアルだけの spec で、main への push で Pages に出るのでリリースを待たない。
 
 ## 依存の更新（2026-10-24 起票）
 
@@ -371,6 +372,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 - [ ] shiori4-v4-host -- 版 4 に本格対応する Rust の土台。ホストのテーブルを受け、アクタースレッドからの `host->request` を SHIORI のスレッドへ中継する。post（SSTP に揃えた `SEND`＋`Script`・`Option: nobreak`、`NOTIFY`）と `Tag` の Rust の側、unload での無効化、ホストの `log` への転送、Lua への低い入口と「版 4 で読まれた」の印（キックの即時化は、0.5.0 の `debug-mcp-runtime` がキックを消したので要らない）。取り決めの正本は shiori4 の `abi-conventions`・`host-protocol`（2026-10-23 起票。2 段の 2 段目。同じ日の棚卸で、Lua と DSL の口を `shiori4-v4-lua-api` へ分けた）。0.5.0 に入れる（2026-10-23 開発者の方針。ノベルゲームと同じリリース。2026-10-29 にノベルゲームとともに 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）。`debug-mcp-runtime` と同じウェーブに置かない（`actor/`・`shiori.rs` のキックの道を共有する。あちらは 2026-11-03 に入った）。Dependencies: none（`shiori4-v3-portable`・`ponytail-shiori`・`debug-mcp-runtime` は入った）
 - [ ] shiori4-v4-lua-api -- 版 4 のホストの機能を Lua と DSL から使う口。ホストのプロパティの読み出し（今の `act:get_property` と `CALLBACK.pending` の上に作る）、シーンからの SEND・NOTIFY、終わりを待って `OnHostComplete` で待っているシーンを再開する書き方（`REG:register` との並び・チェイントークの `STORE.co_preempt` との関係・待っている間の unload）、SHIORI3 だけのときの扱い、`pasta_check` の組み込みの名前、マニュアル（2026-10-23 の棚卸で `shiori4-v4-host` から分けた）。0.7.0（2026-10-29 にノベルゲームとともに 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）。Dependencies: shiori4-v4-host
 - [ ] pasta-dll-multiarch -- x64・arm64 版の pasta.dll をビルドし、32bit 版と同じリリースで出す。見本ゴーストの .nar に areka の探し方に合う名前（`pasta.x64.dll`・`pasta.arm64.dll`）で同梱し、接尾辞の無い `pasta.dll` は SSP 向けの 32bit 版のまま残す。`release.ps1`・`.cargo/config.toml`・配布物とリリース CI の検査・マニュアル。aarch64 の LuaJIT のビルドは要確認（2026-10-23 起票。3 者会談の後の areka の相談から）。版は未定。`vsce-4-upgrade`（`release.yml`）・`shiori4-v4-host`（`build.yml`）と同じウェーブに置かない。Dependencies: none（先に要った `shiori4-v3-portable`・`ponytail-manual-ci`・`ponytail-shiori` は入った）
+- [ ] manual-download-page -- マニュアルに「ダウンロード」のページ（`book/src/download.md`）を足す。目次の「はじめに」の次と扉の案内の先頭に置き、「やりたいこと → 取るファイル」の表と各ファイルの短い説明にする。トップページ（`introduction.md`）は削り込み、「AI にゴーストを書かせるとき」をこのページへ移し、「このマニュアルの歩き方」を消す。ほかの章と README の入手の説明はこのページへのリンクに寄せる（2026-11-14 起票。方針は discovery の推奨案のまま開発者が承認）。版は未定。`pasta-dll-multiarch` と同じウェーブに置くなら、このページの節を持ち場分けする。Dependencies: none
 - [ ] novel-areka-contract -- pasta と areka の取り決め（台本に載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票）。Dependencies: none
 - [ ] novel-variable-scope -- 変数の保存の範囲を、セーブごとと全セーブ共通の 2 つに分ける書き方。今の `＄＊x` と保存ファイルとの互換、保存できない値の扱い（2026-10-17 の棚卸で `novel-checkpoint-rollback` から分割）。Dependencies: none
 - [ ] cue-command-runtime -- キューコマンド行 `！命令＠対象（引数）` を、実行時に `\![…]` として台本へ流す。日本語の名前の別名表、引数の穴（数字で始まる引数など）の手当て。柱に書いた `＆属性` とアクター指定行も、場面に入ったときに台本へ流す（受け継ぎと、Call から戻ったときの打ち直し）。2026-10-17 に `scene-stage-attributes` をまとめた。Dependencies: none（`scene-attribute-store` は入った）
