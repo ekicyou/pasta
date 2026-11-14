@@ -734,6 +734,55 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
         end
     end)
 
+    -- date-var-calendar: ＄祝日・＄行事（@pasta_calendar から引く）
+    local function date_req(y, m, d)
+        return { id = "OnSecondChange", date = { year = y, month = m, day = d, hour = 0, min = 0, sec = 0, wday = 0 } }
+    end
+
+    test("＄祝日 is the holiday name on a holiday and なし on a weekday", function()
+        local act = new_act(date_req(2026, 1, 1))
+        act:transfer_date_to_var()
+        expect(act.var["祝日"]):toBe("元日")
+
+        act = new_act(date_req(2026, 1, 6))
+        act:transfer_date_to_var()
+        expect(act.var["祝日"]):toBe("なし")
+        -- 行事の表が空なら ＄行事 は なし、節句は今のまま
+        expect(act.var["行事"]):toBe("なし")
+        expect(act.var["節句"]):toBe("なし")
+    end)
+
+    test("＄行事 takes the name from @pasta_calendar.event", function()
+        local saved = package.loaded["@pasta_calendar"]
+        package.loaded["@pasta_calendar"] = {
+            holiday = function() return nil end,
+            event = function(_, m, d) if m == 2 and d == 14 then return "バレンタイン" end end,
+        }
+        local act = new_act(date_req(2026, 2, 14))
+        act:transfer_date_to_var()
+        local act2 = new_act(date_req(2026, 2, 15))
+        act2:transfer_date_to_var()
+        package.loaded["@pasta_calendar"] = saved
+
+        expect(act.var["行事"]):toBe("バレンタイン")
+        expect(act.var["祝日"]):toBe("なし")
+        expect(act2.var["行事"]):toBe("なし")
+    end)
+
+    test("no date sets neither ＄祝日 nor ＄行事", function()
+        local act = new_act({ id = "OnSecondChange" })
+        act:transfer_date_to_var()
+        expect(act.var["祝日"]):toBe(nil)
+        expect(act.var["行事"]):toBe(nil)
+    end)
+
+    test("a value assigned after the transfer remains", function()
+        local act = new_act(date_req(2026, 1, 1))
+        act:transfer_date_to_var()
+        act.var["祝日"] = "自作"
+        expect(act.var["祝日"]):toBe("自作")
+    end)
+
     -- メソッドチェーン用に self を返す
     test("returns self for method chaining", function()
         local req = {
