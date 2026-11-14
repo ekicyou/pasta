@@ -72,6 +72,20 @@ Focus on capabilities and outcomes, not code structure.
 - If work must cross boundaries, make it an explicit integration task rather than a normal implementation task
 - Do not hide cross-boundary coordination inside a task that appears local
 
+### 5.5 Dispatch Tier
+
+**Every executable task declares the tier `/kiro-impl` dispatches it at** (added 2026-11-14 by developer request: the difficulty is already known when the work is decomposed, so it is decided here and reviewed at task approval; the tier → model/effort mapping lives in `kiro-impl/SKILL.md` Preflight):
+- Format: `_Dispatch: mechanical — <reason>_`, placed before `_Requirements:_`. The reason is one short phrase in the spec language naming the criterion that applied.
+- Optional effort override after the tier, only when the tier's effort clearly misfits (for example a standard task with a subtle algorithm): `_Dispatch: standard, effort high — <reason>_`. Levels: `low`, `medium`, `high`, `xhigh`.
+
+| Tier | Choose when |
+|---|---|
+| judgment | an explicit integration task or one that crosses `_Boundary:_` scopes; it changes a contract other tasks depend on (funnel, cache key, public API); it newly designs concurrency, threading, timing or ordering guarantees; or the design leaves a decision to the implementer |
+| standard (default) | ordinary implementation inside one boundary whose design section fully specifies the change |
+| mechanical | signature/rename/import follow-ups, manifest or registration edits, doc rewrites whose wording the design already gives, test re-derivation whose expected values are stated in the design |
+
+When torn between two tiers, choose `standard`.
+
 ### 6. Flexible Task Sizing
 
 **Guidelines**:
@@ -130,7 +144,8 @@ Before writing `tasks.md`, review the draft task plan and repair local issues un
 - If many tasks require broad `_Boundary:_` scopes or repeated cross-boundary coordination, stop and return to design or roadmap decomposition instead of forcing the spec through task generation.
 - Merge or collapse tasks that are too small, bookkeeping-only, or not meaningful execution units.
 - Make implicit prerequisites explicit as preceding tasks.
-- Re-check `_Depends:_`, `_Boundary:_`, and `(P)` markers after edits so concurrency claims still match the design boundaries and dependency graph.
+- Every executable task has a `_Dispatch:_` line whose tier follows section 5.5.
+- Re-check `_Depends:_`, `_Boundary:_`, `_Dispatch:_`, and `(P)` markers after edits so concurrency claims and tiers still match the design boundaries and dependency graph.
 
 ### Review Loop
 

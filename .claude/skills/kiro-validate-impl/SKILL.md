@@ -82,6 +82,8 @@ The following validation dimensions are independent and can be dispatched as **s
 
 For simple features (few tasks, small scope), run checks in main context without subagent dispatch.
 
+**Dispatch model** (added 2026-11-14 by developer request — same text as areka d76827a6: whatever model this session runs on): this is the feature-level judgment gate, so dispatches that **judge** (cross-task contract verification, requirement coverage, the GO/NO-GO verdict) use `model: "fable"`; dispatches that only **collect evidence** (running commands, grepping, counting) use `model: "sonnet"`. Record one line per dispatch: `dispatch model: <role> → <model> (<reason>)`.
+
 If the implementation run explicitly skipped task-local review (for example `--review off`), tighten scrutiny on obvious task-level gaps that surface during integration validation and call out that reduced review coverage in the report.
 
 #### Mechanical Checks (run commands, use results)
