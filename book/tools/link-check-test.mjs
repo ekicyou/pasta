@@ -60,6 +60,7 @@ import {
   checkSkillSelfContained,
   checkInternalsPaths,
   checkReadmeManualLinks,
+  checkReleaseAssetLinks,
   summaryChapters,
   MANUAL_URL,
   INTERNALS_DIR,
@@ -1257,6 +1258,82 @@ log('\n== (J) 章のフェンスの中のリンク・目次の章の並び（pon
     const got = summaryChapters(root);
     check('J-2 summaryChapters は ./・アンカーを外し、重複を消して目次の順に返す',
       JSON.stringify(got) === JSON.stringify(['introduction.md', 'grammar/a.md', 'grammar/b.md']), JSON.stringify(got));
+  } finally {
+    rmrf(root);
+  }
+}
+
+// ============================================================
+log('\n== (K) checkReleaseAssetLinks（最新版の固定リンクの名前とリリース CI の添付・manual-download-page 要件 2.3, 7.8） ==');
+{
+  const LATEST = `https://github.com/${REPO_SLUG}/releases/latest/download/`;
+  const RELEASE_YML = [
+    '      - name: Upload release-assets',
+    '        with:',
+    '          path: |',
+    '            release/pasta.dll.zip',
+    '            release/hello-pasta.nar',
+    '            release/pasta-vscode-${{ needs.verify.outputs.version }}.vsix',
+    "          $x = Get-ZipEntries 'release/pasta_check.zip'",
+    '',
+  ].join('\n');
+  const root = makeSandbox();
+  try {
+    // (6) 固定リンクが 1 つも無ければ release.yml が無くても 0 件。
+    writeFile(root, 'book/src/a.md', '# a\n\n[外](https://example.com/)\n');
+    check('K-6 固定リンクが無ければ release.yml が無くても 0 件', checkReleaseAssetLinks(root).length === 0,
+      JSON.stringify(checkReleaseAssetLinks(root)));
+
+    // (5) 固定リンクがあって release.yml が無い → 読めない旨の 1 件だけ。
+    writeFile(root, 'book/src/a.md', `# a\n\n[dll](${LATEST}pasta.dll.zip) [x](${LATEST}nope.zip)\n`);
+    let broken = checkReleaseAssetLinks(root);
+    check('K-5 release.yml が無ければ読めない旨の 1 件だけ',
+      broken.length === 1 && broken[0].file === '.github/workflows/release.yml' && broken[0].kind === 'release-asset'
+        && broken[0].detail.includes('添付の一覧が読めない'), JSON.stringify(broken));
+    writeFile(root, '.github/workflows/release.yml', 'name: release\n');
+    broken = checkReleaseAssetLinks(root);
+    check('K-5b 名前が 1 つも取れなければ読めない旨の 1 件だけ',
+      broken.length === 1 && broken[0].file === '.github/workflows/release.yml', JSON.stringify(broken));
+
+    // (1) 一致するリンク（リンク記法・自動リンク・裸の URL と末尾の句点）は 0 件。
+    writeFile(root, '.github/workflows/release.yml', RELEASE_YML);
+    writeFile(root, 'book/src/a.md',
+      `# a\n\n[dll](${LATEST}pasta.dll.zip) と <${LATEST}hello-pasta.nar>。\n裸の ${LATEST}pasta.dll.zip。\n`);
+    broken = checkReleaseAssetLinks(root);
+    check('K-1 一致するリンク（リンク記法・<…>・裸の URL の末尾の句点）は 0 件', broken.length === 0, JSON.stringify(broken));
+
+    // (2) 綴りの違う名前は 1 件（行番号・名前・添付の名前の一覧つき）。空の名前も違反。
+    writeFile(root, 'book/src/a.md', `# a\n\n本文\n[dll](${LATEST}pasta-dll.zip)\n`);
+    broken = checkReleaseAssetLinks(root);
+    check('K-2 綴りの違う名前は release-asset 1 件（行番号・名前・添付の一覧つき）',
+      broken.length === 1 && broken[0].file === 'book/src/a.md' && broken[0].kind === 'release-asset'
+        && broken[0].detail.startsWith('L4:') && broken[0].detail.includes('pasta-dll.zip')
+        && broken[0].detail.includes('pasta.dll.zip, hello-pasta.nar'), JSON.stringify(broken));
+    // (4) `${{ … }}` の行・名前だけでない行の名前は添付に入らない。
+    check('K-4 式の行・名前だけでない行は添付に入らない',
+      broken.length === 1 && !broken[0].detail.includes('vscode') && !broken[0].detail.includes('pasta_check'),
+      JSON.stringify(broken));
+    writeFile(root, 'book/src/a.md', `# a\n\n裸の ${LATEST}。\n`);
+    broken = checkReleaseAssetLinks(root);
+    check('K-2b 空の名前も違反', broken.length === 1 && broken[0].detail.startsWith('L3:'), JSON.stringify(broken));
+
+    // (3) フェンスの中は数えない。
+    writeFile(root, 'book/src/a.md', `# a\n\n\`\`\`text\n${LATEST}nope.zip\n\`\`\`\n`);
+    broken = checkReleaseAssetLinks(root);
+    check('K-3 フェンスの中は数えない', broken.length === 0, JSON.stringify(broken));
+
+    // (7) book/src の外の読者に届く文書（README.md）の綴りの違う名前も 1 件。
+    writeFile(root, 'README.md', `# r\n[dll](${LATEST}pasta.dll.zp)\n`);
+    broken = checkReleaseAssetLinks(root);
+    check('K-7 README.md の綴りの違う名前も 1 件',
+      broken.length === 1 && broken[0].file === 'README.md' && broken[0].detail.startsWith('L2:'), JSON.stringify(broken));
+
+    // 種別は [1] の区分に入り、報告の [1] に出て、終了コードの規則に乗る。
+    const result = runLinkCheck(root);
+    const rep = reportLinkCheck(result);
+    check('K-8 release-asset は BOOK_KINDS に入り、報告の [1] に出て failed になる',
+      BOOK_KINDS.has('release-asset') && result.failed
+        && /\[1\][^\n]*最新版の固定リンク[^\n]*: 1 件\n  BROKEN  README\.md/.test(rep), rep);
   } finally {
     rmrf(root);
   }
