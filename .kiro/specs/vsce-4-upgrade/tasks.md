@@ -1,36 +1,36 @@
 # Implementation Plan
 
-- [ ] 1. 手元で 4.1.1 を確かめる（spec のブランチの作業ツリー。`package.json`・lock の変更はコミットしない。main へは 2.2 の版だけの PR が入れる）
-- [ ] 1.1 3.9.2 の基準（監査と VSIX）を先に取る
+- [x] 1. 手元で 4.1.1 を確かめる（spec のブランチの作業ツリー。`package.json`・lock の変更はコミットしない。main へは 2.2 の版だけの PR が入れる）
+- [x] 1.1 3.9.2 の基準（監査と VSIX）を先に取る
   - 前提の道具（wasm-pack・pwsh）が入っていることを先に確かめる
   - 今の lock（3.9.2）で `npm ci` → `npm audit --json` をスクラッチパッドに保存する
   - worktree のパスで `pwsh -NoProfile -File scripts/build-wasm.ps1 -Release` と `npm run compile` を走らせ、`npx --no-install vsce package -o <スクラッチパッド>/v3.vsix` で 3.9.2 の VSIX を作る
   - 完了の状態: 3.9.2 の監査の JSON と `v3.vsix` がスクラッチパッドにあり、`npx --no-install vsce --version` が `3.9.2` だったことを research.md に書いてある
   - _Requirements: 1.3, 2.2_
-- [ ] 1.2 版の指定と lock を 4.1.1 にして、差分が vsce の配下だけであることを確かめる
+- [x] 1.2 版の指定と lock を 4.1.1 にして、差分が vsce の配下だけであることを確かめる
   - `editors/vscode` で `npm install --save-dev @vscode/vsce@^4.1.1` を叩き、続けて `npm ci` で入れ直す
   - `package.json` の差分が `@vscode/vsce` の 1 行だけで、`engines.vscode`・`@types/*`・`typescript` ほか直接の依存が変わっていない
   - lock の差分を `packages` の単位で数え、vsce の配下の外の差が 0（設計の測りでは 消える 174・増える 17・版が変わる 3）
   - 完了の状態: `npx --no-install vsce --version` が `4.1.1` を返し、差分の数え方の結果を research.md に書いてある
   - _Requirements: 1.1, 1.2, 1.5, 1.6_
-- [ ] 1.3 勧告を 3.9.2 と 4.1.1 で比べて記録する
+- [x] 1.3 勧告を 3.9.2 と 4.1.1 で比べて記録する
   - 4.1.1 の lock で `npm audit --json` を取り、1.1 の 3.9.2 の結果と比べて勧告ごとに「消えた／残る／増えた」を分ける
   - `glob` GHSA-3g3m-2fjr-6pw4 が消え、`minimatch` GHSA-g3hv-75wg-m249 は残る理由（vsce 4.1.1・eslint・typescript-eslint が `^10` を要り、直った版は 11.0.1 以上だけ・配る VSIX に入らない）を書く。`overrides` は使わない
   - 増えた勧告があれば、互換の範囲（`npm audit fix`・`--force` なし）で消し、消せないものは理由を書く
   - 完了の状態: research.md に勧告の表があり、`glob` が 4.1.1 の監査に出ていない
   - _Requirements: 1.3, 1.4_
-- [ ] 1.4 4.1.1 で VSIX を作り、1.1 の 3.9.2 の VSIX と中身を比べる
+- [x] 1.4 4.1.1 で VSIX を作り、1.1 の 3.9.2 の VSIX と中身を比べる
   - 4.1.1 の lock のまま、1.1 と同じ WASM と `out/` で `npx --no-install vsce package -o <スクラッチパッド>/v4.vsix`
   - 2 つの zip の項目の名前の一覧（並べ替え）と `extension.vsixmanifest` の中身を比べる。差が出たら 1 つずつ原因を見て、意図しない差は `.vscodeignore` で直し、残す差は理由を書く
   - 完了の状態: 両方の VSIX が `pasta-vscode-<版>.vsix` の名前で、項目の一覧が一致し（または差の扱いが書いてあり）、`extension/package.json`・`extension/wasm/pasta_lsp_wasm_bg.wasm`・`extension/wasm/THIRD_PARTY_LICENSES.txt` を含むことを research.md に書いてある
   - 作った VSIX はコミットしない
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
-- [ ] 1.5 4.1.1 の lock で拡張の試験と公開の補助スクリプトの試験を通す
+- [x] 1.5 4.1.1 の lock で拡張の試験と公開の補助スクリプトの試験を通す
   - 4.1.1 の lock で `npm ci` の後に `npm test`（`build.yml` の `vscode-test` と同じ。`PASTA_VSCODE_NO_WASM=1`）
   - `pwsh -NoProfile -File .github/scripts/release/release-scripts-test.ps1` を走らせる
   - 完了の状態: `npm test` が成功し、`release-scripts-test.ps1` が項目 12 を含めて全項目合格している
   - _Requirements: 2.5, 2.6, 3.7_
-- [ ] 1.6 4.1.1 の CLI の振る舞いを照合表と突き合わせ、3.x に固有の記述が無いことを確かめる
+- [x] 1.6 4.1.1 の CLI の振る舞いを照合表と突き合わせ、3.x に固有の記述が無いことを確かめる
   - 4.1.1 で `npx --no-install vsce show ekicyou.pasta-vscode --json` が版の一覧を返し、無い拡張で標準出力 `undefined`・終了コード 0 であることを取り直す（`read ECONNRESET` のときは `NODE_OPTIONS=--dns-result-order=ipv4first`）
   - 設計の照合表 C1〜C9 のどれかが崩れていたら、`publish-vsix.ps1` と項目 12 の偽の vsce の答えを 4.1.1 の実際に合わせ、1.5 の試験を取り直す。崩れていなければスクリプトとワークフローは触らない
   - `publish-vsix.ps1`・`release` スキル・`tech.md`・`.github/release-ci-setup.md` に vsce 3.x に固有の記述（版の数字・3.x のソースの場所）が無いか探し、あれば 4.x で正しい記述に直す
@@ -39,7 +39,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.8, 3.9, 4.6, 6.1, 6.2_
 
 - [ ] 2. main へ入れて公開の道を確かめる
-- [ ] 2.1 今の main（3.9.2）で公開の道の基準を取る
+- [x] 2.1 今の main（3.9.2）で公開の道の基準を取る
   - `gh workflow run release-setup-check.yml --ref main` を回し、job summary の 2 行（メンバー確認・拡張の存在確認）とログの `verification succeeded` を読む。run の緑だけでは判定しない（`verify-pat` は `continue-on-error`）
   - 2 行のどちらかが成功でなければ、2.2 へ進まず `.github/release-ci-setup.md` に沿って設定を直し、回し直す（版と関係の無い原因・5.4）
   - 完了の状態: research.md 11 節の「基準の run」に、2 行とも成功した run の URL が書いてある

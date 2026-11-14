@@ -239,11 +239,59 @@
 - [GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4) — `glob` `>=9.0.0 <=14.0.1`
 - 手元の測りの記録（スクラッチパッド。コミットしない）: `audit-v3.json`・`audit-v4.json`・`ls-v3.txt`・`ls-v4.txt`・`zip-v3.txt`・`zip-v4.txt`・`show-v3.json`・`show-v4.json`
 
+## 10b. 実装の手元の確かめ（2026-11-14・tasks 1.1〜1.6）
+
+- 場所: worktree `editors/vscode`（Windows・Node 26.12.1・npm 12.2.1）。測りの記録はスクラッチパッド（`audit-v3.json`・`audit-v4.json`・`v3.vsix`・`v4.vsix`・`zip-v3.txt`・`zip-v4.txt`・`man-v3.xml`・`man-v4.xml`・`show-v4.json`。コミットしない）
+- 前提の道具: wasm-pack・pwsh が在る
+
+### 1.1 3.9.2 の基準
+
+- 今の lock で `npm ci` の後 `npx --no-install vsce --version` = `3.9.2`
+- `npm audit --json` を `audit-v3.json` に保存（moderate 11）
+- `pwsh -NoProfile -File scripts/build-wasm.ps1 -Release`（本物の WASM 759.5 KB・`THIRD_PARTY_LICENSES.txt` 生成）→ `npm run compile` → `vsce package -o v3.vsix`（18 files）
+
+### 1.2 版の指定と lock
+
+- `npm install --save-dev @vscode/vsce@^4.1.1` → `npm ci` の後 `npx --no-install vsce --version` = `4.1.1`
+- `package.json` の差分は `"@vscode/vsce": "^3.0.0"` → `"^4.1.1"` の 1 行だけ（`engines.vscode`・`@types/*`・`typescript` ほか変わらない）
+- lock の差分を `packages` の単位で数えた（3.9.2 の lock と 4.1.1 の lock の両方で `node_modules/@vscode/vsce` から依存を辿れる項目を「vsce の配下」とした）: 消える 174・増える 17・版が変わる 3（`@vscode/vsce`・`entities`・`parse5`）・**vsce の配下の外 0**。ルートの `devDependencies` の差は `@vscode/vsce` だけ。設計の測りと同じ数
+
+### 1.3 勧告の比べ
+
+| 勧告 | 3.9.2 | 4.1.1 | 扱い |
+|------|-------|-------|------|
+| `glob` GHSA-3g3m-2fjr-6pw4（moderate） | 在る | **無い**（`glob` が lock から消えた） | 消えた |
+| `minimatch` GHSA-g3hv-75wg-m249（moderate） | 在る | 在る | 残る。直った版は 11.0.1 以上だけで、vsce 4.1.1・`eslint`・`typescript-eslint` が `minimatch ^10` を要る。パッケージを作る道具の中の DoS で配る VSIX に入らない。`overrides` は使わない |
+| 増えた勧告 | — | 無い | — |
+
+- 件数: 3.9.2 は moderate 11、4.1.1 は moderate 10（残りは全部 `minimatch` の 1 件から辿ったもの）。増えた勧告が無いので `npm audit fix` はしない
+
+### 1.4 VSIX の比べ（本物の WASM）
+
+- 1.1 と同じ WASM と `out/` のまま 4.1.1 で `vsce package -o v4.vsix`（18 files・356.07 KB。3.9.2 と同じ大きさ）
+- zip の項目の名前の一覧（並べ替え）: 18 件で **一致**。`extension.vsixmanifest` の中身も **一致**
+- 必須の 3 つ `extension/package.json`・`extension/wasm/pasta_lsp_wasm_bg.wasm`・`extension/wasm/THIRD_PARTY_LICENSES.txt` を含む
+- `-o` を付けない `vsce package`（4.1.1）の名前は `pasta-vscode-0.5.2.vsix`（C9）。作った VSIX は消した・コミットしない
+- 差が無いので `.vscodeignore` は触らない
+
+### 1.5 試験
+
+- 4.1.1 の lock で `npm ci` の後 `PASTA_VSCODE_NO_WASM=1 npm test`: 29 passed, 0 failed
+- `pwsh -NoProfile -File .github/scripts/release/release-scripts-test.ps1`: 13 項目すべて `ok`（項目 12 `publish-vsix.ps1` の skipped を含む）・終了コード 0
+
+### 1.6 CLI の振る舞いの照合
+
+- `NODE_OPTIONS=--dns-result-order=ipv4first` で 4.1.1:
+  - `vsce show ekicyou.pasta-vscode --json`: exit 0・`versions` 42 件・最新 0.5.2（C6）
+  - `vsce show ekicyou.pasta-vscode-nonexistent-zz --json`: exit 0・標準出力 `undefined`（C7）
+- 照合表 C1〜C9: 全行「同じ」（C1〜C5・C8 は設計で配布物を読んだ結果のまま。C6・C7・C9 を取り直した）。`publish-vsix.ps1`・項目 12・ワークフローは触らない
+- `publish-vsix.ps1`・`.claude/skills/release/`・`tech.md`・`.github/release-ci-setup.md` に vsce 3.x に固有の記述（版の数字・3.x のソースの場所）は無かった。認証の記述は変えていない
+
 ## 11. 公開の道の確かめの記録（実装で埋める・要件 4.3）
 
 | 項目 | 値 |
 |------|----|
-| 基準の run（3.9.2・マージの前） | （未） |
+| 基準の run（3.9.2・マージの前） | https://github.com/ekicyou/pasta/actions/runs/43534662446 （2026-11-14・main・vsce 3.9.2）: `verify-pat` の step と `show` の step がどちらも exit 0（＝ summary の 2 行とも「成功」）・ログに `The Personal Access Token verification succeeded for the publisher 'ekicyou'.` |
 | 版を上げる PR | （未） |
 | 確かめの run（4.1.1・マージの後） | （未） |
 | 走らせた日 | （未） |
