@@ -8,7 +8,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 
 この spec は、pasta-recipe の配布物を arch ごとの 2 つの zip（`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip`）に分け、手元の作成・リリース CI の作成と検査・GitHub Release の添付・リリースの状態の集計・main の CI の見張り・利用者向けの文書を、2 つの新しい名前にそろえる。`pasta-recipe.zip` の名前は一度も出さない。
 
-**前提（仮置き。OPEN QUESTION 1）**: 2 つの zip を初めて添付する版は **0.5.3** とする（`brief.md` の推奨）。`pasta-recipe.zip` は 0.5.2 までのどの版にも添付されておらず、0.5.3 から添付する予定だった。0.5.3 に入れれば、古い名前の互換と、過去の版の添付の数え方の追加は要らない。
+**前提**: 2 つの zip を初めて添付する版は、v0.5.2 の次のリリース **0.6.0** とする（2026-11-14 開発者の決定。pasta-recipe を出す版を 0.5.3 から 0.6.0 に上げ、ノベルゲームを 0.6.0 から 0.7.0 へ送った）。`pasta-recipe.zip` は 0.5.2 までのどの版にも添付されていないので、古い名前の互換と、過去の版の添付の数え方の追加は要らない。
 
 用語:
 
@@ -39,7 +39,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 - **Adjacent expectations**:
   - `pasta-dll-multiarch` も、ルートの静的 CRT の設定に arm64 の 1 段を要る。先に入った方が足し、後の方は在るのを確かめる。この spec は、その段がどちらの spec で入っても、arm64 版の exe が静的 CRT で作られることを求める。
   - `completed/` の下の spec の記録（`completed/pasta-recipe/` など）は、過去の決定の記録として書き換えない。
-  - 実際の 0.5.3 のリリースでの添付の確かめは、`release` スキルが行う。
+  - 実際の 0.6.0 のリリースでの添付の確かめは、`release` スキルが行う。
 - **完成の定義**: x64 と arm64 の 2 つの zip が、タグを打たない確かめの実行（Requirement 7）で作成と検査を通った記録と、GitHub Release の添付の自己テスト（4.5・4.6）が通った記録がそろったとき、この spec は完成とする。
 - **作業の制約**: `.claude/skills/` の下（`release` スキル・`pasta-check` スキル）の書き換えが作業の環境の分類器に拒まれたときは、回避の手段を探さず、入った分と残りを示して開発者の許可を求める。
 
@@ -107,14 +107,14 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 
 ### Requirement 5: リリースの状態の集計と手順書
 
-**Objective:** As a リリースを行うエージェント, I want リリースの状態の集計が 8 つの添付で数えること, so that 0.5.3 以降のリリースの完了と未完了を正しく見分けられる
+**Objective:** As a リリースを行うエージェント, I want リリースの状態の集計が 8 つの添付で数えること, so that 0.6.0 以降のリリースの完了と未完了を正しく見分けられる
 
 #### Acceptance Criteria
 
 1. When `release` スキルの状態の集計が版 V の GitHub Release を調べるとき, the 状態の集計 shall 4.1 の 8 つの名前のうち添付済みのものを数え、「公開・添付 n/8」の形で示す。
 2. When 版 V の GitHub Release が公開済みで 8 つがそろっているとき, the 状態の集計 shall 「あり（公開・添付 8/8）」と示し、公開済みに数える。
 3. While 調べる版が 0.5.2 以下のとき, the `release` スキルの手順書 shall 2 つの zip の無い過去の版（0.4.2〜0.5.2 は 6/8、0.4.1 以下は 4/8）を、完了したリリースとして読み替える決まりを示す。
-4. The `release` スキルの手順書 shall 状態の表と「公開済み」の数え方の説明を、8 つの添付（配布物 7 つと詳しいリリースノート）と、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` は 0.5.3 から添付することに合わせる。
+4. The `release` スキルの手順書 shall 状態の表と「公開済み」の数え方の説明を、8 つの添付（配布物 7 つと詳しいリリースノート）と、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` は 0.6.0 から添付することに合わせる。
 
 ### Requirement 6: main の CI での arm64 の見張り
 

@@ -102,7 +102,7 @@
 6. **機械の種類の読み方**: pwsh で `[System.IO.File]::ReadAllBytes` → `e_lfanew`（0x3C の 4 バイト）→ `PE\0\0` の後の 2 バイト。`dumpbin /headers` は VS の開発の環境が要る。
 7. **VC++ の DLL の検査（OQ 2 を採るなら）**: `dumpbin /dependents`（vswhere で探す）か、pwsh で import の表を読むか。x64 の exe でも今は検査していないので、まず今の x64 の exe が本当に `vcruntime140.dll` を読まないかを見る。
 8. **`windows-11-arm` のランナー（OQ 3 を採るなら）**: 公開リポジトリで使えること、`dtolnay/rust-toolchain`・`actions/setup-node`・`Swatinem/rust-cache` が arm64 の Windows で動くこと、GUI の exe を起動できる画面があること。
-9. **`link-check.mjs`** が `releases/latest/download/` の外のリンクを見ないこと（新しい名前のリンクは、0.5.3 を出すまで 404 になる）。
+9. **`link-check.mjs`** が `releases/latest/download/` の外のリンクを見ないこと（新しい名前のリンクは、0.6.0 を出すまで 404 になる）。
 
 ## 複雑さと危険
 
@@ -114,4 +114,4 @@
 - **推奨の形**: Option B（OQ 3 で arm64 のランナーを採るなら Option C）。R7 を満たすには、リリースと同じ作成と検査を、タグを打たずに走らせる道がどうしても要る。今の `build.yml` の job `recipe` は既に x64 の release ビルドを 1 回しているので、それを `package.ps1` の 2 つの arch に置き換えるのが最も足し算が少ない。
 - **決めること**: `package.ps1` の引数の形（OQ 4）、`cargo-about` の版固定の共有の置き場、x64 にも `--target` を付けるか、検査のスクリプトの名前と置き場、`about.toml`・`deny.toml` の targets。
 - **隣の spec**: `pasta-dll-multiarch` と `.cargo/config.toml` の aarch64 の段・`release.yml` の build job（rust の targets・cache の key・検査の step）を共有する。同じウェーブに置かない。後に入る方が、在るのを確かめる。
-- **版**: 0.5.3 に入れる前提で、古い名前の互換（固定のリンクの転送など）と、`release-state.ps1` の過去の版の数え方の追加は作らない（OQ 1）。
+- **版**: 0.6.0（2026-11-14 開発者の決定。v0.5.2 の次のリリース）に入れる前提で、古い名前の互換（固定のリンクの転送など）と、`release-state.ps1` の過去の版の数え方の追加は作らない（OQ 1）。

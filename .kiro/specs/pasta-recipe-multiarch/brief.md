@@ -1,6 +1,6 @@
 # Brief: pasta-recipe-multiarch
 
-> **ステータス**: 未着手（2026-11-14 の `/kiro-discovery` で起票。開発者の問い「`/release` の CI に、pasta-recipe.x64.zip / arm64 は含まれるか？」→ 含まれていないと答えた → 開発者「arm64 を起票して」「起票の要件に、x64 も含めた CI ビルド完成まで含めてください」）。版は開発者が決める（推奨は 0.5.3。下の「版」）。要件定義は Opus（Fable なし）。
+> **ステータス**: 未着手（2026-11-14 の `/kiro-discovery` で起票。開発者の問い「`/release` の CI に、pasta-recipe.x64.zip / arm64 は含まれるか？」→ 含まれていないと答えた → 開発者「arm64 を起票して」「起票の要件に、x64 も含めた CI ビルド完成まで含めてください」）。版は 0.6.0（2026-11-14 の要件ディスカッションで開発者が決めた。pasta-recipe を出す版を 0.5.3 から 0.6.0 に上げ、ノベルゲームは 0.7.0 へ送った。下の「版」）。要件定義は Opus（Fable なし）。
 
 ## Problem
 
@@ -50,7 +50,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
   - `.github/workflows/release.yml`（2 つのビルド・配布物の検査・PE ヘッダの検査・アップロード・Cargo.lock の不変検査）。
   - `.github/workflows/build.yml` の job `recipe` の aarch64 のビルド。
   - `.github/scripts/release/github-release.ps1` と `release-scripts-test.ps1`（添付 8 つ）。
-  - `.claude/skills/release/scripts/release-state.ps1`・`procedure.md`（添付の数え方。0.5.3 からは 8/8）、`.claude/skills/pasta-check/SKILL.md`。
+  - `.claude/skills/release/scripts/release-state.ps1`・`procedure.md`（添付の数え方。0.6.0 からは 8/8）、`.claude/skills/pasta-check/SKILL.md`。
   - マニュアル・README・`crates/pasta_sample_ghost/RELEASE.md`・steering の名前と、arch の選び方。
   - x64 も含めて、リリース CI で 2 つの zip が作られ検査を通ることの確かめ（`workflow_dispatch` か、それに当たる回し方。タグを打って本当のリリースをするのは `release` スキル）。
 - **Out**:
@@ -73,7 +73,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 ## Upstream / Downstream
 
 - **Upstream**: `pasta-recipe`（`package.ps1`・`release.yml` の組み込み。入った）。`pasta-recipe-dev-actions`（入った）。
-- **Downstream**: 0.5.3 のリリース（`release` スキル）。0.5.3 に入れるなら、リリースのウェーブの前に入れる。
+- **Downstream**: 0.6.0 のリリース（`release` スキル）。リリースのウェーブの前に入れる。
 
 ## Existing Spec Touchpoints
 
@@ -82,7 +82,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 
 ## Constraints
 
-- **版**: 開発者が決める。推奨は 0.5.3（リリースの前に入れれば、`pasta-recipe.zip` の名前は一度も出ない。古い名前の互換も、`release-state.ps1` の過去の版の数え方の追加も要らない）。0.5.3 より後にするなら、0.5.3 が出す `pasta-recipe.zip` から名前を変えることになり、固定のダウンロードのリンクの互換と、添付の数え方の版ごとの読み替えを要件で決める。
+- **版**: 0.6.0（2026-11-14 開発者の決定。v0.5.2 の次のリリース。以下は起票のときの検討で、「0.5.3」は今は 0.6.0 と読む）。推奨は 0.5.3 だった（リリースの前に入れれば、`pasta-recipe.zip` の名前は一度も出ない。古い名前の互換も、`release-state.ps1` の過去の版の数え方の追加も要らない）。0.5.3 より後にするなら、0.5.3 が出す `pasta-recipe.zip` から名前を変えることになり、固定のダウンロードのリンクの互換と、添付の数え方の版ごとの読み替えを要件で決める。
 - **静的 CRT**: pasta の配布物は VC++ ランタイムに頼らない（ルートの `.cargo/config.toml` の方針）。arm64 版も同じ。
 - **x64 のランナーでは arm64 の exe を動かせない**: 検査は中身・版・PE ヘッダ・大きさまで。
 - **`.claude/skills/` の編集**: `release-state.ps1`・`procedure.md`・`SKILL.md` の書き換えは、分類器が Self-Modification として拒むことがある。拒まれたら回避策を探さず、入った分と残りを示して開発者の許可を求める。
