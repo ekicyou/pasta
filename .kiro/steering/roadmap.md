@@ -118,9 +118,9 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
   `book/src/debug/source-level.md` の「切り替えても `.pasta` のブレークポイントは有効」は事実と違うが、`vscode-mcp-client` がその頁ごと消すので、0.5.0 の外へは出ない。`ponytail-editor-tooling` が範囲から外した DAP の側の直し（`host` の廃止など）は、`vscode-mcp-client` が受け継ぐ。この spec の brief は git の `ae04a28b` で読める。
 
-## 0.6.1 の範囲：時報の後のトーク時刻の直し（2026-11-14 開発者の決定）
+## 0.6.1 の範囲：時報の後のトーク時刻の直しと、祝日・行事の日時変数（2026-11-14 開発者の決定）
 
-不具合なので、即時の版（開発者「バグなので即時リリース版」）。spec は `onhour-talk-recount` の 1 本（台帳の行にある）。入ったら `/release 0.6.1`。
+不具合なので、即時の版（開発者「バグなので即時リリース版」）。spec は `onhour-talk-recount` と `date-var-calendar`（同じ日に開発者「版は0.6.1」）の 2 本（台帳の行にある）。2 本とも入ったら `/release 0.6.1`。
 
 ## 0.6.0 の範囲：VS Code を使わないエディタ pasta-recipe（2026-11-12 開発者の決定）
 
@@ -394,6 +394,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 
 - [x] pasta-recipe-multiarch -- pasta-recipe を x64 と arm64 の 2 つで作り、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` としてリリース CI で検査して添付する（`pasta-recipe.zip` の名前は出さない）。x64 のランナーで `--target` を付けて 2 回作る（arm64 はクロス）。`package.ps1`・ルートの `.cargo/config.toml`（aarch64 の `crt-static`）・`release.yml`（PE ヘッダの arch の検査も）・`build.yml` の job `recipe`・`github-release.ps1` と自己テスト・`release` スキルの添付の数え方・マニュアルと README。x64 も含めた CI のビルドの完成までが範囲（開発者の指示）。アプリは LuaJIT を持たない。クロスで通るかは要確認（2026-11-14 起票。開発者「arm64 を起票して」）。版は 0.6.0（2026-11-14 開発者の決定）。`pasta-dll-multiarch`（`.cargo/config.toml`・`release.yml`）・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`pasta-recipe`・`pasta-recipe-dev-actions` は入った）
 - [ ] onhour-talk-recount -- 時報のシーンを出したら、次のランダムトークの時刻をそこから数え直す（`virtual_dispatcher.lua` の `check_hour`）。正時の前に `hour_margin` で見送った分が時報の直後に OnTalk として出る不具合を直す。Lua のテストとマニュアル（`lua/shiori-events.md`・`internals/shiori.md`）。スリープ明けも例外にせず、代わりにゴーストが `OnSysResume` を受けていなければ、その合図でおしゃべりを出す既定の動きを足す（2026-11-14 作者の決定）（2026-11-14 起票。ghost_dev の「ぱすた開発」のヒアリング。仮実装は別の作業ツリーにある）。版は 0.6.1（不具合なので即時の版。2026-11-14 開発者の決定）。`novel-talk-flow` と同じウェーブに置くなら `virtual_dispatcher.lua` を持ち場分けする。Dependencies: none
+- [ ] date-var-calendar -- 日時の変数に `＄祝日`（今の法律の規則で pasta が数える。固定の日・ハッピーマンデー・春分と秋分の式・振替休日・国民の休日。ほかの日は `なし`）と `＄行事`（作者が `ghost/master/calendar.csv` に書く表。`0101-0103,お正月` の 1 行 1 件で、日付は `MMDD`・`MMDD-MMDD`・`YYYYMMDD` の数字だけ。重なりは先の行が勝つ。ほかの日は `なし`。TOML は冗長なので CSV（開発者の判断））を足す。内閣府の CSV は同梱せず、テストの答え合わせに使う（何年か後に古くなるため）。不正な書き方は読み込みのエラー。Lua のテストとマニュアル（`grammar/variables.md`・`reference/pasta-toml.md`）。CSV の細かい形と 2019〜2021 年の特例は要件で決める（2026-11-14 起票）。版は 0.6.1（2026-11-14 開発者の決定）。`onhour-talk-recount` とは触るファイルが違う（`act.lua` と `virtual_dispatcher.lua`）ので同じウェーブに置ける。Dependencies: none
 
 ## Existing Spec Updates
 
