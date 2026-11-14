@@ -7,6 +7,7 @@
 mod common;
 
 mod cache_test;
+mod calendar_test;
 mod config_actors_initialization_test;
 mod config_defaults_test;
 mod config_sections_test;
