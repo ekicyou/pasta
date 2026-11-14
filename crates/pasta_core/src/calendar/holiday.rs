@@ -1,7 +1,5 @@
 //! 祝日の規則（今の「国民の祝日に関する法律」だけ。2019〜2021 年の特例は持たない）。
 
-#![allow(dead_code)] // 公開 API は task 2.3 で出る（そこで外す）
-
 use super::civil::{civil_from_days, days_from_civil, days_in_month, weekday};
 
 /// 年月日（暦にある日）の祝日の名前。祝日でなければ None。

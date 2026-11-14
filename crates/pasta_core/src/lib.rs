@@ -25,8 +25,10 @@ pub mod registry;
 
 // Convenience re-exports
 pub use actor_font::{ActorFont, FONT_ATTRIBUTES, FontInput, FontValue};
+pub use calendar::{CALENDAR_FILE_NAME, CalendarTable, holiday_name, is_calendar_file_name};
 pub use error::{
-    ActorFontError, FontValueProblem, SceneAliasError, SceneTableError, WordTableError,
+    ActorFontError, CalendarError, CalendarProblem, FontValueProblem, SceneAliasError,
+    SceneTableError, WordTableError,
 };
 pub use registry::{
     CmpOp, DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneAttr,

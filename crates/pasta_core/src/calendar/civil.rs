@@ -1,7 +1,5 @@
 //! 日付の算術（Howard Hinnant の civil 算術）。`os.time` は使わない。通日は 1970-01-01 を 0 とする。
 
-#![allow(dead_code)] // 公開 API は task 2.3 で出る
-
 pub(crate) fn is_leap(year: i32) -> bool {
     year.rem_euclid(4) == 0 && (year.rem_euclid(100) != 0 || year.rem_euclid(400) == 0)
 }

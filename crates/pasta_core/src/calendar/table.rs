@@ -1,7 +1,5 @@
 //! `calendar.csv`（行事の表）の書式の検査と表への読み取り。
 
-#![allow(dead_code)] // 公開 API は task 2.3 で出る
-
 use super::civil::days_in_month;
 use crate::error::{CalendarError, CalendarProblem};
 
@@ -49,6 +47,20 @@ impl CalendarTable {
         } else {
             Err(errors)
         }
+    }
+
+    /// その日に当たる最初の行（書いた順）の名前。書き方による優先はない。
+    pub fn event_name(&self, year: i32, month: u32, day: u32) -> Option<&str> {
+        let key = month * 100 + day;
+        self.entries
+            .iter()
+            .find(|e| match e.date {
+                DateSpec::MonthDay(md) => key == md,
+                DateSpec::Range { start, end } if start <= end => (start..=end).contains(&key),
+                DateSpec::Range { start, end } => key >= start || key <= end,
+                DateSpec::Date { year: y, md } => year == y && key == md,
+            })
+            .map(|e| e.name.as_str())
     }
 }
 
@@ -121,6 +133,76 @@ fn parse_date(written: &str) -> Result<DateSpec, CalendarProblem> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn t(text: &str) -> CalendarTable {
+        CalendarTable::parse(text).unwrap()
+    }
+
+    #[test]
+    fn matches_three_forms() {
+        let tb = t("0315,a
+1231-0103,b
+20270111,c
+0229,d
+");
+        assert_eq!(tb.event_name(2030, 3, 15), Some("a"));
+        assert_eq!(tb.event_name(2030, 3, 16), None);
+        assert_eq!(tb.event_name(2027, 1, 11), Some("c"));
+        assert_eq!(tb.event_name(2028, 1, 11), None);
+    }
+
+    #[test]
+    fn wrapping_range_includes_both_ends() {
+        let tb = t("1231-0103,b
+");
+        assert_eq!(tb.event_name(2026, 12, 31), Some("b"));
+        assert_eq!(tb.event_name(2027, 1, 3), Some("b"));
+        assert_eq!(tb.event_name(2027, 1, 4), None);
+        assert_eq!(tb.event_name(2027, 12, 30), None);
+    }
+
+    #[test]
+    fn plain_range_includes_both_ends() {
+        let tb = t("0301-0303,r
+");
+        assert_eq!(tb.event_name(2027, 2, 28), None);
+        for d in 1..=3 {
+            assert_eq!(tb.event_name(2027, 3, d), Some("r"));
+        }
+        assert_eq!(tb.event_name(2027, 3, 4), None);
+    }
+
+    #[test]
+    fn leap_day_matches_only_in_leap_years() {
+        let tb = t("0229,d
+");
+        assert_eq!(tb.event_name(2028, 2, 29), Some("d"));
+        assert_eq!(tb.event_name(2027, 2, 28), None);
+        assert_eq!(tb.event_name(2027, 3, 1), None);
+    }
+
+    #[test]
+    fn earlier_line_wins_regardless_of_form() {
+        let tb = t("0101-0105,range
+20270103,date
+0103,md
+");
+        assert_eq!(tb.event_name(2027, 1, 3), Some("range"));
+        let tb = t("20270103,date
+0101-0105,range
+");
+        assert_eq!(tb.event_name(2027, 1, 3), Some("date"));
+        assert_eq!(tb.event_name(2028, 1, 3), Some("range"));
+    }
+
+    #[test]
+    fn same_name_on_multiple_lines() {
+        let tb = t("0101,x
+0505,x
+");
+        assert_eq!(tb.event_name(2027, 1, 1), Some("x"));
+        assert_eq!(tb.event_name(2027, 5, 5), Some("x"));
+    }
 
     fn err(text: &str) -> Vec<CalendarError> {
         CalendarTable::parse(text).expect_err("should fail")
