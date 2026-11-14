@@ -30,7 +30,7 @@ VSCode の拡張機能ビュー（サイドバーの拡張アイコン、また�
 
 ### 代替経路: VSIX を手動インストール
 
-Marketplace を利用できない環境では、GitHub Releases で配布される VSIX 資産を手動でインストールできる。資産名は次の形式である（`<version>` はリリース版番号に置き換わる）。
+Marketplace を利用できない環境では、GitHub Releases で配布される VSIX 資産を手動でインストールできる。VSIX は [ダウンロード](../download.md#vs-code-の拡張) のページから辿れる最新のリリースの Assets にある。資産名は次の形式である（`<version>` はリリース版番号に置き換わる）。
 
 ```text
 pasta-vscode-<version>.vsix
