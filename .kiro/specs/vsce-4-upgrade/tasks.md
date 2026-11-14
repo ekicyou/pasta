@@ -38,13 +38,13 @@
   - 1 の結果（research.md と、1.3・1.4・1.6 で直したファイルがあればそれも）を spec のブランチにコミットする。`package.json`・lock だけはコミットしない
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.8, 3.9, 4.6, 6.1, 6.2_
 
-- [ ] 2. main へ入れて公開の道を確かめる
+- [x] 2. main へ入れて公開の道を確かめる
 - [x] 2.1 今の main（3.9.2）で公開の道の基準を取る
   - `gh workflow run release-setup-check.yml --ref main` を回し、job summary の 2 行（メンバー確認・拡張の存在確認）とログの `verification succeeded` を読む。run の緑だけでは判定しない（`verify-pat` は `continue-on-error`）
   - 2 行のどちらかが成功でなければ、2.2 へ進まず `.github/release-ci-setup.md` に沿って設定を直し、回し直す（版と関係の無い原因・5.4）
   - 完了の状態: research.md 11 節の「基準の run」に、2 行とも成功した run の URL が書いてある
   - _Requirements: 4.2, 4.5, 5.4_
-- [ ] 2.2 版だけの PR を作り、squash マージする
+- [x] 2.2 版だけの PR を作り、squash マージする
   - `origin/main` から作業用のブランチを切り、その上で `npm install --save-dev @vscode/vsce@^4.1.1` を叩いて `package.json`・lock を作り直す（spec のブランチから持ち込まない）。lock の差分が vsce の配下だけであることを 1.2 と同じ数え方でもう一度確かめる
   - 1 で条件つきで直したもの（1.3 の `npm audit fix`・1.4 の `.vscodeignore`・1.6 の `publish-vsix.ps1` と項目 12）があれば、同じ PR に入れる（`npm audit fix` はこのブランチの上でやり直す）。無ければ `package.json`・`package-lock.json` の 2 つだけ
   - コミットし、`gh pr create` → `gh pr merge --squash --delete-branch`。CI は待たない（main が赤になれば追いかけて直す）
@@ -52,11 +52,11 @@
   - 完了の状態: main に版だけの squash のコミットがあり、spec のブランチがそれを含み、main の `build.yml` の `vscode-test` が 4.1.1 の lock で通っている（赤なら直した）
   - この後 2.3 が済むまでリリースタグを push しない
   - _Requirements: 1.1, 1.6, 2.5, 4.1, 4.4_
-- [ ] 2.3 4.1.1 の main で公開の道を確かめて記録する
+- [x] 2.3 4.1.1 の main で公開の道を確かめて記録する
   - マージの直後に同じセッションで `gh workflow run release-setup-check.yml --ref main` を回し、2.1 と同じ判定の規則で 2 行を読む。`npm ci` の step で lock の vsce が 4.1.1 であることも読む
   - 完了の状態: research.md 11 節の表（基準の run・版を上げる PR・確かめの run・日付・vsce の版・2 つの結果・判断）が埋まり、spec のブランチにコミットしてある
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.7_
-- [ ] 2.4 確かめがだめだったときに、原因に応じて戻すか直すか見送る（2.3 が成功なら「不要」と research.md に書いて終える）
+- [x] 2.4 確かめがだめだったときに、原因に応じて戻すか直すか見送る（2.3 が成功なら「不要」と research.md に書いて終える）
   - 4.1.1 だけ `verify-pat` が失敗（基準は成功）: squash のコミットを `git revert` した PR を入れて main を 3.9.2 に戻し、この spec の中で認証の直しか `--oidc`（OIDC のまま。触るファイルを揃える）を比べる。`--oidc` を選ぶときは実装に入る前に設計へ戻って見直す（その場で移さない）。直せたら 2.2 からやり直す
   - 基準も失敗: 版は戻さず、`.github/release-ci-setup.md` に沿って設定を直してから 2.1 から確かめ直す
   - `show` だけ失敗: 再実行し、2 回目も失敗で基準が成功なら 4.1.1 だけの失敗と同じ扱い
@@ -70,3 +70,7 @@
   - 完了の状態: ロードマップに `vsce-4-upgrade` が未着手として残っていない
   - _Depends: 2.3, 2.4_
   - _Requirements: 6.3_
+
+## Implementation Notes
+
+- 3 のロードマップの移動は、タスクの許すとおり `/kiro-complete` の手順の中で行う（2026-11-14。2.3 が成功し 2.4 は不要）

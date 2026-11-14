@@ -292,10 +292,10 @@
 | 項目 | 値 |
 |------|----|
 | 基準の run（3.9.2・マージの前） | https://github.com/ekicyou/pasta/actions/runs/43534662446 （2026-11-14・main・vsce 3.9.2）: `verify-pat` の step と `show` の step がどちらも exit 0（＝ summary の 2 行とも「成功」）・ログに `The Personal Access Token verification succeeded for the publisher 'ekicyou'.` |
-| 版を上げる PR | （未） |
-| 確かめの run（4.1.1・マージの後） | （未） |
-| 走らせた日 | （未） |
-| lock の vsce の版 | （未） |
-| `verify-pat ekicyou --azure-credential` | （未） |
-| `show ekicyou.pasta-vscode --json` | （未） |
-| 判断 | （未） |
+| 版を上げる PR | https://github.com/ekicyou/pasta/pull/258 （squash `cf244e95`。`origin/main` から切ったブランチで lock を作り直し、vsce の配下の外 0・手元で試した lock とバイト単位で同じ） |
+| 確かめの run（4.1.1・マージの後） | https://github.com/ekicyou/pasta/actions/runs/43535000457 （head `cf244e95`・マージの直後に同じセッションで回した。間にリリースタグは push していない） |
+| 走らせた日 | 2026-11-14（基準 00:30 UTC・確かめ 00:34 UTC） |
+| lock の vsce の版 | 基準 3.9.2・確かめ 4.1.1（run の head が版を上げた squash のコミット。`npm ci --ignore-scripts` は 210 packages で成功） |
+| `verify-pat ekicyou --azure-credential` | 成功（step exit 0 ＝ summary「成功（Members に追加済み）」・ログに `The Personal Access Token verification succeeded for the publisher 'ekicyou'.`）。基準も成功 |
+| `show ekicyou.pasta-vscode --json` | 成功（step exit 0 ＝ summary「成功（版 N 件。最新 X）」）。基準も成功 |
+| 判断 | 公開の道は 4.1.1 で通る。2.4 の戻し・直し・見送りは不要。main の `build.yml` の `vscode-test`（run 43534977994）も 4.1.1 の lock で成功。公開の API の受け付けは次のリリースの `publish-vsce` で分かる（要件 4.3 の合意） |
