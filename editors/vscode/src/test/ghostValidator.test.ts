@@ -724,6 +724,31 @@ test('a.PASTA・直下の PASTA.TOML の保存で走り、dic/pasta.toml の保�
   gv.dispose();
 });
 
+test('直下の calendar.csv（大文字・小文字不問）の保存・作成・削除で走り、dic/calendar.csv では走らない', async () => {
+  const { gv, masters, watcher } = newRegistered();
+  save('/ws/Ghost/Master/Calendar.CSV');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/Ghost/Master'], '保存');
+
+  masters.length = 0;
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/ghost/master/calendar.csv'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/master'], '作成');
+
+  masters.length = 0;
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/master/CALENDAR.csv'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/master'], '削除');
+
+  masters.length = 0;
+  save('/ws/ghost/master/dic/calendar.csv');
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/ghost/master/dic/calendar.csv'));
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/master/calendar.csv.bak'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, []);
+  gv.dispose();
+});
+
 test('綴りの違う 2 つの起動は 1 回の検査にまとまり、診断が二重にならない', async () => {
   mock.resetFakeFs();
   setOpenDocuments([]);

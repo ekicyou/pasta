@@ -102,7 +102,7 @@
   - _Dispatch: mechanical — 設計が事例と期待を並べる_
   - _Requirements: 3.3, 4.1, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.10, 5.11, 7.3, 8.4, 8.5_
 
-- [ ] 4. 起動しないでの検査とエディタ
+- [x] 4. 起動しないでの検査とエディタ
 - [x] 4.1 (P) `pasta_check validate` の核で行事の表を検査し `calendar-invalid` を報告する
   - 報告の種類 `calendar-invalid`（誤り。`[actor].font` の誤りの後）と、日本語の文（行の誤りの 5 つの原因・UTF-8 で保存し直す・読めない・重複）を足す
   - 核で、ファイルの一覧の直下でファイル名の判定に当たるパスを選び、辞書ファイルの後ろに加えて返す（辞書ファイルの数え方は変えない・殻は変えない）。この一覧を読む呼び手は 4 つある: CLI・WASM・pasta-recipe と、LSP の WASM の口（`crates/pasta_lsp/src/transport.rs` の `wasm_select_ghost_files`。使う側は `editors/vscode/src/ghostValidator.ts`）。どれも一覧の全パスを読むだけで、変えずに表が届くことを確かめる
@@ -122,7 +122,7 @@
   - _Dispatch: mechanical — 設計が事例と比べる値を与える_
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.11, 6.1, 6.2, 6.3, 6.4, 6.5, 8.5_
 
-- [ ] 4.3 (P) VSCode の拡張機能で `calendar.csv` の保存・作成・削除でも検査し直す
+- [x] 4.3 (P) VSCode の拡張機能で `calendar.csv` の保存・作成・削除でも検査し直す
   - 保存のきっかけに master の直下の `calendar.csv`（大文字・小文字を区別しない）を足し、作成・削除のきっかけの判定にも同じ条件を足す
   - 拡張の試験に保存・作成・削除の 3 つの事例を足し、`editors/vscode` の `npm test` と型の検査が通る
   - _Boundary: VSCodeTrigger_

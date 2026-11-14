@@ -80,7 +80,7 @@ export class GhostValidator implements vscode.Disposable {
   ) {}
 
   /**
-   * 保存（.pasta・master の直下の pasta.toml）と配下の .pasta・.lua の作成・削除で検査を起動する
+   * 保存（.pasta・master の直下の pasta.toml・calendar.csv）と、配下の .pasta・.lua・master の直下の calendar.csv の作成・削除で検査を起動する
    * （11.3・11.6。名前の変更は削除と作成として届く）。ghost/master の外なら何もしない（11.10）。
    * 大文字・小文字はどれも区別しない（3.1〜3.4）。見張りはすべてのファイルに張って関数で絞る:
    * 1.106 までの VSCode はパターンを大文字・小文字を区別して照らすため（OQ-6）。
@@ -88,12 +88,15 @@ export class GhostValidator implements vscode.Disposable {
    */
   register(): void {
     const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+    // master の直下のファイル（大文字・小文字不問。比べる名前は ASCII）か
+    const isDirectChild = (uri: vscode.Uri, master: vscode.Uri, name: string) =>
+      uri.path.toLowerCase() === `${master.path.toLowerCase()}/${name}`;
     const onFileChange = (uri: vscode.Uri) => {
-      if (!endsWithIgnoreCase(uri, '.pasta') && !endsWithIgnoreCase(uri, '.lua')) {
-        return;
-      }
       const master = findGhostMaster(uri);
-      if (master) {
+      if (
+        master &&
+        (endsWithIgnoreCase(uri, '.pasta') || endsWithIgnoreCase(uri, '.lua') || isDirectChild(uri, master, 'calendar.csv'))
+      ) {
         this.requestValidation(master);
       }
     };
@@ -126,7 +129,8 @@ export class GhostValidator implements vscode.Disposable {
         }
         if (
           endsWithIgnoreCase(doc.uri, '.pasta') ||
-          doc.uri.path.toLowerCase() === `${master.path.toLowerCase()}/pasta.toml`
+          isDirectChild(doc.uri, master, 'pasta.toml') ||
+          isDirectChild(doc.uri, master, 'calendar.csv')
         ) {
           this.requestValidation(master);
         }
