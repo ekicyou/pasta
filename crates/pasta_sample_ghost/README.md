@@ -23,7 +23,7 @@ SHIORI/3.0 プロトコルで動作するミニマルなゴーストとして、
 
 ## ディレクトリ構成
 
-サンプルゴーストの実体は `ghosts/hello-pasta/` に**完全なゴースト一式として直接配置**されており、これが配布物の Single Source of Truth（SSOT）です。テキスト系ファイル（`descript.txt` / `pasta.toml` / `dic/*.pasta` / `install.txt` / `surfaces.txt`）は手書きの正本、立ち絵（`surface*.png`）はコミットした素材です。DLL などの生成物も同じツリー内に置かれますが、コミットしません。
+サンプルゴーストの実体は `ghosts/hello-pasta/` に**完全なゴースト一式として直接配置**されており、これが配布物の Single Source of Truth（SSOT）です。テキスト系ファイル（`descript.txt` / `pasta.toml` / `dic/*.pasta` / `calendar.csv` / `install.txt` / `surfaces.txt`）は手書きの正本、立ち絵（`surface*.png`）はコミットした素材です。DLL などの生成物も同じツリー内に置かれますが、コミットしません。
 
 ```
 crates/pasta_sample_ghost/
@@ -37,7 +37,7 @@ crates/pasta_sample_ghost/
 ├── ghosts/                 # サンプルゴースト本体（SSOT・配布物）
 │   └── hello-pasta/        # ゴーストID
 │       ├── install.txt
-│       ├── ghost/master/   # descript.txt, pasta.toml, dic/*.pasta（手書きSSOT）＋ pasta.dll, THIRD_PARTY_LICENSES.txt, scripts/（生成物・コミットしない）
+│       ├── ghost/master/   # descript.txt, pasta.toml, dic/*.pasta, calendar.csv（手書きSSOT）＋ pasta.dll, THIRD_PARTY_LICENSES.txt, scripts/（生成物・コミットしない）
 │       └── shell/master/   # descript.txt, surfaces.txt（手書きSSOT）＋ surface*.png（コミットした素材）
 ├── release.ps1             # ビルド＋セットアップ＋pasta_check.zip・.nar・pasta.dll.zip・pasta-skills.zip 作成（動作確認用）
 └── tests/
@@ -79,7 +79,7 @@ crates/pasta_sample_ghost/
 
 `-SkipSetup` は手順 1〜2 を、`-SkipDllBuild` は手順 1 だけを飛ばします。手順 3〜8 はどちらの指定でも毎回走ります。
 
-**注**: テキスト系配布ファイル（`descript.txt` / `pasta.toml` / `dic/*.pasta` / `install.txt`）と、シェルの立ち絵（`surface*.png`）・`surfaces.txt` は `ghosts/hello-pasta/` にコミット済みのため、コピー工程も生成工程もありません。`release.ps1` は `shell/master/` を書き換えず、生成物（DLL・ライセンス表示）と `scripts/` の配置とパッケージングのみを担います。
+**注**: テキスト系配布ファイル（`descript.txt` / `pasta.toml` / `dic/*.pasta` / `calendar.csv` / `install.txt`）と、シェルの立ち絵（`surface*.png`）・`surfaces.txt` は `ghosts/hello-pasta/` にコミット済みのため、コピー工程も生成工程もありません。`release.ps1` は `shell/master/` を書き換えず、生成物（DLL・ライセンス表示）と `scripts/` の配置とパッケージングのみを担います。
 
 **注**: `release.ps1` の成果物は手元の動作確認用で、コミットの対象ではありません。手順 2 で `ghost/master/` に置く `pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`scripts/` と、出力先の `release/` は `.gitignore` で無視されます（シェルの立ち絵 `surface*.png`・`surfaces.txt` は素材として追跡します）。配布物の公開は、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）がソースから作り直して行います。手順は [RELEASE.md](RELEASE.md) を参照してください。
 
@@ -138,7 +138,9 @@ hello-pasta/
 │       │   ├── 09-choice.pasta   # 9 段: 選択肢
 │       │   ├── 10-save.pasta     # 10 段: 保存される変数（＄＊回数）
 │       │   ├── 11-jump.pasta     # 11 段: Call・前方一致・ローカルシーン・チェイントーク
-│       │   └── 12-lua.pasta      # 12 段: Lua ブロックの関数を呼ぶ
+│       │   ├── 12-lua.pasta      # 12 段: Lua ブロックの関数を呼ぶ
+│       │   └── 13-calendar.pasta # 13 段: 行事の表で話を変える（＞「行事_」＆＄行事）
+│       ├── calendar.csv        # [SSOT] 行事の表（13 段で足す。＄行事 の元）
 │       ├── pasta.dll           # [gen] SHIORI DLL（cargo build・コミットしない）
 │       ├── THIRD_PARTY_LICENSES.txt # [gen] 第三者ライセンス表示（cargo about・コミットしない）
 │       └── scripts/            # [gen] 利用者向けの説明 1 枚（README.md）だけ。ランタイムは pasta.dll の中にある（pasta_lua/scripts/ の写し・コミットしない）
@@ -149,7 +151,7 @@ hello-pasta/
         └── surface*.png        # [SSOT] 立ち絵 18 枚（画像生成で作成・Unlicense）
 ```
 
-段階表（各段で教える表現・追加するファイル・検証するイベント）は [`STAGES.md`](STAGES.md) にあります。段階 N の辞書は `01`〜`NN` のファイルの集まりで、12 段目（全ファイル）が配布版の辞書です。
+段階表（各段で教える表現・追加するファイル・検証するイベント）は [`STAGES.md`](STAGES.md) にあります。段階 N の辞書は `01`〜`NN` のファイルの集まりで、13 段目（全ファイル）が配布版の辞書です。13 段目では行事の表 `calendar.csv` も足します。
 
 ## ライセンス
 
