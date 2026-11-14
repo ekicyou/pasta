@@ -188,7 +188,11 @@ function M.check_hour(act)
     local candidates = { "時報" .. hh, "OnHour" .. hh, "時報その他", "OnHourOther" }
     for _, name in ipairs(candidates) do
         local t = create_scene_thread(name, act)
-        if t then return t end
+        if t then
+            -- 時報が出るので、次のトークの時刻をこの時点から決め直す（時報の直後にトークが続かないように）
+            next_talk_time = calculate_next_talk_time(CLOCK.steady(act.req))
+            return t
+        end
     end
     return nil
 end
