@@ -7,7 +7,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 現在の主題は次のとおり。
 
 - **0.6.0: VS Code を使わないエディタ pasta-recipe**（2026-11-12 開発者の決定「次のリリースにする。最優先事項」）。2026-11-12 にウェーブ 1 の 2 本（`vscode-scene-outline-play`・`scene-play-locals`）が入り、2026-11-13 にウェーブ 2 の `pasta-recipe` と、ウェーブ 3 の `pasta-recipe-dev-actions`（アプリのシーンの ▶・リロード・保存変数の表と書き換え・値を入れて実行）が入った。2026-11-14 に `pasta-recipe-multiarch`（x64・arm64 の 2 つの zip）が入った。0.6.0 の spec は揃い、残りはリリース（下の「0.6.0 の範囲」と棚卸）。
-- **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`、2026-11-14 に起票した `manual-download-page`・`date-var-calendar`。まとめは下の「版がまだ決まっていないもの」にある。
+- **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`、2026-11-14 に起票した `manual-download-page`。まとめは下の「版がまだ決まっていないもの」にある。
 - **Phase 13: areka でノベルゲーム（0.7.0。2026-10-29 に 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性の 2 本（`scene-attribute-store`・`scene-condition-attributes`）は、2026-10-29 に 0.5.0 へ移した。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
@@ -118,9 +118,9 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
   `book/src/debug/source-level.md` の「切り替えても `.pasta` のブレークポイントは有効」は事実と違うが、`vscode-mcp-client` がその頁ごと消すので、0.5.0 の外へは出ない。`ponytail-editor-tooling` が範囲から外した DAP の側の直し（`host` の廃止など）は、`vscode-mcp-client` が受け継ぐ。この spec の brief は git の `ae04a28b` で読める。
 
-## 0.6.1 の範囲：時報の後のトーク時刻の直し（2026-11-14 開発者の決定）
+## 0.6.1 の範囲：時報の後のトーク時刻の直しと、祝日・行事の日時変数（2026-11-14 開発者の決定）
 
-不具合なので、即時の版（開発者「バグなので即時リリース版」）。spec は `onhour-talk-recount` の 1 本（台帳の行にある）。入ったら `/release 0.6.1`。
+不具合なので、即時の版（開発者「バグなので即時リリース版」）。spec は `onhour-talk-recount` と `date-var-calendar`（同じ日に開発者「版は0.6.1」）の 2 本（台帳の行にある）。2 本とも入ったら `/release 0.6.1`。
 
 ## 0.6.0 の範囲：VS Code を使わないエディタ pasta-recipe（2026-11-12 開発者の決定）
 
@@ -346,7 +346,6 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 - `scene-anchor-link`（2026-10-08 起票）: 中身は上の「Phase 11 の残り」の「文中のシーンリンク」にある。先に置いた `scene-condition-attributes` は入った。
 - `pasta-recipe-multiarch`（2026-11-14 起票）: 中身は台帳の行にある。版は 0.6.0（2026-11-14 開発者の決定。リリースの前に入れれば `pasta-recipe.zip` の名前は一度も出ない）。
 - `manual-download-page`（2026-11-14 起票。開発者「ダウンロード関係だけ簡潔に説明したページが欲しい」）: 中身は台帳の行にある。マニュアルだけの spec で、main への push で Pages に出るのでリリースを待たない。
-- `date-var-calendar`（2026-11-14 起票。開発者「イベントテーブルを持ちたい」）: 中身は台帳の行にある。版は開発者が後で決める。
 
 ## 依存の更新（2026-10-24 起票）
 
@@ -395,7 +394,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 
 - [x] pasta-recipe-multiarch -- pasta-recipe を x64 と arm64 の 2 つで作り、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` としてリリース CI で検査して添付する（`pasta-recipe.zip` の名前は出さない）。x64 のランナーで `--target` を付けて 2 回作る（arm64 はクロス）。`package.ps1`・ルートの `.cargo/config.toml`（aarch64 の `crt-static`）・`release.yml`（PE ヘッダの arch の検査も）・`build.yml` の job `recipe`・`github-release.ps1` と自己テスト・`release` スキルの添付の数え方・マニュアルと README。x64 も含めた CI のビルドの完成までが範囲（開発者の指示）。アプリは LuaJIT を持たない。クロスで通るかは要確認（2026-11-14 起票。開発者「arm64 を起票して」）。版は 0.6.0（2026-11-14 開発者の決定）。`pasta-dll-multiarch`（`.cargo/config.toml`・`release.yml`）・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`pasta-recipe`・`pasta-recipe-dev-actions` は入った）
 - [ ] onhour-talk-recount -- 時報のシーンを出したら、次のランダムトークの時刻をそこから数え直す（`virtual_dispatcher.lua` の `check_hour`）。正時の前に `hour_margin` で見送った分が時報の直後に OnTalk として出る不具合を直す。Lua のテストとマニュアル（`lua/shiori-events.md`・`internals/shiori.md`）。スリープ明けも例外にせず、代わりにゴーストが `OnSysResume` を受けていなければ、その合図でおしゃべりを出す既定の動きを足す（2026-11-14 作者の決定）（2026-11-14 起票。ghost_dev の「ぱすた開発」のヒアリング。仮実装は別の作業ツリーにある）。版は 0.6.1（不具合なので即時の版。2026-11-14 開発者の決定）。`novel-talk-flow` と同じウェーブに置くなら `virtual_dispatcher.lua` を持ち場分けする。Dependencies: none
-- [ ] date-var-calendar -- 日時の変数に `＄祝日`（今の法律の規則で pasta が数える。固定の日・ハッピーマンデー・春分と秋分の式・振替休日・国民の休日。ほかの日は `なし`）と `＄行事`（作者が `ghost/master/calendar.csv` に書く表。`0101-0103,お正月` の 1 行 1 件で、日付は `MMDD`・`MMDD-MMDD`・`YYYYMMDD` の数字だけ。重なりは先の行が勝つ。ほかの日は `なし`。TOML は冗長なので CSV（開発者の判断））を足す。内閣府の CSV は同梱せず、テストの答え合わせに使う（何年か後に古くなるため）。不正な書き方は読み込みのエラー。Lua のテストとマニュアル（`grammar/variables.md`・`reference/pasta-toml.md`）。CSV の細かい形と 2019〜2021 年の特例は要件で決める（2026-11-14 起票）。版は未定。Dependencies: none
+- [ ] date-var-calendar -- 日時の変数に `＄祝日`（今の法律の規則で pasta が数える。固定の日・ハッピーマンデー・春分と秋分の式・振替休日・国民の休日。ほかの日は `なし`）と `＄行事`（作者が `ghost/master/calendar.csv` に書く表。`0101-0103,お正月` の 1 行 1 件で、日付は `MMDD`・`MMDD-MMDD`・`YYYYMMDD` の数字だけ。重なりは先の行が勝つ。ほかの日は `なし`。TOML は冗長なので CSV（開発者の判断））を足す。内閣府の CSV は同梱せず、テストの答え合わせに使う（何年か後に古くなるため）。不正な書き方は読み込みのエラー。Lua のテストとマニュアル（`grammar/variables.md`・`reference/pasta-toml.md`）。CSV の細かい形と 2019〜2021 年の特例は要件で決める（2026-11-14 起票）。版は 0.6.1（2026-11-14 開発者の決定）。`onhour-talk-recount` とは触るファイルが違う（`act.lua` と `virtual_dispatcher.lua`）ので同じウェーブに置ける。Dependencies: none
 
 ## Existing Spec Updates
 
