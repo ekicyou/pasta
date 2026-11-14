@@ -19,7 +19,7 @@
   - _Requirements: 6.1, 6.2, 6.3, 2.5_
 
 - [ ] 2. 「復帰の後にもう喋ったか」を覚えてスリープ明けのおしゃべりを予約する
-- [ ] 2.1 (P) 時計が OnSysSuspend を見た回数を数えて読み出せるようにする
+- [x] 2.1 (P) 時計が OnSysSuspend を見た回数を数えて読み出せるようにする
   - `OnSysSuspend` を見た今の印の行で回数を 1 増やし、読み出しの口を足す。リセットと状態の取り出しの表にも入れる
   - 時刻の飛びの判定・ほかの出力・新しい require は変えない
   - `virtual_clock_test.lua` に、`OnSysSuspend` で 1 増え、`OnSysResume`・`OnSecondChange` では増えず、リセットで 0 に戻ることを足す

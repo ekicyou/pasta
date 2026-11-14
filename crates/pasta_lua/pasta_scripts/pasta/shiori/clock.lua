@@ -65,6 +65,7 @@ local _epoch = 0           -- 時刻の飛びの通し番号
 local _jump_total = 0      -- 飛びの合計（秒。ふだんの 1 秒分を除く）
 local _resumed = false     -- OnSysResume の後で、次の 1 回の飛びを数えない
 local _suspended = false   -- OnSysSuspend の後で、次の 1 回の飛びを数えない（飛ばない秒では消えない）
+local _suspend_count = 0   -- OnSysSuspend を見た回数（X-Pasta-Time の有無に関わらず数える）
 
 --- X-Pasta-Time（テストの時刻の上書き）があるリクエストか
 ---@param req ClockRequest
@@ -153,7 +154,7 @@ function M.observe(req)
         return true
     end
     if req.id == "OnSysResume" then _resumed = true end
-    if req.id == "OnSysSuspend" then _suspended = true end
+    if req.id == "OnSysSuspend" then _suspended = true; _suspend_count = _suspend_count + 1 end
     if has_pasta_time(req) then return false end
     local now = M.now(req)
     if now == nil then return false end
@@ -236,6 +237,12 @@ function M.offset()
     return _offset
 end
 
+--- OnSysSuspend を見た回数。時報のディスパッチャが「前回から変わったか」で数え直しを決める。
+---@return integer
+function M.suspend_count()
+    return _suspend_count
+end
+
 --- テスト用: 状態を初期値に戻す
 function M._reset()
     _offset = 0
@@ -245,11 +252,12 @@ function M._reset()
     _jump_total = 0
     _resumed = false
     _suspended = false
+    _suspend_count = 0
 end
 
 --- テスト用: 状態を読む
 ---@return { offset: integer, probe_armed: boolean, prev_now: integer|nil,
----   epoch: integer, jump_total: integer, resumed: boolean }
+---   epoch: integer, jump_total: integer, resumed: boolean, suspended: boolean, suspend_count: integer }
 function M._get_state()
     return {
         offset = _offset,
@@ -259,6 +267,7 @@ function M._get_state()
         jump_total = _jump_total,
         resumed = _resumed,
         suspended = _suspended,
+        suspend_count = _suspend_count,
     }
 end
 
