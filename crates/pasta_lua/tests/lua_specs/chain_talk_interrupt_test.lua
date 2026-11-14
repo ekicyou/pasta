@@ -18,6 +18,7 @@ local RELOAD = {
     "pasta.shiori.event.boot",
     "pasta.shiori.event.choice_select",
     "pasta.shiori.event.second_change",
+    "pasta.shiori.event.sys_resume",
     "pasta.shiori.event.mouse",
     "pasta.shiori.event.scene_play",
     "pasta.shiori.event.external_control",

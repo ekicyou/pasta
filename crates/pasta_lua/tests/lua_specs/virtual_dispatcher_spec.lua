@@ -37,6 +37,7 @@ describe("pasta.shiori.event.virtual_dispatcher", function()
         expect(type(dispatcher.dispatch)):toBe("function")
         expect(type(dispatcher.check_hour)):toBe("function")
         expect(type(dispatcher.check_talk)):toBe("function")
+        expect(type(dispatcher.wake_talk)):toBe("function")
         expect(type(dispatcher._reset)):toBe("function")
         expect(type(dispatcher._get_internal_state)):toBe("function")
         expect(type(dispatcher._set_scene_executor)):toBe("function")
@@ -47,6 +48,7 @@ describe("pasta.shiori.event.virtual_dispatcher", function()
         local state = dispatcher._get_internal_state()
         expect(state.next_hour_unix):toBe(0)
         expect(state.next_talk_time):toBe(0)
+        expect(state.talk_suspend_count):toBe(0)
         expect(state.cached_config):toBe(nil)
     end)
 end)
@@ -614,6 +616,24 @@ describe("check_hour - all candidates miss", function()
 
         expect(result):toBe(nil)
     end)
+
+    test("next_talk_time is unchanged when no candidate matches", function()
+        setup()
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            return nil
+        end)
+
+        local act = { req = { id = "OnSecondChange", status = "idle", date = { unix = 0, hour = 12 } } }
+        dispatcher.check_hour(act)
+        dispatcher.check_talk(act) -- 初回: 次のおしゃべりの時刻を決める
+        local before = dispatcher._get_internal_state().next_talk_time
+        expect(before ~= 0):toBe(true)
+        act.req.date.unix = 3600
+
+        expect(dispatcher.check_hour(act)):toBe(nil)
+        expect(dispatcher._get_internal_state().next_talk_time):toBe(before)
+    end)
 end)
 
 -- ============================================================================
@@ -879,6 +899,22 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         })
     end
 
+    --- OnSysResume の act を作る（CLOCK.observe を通す）
+    local function resume_act(real)
+        local req = { id = "OnSysResume", status = "idle", date = mk_date(real), dic = {} }
+        CLOCK.observe(req)
+        return create_mock_act(req)
+    end
+
+    --- OnSysSuspend を見せる（SSP は復帰してから送る）
+    local function suspend(real)
+        CLOCK.observe({ id = "OnSysSuspend", date = mk_date(real), dic = {} })
+    end
+
+    local function talk_time()
+        return dispatcher._get_internal_state().next_talk_time
+    end
+
     --- 時報の候補を探すと、"時報HH" の名前を found に残して thread を返す
     local function vtest(name, fn)
         test(name, function()
@@ -975,7 +1011,7 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         expect(found):toBe(nil)
     end)
 
-    vtest("実機の順番のスリープ明け（OnSysSuspend → 最初の秒 → OnSysResume）でも時報は 1 回出て、おしゃべりはすぐ出る", function()
+    vtest("実機の順番のスリープ明け（OnSysSuspend → 最初の秒 → OnSysResume）でも時報は 1 回出て、おしゃべりは時報から数え直す", function()
         dispatcher.check_hour(mk_act(R0)) -- 初回: 11:00 を記録
         dispatcher.check_talk(mk_act(R0)) -- 初回: 次のおしゃべりを記録
         local talk_at = dispatcher._get_internal_state().next_talk_time
@@ -984,11 +1020,39 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         expect(type(dispatcher.check_hour(mk_act(real)))):toBe("thread")
         expect(found):toBe("時報" .. hh_of(real))
         expect(talk_at < CLOCK.steady({ date = mk_date(real), dic = {} })):toBe(true)
-        expect(type(dispatcher.check_talk(mk_act(real + 1)))):toBe("thread")
-        CLOCK.observe({ id = "OnSysResume", date = mk_date(real + 4), dic = {} }) -- 4 秒遅れて届く
+        expect(dispatcher.check_talk(mk_act(real + 1))):toBe(nil) -- 時報から数え直すので、すぐは出ない
+        local recounted = dispatcher._get_internal_state().next_talk_time
+        dispatcher.wake_talk(resume_act(real + 4)) -- 4 秒遅れて届く。時報が出たので予約しない
+        expect(dispatcher._get_internal_state().next_talk_time):toBe(recounted)
         found = nil
         expect(dispatcher.check_hour(mk_act(real + 5))):toBe(nil)
         expect(found):toBe(nil)
+    end)
+
+    vtest("時報が出たら、次のおしゃべりは時報から数え直す（マージンで見送られた分は時報の直後に出ない）", function()
+        local t0 = BASE + H - 400
+        dispatcher.check_hour(mk_act(t0))
+        dispatcher.check_talk(mk_act(t0)) -- 次のおしゃべりは 10:56:20〜10:58:20 のどこか
+        pass(t0 + 1, BASE + H - 21)
+        expect(dispatcher.check_talk(mk_act(BASE + H - 20))):toBe(nil) -- 時報の 20 秒前: マージンで見送り
+        pass(BASE + H - 19, BASE + H - 1)
+        local act = mk_act(BASE + H)
+        expect(type(dispatcher.check_hour(act))):toBe("thread")
+        local wait = dispatcher._get_internal_state().next_talk_time - CLOCK.steady(act.req)
+        expect(wait >= 180 and wait <= 300):toBe(true)
+        pass(BASE + H + 1, BASE + H + 178)
+        expect(dispatcher.check_talk(mk_act(BASE + H + 179))):toBe(nil)
+    end)
+
+    vtest("時報の候補が 1 つもなければ、次のおしゃべりの時刻は変わらない", function()
+        dispatcher._set_scene_executor(function() return nil end)
+        dispatcher.check_hour(mk_act(R0))
+        dispatcher.check_talk(mk_act(R0))
+        local talk_at = dispatcher._get_internal_state().next_talk_time
+        expect(talk_at ~= 0):toBe(true)
+        pass(R0 + 1, BASE + H - 1)
+        expect(dispatcher.check_hour(mk_act(BASE + H))):toBe(nil)
+        expect(dispatcher._get_internal_state().next_talk_time):toBe(talk_at)
     end)
 
     vtest("hour_margin は仮想の正時までの残りで見る", function()
@@ -1076,5 +1140,102 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         pass(jumped + 1, jumped + n - 12)
         expect(dispatcher.check_talk(mk_act(jumped + n - 11 - 1))):toBe(nil)
         expect(type(dispatcher.check_talk(mk_act(jumped + n - 11)))):toBe("thread")
+    end)
+
+    -- スリープ明けの予約（wake_talk）
+
+    vtest("正時をまたがない長いスリープで溜まったトークが最初の秒に出たら、wake_talk は予約しない", function()
+        dispatcher.check_hour(mk_act(R0))
+        dispatcher.check_talk(mk_act(R0))
+        local real = R0 + 1200 -- 20 分眠って 10:41
+        suspend(real)
+        expect(dispatcher.check_hour(mk_act(real))):toBe(nil)
+        expect(type(dispatcher.check_talk(mk_act(real)))):toBe("thread")
+        local talk_at = talk_time()
+        expect(dispatcher._get_internal_state().talk_suspend_count):toBe(CLOCK.suspend_count())
+        dispatcher.wake_talk(resume_act(real + 4))
+        expect(talk_time()):toBe(talk_at)
+    end)
+
+    vtest("自動トークの出ていないスリープ明けは、wake_talk の次の秒の check_talk が出す", function()
+        dispatcher.check_hour(mk_act(R0))
+        dispatcher.check_talk(mk_act(R0)) -- 次は 180〜300 秒後
+        local real = R0 + 60 -- 1 分だけ眠った
+        suspend(real)
+        expect(dispatcher.check_hour(mk_act(real))):toBe(nil)
+        expect(dispatcher.check_talk(mk_act(real))):toBe(nil)
+        local act = resume_act(real + 4)
+        dispatcher.wake_talk(act)
+        expect(talk_time()):toBe(CLOCK.steady(act.req))
+        expect(type(dispatcher.check_talk(mk_act(real + 5)))):toBe("thread")
+        -- 出た後は、同じスリープでもう一度呼ばれても予約しない
+        local talk_at = talk_time()
+        dispatcher.wake_talk(resume_act(real + 6))
+        expect(talk_time()):toBe(talk_at)
+    end)
+
+    --- 正時の 22 秒前に起きて wake_talk する（おしゃべりの時刻はまだ来ていない）
+    local function wake_before_hour()
+        local t0 = BASE + H - 200
+        dispatcher.check_hour(mk_act(t0))
+        dispatcher.check_talk(mk_act(t0)) -- 次は正時の 20 秒前〜100 秒後
+        suspend(BASE + H - 25)
+        expect(dispatcher.check_hour(mk_act(BASE + H - 25))):toBe(nil)
+        expect(dispatcher.check_talk(mk_act(BASE + H - 25))):toBe(nil)
+        dispatcher.wake_talk(resume_act(BASE + H - 22))
+        expect(dispatcher.check_talk(mk_act(BASE + H - 21))):toBe(nil) -- hour_margin の間は出ない
+        pass(BASE + H - 20, BASE + H - 1)
+    end
+
+    vtest("wake_talk は門を飛ばさない: hour_margin の間は出ず、正時を過ぎて時報の候補が無ければ出る", function()
+        dispatcher._set_scene_executor(function(event_name)
+            if event_name == "OnTalk" then return coroutine.create(function() end) end
+            return nil
+        end)
+        wake_before_hour()
+        expect(dispatcher.check_hour(mk_act(BASE + H))):toBe(nil)
+        expect(type(dispatcher.check_talk(mk_act(BASE + H + 1)))):toBe("thread")
+    end)
+
+    vtest("wake_talk の後に時報の候補があれば、時報の数え直しが勝つ", function()
+        wake_before_hour()
+        local act = mk_act(BASE + H)
+        expect(type(dispatcher.check_hour(act))):toBe("thread")
+        local wait = talk_time() - CLOCK.steady(act.req)
+        expect(wait >= 180 and wait <= 300):toBe(true)
+        expect(dispatcher.check_talk(mk_act(BASE + H + 1))):toBe(nil)
+        dispatcher.wake_talk(resume_act(BASE + H + 2)) -- 時報が出たので予約しない
+        expect(talk_time() - CLOCK.steady(act.req)):toBe(wait)
+    end)
+
+    vtest("act.req.date が無ければ wake_talk は何もしない", function()
+        dispatcher.check_talk(mk_act(R0))
+        local talk_at = talk_time()
+        suspend(R0 + 60)
+        dispatcher.wake_talk(create_mock_act({ id = "OnSysResume", dic = {} }))
+        expect(talk_time()):toBe(talk_at)
+    end)
+
+    vtest("next_talk_time が 0 なら wake_talk は何もしない", function()
+        suspend(R0)
+        dispatcher.wake_talk(resume_act(R0 + 4))
+        expect(talk_time()):toBe(0)
+    end)
+
+    vtest("OnSysSuspend を一度も見ていなければ wake_talk は何もしない", function()
+        dispatcher.check_talk(mk_act(R0))
+        local talk_at = talk_time()
+        dispatcher.wake_talk(resume_act(R0 + 5))
+        expect(talk_time()):toBe(talk_at)
+    end)
+
+    vtest("wake_talk の後に restart_timers を呼ぶと、予約は持ち越さない（next_talk_time が 0）", function()
+        dispatcher.check_talk(mk_act(R0))
+        suspend(R0 + 60)
+        dispatcher.check_talk(mk_act(R0 + 60))
+        dispatcher.wake_talk(resume_act(R0 + 64))
+        expect(talk_time()):toBe(CLOCK.steady({ date = mk_date(R0 + 64), dic = {} }))
+        dispatcher.restart_timers(mk_act(R0 + 65))
+        expect(talk_time()):toBe(0)
     end)
 end)

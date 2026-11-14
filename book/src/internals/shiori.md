@@ -118,6 +118,7 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 | `pasta.shiori.event.callback` | 非同期トークのコールバック待ちの登録・ルーティング・タイムアウトの掃引 |
 | `pasta.shiori.event.scene_play` | 既定ハンドラ（OnPastaScene・OnPastaSceneAt・OnPastaDumpVariables）を `REG` に登録する。デバッグが有効なときだけ、名前か位置で指名したシーンを再生するか、グローバル変数を書き出す（[開発用のイベントの門](debug.md#開発用のイベントの門)） |
 | `pasta.shiori.event.recommend` | 既定ハンドラ（メニューのリソース `sakura.recommendsites` など・ボタンの名前のリソース・OnRecommendsiteChoice）を `REG` に登録し、`＞おすすめ項目`・`＞おすすめ区切り` を `GLOBAL` に置く。メニューのシーンは `EVENT.drive` を通さず、自前のコルーチンで 1 回だけ動かして、続き・持ち越し・ほかの予約に触れない（[おすすめメニュー](../grammar/call-jump.md#おすすめメニュー)） |
+| `pasta.shiori.event.sys_resume` | 既定ハンドラ（OnSysResume）を `REG` に登録する。`SCENE.co_exec` でイベント名のシーンを探し、あればそのコルーチンを返す。無く、Reference0 が `auto` でなければ、`virtual_dispatcher.wake_talk(act)` を呼んで 204 を返す（スリープ明けのおしゃべりの予約。[OnSysResume](../lua/shiori-events.md#onsysresumeスリープ明けのおしゃべり)） |
 | `pasta.shiori.event.external_control` | 既定ハンドラ（OnPastaCallFunction・OnPastaSetSaveVariable）を `REG` に登録する。デバッグの有無によらず、名前で指名したものを `＞名前` と同じ探し方で呼ぶか、グローバル変数に代入する（[OnPastaCallFunction](../lua/shiori-events.md#onpastacallfunction名前を外から呼ぶ)・[OnPastaSetSaveVariable](../lua/shiori-events.md#onpastasetsavevariableグローバル変数に代入)） |
 | `pasta.shiori.res` | SHIORI/3.0 の応答文字列を作る `RES` |
 | `pasta.shiori.act`・`pasta.shiori.sakura_builder`・`pasta.shiori.appearance`・`pasta.shiori.actor_style` | SHIORI 用の ACT とさくらスクリプトの組立、外見の復旧、装いの出し入れ（[トーク出力とアピアランス](talk-output.md)） |
@@ -432,8 +433,13 @@ pasta.shiori.entry
   │     ├→ pasta.shiori.event.choice_select  REG.OnChoiceSelectEx を登録
   │     ├→ pasta.shiori.event.second_change  REG.OnSecondChange を登録
   │     │     └→ pasta.shiori.event.virtual_dispatcher
-  │     └→ pasta.shiori.event.mouse          REG.OnMouseDoubleClick・REG.OnMouseMove を登録
-  │           └→ pasta.store・pasta.shiori.event.virtual_dispatcher
+  │     ├→ pasta.shiori.event.mouse          REG.OnMouseDoubleClick・REG.OnMouseMove を登録
+  │     │     └→ pasta.store・pasta.shiori.event.virtual_dispatcher
+  │     ├→ pasta.shiori.event.scene_play     REG.OnPastaScene・REG.OnPastaSceneAt・REG.OnPastaDumpVariables を登録
+  │     ├→ pasta.shiori.event.external_control  REG.OnPastaCallFunction・REG.OnPastaSetSaveVariable を登録
+  │     ├→ pasta.shiori.event.recommend      メニューとボタンの名前のリソース・REG.OnRecommendsiteChoice を登録
+  │     └→ pasta.shiori.event.sys_resume     REG.OnSysResume を登録
+  │           └→ pasta.scene・pasta.shiori.event.virtual_dispatcher
   ├→ pasta.shiori.res
   └→ pasta.global                            close_ghost・ゴースト終了・pause_auto_talk・自動トーク停止・resume_auto_talk・自動トーク再開 を追加
 ```
@@ -502,7 +508,7 @@ Lua のエラーでシーンやハンドラが止まったとき（止まるエ�
 
 ### 仮想イベントディスパッチャ（OnTalk・OnHour）
 
-OnTalk と OnHour は、`REG.OnSecondChange` の既定ハンドラが毎回呼ぶ `pasta.shiori.event.virtual_dispatcher` が発行する。状態はモジュールのローカル変数 `next_hour_unix`（次の正時）・`seen_epoch`（前に見た時刻の飛びの通し番号）・`next_talk_time`（次のトーク時刻）だけで、`next_hour_unix`・`next_talk_time` は 0 が「未設定」を表す。状態は VM と同じ寿命（`load` から `unload` まで）で、保存されない。
+OnTalk と OnHour は、`REG.OnSecondChange` の既定ハンドラが毎回呼ぶ `pasta.shiori.event.virtual_dispatcher` が発行する。状態はモジュールのローカル変数 `next_hour_unix`（次の正時）・`seen_epoch`（前に見た時刻の飛びの通し番号）・`next_talk_time`（次のトーク時刻）・`talk_suspend_count`（最後に自動トークを出したときの `CLOCK.suspend_count()`）だけで、`next_hour_unix`・`next_talk_time` は 0 が「未設定」を表す。状態は VM と同じ寿命（`load` から `unload` まで）で、保存されない。
 
 ```text
 dispatch(act)
@@ -515,11 +521,12 @@ dispatch(act)
 
 利用者から見た判定の順・ブロック対象のキーワードと照合の仕方・OnHour のシーン候補の順・トーク間隔の決まり方・テスト用の関数は、[仮想ディスパッチャ](../lua/shiori-events.md#仮想ディスパッチャ)（[ブロック対象 Status キーワード](../lua/shiori-events.md#ブロック対象-status-キーワード)・[OnHour](../lua/shiori-events.md#onhour)・[pasta.toml 設定](../lua/shiori-events.md#pastatoml-設定)・[テスト用関数](../lua/shiori-events.md#テスト用関数)）が正である。ここではそれを実現する仕組みだけを書く。
 
-- `check_hour` の現在時刻は `CLOCK.now(act.req)`（仮想時刻。下の「仮想時刻の時計」）である。`next_hour_unix` が 0 なら次の正時（`unix - unix % 3600 + 3600`）を記録するだけで終わる。`CLOCK.epoch()` が `seen_epoch` と違えば（時刻の飛びがあれば）、`seen_epoch` を更新し、現在時刻の 70 秒前（ローカル定数 `REBASE_GRACE`）から同じ式で次の正時を決め直す。現在時刻がそれに達していれば、同じ式で次の正時を記録し直し、`act:transfer_date_to_var()` で日時変数を転記してからシーンを探す。シーン名の `{HH}` は `CLOCK.date(act.req).hour` から作る。
+- `check_hour` の現在時刻は `CLOCK.now(act.req)`（仮想時刻。下の「仮想時刻の時計」）である。`next_hour_unix` が 0 なら次の正時（`unix - unix % 3600 + 3600`）を記録するだけで終わる。`CLOCK.epoch()` が `seen_epoch` と違えば（時刻の飛びがあれば）、`seen_epoch` を更新し、現在時刻の 70 秒前（ローカル定数 `REBASE_GRACE`）から同じ式で次の正時を決め直す。現在時刻がそれに達していれば、同じ式で次の正時を記録し直し、`act:transfer_date_to_var()` で日時変数を転記してからシーンを探す。シーン名の `{HH}` は `CLOCK.date(act.req).hour` から作る。時報のシーンが見つかってコルーチンを返すときは、`next_talk_time` を `CLOCK.steady(act.req)` から決め直し（時報の直後にトークが続かないようにする）、`talk_suspend_count` に `CLOCK.suspend_count()` を記録する。`check_talk` も、コルーチンを返すとき（チェイントークの続きを含む）に同じ記録をする。
 - `check_talk` は、`next_talk_time` が 0 なら次のトーク時刻を決めるだけで終わる。トーク時刻は `CLOCK.steady(act.req)`（飛びを差し引いた時計）で数え、仮想時刻の設定し直しに左右されない。正時までの残りを `hour_margin` と比べる判定は、`check_hour` が記録した `next_hour_unix` と `CLOCK.now(act.req)` の差を使う（仮想時刻で数える）。この判定で発行を見送るときは `next_talk_time` を変えないため、次の秒にまた判定する。発行するときは、シーンを探す前に `next_talk_time` を決め直す。
 - 次のトーク時刻は「現在時刻 + `math.random(最小間隔, 最大間隔)`」で決める。間隔は、決めるたびにローカル関数 `get_config` が `pasta.save` と `@pasta_config` を読み直して求める（キャッシュしない）。`hour_margin` は `[ghost].hour_margin` が有限の数ならその値を、切り捨てや下限の補正をせずにそのまま使う。無いとき、数でないとき、NaN・無限大のときは 30 を使う（ローカル関数 `finite_or`）。`[ghost]` の既定値の補完は [設定読込](loader.md#設定読込) で扱う。
 - ブロック中（2 で終わる間）は `check_hour`・`check_talk` を呼ばないため、`next_hour_unix`・`next_talk_time` は進まない。そのため、ブロックが解けた最初の判定で、過ぎていた正時やトーク時刻の条件が成り立つ。
-- 3 の `STORE.auto_talk_paused` は、`GLOBAL.pause_auto_talk`／`resume_auto_talk`（`pasta/shiori/entry.lua`）が書く（[自動トークを止めている間](../lua/shiori-events.md#自動トークを止めている間)）。止めている間もブロック中と同じく時計は進まないが、再開の関数が公開の関数 `restart_timers(act)` を 1 回呼び、時計を決め直す。`next_talk_time` を 0 に戻し、`CLOCK.now(act.req)` が取れれば次の正時を求めて、今の `next_hour_unix` より後のとき、または `CLOCK.epoch()` が `seen_epoch` と違うときだけ置き換えて `seen_epoch` を記録する（取れなければ `next_hour_unix` を 0 にする）。そのため、ブロックと違い、止めている間に過ぎた正時は再開の後にも発行されない。`set_co_scene` を通らないので、中断中の継続は捨てずに残る。
+- 3 の `STORE.auto_talk_paused` は、`GLOBAL.pause_auto_talk`／`resume_auto_talk`（`pasta/shiori/entry.lua`）が書く（[自動トークを止めている間](../lua/shiori-events.md#自動トークを止めている間)）。止めている間もブロック中と同じく時計は進まないが、再開の関数が公開の関数 `restart_timers(act)` を 1 回呼び、時計を決め直す。`next_talk_time` を 0 に戻し、`CLOCK.now(act.req)` が取れれば次の正時を求めて、今の `next_hour_unix` より後のとき、または `CLOCK.epoch()` が `seen_epoch` と違うときだけ置き換えて `seen_epoch` を記録する（取れなければ `next_hour_unix` を 0 にする）。そのため、ブロックと違い、止めている間に過ぎた正時は再開の後にも発行されない。`set_co_scene` を通らないので、中断中の継続は捨てずに残る。`talk_suspend_count` は `restart_timers` では戻さない。
+- 公開の関数 `wake_talk(act)` は、スリープ明けのおしゃべりを予約する。`next_talk_time` を `CLOCK.steady(act.req)` に置くだけで、発行はしない（次の OnSecondChange からの `check_talk` が、ブロックと止める門を通ったうえで出す）。次のどれかなら何もしない。`act.req` か `act.req.date` が無い（`CLOCK.steady(act.req)` が nil）、`next_talk_time` が 0（初回の時刻決めの前）、`CLOCK.suspend_count()` が 0（`OnSysSuspend` を見ていない）、`talk_suspend_count` が `CLOCK.suspend_count()` と同じ（最後のスリープの後に自動トークを出し済み）。予約は `next_talk_time` を今にするだけなので、`restart_timers` が `next_talk_time` を 0 に戻せば消える。
 - 返したコルーチンは `EVENT.fire` が `EVENT.drive` で再開し、続きの決まりに従って `STORE.co_scene` を更新する。継続を再開するのは OnTalk だけである（`check_talk` が `STORE.co_scene` を返し、種類は "resume"）。OnHour のシーンは `SCENE.co_exec` で探した印の無いコルーチンなので、中断中の継続があればふつうの割り込み（"interrupt"）になり、台詞を出せば継続を捨て、出さなければ残す（[継続トークと co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新)）。
 - 仮想イベントは `REG` を通らない。OnHour・OnTalk で発行するシーンはどれも `SCENE.co_exec` で探す（テスト用の差し替え `scene_executor` が設定されていればそれを使う）。
 
@@ -527,7 +534,7 @@ dispatch(act)
 
 SSP の仮想時刻は SHIORI のリクエストのヘッダに載らない。SSP によっては（2.9.18 の `20261017-5` ビルドで確認）SSP のプロセスの中の OS の時計そのものが仮想時刻になり、`act.req.date` も仮想時刻になるが、そうでない SSP のために `pasta.shiori.clock`（以下 `CLOCK`）が OS の時計とのずれを持つ。どちらの SSP でも Apply・Reset は「今」の飛びになるため、`CLOCK` は飛びも数える。利用者から見た読み取りの手順・返事の扱い・ずれの使われ方は [OnPastaClock](../lua/shiori-events.md#onpastaclock仮想時刻の読み取り) が正である。`CLOCK` は `pasta.shiori.event`・`pasta.shiori.act`・`pasta.shiori.event.second_change`・`pasta.shiori.event.virtual_dispatcher`・`pasta.shiori.event.mouse` から読まれるため、循環参照を避けて `pasta.shiori.event.*`・`pasta.shiori.act`・`pasta.store` を `require` しない。
 
-状態はモジュールのローカル変数 6 つだけである。
+状態はモジュールのローカル変数 8 つだけである。
 
 | 変数 | 型 | 初期値 | 意味 |
 | ---- | -- | ------ | ---- |
@@ -538,6 +545,7 @@ SSP の仮想時刻は SHIORI のリクエストのヘッダに載らない。SS
 | `_jump_total` | 整数（秒） | `0` | 飛びの合計（ふだんの 1 秒分を除く） |
 | `_resumed` | 真偽値 | `false` | `OnSysResume` の後で、次の 1 回の差を飛びとみなさないか |
 | `_suspended` | 真偽値 | `false` | `OnSysSuspend` の後で、次の 1 回の飛びを飛びとみなさないか（飛ばない差では下ろさない） |
+| `_suspend_count` | 整数 | `0` | `OnSysSuspend` を見た回数（`X-Pasta-Time` の有無に関わらず数える）。判定には使わず、ディスパッチャが `suspend_count()` で読む |
 
 状態は保存しない。VM と同じ寿命（`load` から `unload` まで）で、次の `load` で初期値から始まる。
 
@@ -560,7 +568,7 @@ REG.OnSecondChange（既定。鎖の底）
 - 返事の受け取り: `id` が `OnPastaClock` で `SecurityLevel` が `external` でなければ、`observe` が返事として消費して true を返す（`REG` へ進まない）。Reference0〜5 を `tonumber` で整数に読み、`os.time`（地方時）で Unix 時刻にし、`act.req.date.unix` との差をずれにする。差の絶対値が 2 秒以下（ローカル定数 `OFFSET_DEADBAND`）なら 0 にする。値が読めなければずれを 0 に戻し、警告ログを出す。ずれが変わったときはデバッグログを出す。
 - `X-Pasta-Time`: ヘッダのあるリクエストでは、合図を判定せず、返事を受け取っても無視し、読み取りも返さない。`now` は `req.date.unix` を、`date` は `req.date` をそのまま返す。
 - 読み出し: `now(req)` は `req.date.unix + _offset`、`date(req)` はずれを足した時刻から `os.date("*t")` で作った新しい日付の表（`act.req.date` と同じ形）を返す。ずれが 0 なら `req.date` をそのまま返し、`act.req.date` は書き換えない。日時変数の転記（`pasta.shiori.act` の `transfer_date_to_var`）は `CLOCK.date` を読む。`offset()` は `_offset` を返す。
-- 時刻の飛び: `observe` は OnSecondChange のたびに `d = now − _prev_now` を求め、`d` が −2 秒より小さいか 90 秒より大きければ（ローカル定数 `JUMP_BACK`・`JUMP_FORWARD`）飛びとして `_epoch` を 1 増やし、`_jump_total` に `d − 1` を足す。`_resumed` か `_suspended` が立っていれば数えずに `_suspended` を下ろす。飛ばない差で `_resumed` が立っていれば `_suspended` も下ろす（スリープせずに戻った場合に印を残さない）。どの場合も最後に `_resumed` を下ろして `_prev_now` を `now` にする。`OnSysSuspend` を見ると `_suspended` を、`OnSysResume` を見ると `_resumed` を立てる（スリープ明けは飛びにしない）。SSP 2.9.18 では、`OnSysSuspend` は復帰してから最初の OnSecondChange より前に届き、`OnSysResume` は最初の OnSecondChange より数秒遅れて届く（2026-10-18 実機）ので、両方を見る。`X-Pasta-Time` 付きのリクエストは飛びを見ず、`_prev_now` も変えない。ずれが変わったとき（読み取りの返事）も、次の OnSecondChange で `now` が飛ぶので同じ判定に入る。
+- 時刻の飛び: `observe` は OnSecondChange のたびに `d = now − _prev_now` を求め、`d` が −2 秒より小さいか 90 秒より大きければ（ローカル定数 `JUMP_BACK`・`JUMP_FORWARD`）飛びとして `_epoch` を 1 増やし、`_jump_total` に `d − 1` を足す。`_resumed` か `_suspended` が立っていれば数えずに `_suspended` を下ろす。飛ばない差で `_resumed` が立っていれば `_suspended` も下ろす（スリープせずに戻った場合に印を残さない）。どの場合も最後に `_resumed` を下ろして `_prev_now` を `now` にする。`OnSysSuspend` を見ると `_suspended` を立て、`_suspend_count` を 1 増やす（回数は判定に使わず、ディスパッチャが `suspend_count()` で読む）。`OnSysResume` を見ると `_resumed` を立てる（スリープ明けは飛びにしない）。SSP 2.9.18 では、`OnSysSuspend` は復帰してから最初の OnSecondChange より前に届き、`OnSysResume` は最初の OnSecondChange より数秒遅れて届く（2026-10-18 実機）ので、両方を見る。`X-Pasta-Time` 付きのリクエストは飛びを見ず、`_prev_now` も変えない。ずれが変わったとき（読み取りの返事）も、次の OnSecondChange で `now` が飛ぶので同じ判定に入る。
 - なめらかな時計: `steady(req)` は `now(req) − _jump_total`（`X-Pasta-Time` があれば `req.date.unix`）を返す。おしゃべりの間隔（`check_talk`）、`act:get_property` の期限（シーンを最後に再開した要求 `act._resume_req`、無ければ `act.req` の時刻から数える）と `CALLBACK.sweep` に渡す今（`req.date` が無ければ `os.time()`）、撫での判定の時刻（`pasta.shiori.event.mouse`）はこれで数える。`epoch()` は `_epoch` を返し、ディスパッチャが `seen_epoch` と比べる。飛んでから次の OnSecondChange までの 1 秒足らずの間に始まった期限や撫では、補正前の時計で数える。
 - 仮想時刻を使わずに OS の時計を手で 90 秒より進めたか 2 秒より戻したときも、飛びになる（10 時 30 分から 9 時 30 分へ戻すと 10 時に時報が出る。10 時 30 分から 12 時 10 分へ進めると 13 時まで時報が出ず、おしゃべりは残りの間隔を待つ）。
 - 見落とし: ずれの変化の秒の端数が毎分の許容幅（±2 秒）に入ると、毎分の合図では気づかない。そのときは仮想の正時の `OnHourTimeSignal` で気づき、決め直しの猶予（70 秒）で時報が数秒遅れて 1 回出る。仮想時刻を戻した（Reset）のを見落とすと、古いずれが最大 1 時間残り、実際の正時の `OnHourTimeSignal` で直る。ずれの変化が 1 時間の倍数に近いと気づけない。

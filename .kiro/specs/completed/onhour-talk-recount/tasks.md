@@ -1,0 +1,88 @@
+# Implementation Plan
+
+コミットは 2 段に分ける（design.md「Implementation Notes」・research.md の選択肢 C）。1 を先のコミット（時報の数え直し）、2〜3 を後のコミット（スリープ明けのおしゃべり）にし、マニュアルは 4 でまとめる。
+
+- [x] 1. 時報を出したら次のランダムトークを数え直す
+- [x] 1.1 時報の候補のシーンが見つかったら、次のトークの時刻をその時点から決め直す
+  - 時報の候補を探す流れで thread が返ったときだけ、返す直前に次のトークの時刻を今の時計から `talk_interval_min`〜`talk_interval_max` 秒で決め直す（brief の仮実装の 1 行）
+  - 候補が無く何も返さないときは次のトークの時刻を変えない。時報マージンで見送る側（ランダムトークの判定）は変えない
+  - 出力の有無は見ず、候補が見つかって実行されれば決め直す（本文の無い時報のシーンを含む）
+  - 完了の状態: 正時の前に期限が来て見送ったおしゃべりが、時報の直後の秒に出ず、時報から `talk_interval_min` 秒より前は出ない
+  - _Dispatch: mechanical — 設計が変更の 1 行と位置を示している_
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 2.4, 2.6_
+- [x] 1.2 数え直しの単体テストを足し、変わる期待を 1 か所書き換える
+  - 見送り → 時報 → 待ちが 180〜300 秒 → 時報の 179 秒後のランダムトークの判定が何も返さない、を確かめるテストを足す（1.1 の 1 行を一時的に外してこのテストが落ちることを確かめ、戻す）
+  - 候補が全部無いときに次のトークの時刻が呼ぶ前と同じであること、0 でない時刻が候補の無い正時を過ぎても変わらないことを足す
+  - 実機の順番のスリープ明けのテスト（`virtual_dispatcher_spec.lua` L978 付近）の名前を改め、時報の 1 秒後のランダムトークの判定の期待を thread から nil に書き換える（期待の変更はここだけ）
+  - 完了の状態: `virtual_dispatcher_spec.lua` が新しいテストを含めてすべて通り、スリープ明けの時報が 1 回だけ出ることも今どおり通る
+  - _Dispatch: mechanical — 期待値を設計と brief が示している_
+  - _Requirements: 6.1, 6.2, 6.3, 2.5_
+
+- [x] 2. 「復帰の後にもう喋ったか」を覚えてスリープ明けのおしゃべりを予約する
+- [x] 2.1 (P) 時計が OnSysSuspend を見た回数を数えて読み出せるようにする
+  - `OnSysSuspend` を見た今の印の行で回数を 1 増やし、読み出しの口を足す。リセットと状態の取り出しの表にも入れる
+  - 時刻の飛びの判定・ほかの出力・新しい require は変えない
+  - `virtual_clock_test.lua` に、`OnSysSuspend` で 1 増え、`OnSysResume`・`OnSecondChange` では増えず、リセットで 0 に戻ることを足す
+  - 完了の状態: 新しいテストと、実機の順番の既存の時計のテストがそのまま通る
+  - _Boundary: CLOCK_
+  - _Dispatch: mechanical — 既存の印と同じ位置に数え上げを足すだけ_
+  - _Requirements: 3.4, 3.10_
+- [x] 2.2 自動トークを出すたびに回数を控え、スリープ明けの予約の関数を足す
+  - 時報の thread を返すとき（1.1 の決め直しと同じ場所）と、ランダムトークの判定が thread（続きか新しい OnTalk）を返すときに、その時の回数を控える。判定の順・期限・時報マージンは変えない
+  - 予約の関数は、時計が nil・次のトークの時刻が 0・回数が 0・控えと回数が同じ、のどれかなら何もせず、それ以外は次のトークの時刻を今にする。門は飛ばさない
+  - リセットと内部状態の取り出しの表に控えを足す。自動トークの再開（`restart_timers`）は変えない
+  - 単体テスト: 予約の後の次の秒で thread が返る・時報マージンの間は返らず正時の後に時報の候補が無ければ出る・時報の候補があれば時報の数え直しが勝つ・上の 4 つの何もしない場合・予約の後の再開で 0 に戻る・正時をまたいだスリープと溜まったトークの後の予約は時刻を変えない
+  - 完了の状態: `virtual_dispatcher_spec.lua` の新しいテストがすべて通る
+  - _Depends: 2.1_
+  - _Dispatch: standard — 発行の記録と予約の分岐を書く_
+  - _Requirements: 3.1, 3.3, 3.4, 3.5, 3.6, 3.8, 3.9, 6.3_
+
+- [x] 3. OnSysResume の既定ハンドラ
+- [x] 3.1 OnSysResume の既定ハンドラを新しいモジュールに置き、読み込みに足す
+  - ゴーストが先に代入していなければ置く形で、イベント名でシーンを探して見つかればそれを返し、Reference0 が `auto` なら何もせず、それ以外は 2.2 の予約を呼んで何も返さない（応答は 204）
+  - `pasta.shiori.event` を require しない。既定ハンドラの読み込みの並びの `recommend` の後に 1 行足す
+  - 既定ハンドラを読み直す 10 スイートの並びに新しいモジュールを足す（各ファイルの書き方に合わせる・期待は変えない）。Lua のテストの一覧（`lua_specs/init.lua`）への登録は、スイートを作る 3.2 で行う
+  - 完了の状態: 読み込み後に `REG.OnSysResume` が既定の関数になり、10 スイートが今の期待のまま通る
+  - _Depends: 2.2_
+  - _Dispatch: standard — 既定ハンドラの分岐と読み込みの配線_
+  - _Requirements: 3.2, 3.7, 4.1, 4.2, 4.3, 4.4, 4.5_
+- [x] 3.2 EVENT.fire を通すスリープ明けの結合テストを書く
+  - 新しいスイート `sys_resume_event_test.lua` を、依存の閉包を読み直す形で書き、Lua のテストの一覧（`lua_specs/init.lua`）に spec 名と要件の注釈つきで登録する（シーンの検索は差し替えか、ディスパッチャのシーンの差し替えで OnTalk を返す）
+  - 受けていないゴースト: `OnSysSuspend` → 何も出ない最初の秒 → `OnSysResume`（normal）が 204、次の門の開いた秒が OnTalk の 200、Status に `talking` がある秒は 204 で解けた秒に出る
+  - 正時をまたいだ復帰: 最初の秒で時報 → `OnSysResume` → `talk_interval_min` 秒より前は OnTalk が出ない
+  - 出ない場合: `＊OnSysResume` のシーン・`GLOBAL.OnSysResume`・`REG.OnSysResume` の代入・真の値を返す鎖・Reference0 `auto`・自動トークの停止中（再開の後すぐには出ない）。出る場合: 鎖が全部 nil・名前のシーンが条件漏れ・`auto` → `normal` の順で 2 回目に出て 3 回目は何も変えない
+  - 続き: 本文の無い時報の後と予約の機会に続きが出る・台詞を出した時報は続きを捨てる。外から起こした `OnTalk` は今どおり
+  - 完了の状態: 新しいスイートがすべて通る
+  - _Dispatch: standard — 実機の順番を再現する結合の筋書きを組む_
+  - _Requirements: 2.1, 2.2, 2.3, 2.7, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 4.1, 4.2, 4.3, 4.4, 6.3, 6.4, 6.5, 6.6_
+
+- [x] 4. マニュアルと references を新しい動きに合わせる
+- [x] 4.1 SHIORI イベントの章を書き換え、references を作り直す
+  - 既定ハンドラの表に OnSysResume の行を足し「13 行」を「14 行」に、主要イベントの表に OnSysResume を足す
+  - `OnMinuteChange` の後に OnSysResume（スリープ明けのおしゃべり）の節を足す: Reference0 の表・出す条件と時機・出さない条件・受けているとみなす条件・止め方（本文の無い `＊OnSysResume` を先に、Lua の代入を後に）・本文の無い時報も 1 回と数えること・`OnSysSuspend` を送らないベースウェアでは出ないこと
+  - `check_hour(act)` 節に数え直しの文、「時刻の飛び」節のスリープ明けの文を改め、テスト用関数の表に控えを足す
+  - `node book/tools/gen-skill-refs.mjs` で references を作り直す（手で書かない）。completed の spec は触らない
+  - 完了の状態: `gen-skill-refs.mjs --check` と `node book/tools/link-check.mjs` が通る
+  - _Dispatch: mechanical — 設計が節と文面を示している_
+  - _Requirements: 5.1, 5.2, 5.3, 5.5, 5.6_
+- [x] 4.2 (P) 内部設計の章を書き換える
+  - モジュール表と読み込みの順の木に新しいモジュールを足す
+  - 仮想イベントディスパッチャの段落に控えの状態・時報の数え直しと記録・予約の関数の条件と再開で消えることを足す
+  - 時計の状態の表に回数を足し、表の前の「ローカル変数 6 つ」を 8 つに直し、`observe` の箇条に数え上げを足す
+  - 完了の状態: `internals/shiori.md` が利用者向けの章と食い違わず、`node book/tools/link-check.mjs` が通る
+  - _Boundary: internals/shiori.md_
+  - _Dispatch: mechanical — 設計が足す行と直す数を示している_
+  - _Requirements: 5.4, 5.6_
+
+- [x] 5. 全体の確かめ
+  - `NoDefaultCurrentDirectoryInExePath` を外して `cargo test -p pasta_lua` と `cargo test -p pasta_shiori` を通し、テストが書き換えた `sample.generated.lua` を戻す
+  - 新しいファイルを含めて luacheck を通す（luarocks の lfs・argparse を LUA_PATH／LUA_CPATH に足せば同梱の luacheck が手元で動く）
+  - 実機（SSP）の確かめを ghost_dev の「ぱすた開発」に頼むための項目（仮想時刻の年越しの時報・復帰の種類ごとの OnSysResume の回数と Reference0・短いスリープでの OnSysSuspend の順番）と、x86 の pasta.dll のありかを報告にまとめる。ghost_dev には触らない
+  - 完了の状態: 2 つの cargo test と luacheck が通り、作業ツリーに `sample.generated.lua` の差分が残っていない
+  - _Dispatch: mechanical — 決まった検査を走らせるだけ_
+  - _Requirements: 6.7, 2.6_
+
+## Implementation Notes
+
+- 完了時の棚卸（2026-11-15）: その場で解決 2 件（`clock.lua` の `suspend_count` の注釈・`sys_resume.lua` の `auto` の言い方。最終検証の指摘）、申し送り 3 件（`novel-talk-flow`・`novel-checkpoint-rollback`・`scene-exact-match` の brief。ディスパッチャの状態と `wake_talk`・`sys_resume.lua` の前方一致の入口）、起票 0 件。
+- 実機（SSP）の確かめは ghost_dev の「ぱすた開発」に頼む（年越しの時報の後の間隔・復帰の種類ごとの OnSysResume の回数と Reference0・短いスリープでの OnSysSuspend の順番）。結果で要件 3.7 か前提 1 が崩れたら、そのときに起票する。

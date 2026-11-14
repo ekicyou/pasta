@@ -366,7 +366,7 @@ describe("既定のハンドラ - EVENT.fire を通す", function()
         for _, name in ipairs({
             "pasta.shiori.event", "pasta.shiori.event.callback", "pasta.shiori.event.register",
             "pasta.store", "pasta.shiori.event.boot", "pasta.shiori.event.second_change",
-            "pasta.shiori.event.scene_play",
+            "pasta.shiori.event.scene_play", "pasta.shiori.event.sys_resume",
         }) do
             package.loaded[name] = nil
         end

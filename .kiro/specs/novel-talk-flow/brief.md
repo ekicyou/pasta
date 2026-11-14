@@ -224,3 +224,8 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - **要件定義のモデル**: Fable のまま（分けるなら出力の分だけ）。areka が既読と声のために全セーブ共通で覚える「変わらない行 ID」は、後から変えにくい保存の形である。`act:line()` は ID を入れる場所の候補になったが、ID の細かさ・クリック待ちの単位・「次の場面へ」の書き方と印・途中の `＞yield` の扱いが絡み、推奨案がまだ無い（3 つ以上の絡む問い）。`.pasta` の行番号（`act.line_map`）は台本を直すとずれるので、ID の元にならない。
 - **分割の案**: 20 を超えたら `novel-talk-output`（Fable。設定・クリック待ち・`\x`・話者名・行 ID と声・待ちと改行）と `novel-scene-flow`（Opus。ランダムトークと時報の停止・起動の場面・次の場面へ・途中の `＞yield`・割り込みの扱い・止めるスイッチとの整合）に分ける。切り替えの設定は前の 1 本に置き、後の 1 本はそれを読む。`init.lua`・`virtual_dispatcher.lua`・`mouse.lua` は後の 1 本だけが持つ。
 - **見つけた穴・古くなった記述**: 「穴」の「イベントの Reference は場面の引数にならない。場面ごとに `＞transfer_req_to_var` を書く」は古い（上のイベントの変化）。止まっている場面を捨てる所は `init.lua` の `set_co_scene` 114 行。「完全一致で探す道は `kick.lua` にしか無い」は古い（`kick.lua` は消え、`SCENE.co_exec_exact` がある）。roadmap の Phase 13 の共有接点（`roadmap.md` 308・312 行）の `sakura_builder.lua` 557 行・`act.lua` 812 行は、690・857 行。
+
+## 申し送り（onhour-talk-recount より、2026-11-15）
+
+- **仮想ディスパッチャの状態と口が増えた**: `virtual_dispatcher.lua`（335 行）の状態は 4 つになった（`next_hour_unix`・`seen_epoch`・`next_talk_time`・新しい `talk_suspend_count`＝最後に自動トークを出したときの `CLOCK.suspend_count()`。22〜23 行）。`check_hour` は時報の thread を返すとき（192〜196 行）に `next_talk_time` を決め直して回数を控え、`check_talk` は thread（止まっている場面 `STORE.co_scene` か新しい OnTalk）を返すとき（234〜237 行）に回数を控える。止まっている場面を返す所は 234 行に動いた。公開の関数 `wake_talk(act)`（294 行）が増え、`next_talk_time` を今にする（門は飛ばさない。`restart_timers` が 0 に戻して予約を消す）。
+- **OnSysResume に既定が入った**: 新しいモジュール `event/sys_resume.lua` が `REG.OnSysResume` の既定を置く（`init.lua` 92 行で読む）。シーンが無く Reference0 が `auto` でなければ `wake_talk` を呼び、次の門の開いた OnSecondChange でスリープ明けのおしゃべりが 1 回出る。ランダムトークを止める道を `dispatch` の門の外に作ると、この予約がその道をすり抜けて出るおそれがある。止める設計は `dispatch` の門で止めるか、`wake_talk` の条件に足す（本 spec の design.md の Revalidation Triggers）。
