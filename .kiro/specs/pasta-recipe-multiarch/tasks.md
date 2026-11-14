@@ -8,7 +8,7 @@
   - 完了の状態: 3 つのファイルに aarch64 の行が在り、手元の `cargo deny check`（pasta-recipe）が通る。手元に cargo-deny が無ければ、無かったことを記録して CI の job `deny` に委ねる
   - _Requirements: 1.6, 1.3, 6.6_
 
-- [ ] 1.2 版と SHA-256 を固定した道具の取得をスクリプトに出す
+- [x] 1.2 版と SHA-256 を固定した道具の取得をスクリプトに出す
   - `release.yml` の build の job の `Install wasm-pack and cargo-about` の loop と、`env` の 4 つの固定値（wasm-pack・cargo-about の版と SHA-256）を、そのまま新しい `install-tools.ps1` に移す。`-Name` は `wasm-pack`・`cargo-about` の `ValidateSet`
   - 取得・SHA-256 の照合・`--version` の照合・`GITHUB_PATH` への追加を今と同じに保ち、どれかの失敗で終了コード 1
   - この task では `release.yml` を書き換えない（呼び出しへの置き換えは 5.1）
@@ -20,7 +20,7 @@
   - `-Arch` を `ValidateSet('x64','arm64')`・既定は x64・arm64 の順で両方にし、arch と triple の表を 2 行持つ
   - arch ごとに、その arch の zip を消す → `--target <triple>` 付きの Tauri のビルド（x64 にも付ける）→ `target/<triple>/release/` の exe の在る確かめ → `cargo about --target <triple>` → 表示をつなぐ → `release/pasta-recipe.<arch>.zip` → 中身の並びの自己検査
   - `npm ci` は最初の 1 回。どの段の失敗でもその arch の zip を消して `ERROR:` の行と終了コード 1 で止まり、残りの arch は作らず、先に作り終えた arch の zip は残す
-  - 完了の状態: 手元で引数なしの実行が `release/pasta-recipe.x64.zip`・`release/pasta-recipe.arm64.zip` を作り、`-Arch x86` が受け付ける値を示して終了コード 1、`-Arch arm64` だけの実行が x64 の zip を消さない。arm64 の表示に `windows_aarch64_msvc` が載り、x64 の表示に載らない
+  - 完了の状態: 手元で引数なしの実行が `release/pasta-recipe.x64.zip`・`release/pasta-recipe.arm64.zip` を作り、`-Arch x86` が受け付ける値を示して終了コード 1、`-Arch arm64` だけの実行が x64 の zip を消さない。x64 の表示に `cpufeatures` の節が在り、arm64 の表示に無い（`windows_aarch64_msvc` はどちらの arch の通常の依存にも届かないため目印にしない。1.2 の確認）
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
 
 - [ ] 3. 2 つの zip の検査
@@ -115,3 +115,7 @@
   - 完了の状態: すべての job が成功した実行の URL と artifact `pasta-recipe-zips` の在ることを、タスクの記録に書く
   - _Depends: 4.1, 5.1, 5.2, 5.3, 7.1_
   - _Requirements: 1.1, 1.5, 6.1, 6.3, 6.4, 6.5, 6.6, 7.1, 7.2, 7.4, 7.5_
+
+## Implementation Notes
+- 1.2: cargo-about 0.9.2 の `generate --target <triple>` は `about.toml` の `targets` を置き換える（`--help` の "Overrides the `targets` configuration value"。2 つの triple で表示が違う: x64 は MIT 226 件で `cpufeatures 0.3.1` の節が在り、aarch64 は 225 件で無い）。`windows_aarch64_msvc` は lock に在るが `jni`（Android だけ）経由でしか届かず、どちらの arch の表示にも出ない。arch の目印は `cpufeatures`。
+- 1.2: `install-tools.ps1 -Name a,b` は `pwsh -File` で 1 つの文字列になるので、`ValidateSet` でなく `,` で分けて照合する。`RUNNER_TEMP` が無ければ OS の一時フォルダ、`GITHUB_PATH` が無ければ足さずに置き場を出す。

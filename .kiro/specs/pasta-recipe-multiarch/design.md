@@ -305,7 +305,7 @@ sequenceDiagram
 
 **Contracts**: Batch [x]
 - Trigger: `pwsh -NoProfile -File .github/scripts/release/install-tools.ps1 -Name wasm-pack,cargo-about`（`release.yml`）／`-Name cargo-about`（`build.yml`）。
-- 中身: 今の `release.yml` の `Install wasm-pack and cargo-about` の loop と、`env` の `WASM_PACK_VERSION`・`WASM_PACK_SHA256`・`CARGO_ABOUT_VERSION`・`CARGO_ABOUT_SHA256` の値をそのまま移す（取得・SHA-256 の照合・`--version` の照合・`GITHUB_PATH`）。`-Name` は `ValidateSet('wasm-pack','cargo-about')`。
+- 中身: 今の `release.yml` の `Install wasm-pack and cargo-about` の loop と、`env` の `WASM_PACK_VERSION`・`WASM_PACK_SHA256`・`CARGO_ABOUT_VERSION`・`CARGO_ABOUT_SHA256` の値をそのまま移す（取得・SHA-256 の照合・`--version` の照合・`GITHUB_PATH`）。`-Name` は `wasm-pack`・`cargo-about` だけを受け、外れた値は受け付ける値を示して終了コード 1（`pwsh -File` は `a,b` を 1 つの文字列で渡すので、`ValidateSet` でなく `,` で分けて表と照合する）。
 - 失敗: SHA-256・版の違い・取得の失敗で終了コード 1（今と同じ）。
 - **決定**（2026-11-14 設計議題 1）: 版と SHA-256 を 1 か所に持つため、このスクリプトに出す。`build.yml` へ写す形（版を上げるとき 2 か所を直す）と `cargo install --locked`（毎回のソースのビルドで遅く、SHA-256 の照合を失う）は採らない。
 
@@ -412,7 +412,7 @@ sequenceDiagram
 - **自己テスト（`release-scripts-test.ps1`・ubuntu）**: 項目 10・11・13・14（添付 8 つの欠け。4.5・4.6）、項目 15〜17（機械の種類の取り違え・複数の問題を全部示す・VC++ の DLL。2.4・2.2・2.5・2.7・2.11）。
 - **作成と検査の実物（`build.yml` の `recipe`・windows-latest）**: 毎回の push・PR と `workflow_dispatch` で、2 つの zip を作り、本物の exe で版・機械の種類（x64 = `0x8664`・arm64 = `0xAA64`）・表示の名前・大きさ・DLL を見る（1.2, 1.3, 1.4, 1.5, 1.6・6.1・7.1）。成功の経路はここでしか確かめられない（`FileVersionInfo`・`dumpbin` が要る）。
 - **arm64 のランナー**: `recipe-arm64-test` の Rust のテスト（6.4）、`recipe-arm64-smoke` の起動（6.5）。
-- **手元の確かめ（実装のとき 1 回）**: `package.ps1 -Arch x86` が終了コード 1、`-Arch arm64` が x64 の zip を消さない（3.6・3.7）。arm64 の表示に `windows_aarch64_msvc` が載り、x64 の表示に載らない（1.3）。
+- **手元の確かめ（実装のとき 1 回）**: `package.ps1 -Arch x86` が終了コード 1、`-Arch arm64` が x64 の zip を消さない（3.6・3.7）。arm64 の表示が `--target aarch64-pc-windows-msvc` の依存だけになる（1.3）。今の lock で arch によって変わるのは `cpufeatures`（x64 の表示にだけ在る）。テンプレートは crate の名前を全部は書かず、`windows_aarch64_msvc` はどちらの arch の通常の依存にも届かない（2026-11-14 実装 1.2 で確認）。
 - **完了の証拠**: 作業のブランチで `gh workflow run build.yml --ref <branch>` が成功した実行の URL と、`release-scripts` の job の成功（4.5・4.6）。
 
 ## Open Questions / Risks
