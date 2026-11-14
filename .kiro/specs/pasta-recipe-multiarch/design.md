@@ -352,7 +352,8 @@ sequenceDiagram
   - 30 秒たっても無い → 失敗（WebView2 が立たない。ランタイムが無いときのメッセージ箱で止まっている場合もここで落ちる）。
   - 最後に exe を止める（ランナーは使い捨て）。
 - 窓の題名・画面の写しは見ない（対話の画面の有無に頼らない）。
-- **仮定**: `windows-11-arm` に WebView2 ランタイムがあり、対話の画面が無くても WebView2 の子のプロセスが立つ。実装の最初の `workflow_dispatch` で確かめる。起動できないと分かったら、黙って外さず開発者に戻す（6.5・OPEN QUESTION 2）。
+- **決定**（2026-11-14 設計議題 2）: 合格は「30 秒のうちに exe の子の `msedgewebview2.exe` が立ち、その時点で exe が生きている」。終わらないことだけを見る形（WebView2 が無いときのメッセージ箱で止まっても合格する）と、窓のハンドルを見る形（対話の画面に頼る）は採らない。
+- **仮定**: `windows-11-arm` に WebView2 ランタイムがあり、対話の画面が無くても WebView2 の子のプロセスが立つ。実装の最初の `workflow_dispatch` で確かめる。起動できないと分かったら、黙って外さず開発者に戻す（6.5）。
 
 ### 設定
 
@@ -417,7 +418,7 @@ sequenceDiagram
 ## Open Questions / Risks
 
 1. **`cargo-about` の取得の共有**（InstallTools）: 確定（2026-11-14 設計議題 1）。`install-tools.ps1` へ出す。`pasta-dll-multiarch/brief.md` へ申し送り済み。
-2. **煙試験の合格の形と、`windows-11-arm` で起動できるか**（ArmSmoke）: WebView2 ランタイムと対話の画面の有無は公式の文書で確かめられていない。最初の `workflow_dispatch` で確かめ、起動できなければ開発者に戻す（6.5）。
+2. **煙試験の合格の形と、`windows-11-arm` で起動できるか**（ArmSmoke）: 合格の形は確定（2026-11-14 設計議題 2）。起動できるかは未確認で、WebView2 ランタイムと対話の画面の有無は公式の文書で確かめられていない。最初の `workflow_dispatch` で確かめ、起動できなければ開発者に戻す（6.5）。
 3. **VC++ ランタイムの検査から UCRT を外すこと**（Verify）: 確定（2026-11-14 設計議題 3）。UCRT は数えない。対象はサポート中の Windows 10・11 だけで、UCRT はその OS の部品。
 - 危険: `windows-latest` でのクロスのビルドは手元でだけ確かめた。`main` の CI は arm64 の LTO の release ビルド 1 回ぶん長くなる。
 
