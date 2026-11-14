@@ -41,13 +41,14 @@
 | -------- | ---- |
 | `crates/pasta_lua/src/runtime/mod.rs` | 構造体の定義と、VM を作る `new`・`with_config`・`with_config_and_source_map` |
 | `crates/pasta_lua/src/runtime/factory.rs` | ローダが使う構築経路 `from_loader_with_scene_dic`、起動モジュールの `require` と致命扱い |
-| `crates/pasta_lua/src/runtime/module_registry.rs` | `package.path` と searcher の設置、`@pasta_config`・`@enc`・`@pasta_persistence`・`@pasta_sakura_script`・`@pasta_log` の登録（`package.loaded` への格納） |
+| `crates/pasta_lua/src/runtime/module_registry.rs` | `package.path` と searcher の設置、`@pasta_config`・`@enc`・`@pasta_persistence`・`@pasta_sakura_script`・`@pasta_log`・`@pasta_calendar` の登録（`package.loaded` への格納） |
 | `crates/pasta_lua/src/runtime/exec.rs` | 任意の Lua コードの実行（`exec`・`exec_named`・`exec_file`）と、VM・設定・ロガー・デバッグ状態の参照 |
 | `crates/pasta_lua/src/runtime/lifecycle.rs` | `Drop` での永続化データの保存 |
 | `crates/pasta_lua/src/runtime/persistence.rs` | `@pasta_persistence` の実装（読み込み・保存・形式判定・原子的な書き込み） |
 | `crates/pasta_lua/src/runtime/finalize.rs` | `finalize_scene` の Rust 実装（[シーン・単語レジストリとシーン検索](registry-search.md#辞書確定rust-側)） |
 | `crates/pasta_lua/src/runtime/runtime_config.rs`・`crates/pasta_lua/src/runtime/searcher.rs` | ライブラリ構成（`RuntimeConfig`）と `require` のファイル解決（[ローダ自己展開とモジュール解決](loader.md)） |
 | `crates/pasta_lua/src/runtime/log.rs`・`crates/pasta_lua/src/runtime/enc.rs` | `@pasta_log`・`@enc` の実装（[ロギングとエンコーディング](logging-encoding.md)） |
+| `crates/pasta_lua/src/runtime/calendar.rs` | `@pasta_calendar`（`holiday`・`event`）の実装（[行事の表](../grammar/variables.md#行事の表calendarcsv)） |
 
 `PastaLuaRuntime` は VM のほかに、インスタンスのロガー、`pasta.toml` の設定（`PastaConfig`）、ゴーストのベースディレクトリと、デバッグが有効なときだけシーンマップ（`source_map`）を持つ。設定とベースディレクトリは、`Drop` で永続化データを保存するために保持している。
 
@@ -125,6 +126,7 @@ from_loader_with_scene_dic
     c. @pasta_search を登録（空の登録表と、RuntimeConfig の別名表から。8 の finalize_scene が作り直す）
     d. @pasta_log を登録（libs に依らず常に）
     e. @toml を登録（libs に依らず常に）
+    f. @pasta_calendar を登録（libs に依らず常に。表はローダの段階 1.6 が読んだものを RuntimeConfig から受ける）
  2. ロガー・PastaConfig・ベースディレクトリを構造体に保持
  3. package.path を設定し、require の searcher を差し替え、@pasta_chunks（読み込んだファイルの表）を置く
  4. @pasta_config・@enc・@pasta_persistence・@pasta_log・@pasta_sakura_script・@pasta_debug を登録
