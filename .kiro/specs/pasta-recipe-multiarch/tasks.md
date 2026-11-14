@@ -108,7 +108,7 @@
   - _Depends: 4.1, 4.2, 5.1, 5.3, 6.1, 6.2_
   - _Requirements: 3.8, 7.3, 8.6_
 
-- [ ] 7.2 作業のブランチで main の CI を手動で起動し、x64 と arm64 の確かめを通す
+- [x] 7.2 作業のブランチで main の CI を手動で起動し、x64 と arm64 の確かめを通す
   - 作業のブランチを remote に置き（main には push しない）、`gh workflow run build.yml --ref <branch>` で起動する
   - job `recipe`（2 つの zip の作成・検査・artifact）、`recipe-arm64-test`、`recipe-arm64-smoke`、`release-scripts`、`deny` が成功することを見る。クロスのビルドや煙試験が CI で落ちたら原因を直して再実行する
   - `windows-11-arm` で exe が起動できない（WebView2 が無い・対話の画面が要る）と分かったら、煙試験を黙って外さず、分かったことを示して開発者に戻す
@@ -123,3 +123,4 @@
 - 3.2: 自己テストの偽の dumpbin は `.ps1` を `&` で呼ぶ（shebang・実行ビット不要）。偽の exe の版は 0.0.0 と読まれ版の問題が一緒に出る。Linux の pwsh では未確認（7.2 の CI の job `release-scripts` で確かめる）。
 - 4.2: release スキルの `/7` には 2 種ある。添付の数（今は 8）と、`集計`・状態の表の公開先の数（5 クレート＋Marketplace＋GitHub Release＝7）。後者は 7 のまま。
 - 7.1（2026-11-14 手元・cargo-about 0.9.2）: 引数なしの `package.ps1` → exit 0（x64 4,411,364 バイト・arm64 4,298,600 バイト）、`verify-recipe-zips.ps1 -Version 0.5.2` → exit 0、`release-scripts-test.ps1` → exit 0、Cargo.lock 不変。`pasta-recipe.zip` の grep は除外の外で roadmap.md の名前を変えた説明の 2 行（343・385 行）だけ。
+- 7.2（2026-11-14）: `gh workflow run build.yml --ref claude/pasta-recipe-multiarch-cf4beb` → https://github.com/ekicyou/pasta/actions/runs/43566925714 全 job 成功（`pasta-recipe`・`pasta-recipe (arm64 test)`・`pasta-recipe (arm64 smoke)`・`release-scripts`・`cargo-deny` を含む）。artifact `pasta-recipe-zips`（8,699,595 バイト）在り。windows-11-arm の煙試験は「OK: msedgewebview2.exe started as a child of pasta-recipe.exe after 1 s」。
