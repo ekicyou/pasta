@@ -1,0 +1,72 @@
+# Implementation Plan
+
+- [ ] 1. 手元で 4.1.1 を確かめる（spec のブランチの作業ツリー。`package.json`・lock の変更はコミットしない。main へは 2.2 の版だけの PR が入れる）
+- [ ] 1.1 3.9.2 の基準（監査と VSIX）を先に取る
+  - 前提の道具（wasm-pack・pwsh）が入っていることを先に確かめる
+  - 今の lock（3.9.2）で `npm ci` → `npm audit --json` をスクラッチパッドに保存する
+  - worktree のパスで `pwsh -NoProfile -File scripts/build-wasm.ps1 -Release` と `npm run compile` を走らせ、`npx --no-install vsce package -o <スクラッチパッド>/v3.vsix` で 3.9.2 の VSIX を作る
+  - 完了の状態: 3.9.2 の監査の JSON と `v3.vsix` がスクラッチパッドにあり、`npx --no-install vsce --version` が `3.9.2` だったことを research.md に書いてある
+  - _Requirements: 1.3, 2.2_
+- [ ] 1.2 版の指定と lock を 4.1.1 にして、差分が vsce の配下だけであることを確かめる
+  - `editors/vscode` で `npm install --save-dev @vscode/vsce@^4.1.1` を叩き、続けて `npm ci` で入れ直す
+  - `package.json` の差分が `@vscode/vsce` の 1 行だけで、`engines.vscode`・`@types/*`・`typescript` ほか直接の依存が変わっていない
+  - lock の差分を `packages` の単位で数え、vsce の配下の外の差が 0（設計の測りでは 消える 174・増える 17・版が変わる 3）
+  - 完了の状態: `npx --no-install vsce --version` が `4.1.1` を返し、差分の数え方の結果を research.md に書いてある
+  - _Requirements: 1.1, 1.2, 1.5, 1.6_
+- [ ] 1.3 勧告を 3.9.2 と 4.1.1 で比べて記録する
+  - 4.1.1 の lock で `npm audit --json` を取り、1.1 の 3.9.2 の結果と比べて勧告ごとに「消えた／残る／増えた」を分ける
+  - `glob` GHSA-3g3m-2fjr-6pw4 が消え、`minimatch` GHSA-g3hv-75wg-m249 は残る理由（vsce 4.1.1・eslint・typescript-eslint が `^10` を要り、直った版は 11.0.1 以上だけ・配る VSIX に入らない）を書く。`overrides` は使わない
+  - 増えた勧告があれば、互換の範囲（`npm audit fix`・`--force` なし）で消し、消せないものは理由を書く
+  - 完了の状態: research.md に勧告の表があり、`glob` が 4.1.1 の監査に出ていない
+  - _Requirements: 1.3, 1.4_
+- [ ] 1.4 4.1.1 で VSIX を作り、1.1 の 3.9.2 の VSIX と中身を比べる
+  - 4.1.1 の lock のまま、1.1 と同じ WASM と `out/` で `npx --no-install vsce package -o <スクラッチパッド>/v4.vsix`
+  - 2 つの zip の項目の名前の一覧（並べ替え）と `extension.vsixmanifest` の中身を比べる。差が出たら 1 つずつ原因を見て、意図しない差は `.vscodeignore` で直し、残す差は理由を書く
+  - 完了の状態: 両方の VSIX が `pasta-vscode-<版>.vsix` の名前で、項目の一覧が一致し（または差の扱いが書いてあり）、`extension/package.json`・`extension/wasm/pasta_lsp_wasm_bg.wasm`・`extension/wasm/THIRD_PARTY_LICENSES.txt` を含むことを research.md に書いてある
+  - 作った VSIX はコミットしない
+  - _Requirements: 2.1, 2.2, 2.3, 2.4_
+- [ ] 1.5 4.1.1 の lock で拡張の試験と公開の補助スクリプトの試験を通す
+  - 4.1.1 の lock で `npm ci` の後に `npm test`（`build.yml` の `vscode-test` と同じ。`PASTA_VSCODE_NO_WASM=1`）
+  - `pwsh -NoProfile -File .github/scripts/release/release-scripts-test.ps1` を走らせる
+  - 完了の状態: `npm test` が成功し、`release-scripts-test.ps1` が項目 12 を含めて全項目合格している
+  - _Requirements: 2.5, 2.6, 3.7_
+- [ ] 1.6 4.1.1 の CLI の振る舞いを照合表と突き合わせ、3.x に固有の記述が無いことを確かめる
+  - 4.1.1 で `npx --no-install vsce show ekicyou.pasta-vscode --json` が版の一覧を返し、無い拡張で標準出力 `undefined`・終了コード 0 であることを取り直す（`read ECONNRESET` のときは `NODE_OPTIONS=--dns-result-order=ipv4first`）
+  - 設計の照合表 C1〜C9 のどれかが崩れていたら、`publish-vsix.ps1` と項目 12 の偽の vsce の答えを 4.1.1 の実際に合わせ、1.5 の試験を取り直す。崩れていなければスクリプトとワークフローは触らない
+  - `publish-vsix.ps1`・`release` スキル・`tech.md`・`.github/release-ci-setup.md` に vsce 3.x に固有の記述（版の数字・3.x のソースの場所）が無いか探し、あれば 4.x で正しい記述に直す
+  - 完了の状態: research.md に `show` の実測と照合表の結果（全行「同じ」か、直した所）が書いてあり、認証の記述は変わっていない
+  - 1 の結果（research.md と、1.3・1.4・1.6 で直したファイルがあればそれも）を spec のブランチにコミットする。`package.json`・lock だけはコミットしない
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.8, 3.9, 4.6, 6.1, 6.2_
+
+- [ ] 2. main へ入れて公開の道を確かめる
+- [ ] 2.1 今の main（3.9.2）で公開の道の基準を取る
+  - `gh workflow run release-setup-check.yml --ref main` を回し、job summary の 2 行（メンバー確認・拡張の存在確認）とログの `verification succeeded` を読む。run の緑だけでは判定しない（`verify-pat` は `continue-on-error`）
+  - 2 行のどちらかが成功でなければ、2.2 へ進まず `.github/release-ci-setup.md` に沿って設定を直し、回し直す（版と関係の無い原因・5.4）
+  - 完了の状態: research.md 11 節の「基準の run」に、2 行とも成功した run の URL が書いてある
+  - _Requirements: 4.2, 4.5, 5.4_
+- [ ] 2.2 版だけの PR を作り、squash マージする
+  - `origin/main` から作業用のブランチを切り、その上で `npm install --save-dev @vscode/vsce@^4.1.1` を叩いて `package.json`・lock を作り直す（spec のブランチから持ち込まない）。lock の差分が vsce の配下だけであることを 1.2 と同じ数え方でもう一度確かめる
+  - 1 で条件つきで直したもの（1.3 の `npm audit fix`・1.4 の `.vscodeignore`・1.6 の `publish-vsix.ps1` と項目 12）があれば、同じ PR に入れる（`npm audit fix` はこのブランチの上でやり直す）。無ければ `package.json`・`package-lock.json` の 2 つだけ
+  - コミットし、`gh pr create` → `gh pr merge --squash --delete-branch`。CI は待たない（main が赤になれば追いかけて直す）
+  - マージの後、spec のブランチの作業ツリーの `package.json`・lock を戻してから `git merge origin/main`
+  - 完了の状態: main に版だけの squash のコミットがあり、spec のブランチがそれを含み、main の `build.yml` の `vscode-test` が 4.1.1 の lock で通っている（赤なら直した）
+  - この後 2.3 が済むまでリリースタグを push しない
+  - _Requirements: 1.1, 1.6, 2.5, 4.1, 4.4_
+- [ ] 2.3 4.1.1 の main で公開の道を確かめて記録する
+  - マージの直後に同じセッションで `gh workflow run release-setup-check.yml --ref main` を回し、2.1 と同じ判定の規則で 2 行を読む。`npm ci` の step で lock の vsce が 4.1.1 であることも読む
+  - 完了の状態: research.md 11 節の表（基準の run・版を上げる PR・確かめの run・日付・vsce の版・2 つの結果・判断）が埋まり、spec のブランチにコミットしてある
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.7_
+- [ ] 2.4 確かめがだめだったときに、原因に応じて戻すか直すか見送る（2.3 が成功なら「不要」と research.md に書いて終える）
+  - 4.1.1 だけ `verify-pat` が失敗（基準は成功）: squash のコミットを `git revert` した PR を入れて main を 3.9.2 に戻し、この spec の中で認証の直しか `--oidc`（OIDC のまま。触るファイルを揃える）を比べる。`--oidc` を選ぶときは実装に入る前に設計へ戻って見直す（その場で移さない）。直せたら 2.2 からやり直す
+  - 基準も失敗: 版は戻さず、`.github/release-ci-setup.md` に沿って設定を直してから 2.1 から確かめ直す
+  - `show` だけ失敗: 再実行し、2 回目も失敗で基準が成功なら 4.1.1 だけの失敗と同じ扱い
+  - 直しも移行もできない: 部分的に出さず spec を見送り、vsce を 3.9.2 のままにして理由を research.md に書く
+  - 完了の状態: main が公開できる版（4.1.1 で確かめ済み、または 3.9.2 に戻した）になり、取った手と理由が research.md に書いてある
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+
+- [ ] 3. ロードマップを完了へ移す
+  - 2.4 で見送ったときは完了へ移さず、見送った理由とともにロードマップに記録する
+  - `.kiro/steering/roadmap.md` の `vsce-4-upgrade` の項を「版の決まっていないもの」「依存の更新」から完了へ移す（`/kiro-complete` の手順の中で行ってよい）
+  - 完了の状態: ロードマップに `vsce-4-upgrade` が未着手として残っていない
+  - _Depends: 2.3, 2.4_
+  - _Requirements: 6.3_

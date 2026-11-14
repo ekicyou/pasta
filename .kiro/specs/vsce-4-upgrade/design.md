@@ -148,7 +148,7 @@ flowchart TB
 
 - **手元の確かめ（`Local`）**: 版を上げる PR を作る前に、spec のブランチで行う。lock の差分の確かめ（1.6）・`npx --no-install vsce --version` = 4.1.1（1.2）・`npm audit`（1.3・1.4）・本物の WASM での VSIX の比べ（2.1〜2.4）・`npm test`（2.5 の手元の代わり）・`release-scripts-test.ps1`（3.7）・`vsce show ekicyou.pasta-vscode --json`（4.6）
 - **基準（`Baseline`）**: 今の main（3.9.2）で `release-setup-check.yml` を一度回し、`verify-pat` と `show` が通ることを記録する。失敗の原因を vsce の版に帰すかどうか（5.1・5.4）の比べの相手になる（2026-11-14 の設計ディスカッションで決めた。最後の setup-check は 2026-10-08 で、その後の Azure 側の変化を言い切れないため）
-- **版を上げる PR（`BumpPR`）**: `origin/main` から切ったブランチに、`package.json`・`package-lock.json` の 2 つだけを載せる（そのブランチの上で lock を作り直す。統合の手順を参照）。spec の文書は載せない（4.1）。`build.yml`（`vscode-test` を含む）の結果は待たずにマージしてよい（memory の運用）。ただし main が赤になれば追いかけて直す（2.5）
+- **版を上げる PR（`BumpPR`）**: `origin/main` から切ったブランチに、`package.json`・`package-lock.json` の 2 つを載せる（そのブランチの上で lock を作り直す。統合の手順を参照）。手元の確かめで条件つきで直したもの（`npm audit fix`・`.vscodeignore`・`publish-vsix.ps1` と項目 12）があれば同じ PR に入れる。spec の文書は載せない（4.1）。`build.yml`（`vscode-test` を含む）の結果は待たずにマージしてよい（memory の運用）。ただし main が赤になれば追いかけて直す（2.5）
 - **確かめ（`Check`）**: マージの直後に、同じセッションで `gh workflow run release-setup-check.yml --ref main` を回す。マージから確かめまでの間はリリースタグを push しない（4.4）
 - **判定（`Judge`）**: run の緑だけでは判定しない（`verify-pat` の step は `continue-on-error`）。job summary の 2 つの行が「成功」であることで判定する（4.2・4.3）
 - **戻し（`Revert`）**: squash のコミットを `git revert` した PR を入れ、main をリリースできる状態に戻してから比べる（5.1）
@@ -159,7 +159,7 @@ flowchart TB
 |-------------|---------|------------|------------|-------|
 | 1.1 | 指定 `^4.1.1`・lock 4.1.1 | 依存の定義 | `package.json` 241 行・lock | Local |
 | 1.2 | `npm ci` 後に `vsce --version` = 4.1.1 | 依存の定義 | `npx --no-install vsce --version` | Local |
-| 1.3 | `glob`・`minimatch` の勧告が出ない | 依存の定義・勧告の照合 | `npm audit` | Local（`minimatch` は残る理由を記録） |
+| 1.3 | `glob` の勧告が出ない・`minimatch` は残る理由を記録 | 依存の定義・勧告の照合 | `npm audit` | Local（`minimatch` は残る理由を記録） |
 | 1.4 | 新しい勧告の一覧と扱い | 勧告の照合 | `npm audit`・research.md | Local |
 | 1.5 | `engines.vscode` などを変えない | 依存の定義 | `package.json` の差分 | Local |
 | 1.6 | vsce 以外の直接の依存を変えない | 依存の定義 | lock の差分 | Local |
@@ -181,7 +181,7 @@ flowchart TB
 | 4.1 | 単独の PR の後に main で確かめ | 統合の手順 | `gh workflow run` | BumpPR・Merge・Check |
 | 4.2 | summary に 2 つの結果 | 公開の道の確かめ | job summary | Check |
 | 4.3 | 成功を記録 | 公開の道の確かめ・統合の手順 | research.md 11 節 | Record |
-| 4.4 | 確かめの前にリリースタグを push しない | 統合の手順 | 手順（仕組みは足さない。Q2） | Merge・Check |
+| 4.4 | 確かめの前にリリースタグを push しない | 統合の手順 | 手順（仕組みは足さない） | Merge・Check |
 | 4.5 | 公開せず crates.io の交換もしない | 公開の道の確かめ | `release-setup-check.yml` を触らない | Check |
 | 4.6 | PR の前に手元で `show` | vsce の CLI の契約 | `vsce show --json` | Local |
 | 4.7 | 確かめの前に完了しない | 統合の手順 | `/kiro-complete` の前の条件 | Record・Complete |
