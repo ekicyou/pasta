@@ -5,6 +5,7 @@
 
 use crate::error::ConfigError;
 use mlua::{Function, Lua, Result as LuaResult, StdLib, Value};
+use pasta_core::CalendarTable;
 use pasta_core::registry::SceneAliasTable;
 
 /// Default libs configuration used by [`RuntimeConfig::new`].
@@ -78,6 +79,12 @@ pub struct RuntimeConfig {
     /// the table the transpiler used for the same dictionary (the loader
     /// guarantees this).
     pub scene_aliases: SceneAliasTable,
+
+    /// The ghost's event table (`calendar.csv`) behind `@pasta_calendar.event`.
+    ///
+    /// Defaults to the **empty** table; the loader sets it via
+    /// [`with_calendar`](Self::with_calendar).
+    pub calendar: CalendarTable,
 }
 
 impl RuntimeConfig {
@@ -88,6 +95,7 @@ impl RuntimeConfig {
         Self {
             libs: default_libs(),
             scene_aliases: SceneAliasTable::empty(),
+            calendar: CalendarTable::default(),
         }
     }
 
@@ -98,6 +106,7 @@ impl RuntimeConfig {
         Self {
             libs: vec!["std_all_unsafe".into()],
             scene_aliases: SceneAliasTable::empty(),
+            calendar: CalendarTable::default(),
         }
     }
 
@@ -108,6 +117,7 @@ impl RuntimeConfig {
         Self {
             libs: vec!["std_all".into()],
             scene_aliases: SceneAliasTable::empty(),
+            calendar: CalendarTable::default(),
         }
     }
 
@@ -120,6 +130,7 @@ impl RuntimeConfig {
         Self {
             libs,
             scene_aliases: SceneAliasTable::empty(),
+            calendar: CalendarTable::default(),
         }
     }
 
@@ -129,6 +140,12 @@ impl RuntimeConfig {
     /// and `finalize_scene`). Returns `self` for chaining.
     pub fn with_scene_aliases(mut self, scene_aliases: SceneAliasTable) -> Self {
         self.scene_aliases = scene_aliases;
+        self
+    }
+
+    /// Set the event table handed to `@pasta_calendar` (builder).
+    pub fn with_calendar(mut self, calendar: CalendarTable) -> Self {
+        self.calendar = calendar;
         self
     }
 

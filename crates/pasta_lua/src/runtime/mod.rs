@@ -16,6 +16,8 @@
 //! let result = runtime.exec("return 1 + 1")?;
 //! ```
 
+/// Calendar module - `@pasta_calendar` (holidays and the event table).
+pub mod calendar;
 mod enc;
 mod exec;
 mod factory;
@@ -165,6 +167,9 @@ impl PastaLuaRuntime {
 
         // Register @toml module (always available, independent of RuntimeConfig.libs)
         Self::register_toml_module(&lua)?;
+
+        // Register @pasta_calendar module (always available; empty table unless the loader set one)
+        Self::register_calendar_module(&lua, config.calendar)?;
 
         Ok(Self {
             lua,
