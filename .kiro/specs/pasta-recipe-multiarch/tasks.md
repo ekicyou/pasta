@@ -33,7 +33,7 @@
   - _Depends: 2.1_
   - _Requirements: 1.2, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.11, 7.1_
 
-- [ ] 3.2 検査のスクリプトの失敗の形を自己テストで確かめる
+- [x] 3.2 検査のスクリプトの失敗の形を自己テストで確かめる
   - `release-scripts-test.ps1` に、偽の exe（`MZ`・`e_lfanew`・`PE\0\0`・Machine の 2 バイトだけ）と偽の表示で zip を作る項目を足す。ネットワーク・gh・Windows の道具を使わない
   - 項目 15: arm64 の zip の exe の Machine が `0x8664` → 終了コード 1・出力に `pasta-recipe.arm64.zip`・`0xAA64`・`0x8664`
   - 項目 16: x64 の zip が無く、arm64 の表示に `monaco-editor` が無い → 終了コード 1・両方の文が出る
@@ -120,3 +120,4 @@
 - 1.2: cargo-about 0.9.2 の `generate --target <triple>` は `about.toml` の `targets` を置き換える（`--help` の "Overrides the `targets` configuration value"。2 つの triple で表示が違う: x64 は MIT 226 件で `cpufeatures 0.3.1` の節が在り、aarch64 は 225 件で無い）。`windows_aarch64_msvc` は lock に在るが `jni`（Android だけ）経由でしか届かず、どちらの arch の表示にも出ない。arch の目印は `cpufeatures`。
 - 1.2: `install-tools.ps1 -Name a,b` は `pwsh -File` で 1 つの文字列になるので、`ValidateSet` でなく `,` で分けて照合する。`RUNNER_TEMP` が無ければ OS の一時フォルダ、`GITHUB_PATH` が無ければ足さずに置き場を出す。
 - 2.1: `package.ps1 -Arch` も `,` で分けて照合（`if ($bad.Count)`。`@('')` は偽になるので空の要素を通さない。install-tools.ps1 も同じ）。手元の zip: x64 4,411,365 バイト・arm64 4,298,602 バイト。
+- 3.2: 自己テストの偽の dumpbin は `.ps1` を `&` で呼ぶ（shebang・実行ビット不要）。偽の exe の版は 0.0.0 と読まれ版の問題が一緒に出る。Linux の pwsh では未確認（7.2 の CI の job `release-scripts` で確かめる）。

@@ -50,46 +50,50 @@ try {
         $zipPath = Join-Path $Dir $name
         if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf)) { $errors.Add("配布物が無い: $name"); continue }
 
-        $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $zipPath).Path)
-        try { $entries = @($zip.Entries | ForEach-Object FullName | Sort-Object) } finally { $zip.Dispose() }
-        if (($entries -join '|') -ne $Expected) {
-            $errors.Add("$name の中身が pasta-recipe.exe・THIRD_PARTY_LICENSES.txt の 2 つでない: $($entries -join ', ')")
-            continue
-        }
-
-        $out = Join-Path $work $arch
-        Expand-Archive -LiteralPath $zipPath -DestinationPath $out -Force
-        $exe = Join-Path $out 'pasta-recipe.exe'
-
-        $vi = (Get-Item -LiteralPath $exe).VersionInfo
-        $exeVersion = "$($vi.FileMajorPart).$($vi.FileMinorPart).$($vi.FileBuildPart)"
-        if ($exeVersion -cne $Version) { $errors.Add("$name の pasta-recipe.exe の版が $Version でない: $exeVersion") }
-
-        $machine = Get-PeMachine $exe
-        $want = $Machines[$arch]
-        if ($null -eq $machine) { $errors.Add("$name の pasta-recipe.exe が PE でない") }
-        elseif ($machine -ne $want) { $errors.Add(('{0} の pasta-recipe.exe の機械の種類が 0x{1:X4}（{2}）でない: 0x{3:X4}' -f $name, $want, $arch, $machine)) }
-
-        $notice = Get-Content -LiteralPath (Join-Path $out 'THIRD_PARTY_LICENSES.txt') -Raw
-        foreach ($n in 'tauri', 'monaco-editor') {
-            if (-not $notice.Contains($n)) { $errors.Add("$name の THIRD_PARTY_LICENSES.txt に $n の名前が無い") }
-        }
-
-        $size = (Get-Item -LiteralPath $zipPath).Length
-        if ($size -gt $SizeLimit) { $errors.Add("$name が 30 MB（31,457,280 バイト）を超える: $size バイト") }
-
-        if ($DumpbinCommand) {
-            try {
-                # 偽の .ps1 は exit を書かないことがあるので、先に 0 にしておく（StrictMode で未設定を読まない）。
-                $global:LASTEXITCODE = 0
-                $lines = @(& $DumpbinCommand /nologo /dependents $exe 2>&1 | ForEach-Object { "$_".Trim() })
-                if ($global:LASTEXITCODE) { throw "終了コード $global:LASTEXITCODE" }
-                foreach ($dll in @($lines | Where-Object { $_ -match '\.dll$' -and $_ -match $VcRuntime })) {
-                    $errors.Add("$name の pasta-recipe.exe が VC++ ランタイムの DLL を読む: $dll")
-                }
+        # 壊れた zip でも止めずに問題として集め、もう一方の zip も見る（2.7）。
+        try {
+            $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $zipPath).Path)
+            try { $entries = @($zip.Entries | ForEach-Object FullName | Sort-Object) } finally { $zip.Dispose() }
+            if (($entries -join '|') -ne $Expected) {
+                $errors.Add("$name の中身が pasta-recipe.exe・THIRD_PARTY_LICENSES.txt の 2 つでない: $($entries -join ', ')")
+                continue
             }
-            catch { $errors.Add("$name の pasta-recipe.exe の DLL を dumpbin で読めない（$DumpbinCommand）: $_") }
+
+            $out = Join-Path $work $arch
+            Expand-Archive -LiteralPath $zipPath -DestinationPath $out -Force
+            $exe = Join-Path $out 'pasta-recipe.exe'
+
+            $vi = (Get-Item -LiteralPath $exe).VersionInfo
+            $exeVersion = "$($vi.FileMajorPart).$($vi.FileMinorPart).$($vi.FileBuildPart)"
+            if ($exeVersion -cne $Version) { $errors.Add("$name の pasta-recipe.exe の版が $Version でない: $exeVersion") }
+
+            $machine = Get-PeMachine $exe
+            $want = $Machines[$arch]
+            if ($null -eq $machine) { $errors.Add("$name の pasta-recipe.exe が PE でない") }
+            elseif ($machine -ne $want) { $errors.Add(('{0} の pasta-recipe.exe の機械の種類が 0x{1:X4}（{2}）でない: 0x{3:X4}' -f $name, $want, $arch, $machine)) }
+
+            $notice = Get-Content -LiteralPath (Join-Path $out 'THIRD_PARTY_LICENSES.txt') -Raw
+            foreach ($n in 'tauri', 'monaco-editor') {
+                if (-not $notice.Contains($n)) { $errors.Add("$name の THIRD_PARTY_LICENSES.txt に $n の名前が無い") }
+            }
+
+            $size = (Get-Item -LiteralPath $zipPath).Length
+            if ($size -gt $SizeLimit) { $errors.Add("$name が 30 MB（31,457,280 バイト）を超える: $size バイト") }
+
+            if ($DumpbinCommand) {
+                try {
+                    # 偽の .ps1 は exit を書かないことがあるので、先に 0 にしておく（StrictMode で未設定を読まない）。
+                    $global:LASTEXITCODE = 0
+                    $lines = @(& $DumpbinCommand /nologo /dependents $exe 2>&1 | ForEach-Object { "$_".Trim() })
+                    if ($global:LASTEXITCODE) { throw "終了コード $global:LASTEXITCODE" }
+                    foreach ($dll in @($lines | Where-Object { $_ -match '\.dll$' -and $_ -match $VcRuntime })) {
+                        $errors.Add("$name の pasta-recipe.exe が VC++ ランタイムの DLL を読む: $dll")
+                    }
+                }
+                catch { $errors.Add("$name の pasta-recipe.exe の DLL を dumpbin で読めない（$DumpbinCommand）: $_") }
+            }
         }
+        catch { $errors.Add("$name を読めない: $($_.Exception.Message)") }
     }
 }
 finally {
@@ -97,7 +101,8 @@ finally {
 }
 
 if ($errors.Count -gt 0) {
-    $errors | ForEach-Object { Write-Output "::error::$_" }
+    # 複数行の例外の文は 1 行にする（::error:: は 1 行で 1 つの注記）。
+    $errors | ForEach-Object { Write-Output "::error::$($_ -replace '\r?\n', ' ')" }
     exit 1
 }
 Write-Output "pasta-recipe の 2 つの zip の検査: 成功（版 $Version）"

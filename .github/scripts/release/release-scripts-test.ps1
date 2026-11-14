@@ -1,7 +1,7 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1・添付の欠けを見る github-release.ps1・公開済みなら飛ばす publish-vsix.ps1）を、一時の git リポジトリで実際に動かして確かめる。
+  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1・添付の欠けを見る github-release.ps1・公開済みなら飛ばす publish-vsix.ps1・pasta-recipe の 2 つの zip を検査する verify-recipe-zips.ps1）を、一時の git リポジトリで実際に動かして確かめる。
 .DESCRIPTION
   一時のフォルダに git リポジトリを作り、決まった件名のコミットとタグ（v0.0.1・v0.0.2）を積んで、スクリプトを子の pwsh で呼ぶ。
   ネットワークと gh を使わない。一時のフォルダは終わりに消し、リポジトリの作業ツリーを変えない。
@@ -87,6 +87,19 @@ function Test-Item([int]$Number, [string]$Desc, [scriptblock]$Body) {
         $ng.Add("$Number $Desc")
     }
     else { Write-Output "ok $Number $Desc" }
+}
+
+# pasta-recipe.<arch>.zip を $Dir に作る。exe は MZ・e_lfanew（0x40）・PE\0\0・Machine の 2 バイトだけの偽物。
+function New-RecipeZip([string]$Dir, [string]$Arch, [int]$Machine, [string]$Notice = "tauri`nmonaco-editor`n") {
+    $src = Join-Path $Dir "src-$Arch"
+    $b = [byte[]]::new(0x46)
+    $b[0] = 0x4D; $b[1] = 0x5A; $b[0x3C] = 0x40
+    $b[0x40] = 0x50; $b[0x41] = 0x45
+    [BitConverter]::GetBytes([uint16]$Machine).CopyTo($b, 0x44)
+    New-Item -ItemType Directory -Force -Path $src | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $src 'pasta-recipe.exe'), $b)
+    Write-Utf8 (Join-Path $src 'THIRD_PARTY_LICENSES.txt') $Notice
+    Compress-Archive -Path (Join-Path $src '*') -DestinationPath (Join-Path $Dir "pasta-recipe.$Arch.zip") -Force
 }
 
 # release-notes.ps1 の実行が失敗していれば、その理由を返す。
@@ -268,6 +281,44 @@ try {
         $r = Invoke-Script github-release.ps1 @('-Tag', 'v0.0.2', '-NotesFile', $notesPath, '-AssetDir', $dir)
         if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
         if (-not $r.Output.Contains('pasta-recipe.zip')) { "出力に pasta-recipe.zip が無い: $($r.Output)" }
+    }
+
+    # --- verify-recipe-zips.ps1（偽の exe・表示・dumpbin で。Windows の道具を使わない）---
+    # 版（2.3）と 30 MB（2.6）の失敗は見ない（設計議題 4）。偽の exe の版は 0.0.0 と読めて版の問題も出るが、見たい文が含まれるかだけを見る。
+    $noVc = Join-Path $tmp 'fake-dumpbin-ok.ps1'
+    Write-Utf8 $noVc "'  KERNEL32.dll'`n'  ucrtbase.dll'`n"
+
+    Test-Item 15 'verify-recipe-zips.ps1 が、arm64 の zip の exe の機械の種類が 0x8664 のとき、終了コード 1 で、zip の名前と 0xAA64・0x8664 を示す' {
+        $dir = Join-Path $tmp 'recipe-15'
+        New-RecipeZip $dir x64 0x8664
+        New-RecipeZip $dir arm64 0x8664
+        $r = Invoke-Script verify-recipe-zips.ps1 @('-Version', '0.0.2', '-Dir', $dir, '-DumpbinCommand', $noVc)
+        if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('pasta-recipe.arm64.zip の pasta-recipe.exe の機械の種類が 0xAA64（arm64）でない: 0x8664')) { "出力に arm64 の機械の種類の文が無い: $($r.Output)" }
+        if ($r.Output.Contains('pasta-recipe.x64.zip の pasta-recipe.exe の機械の種類')) { "x64 の zip の機械の種類まで問題になる: $($r.Output)" }
+    }
+
+    Test-Item 16 'verify-recipe-zips.ps1 が、x64 の zip が無く arm64 の表示に monaco-editor が無いとき、終了コード 1 で、両方の問題を示す' {
+        $dir = Join-Path $tmp 'recipe-16'
+        New-RecipeZip $dir arm64 0xAA64 'tauri'
+        $r = Invoke-Script verify-recipe-zips.ps1 @('-Version', '0.0.2', '-Dir', $dir, '-DumpbinCommand', $noVc)
+        if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('配布物が無い: pasta-recipe.x64.zip')) { "出力に x64 の zip が無い文が無い: $($r.Output)" }
+        if (-not $r.Output.Contains('pasta-recipe.arm64.zip の THIRD_PARTY_LICENSES.txt に monaco-editor の名前が無い')) { "出力に monaco-editor の欠けの文が無い: $($r.Output)" }
+    }
+
+    Test-Item 17 'verify-recipe-zips.ps1 が、偽の dumpbin が VCRUNTIME140.dll を返すとき、終了コード 1 で、zip の名前と DLL の名前を示す' {
+        $dir = Join-Path $tmp 'recipe-17'
+        New-RecipeZip $dir x64 0x8664
+        New-RecipeZip $dir arm64 0xAA64
+        $vc = Join-Path $tmp 'fake-dumpbin-vc.ps1'
+        Write-Utf8 $vc "'Dump of file pasta-recipe.exe'`n'  Image has the following dependencies:'`n'    KERNEL32.dll'`n'    VCRUNTIME140.dll'`n'    api-ms-win-crt-runtime-l1-1-0.dll'`n"
+        $r = Invoke-Script verify-recipe-zips.ps1 @('-Version', '0.0.2', '-Dir', $dir, '-DumpbinCommand', $vc)
+        if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
+        foreach ($n in 'pasta-recipe.x64.zip', 'pasta-recipe.arm64.zip') {
+            if (-not $r.Output.Contains("$n の pasta-recipe.exe が VC++ ランタイムの DLL を読む: VCRUNTIME140.dll")) { "出力に $n の VCRUNTIME140.dll の文が無い: $($r.Output)" }
+        }
+        if ($r.Output -match 'DLL を読む: (KERNEL32|api-ms-win-crt)') { "OS の部品まで VC++ ランタイムに数える: $($r.Output)" }
     }
 }
 finally {
