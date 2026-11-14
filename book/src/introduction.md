@@ -36,7 +36,7 @@
 | リンク | 内容 |
 | ------ | ---- |
 | [GitHub リポジトリ（ekicyou/pasta）](https://github.com/ekicyou/pasta) | ソースコード・ビルド方法などの開発者向け情報。[README](https://github.com/ekicyou/pasta/blob/main/README.md) も参照 |
-| [リリースページ](https://github.com/ekicyou/pasta/releases) | 各版の配布物（[`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip)・サンプルゴースト [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)・検査の CLI [`pasta_check.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip)・AI 向けのスキル [`pasta-skills.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-skills.zip)・VSCode を使わずに書くアプリ [`pasta-recipe.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.zip)・VSCode 拡張）と変更点。ファイル名のリンクは、最新版を直接ダウンロードする |
+| [リリースページ](https://github.com/ekicyou/pasta/releases) | 各版の配布物（[`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip)・サンプルゴースト [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)・検査の CLI [`pasta_check.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip)・AI 向けのスキル [`pasta-skills.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-skills.zip)・VSCode を使わずに書くアプリ [`pasta-recipe.x64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.x64.zip)・[`pasta-recipe.arm64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.arm64.zip)・VSCode 拡張）と変更点。ファイル名のリンクは、最新版を直接ダウンロードする |
 
 ## AI にゴーストを書かせるとき
 

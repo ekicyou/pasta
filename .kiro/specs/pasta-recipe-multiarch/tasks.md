@@ -85,7 +85,7 @@
   - _Requirements: 6.4, 6.5_
 
 - [ ] 6. 名前の付け替えと利用者向けの文書
-- [ ] 6.1 (P) マニュアルと README で arch ごとの zip を選べるようにする
+- [x] 6.1 (P) マニュアルと README で arch ごとの zip を選べるようにする
   - `book/src/debug/recipe.md` に 2 つの固定のリンク、arch の調べ方（設定 → システム → バージョン情報 → システムの種類が「x64 ベース プロセッサ」なら x64 版、「ARM ベース プロセッサ」なら arm64 版）、対象は x64 と arm64 の Windows で 32 ビット・mac・Linux 向けは無いこと、を書き、293 行あたりの名前も直す
   - `book/src/introduction.md`・`README.md` の固定のリンクを 2 つの zip にする
   - 完了の状態: 3 つのファイルに `pasta-recipe.zip` が無く、2 つの固定のリンクが在る。手元で mdbook のビルドが通る（`book/node_modules` が無ければ在るかを先に確かめ、無い自己テストの失敗は spec のせいとしない）
