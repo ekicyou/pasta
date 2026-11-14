@@ -17,7 +17,9 @@
 //   - 辞書の欠落（辞書の無い章のブロック）→ no-dic。
 //   - 旧方式（全部のブロックを 1 枚の章に集める）→ ほかの辞書が no-chapter・余分なブロックが not-in-dic。
 //   - 抜き出しの一致 → ok=true ／ 抜き出しの不一致 → not-in-dic。
-//   - 字下げ・引用の中のフェンス → indented-fence。
+//   - 字下げ・引用の中のフェンス → indented-fence ／ 飾り付きの開き（```pasta title・```csv,ignore） → attributed-fence。
+//   - csv ブロック ↔ calendar.csv（同じ規則の対）: 全体と抜き出し → ok=true ／ 全体の欠落 →
+//     no-matching-block ／ 抜き出しの不一致 → not-in-calendar ／ calendar.csv の無い csv ブロック → no-calendar。
 //   - 致命的な失敗（入門のフォルダ無し・辞書 0 件）→ fatal。
 //   - ユニット: extractPastaBlocks / normalizeForCompare / matchDicFile / listDicFiles
 //               / listGuideChapters / isExcerptOf / findProseParagraphs。
@@ -31,6 +33,7 @@ import {
   REPO_ROOT,
   GUIDE_REL,
   HELLO_DIC_REL,
+  CALENDAR_REL,
   listDicFiles,
   listGuideChapters,
   extractPastaBlocks,
@@ -72,24 +75,25 @@ const dicRel = (name) => `${HELLO_DIC_REL}/${name}`;
 const chapterRel = (name) => `${GUIDE_REL}/${name.replace(/\.pasta$/, '.md')}`;
 const realDic = (name) => fs.readFileSync(path.resolve(REPO_ROOT, HELLO_DIC_REL, name), 'utf8');
 
-// 中身を ```pasta フェンスで包む。
+// 中身を ```pasta（lang を渡せばその言語）フェンスで包む。
 // 中に ``` を含むとき（12 段目の ```lua）は ````pasta で包む（章と同じ書き方）。
-function fenced(body) {
+function fenced(body, lang = 'pasta') {
   let text = body.replace(/\r\n/g, '\n');
   if (!text.endsWith('\n')) text += '\n';
   const fence = text.includes('```') ? '````' : '```';
-  return fence + 'pasta\n' + text + fence + '\n';
+  return fence + lang + '\n' + text + fence + '\n';
 }
 
 // 実リポジトリの dic 内容から「辞書 1 つにつき章 1 枚」を機械生成して最小フィクスチャを作る。
 // （逐語転記そのものを再現するため、本物の dic を章のコードブロックに埋め込む）。
-// 辞書の無い章（index.md・13-nar.md）も pasta ブロック無しで置く。
+// 辞書の無い章（index.md・14-nar.md）も pasta ブロック無しで置く。
+// calendar.csv と csv ブロックは置かない（csv の場合が足す）。
 // 食い違いは、返したサンドボックスのファイルを各場合が書き換えて注入する。
 const DIC = listDicFiles();
 function makeSandbox() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-check-'));
   writeFile(root, `${GUIDE_REL}/index.md`, '# 入口\n\n辞書を持たない章。\n');
-  writeFile(root, `${GUIDE_REL}/13-nar.md`, '# 13 段目\n\n辞書を足さない段。\n');
+  writeFile(root, `${GUIDE_REL}/14-nar.md`, '# 14 段目\n\n辞書を足さない段。\n');
   for (const name of DIC) {
     const content = realDic(name);
     writeFile(root, dicRel(name), content);
@@ -123,9 +127,14 @@ log('\n== (A) 実リポジトリ現状: 全 dic が同じ名前の章と逐語�
   const result = runTutorialCheck(REPO_ROOT);
   check('実リポジトリ: ok=true（exit 0 相当）', result.ok === true,
     JSON.stringify(result.results.filter((r) => !r.matched)));
-  check(`実リポジトリ: 列挙した ${DIC.length} 件の dic を検証`,
-    DIC.length > 0 && result.results.length === DIC.length,
+  check(`実リポジトリ: 列挙した ${DIC.length} 件の dic と calendar.csv を検証`,
+    DIC.length > 0 && result.results.length === DIC.length + 1,
     `listed=${DIC.length} checked=${result.results.length}`);
+  check('実リポジトリ: calendar.csv の全体と一致する csv ブロックがある',
+    result.results.some((r) => r.file === CALENDAR_REL && r.matched),
+    JSON.stringify(result.results.find((r) => r.file === CALENDAR_REL)));
+  check('実リポジトリ: csv ブロックを見た（全体と抜き出し）', result.csvBlocks >= 2,
+    `csvBlocks=${result.csvBlocks}`);
   check('実リポジトリ: 全 dic が verbatim-match',
     result.results.every((r) => r.matched && r.reason === 'verbatim-match'),
     JSON.stringify(result.results.filter((r) => !r.matched)));
@@ -147,7 +156,7 @@ inSandbox((root) => {
   check('一致: 各 dic の章は同じ名前の .md',
     result.results.every((r, i) => r.file === dicRel(DIC[i]) && r.chapter === chapterRel(DIC[i])),
     JSON.stringify(result.results));
-  check('一致: 辞書の無い章（index.md・13-nar.md）は pasta ブロックが無ければ記録されない',
+  check('一致: 辞書の無い章（index.md・14-nar.md）は pasta ブロックが無ければ記録されない',
     result.problems.length === 0, JSON.stringify(result.problems));
   check('一致: 見た章と pasta ブロックの数',
     result.chapters === DIC.length + 2 && result.blocks === DIC.length,
@@ -310,6 +319,113 @@ inSandbox((root) => {
   check('別の言語のフェンスの中の字下げ ```pasta は記録しない',
     result.problems.length === 3, JSON.stringify(result.problems));
 });
+
+log('\n== (B-3h) 飾り付きのフェンス（```pasta title・```csv,ignore） ==');
+// 言語名の後ろに飾りの付いた ```pasta・```csv の開きは抽出されないので、照合をすり抜けないよう失敗にする。
+inSandbox((root) => {
+  append(root, chapterRel(BOOT), '```pasta title\n＊どこにも無い\n```\n');
+  append(root, chapterRel('02-talk.pasta'), '```csv,ignore\n9999,無い\n```\n');
+  append(root, chapterRel('03-face.pasta'), '```pastax\n例\n```\n');
+  const result = runTutorialCheck(root);
+  check('飾り付きのフェンスで ok=false', result.ok === false);
+  check('```pasta title が attributed-fence',
+    result.problems.some((p) => p.reason === 'attributed-fence'
+      && p.chapter === chapterRel(BOOT) && p.head === '```pasta title'),
+    JSON.stringify(result.problems));
+  check('```csv,ignore が attributed-fence',
+    result.problems.some((p) => p.reason === 'attributed-fence'
+      && p.chapter === chapterRel('02-talk.pasta') && p.head === '```csv,ignore'),
+    JSON.stringify(result.problems));
+  check('別の言語名（```pastax）は記録しない',
+    result.problems.length === 2, JSON.stringify(result.problems));
+});
+
+// ============================================================
+// csv ブロック ↔ hello-pasta の calendar.csv（pasta ブロックと同じ規則の対）。
+// サンドボックスの calendar.csv は CRLF で書き、LF の章のブロックと同一視されることも確かめる。
+const CAL = fs.readFileSync(path.resolve(REPO_ROOT, CALENDAR_REL), 'utf8');
+const CAL_LINES = normalizeForCompare(CAL).split('\n');
+const CAL_CHAPTER = chapterRel('13-calendar.pasta');
+const calResult = (result) => result.results.find((r) => r.file === CALENDAR_REL);
+
+log('\n== (C-1) csv の照合の成功（全体を 1 章に・連続した 2 行の抜き出しを別の章に） ==');
+inSandbox((root) => {
+  writeFile(root, CALENDAR_REL, CAL_LINES.join('\r\n') + '\r\n');
+  append(root, CAL_CHAPTER, fenced(CAL, 'csv'));
+  append(root, `${GUIDE_REL}/index.md`, fenced(CAL_LINES.slice(-3, -1).join('\n'), 'csv'));
+  const result = runTutorialCheck(root);
+  check('csv: 全体と抜き出しで ok=true', result.ok === true,
+    JSON.stringify([result.results.filter((r) => !r.matched), result.problems]));
+  const cal = calResult(result);
+  check('csv: calendar.csv が verbatim-match（全体のある章を名指し）',
+    cal && cal.matched && cal.reason === 'verbatim-match' && cal.chapter === CAL_CHAPTER,
+    JSON.stringify(cal));
+  check('csv: csv ブロックの数は 2・pasta ブロックの数は変わらない',
+    result.csvBlocks === 2 && result.blocks === DIC.length,
+    `csvBlocks=${result.csvBlocks} blocks=${result.blocks}`);
+});
+
+log('\n== (C-2) csv の全体のブロックの欠落（抜き出しだけ） ==');
+inSandbox((root) => {
+  writeFile(root, CALENDAR_REL, CAL);
+  append(root, CAL_CHAPTER, fenced(CAL_LINES.slice(-2).join('\n'), 'csv'));
+  const result = runTutorialCheck(root);
+  check('csv 全体の欠落で ok=false', result.ok === false);
+  const cal = calResult(result);
+  check('csv 全体の欠落: calendar.csv が no-matching-block',
+    cal && cal.matched === false && cal.reason === 'no-matching-block', JSON.stringify(cal));
+  check('csv 全体の欠落: 抜き出しそのものは問題にしない', result.problems.length === 0,
+    JSON.stringify(result.problems));
+  check('csv 全体の欠落: レポートに calendar.csv の MISMATCH 行',
+    reportTutorialCheck(result).split('\n').some((l) => l.includes('MISMATCH')
+      && l.includes(CALENDAR_REL) && l.includes('no-matching-block')),
+    reportTutorialCheck(result));
+});
+
+log('\n== (C-3) csv の抜き出しの不一致（飛び飛びの 2 行・1 文字違い） ==');
+inSandbox((root) => {
+  writeFile(root, CALENDAR_REL, CAL);
+  append(root, CAL_CHAPTER, fenced(CAL, 'csv'));
+  const [a, b] = CAL_LINES.slice(-3, -1);
+  const last = CAL_LINES[CAL_LINES.length - 1];
+  append(root, CAL_CHAPTER, fenced([a, last].join('\n'), 'csv'));
+  append(root, CAL_CHAPTER, fenced([b, last + '！'].join('\n'), 'csv'));
+  const result = runTutorialCheck(root);
+  check('csv の不一致で ok=false', result.ok === false);
+  check('csv の不一致: 全体のブロックは残っているので calendar.csv は match',
+    calResult(result) && calResult(result).matched);
+  check('csv の不一致: 飛び飛びの 2 行・1 文字違いがどちらも not-in-calendar',
+    result.problems.length === 2
+      && result.problems.every((p) => p.reason === 'not-in-calendar' && p.chapter === CAL_CHAPTER)
+      && result.problems[0].head === a && result.problems[1].head === b,
+    JSON.stringify(result.problems));
+});
+
+log('\n== (C-4) calendar.csv の無いゴーストの csv ブロック・字下げの csv フェンス ==');
+inSandbox((root) => {
+  check('calendar.csv も csv ブロックも無ければ calendar.csv の結果は無い',
+    calResult(runTutorialCheck(root)) === undefined);
+  append(root, CAL_CHAPTER, fenced('0214,バレンタイン', 'csv'));
+  append(root, CAL_CHAPTER, '- 項目\n\n  ```csv\n  0214,バレンタイン\n  ```\n');
+  const result = runTutorialCheck(root);
+  check('calendar.csv の無い csv ブロックで ok=false', result.ok === false);
+  check('その csv ブロックが no-calendar・字下げの csv フェンスが indented-fence',
+    result.problems.length === 2
+      && result.problems.some((p) => p.reason === 'no-calendar' && p.chapter === CAL_CHAPTER
+        && p.head === '0214,バレンタイン')
+      && result.problems.some((p) => p.reason === 'indented-fence' && p.head === '  ```csv'),
+    JSON.stringify(result.problems));
+});
+
+log('\n== (C-5) ユニット: extractPastaBlocks の言語の指定 ==');
+{
+  const md = '```csv\n0214,a\n```\n\n```pasta\n＊x\n```\n\n```csvx\n1,b\n```\n';
+  const csv = extractPastaBlocks(md, 'csv');
+  check('csv を指定すると csv ブロックだけ（csvx は拾わない）',
+    csv.length === 1 && normalizeForCompare(csv[0]) === '0214,a', JSON.stringify(csv));
+  check('既定は pasta ブロックだけ', extractPastaBlocks(md).length === 1
+    && normalizeForCompare(extractPastaBlocks(md)[0]) === '＊x');
+}
 
 // ============================================================
 log('\n== (B-4) ユニット: extractPastaBlocks ==');

@@ -4,6 +4,7 @@
 //! including file discovery, configuration loading, transpilation,
 //! and runtime initialization.
 
+use pasta_core::CalendarError;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -28,6 +29,24 @@ pub enum LoaderError {
     /// Configuration file not found error.
     #[error("Configuration file not found: '{0}'")]
     ConfigNotFound(PathBuf),
+
+    /// `calendar.csv` has line errors (all of them, on one line).
+    #[error("Invalid calendar file: '{}': {}", path.display(), format_calendar_errors(errors))]
+    Calendar {
+        path: PathBuf,
+        errors: Vec<CalendarError>,
+    },
+
+    /// `calendar.csv` is not UTF-8.
+    #[error("Calendar file is not valid UTF-8 (save it as UTF-8): '{0}'")]
+    CalendarNotUtf8(PathBuf),
+
+    /// Two or more calendar files whose names differ only in case.
+    #[error(
+        "More than one calendar file (names differ only in case): {}",
+        format_paths(paths)
+    )]
+    CalendarDuplicate { paths: Vec<PathBuf> },
 
     /// Lua runtime initialization error.
     #[error("Failed to initialize Lua runtime: {0}")]
@@ -119,6 +138,24 @@ pub enum LoaderError {
         "[loader] lua_search_paths entry contains '{ch}', which Lua package.path cannot hold: '{entry}'"
     )]
     LuaSearchPathChar { ch: char, entry: String },
+}
+
+/// Format calendar line errors as "line 3: ...; line 7: ...".
+fn format_calendar_errors(errors: &[CalendarError]) -> String {
+    errors
+        .iter()
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+/// Format paths into a comma-separated list for Display.
+fn format_paths(paths: &[PathBuf]) -> String {
+    paths
+        .iter()
+        .map(|p| format!("'{}'", p.display()))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Format collision groups into one line for Display.

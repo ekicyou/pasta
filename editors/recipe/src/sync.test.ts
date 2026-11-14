@@ -74,6 +74,10 @@ test("見張りの知らせ: .pasta・.lua・pasta.toml が含まれるか、そ
   assert.equal(planGhostChanged(files, files, ["dic/A.PASTA"]).check, true);
   assert.equal(planGhostChanged(files, files, ["scripts/m.lua"]).check, true);
   assert.equal(planGhostChanged(files, files, ["pasta.toml"]).check, true);
+  // master の直下の行事の表（大文字・小文字を区別しない）。dic/ の下や別の名前では走らない
+  assert.equal(planGhostChanged(files, files, ["Calendar.CSV"]).check, true);
+  assert.equal(planGhostChanged(files, files, ["dic/calendar.csv"]).check, false);
+  assert.equal(planGhostChanged(files, files, ["calendar.csv.bak"]).check, false);
   // フォルダの名前の変更は知らせにフォルダしか来なくても、並びが変わる
   assert.equal(planGhostChanged(files, ["dic2/a.pasta", "scripts/m.lua", "x.txt"], ["dic", "dic2"]).check, true);
   assert.equal(planGhostChanged(files, ["dic/a.pasta", "scripts/m.lua", "x.txt", "y.txt"], ["y.txt"]).check, false);

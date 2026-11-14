@@ -20,7 +20,8 @@
   - [10 段目：覚えていてほしい](getting-started/10-save.md)
   - [11 段目：話を続けたい・分岐させたい](getting-started/11-jump.md)
   - [12 段目：もっと凝ったことをしたい](getting-started/12-lua.md)
-  - [13 段目：配布したい](getting-started/13-nar.md)
+  - [13 段目：季節の行事でしゃべらせたい](getting-started/13-calendar.md)
+  - [14 段目：配布したい](getting-started/14-nar.md)
 
 # Pasta DSL 文法
 

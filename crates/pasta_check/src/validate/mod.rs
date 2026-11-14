@@ -4,6 +4,7 @@
 //! パスはすべて ghost/master からの相対パスで、区切りは `/`。
 
 mod builtins;
+mod calendar;
 mod conditions;
 mod config;
 mod discovery;
@@ -32,10 +33,13 @@ pub use module_name::module_name_of;
 #[doc(hidden)]
 pub use builtins::{ACT_METHODS, GLOBAL_NAMES, SHIORI_ACT_METHODS};
 
-/// 辞書ファイルとして読むべきパス（.pasta のパターンに一致したもの）を、決まった順で返す。
+/// 殻が読むべきパスを、決まった順で返す: 辞書ファイル（.pasta のパターンに一致したもの）、
+/// その後ろに行事の表（ghost/master 直下の calendar.csv）。
 pub fn select_dictionary_files(input: &GhostInput) -> Vec<String> {
     let (found, _) = discover(input);
-    found.pasta.into_iter().map(|f| f.path).collect()
+    let mut paths: Vec<String> = found.pasta.into_iter().map(|f| f.path).collect();
+    paths.extend(calendar::paths(input));
+    paths
 }
 
 /// 一致テスト用: pasta.dll が見るパスの（.pasta の一覧, .lua の一覧）。実物の相対パスの昇順
@@ -102,6 +106,8 @@ fn discover(input: &GhostInput) -> (discovery::Discovered, Vec<Finding>) {
 /// pasta.toml の誤りが 1 つでもあれば飛び先と条件の検査を丸ごと省く（1.1〜1.3・8.4）。
 pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) -> Report {
     let (config, mut findings) = config::read_config(&input.pasta_toml);
+    // 表の誤りは skip_reasons に入らないので、飛び先と条件の検査を省く理由にならない（Req 6.5）
+    findings.extend(calendar::check(input, files));
 
     let (discovered, found) = discovery::discover(input, &config);
     findings.extend(found);

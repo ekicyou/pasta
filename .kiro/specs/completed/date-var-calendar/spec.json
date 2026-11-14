@@ -1,0 +1,22 @@
+{
+  "feature_name": "date-var-calendar",
+  "created_at": "2026-11-14T14:34:52Z",
+  "updated_at": "2026-11-14T23:11:56Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

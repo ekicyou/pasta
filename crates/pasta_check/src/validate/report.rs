@@ -30,6 +30,7 @@ pub enum FindingKind {
     ConfigLoaderType,
     ConfigSceneAlias,
     ConfigActorFont,
+    CalendarInvalid,
     ConfigPatternInvalid,
     PatternIgnored,
     PatternNotPasta,
@@ -354,6 +355,36 @@ pub mod msg {
     pub fn config_actor_font_not_table(actor: &str) -> String {
         format!(
             "[actor.\"{actor}\"] の font は表で書きます（例: font = {{ color = \"90,110,140\" }}）"
+        )
+    }
+    pub fn calendar_quote() -> String {
+        "行事の表に引用符（\"）は使えません".into()
+    }
+    pub fn calendar_field_count(count: usize) -> String {
+        format!(
+            "行事の表の 1 行は「日付,名前」の 2 つの欄で書きます（欄が {count} 個あります。名前にカンマは使えません）"
+        )
+    }
+    pub fn calendar_bad_date_form(written: &str) -> String {
+        format!("行事の表の日付「{written}」は MMDD・MMDD-MMDD・YYYYMMDD のどれかで書きます")
+    }
+    pub fn calendar_no_such_date(written: &str) -> String {
+        format!("行事の表の日付「{written}」は暦にありません")
+    }
+    pub fn calendar_empty_name() -> String {
+        "行事の表の名前が空です".into()
+    }
+    pub fn calendar_not_utf8() -> String {
+        "行事の表を UTF-8 として読めません。UTF-8 で保存し直してください".into()
+    }
+    pub fn calendar_unreadable(reason: &str) -> String {
+        format!("行事の表を読めません: {reason}")
+    }
+    /// 名前が大文字・小文字だけ違う表がほかにもある。pasta.dll はどちらも選ばずに読み込みに失敗する
+    pub fn calendar_duplicate(others: &[&str]) -> String {
+        format!(
+            "行事の表が {} と重なっています（名前の大文字・小文字だけが違う表は 1 つにしてください）",
+            ghost_paths(others)
         )
     }
     pub fn config_pattern_invalid(pattern: &str, desc: &str) -> String {

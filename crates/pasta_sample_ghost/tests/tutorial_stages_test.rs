@@ -236,7 +236,7 @@ fn assert_responds(stage: u8, file: &str, id: &str, response: &str) {
 }
 
 /// 段階表の「追加するファイル」の集合 ＝ `dic/*.pasta` の集合、各ファイル名の番号 ＝ 段階、
-/// 1 段 1 ファイルで 13 段目だけファイルが無い（Req 2.3・4.3）。
+/// 1 段 1 ファイルで 14 段目だけファイルが無い（Req 2.3・4.3）。
 #[test]
 fn stage_table_matches_dic_files() {
     let markdown = read_stages_md();
@@ -245,14 +245,14 @@ fn stage_table_matches_dic_files() {
     let stages: Vec<u8> = rows.iter().map(|r| r.stage).collect();
     assert_eq!(
         stages,
-        (1..=13).collect::<Vec<u8>>(),
-        "段階表の段階は 1〜13 を順に 1 行ずつ"
+        (1..=14).collect::<Vec<u8>>(),
+        "段階表の段階は 1〜14 を順に 1 行ずつ"
     );
 
     for row in &rows {
         match (row.stage, &row.file) {
-            (13, None) => {}
-            (13, Some(f)) => panic!("13 段目は辞書の差分を持たないのにファイル `{f}` がある"),
+            (14, None) => {}
+            (14, Some(f)) => panic!("14 段目は辞書の差分を持たないのにファイル `{f}` がある"),
             (n, None) => panic!("{n} 段目に追加するファイルが無い"),
             (n, Some(f)) => {
                 let name = f
@@ -285,8 +285,8 @@ fn stage_table_matches_dic_files() {
     let events = parse_verify_events(&markdown);
     for e in &events {
         assert!(
-            (1..=12).contains(&e.stage),
-            "検証イベント表の段階 {} は 1〜12 でない",
+            (1..=13).contains(&e.stage),
+            "検証イベント表の段階 {} は 1〜13 でない",
             e.stage
         );
         assert!(
@@ -335,7 +335,7 @@ fn assert_no_failure_notation(stage: u8, file: &str, id: &str, response: &str, l
     );
 }
 
-/// N = 1〜12 で段階の辞書を組み立てて実ローダーで読み込み、OnBoot と検証イベント表の
+/// N = 1〜13 で段階の辞書を組み立てて実ローダーで読み込み、OnBoot と検証イベント表の
 /// 該当行を送って応答を確かめる（Req 1.6・2.1・2.6・3.9・4.1・4.2・4.2a・4.4・4.5・4.6）。
 /// 応答に失敗表記が無いことも確かめる（failure-output-unification 要件 10.4）。
 /// 仮想イベント（ランダムトーク・時報）は送らない。
@@ -345,7 +345,7 @@ fn every_stage_loads_and_responds() {
     let rows = parse_stage_table(&markdown);
     let events = parse_verify_events(&markdown);
 
-    // 13 段目は辞書の差分を持たない（手順だけの段階）ので、ファイルのある 1〜12 段目を回す
+    // 14 段目は辞書の差分を持たない（手順だけの段階）ので、ファイルのある 1〜13 段目を回す
     for (n, file) in rows
         .iter()
         .filter_map(|r| Some((r.stage, r.file.as_deref()?)))
@@ -388,6 +388,42 @@ fn stage7_greeting_reads_reference_without_transfer() {
         response.starts_with("SHIORI/3.0 200 OK") && response.contains("むらさき"),
         "OnGhostChanged の応答に ＄ｒ０（むらさき）が出ていない:\n{response}"
     );
+}
+
+/// 13 段目: `calendar.csv` の各名前に `＊行事_名前` があり、`＊行事_なし` があり、
+/// `＞「行事_」＆＄行事` で振り分ける場面がある（date-var-calendar 要件 10.1・10.2）。
+#[test]
+fn stage13_calendar_has_event_scenes() {
+    const FILE: &str = "13-calendar.pasta";
+    let csv = std::fs::read_to_string(master_dir().join("calendar.csv"))
+        .expect("ghost/master/calendar.csv を読めない");
+    // 表の正しさは読み込み（every_stage_loads_and_responds）と pasta_check が見る。ここは名前だけ拾う
+    let events: Vec<&str> = csv
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(|l| {
+            l.split_once(',')
+                .unwrap_or_else(|| panic!("calendar.csv の行 `{l}` にカンマが無い"))
+                .1
+                .trim()
+        })
+        .collect();
+    assert!(!events.is_empty(), "calendar.csv に行事が無い");
+
+    let source =
+        std::fs::read_to_string(dic_dir().join(FILE)).expect("13-calendar.pasta を読めない");
+    assert!(
+        source.contains("＞「行事_」＆＄行事"),
+        "{FILE} に ＞「行事_」＆＄行事 が無い"
+    );
+    let names: BTreeSet<String> = global_scene_names(&source).into_iter().collect();
+    for name in events.iter().copied().chain(["なし"]) {
+        assert!(
+            names.contains(&format!("行事_{name}")),
+            "{FILE} に ＊行事_{name} が無い（シーン名: {names:?}）"
+        );
+    }
 }
 
 /// 行頭の `＊名前` / `*名前` の名前を集める。単独の `＊` と Lua ブロックの中は除く。

@@ -115,6 +115,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 | `config-loader-type` | 誤り | `[loader]` が表でない、または `pasta_patterns`・`lua_search_paths`（文字列の配列）・`transpiled_output_dir`（文字列）の型が違う | 示されたキーを決まった型で書く |
 | `config-scene-alias` | 誤り | `[scene.alias]` の別名表が正しくない。同じ別名が 2 つ以上の名前にある（重複）、空の名前、別名を別名で置き換える（連鎖）、型の違い、書いた別名か置き換え先が書かなかったキーの既定の別名と同じ（既定とのぶつかり）のどれか。別名表は `pasta.dll` と同じく、書いたキーだけ既定を置き換えて読む（[[scene]](../reference/pasta-toml.md#sceneシーン名)） | 理由に示された別名・名前を直す。重複は関わる行のすべてに出る。既定とのぶつかりは、理由に相手の既定のキーが出るので、そのキーに空の配列（`OnTalk = []` など）を書いて既定を消すか、書いた名前を変える |
 | `config-actor-font` | 誤り | `[actor."名前"]` の `font`（[装い](../reference/pasta-toml.md#装いfont)）が正しくない。12 個に無い属性名、値が文字列・整数・真偽値でない、空の文字列、値に `]` か `\` が含まれる、`font` が表でない、のどれか。`pasta.dll` はゴーストを読み込めない。行は属性の値の行（表でないときは `font` の値の行） | 理由に示された属性と値を直す |
+| `calendar-invalid` | 誤り | 行事の表（`ghost/master` 直下の `calendar.csv`。[行事の表](../grammar/variables.md#行事の表calendarcsv)）が正しくない。引用符（`"`）がある、`日付,名前` の 2 欄でない、日付の形が `MMDD`・`MMDD-MMDD`・`YYYYMMDD` のどれでもない、暦にない日付、名前が空、UTF-8 として読めない、読めない、大文字・小文字だけ違う表が 2 つ以上ある、のどれか。`pasta.dll` はゴーストを読み込めない。行は誤りのある行（ファイル全体の誤りは行なし）。この誤りは辞書の検査を省く理由にならず、飛び先と条件の検査も続く | 理由に示された行を直す。表の書き方は[行事の表](../grammar/variables.md#行事の表calendarcsv) |
 | `config-pattern-invalid` | 誤り | `pasta_patterns` の要素がパターンとして読めない | パターンの書き方を直す |
 | `pattern-ignored` | 注意 | `pasta_patterns` の要素が `..`・ドライブ名・先頭の `/` を含むため使われない。`pasta.dll` もこのパターンを使わない | `ghost/master` の中を指すパターンにする |
 | `pattern-not-pasta` | 注意 | `pasta_patterns` の要素が `.pasta` で終わらないため、辞書モジュール（`.lua`）を探すのに使われない | `.pasta` で終わるパターンにする |

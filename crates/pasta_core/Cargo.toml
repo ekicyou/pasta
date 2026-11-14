@@ -11,6 +11,7 @@ repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
 keywords.workspace = true
+exclude = ["tests/fixtures/syukujitsu/", "tests/holiday_cao_test.rs"]
 
 [dependencies]
 thiserror.workspace = true

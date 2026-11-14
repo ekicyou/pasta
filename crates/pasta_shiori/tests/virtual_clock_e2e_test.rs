@@ -168,6 +168,29 @@ fn season_and_sekku_route_by_x_pasta_time() {
     }
 }
 
+/// `＞「祝日_」＆＄祝日`・`＞「行事_」＆＄行事` が X-Pasta-Time の日付で振り分けられる（date-var-calendar 1.3・3.6・8.6）
+#[test]
+fn holiday_and_event_route_by_x_pasta_time() {
+    let mut env = ShioriTestEnv::new(FIXTURE);
+    let cases = [
+        ("2025-01-01T03:00:00Z", Some("祝日は元日。"), None),
+        ("2025-12-24T03:00:00Z", None, Some("行事はクリスマス。")),
+        ("2025-11-12T03:00:00Z", None, None),
+    ];
+    for (time, holiday, event) in cases {
+        let resp = get(&mut env, &format!("ID: 振り分け\nX-Pasta-Time: {time}\n"));
+        assert_eq!(resp.status_code, 200, "{time}: {:?}", resp.value);
+        let text = value(&resp);
+        for (label, want) in [("祝日は", holiday), ("行事は", event)] {
+            match want {
+                Some(w) => assert!(text.contains(w), "{time}: no {w}: {text}"),
+                None => assert!(!text.contains(label), "{time}: unexpected {label}: {text}"),
+            }
+        }
+        assert!(!text.contains('【'), "{time}: failure notation: {text}");
+    }
+}
+
 /// 読めない値の返事は 204 で、続く応答は OS の時計のまま（2.9）
 #[test]
 fn unreadable_reply_falls_back_to_os_clock() {

@@ -4,6 +4,7 @@
 //! various Lua modules (split impl pattern).
 
 use super::PastaLuaRuntime;
+use super::calendar;
 use super::enc;
 use super::log;
 use super::persistence;
@@ -12,6 +13,7 @@ use crate::debug::playscene::resolve_position;
 use crate::debug::source_map::SourceMap;
 use crate::loader::{LoaderContext, PastaConfig};
 use mlua::{IntoLua, Lua, Result as LuaResult, Table, Value};
+use pasta_core::CalendarTable;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -160,6 +162,15 @@ impl PastaLuaRuntime {
     pub(crate) fn register_log_module(lua: &Lua) -> LuaResult<()> {
         let log_table = log::register(lua)?;
         set_loaded_module(lua, "@pasta_log", log_table)
+    }
+
+    /// Register @pasta_calendar module (`holiday` / `event`).
+    ///
+    /// Always available, independent of RuntimeConfig.libs; `event` reads the
+    /// table given here (empty unless the loader set one).
+    pub(crate) fn register_calendar_module(lua: &Lua, table: CalendarTable) -> LuaResult<()> {
+        let module = calendar::register(lua, table)?;
+        set_loaded_module(lua, "@pasta_calendar", module)
     }
 
     /// Register @toml module (`decode` only).

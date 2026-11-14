@@ -68,6 +68,7 @@ load_with_config(base_dir, runtime_config)
  1.   PastaConfig::load                                   … pasta.toml の読込と既定値の補完（致命）
  1.5  インスタンスロガーの作成と登録・ログフィルタの更新   … 失敗は既定のログファイルへ切り替えて続行（継続）
       別名表の info ログ（Scene alias table）
+ 1.6  calendar.csv の読込と検査（ghost/master 直下）        … 致命
  1.7  LoaderContext::from_config・package.path に入るパスの ; と ? の検査 … 致命
  2.   profile/ 配下のディレクトリの作成・キャッシュの版と別名表の確認 … 致命
  2.5  sync_pasta_scripts（フレームワークスクリプトの自己展開） … 失敗は ERROR ログで続行（継続）

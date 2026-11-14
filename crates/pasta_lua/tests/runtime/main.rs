@@ -6,6 +6,7 @@
 #[path = "../common/mod.rs"]
 mod common;
 
+mod calendar_module_test;
 mod encoding_test;
 mod finalize_scene_test;
 mod literal_fixes_test;

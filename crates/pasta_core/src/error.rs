@@ -100,6 +100,33 @@ pub enum ActorFontError {
     },
 }
 
+/// One error in `calendar.csv` (line numbers are physical lines, starting at 1).
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[error("line {line}: {problem}")]
+pub struct CalendarError {
+    pub line: usize,
+    pub problem: CalendarProblem,
+}
+
+/// What is wrong with one line of `calendar.csv`.
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum CalendarProblem {
+    #[error("quote characters (\") are not allowed")]
+    Quote,
+
+    #[error("a line must have 2 fields \"date,name\" (got {count})")]
+    FieldCount { count: usize },
+
+    #[error("date '{written}' must be MMDD, MMDD-MMDD or YYYYMMDD")]
+    BadDateForm { written: String },
+
+    #[error("date '{written}' does not exist in the calendar")]
+    NoSuchDate { written: String },
+
+    #[error("name must not be empty")]
+    EmptyName,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

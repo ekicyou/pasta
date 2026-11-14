@@ -23,6 +23,7 @@
 //! ```
 
 mod cache;
+mod calendar;
 mod config;
 mod context;
 mod discovery;
@@ -124,6 +125,10 @@ impl PastaLoader {
             table = %config.scene_aliases,
             "Scene alias table"
         );
+
+        // Stage 1.6: Read the event table (calendar.csv); errors fail the load
+        debug!("Stage 1.6: Loading calendar table");
+        let calendar = calendar::load(base_dir)?;
 
         // Stage 1.7: Reject ';' and '?' that would break package.path
         let mut loader_context = LoaderContext::from_config(base_dir, &config);
@@ -234,7 +239,8 @@ impl PastaLoader {
         // Search side gets the same table as the declaration side (6.2).
         let runtime_config = runtime_config
             .with_scene_aliases(config.scene_aliases.clone())
-            .with_ffi(config.loader.ffi);
+            .with_ffi(config.loader.ffi)
+            .with_calendar(calendar);
         let runtime = PastaLuaRuntime::from_loader_with_scene_dic(
             loader_context,
             runtime_config,

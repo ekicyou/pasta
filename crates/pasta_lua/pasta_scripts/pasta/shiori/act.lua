@@ -120,6 +120,15 @@ local SEASONS_JA = { "冬", "冬", "春", "春", "春", "夏", "夏", "夏", "�
 --- 五節句テーブル（month*100+day → 名前）。ほかの日は「なし」（空だと「節句_」の前方一致で全節句が候補になる）
 local SEKKU_JA = { [107] = "人日", [303] = "上巳", [505] = "端午", [707] = "七夕", [909] = "重陽" }
 
+--- 祝日・行事を var へ転記（Rust の @pasta_calendar。呼び出しごとに取る。無ければ何もしない）
+local function transfer_calendar_vars(var, date)
+    local ok, CAL = pcall(require, "@pasta_calendar")
+    if ok and date.year and date.month and date.day then
+        var["祝日"] = CAL.holiday(date.year, date.month, date.day) or "なし"
+        var["行事"] = CAL.event(date.year, date.month, date.day) or "なし"
+    end
+end
+
 --- 12時間制変換
 --- @param hour number 24時間制の時 (0-23)
 --- @return string 午前/午後付き12時間制文字列
@@ -190,6 +199,8 @@ function SHIORI_ACT_IMPL.transfer_date_to_var(self)
             self.var["節句"] = SEKKU_JA[date.month * 100 + date.day] or "なし"
         end
     end
+
+    transfer_calendar_vars(self.var, date)
 
     return self
 end

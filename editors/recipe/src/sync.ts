@@ -49,6 +49,7 @@ export function planGhostChanged(prev: readonly string[], now: readonly string[]
   const checked = (f: string) => /\.(pasta|lua)$/i.test(f);
   const name = (f: string) => f.slice(f.lastIndexOf("/") + 1).toLowerCase();
   const listed = (files: readonly string[]) => [...keys(files.filter(checked))].sort().join("\n");
-  const check = paths.some((f) => checked(f) || name(f) === "pasta.toml") || listed(prev) !== listed(now);
+  // calendar.csv は master の直下だけが行事の表（ASCII の大文字・小文字を区別しない）
+  const check = paths.some((f) => checked(f) || name(f) === "pasta.toml" || f.toLowerCase() === "calendar.csv") || listed(prev) !== listed(now);
   return { scenes, check };
 }

@@ -63,6 +63,10 @@ fn run_lua_unit_tests() -> LuaResult<()> {
     let log_table = pasta_lua::runtime::log::register(&lua)?;
     loaded.set("@pasta_log", log_table)?;
 
+    // Register @pasta_calendar module with the empty event table (required by pasta.shiori.act)
+    let calendar_table = pasta_lua::runtime::calendar::register(&lua, Default::default())?;
+    loaded.set("@pasta_calendar", calendar_table)?;
+
     // Lua ユニットテストを実行（エントリーポイント: init.lua）
     let test_file = lua_specs_path.join("init.lua");
     println!("Running Lua tests from: {}", test_file.display());
