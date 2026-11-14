@@ -24,7 +24,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
 
 - [ ] 3. 2 つの zip の検査
-- [ ] 3.1 2 つの zip を同じ項目で検査するスクリプトを作る
+- [x] 3.1 2 つの zip を同じ項目で検査するスクリプトを作る
   - 新しい `verify-recipe-zips.ps1` が `-Version`（必須・`X.Y.Z`）・`-Dir`（既定はリポジトリの根の `release`）・`-DumpbinCommand`（既定は `vswhere` で見つけた `dumpbin`）を受ける
   - zip ごとに、在る → 中身 2 つ → exe の版 → PE の Machine（x64 = `0x8664`・arm64 = `0xAA64`）→ 表示の `tauri`・`monaco-editor` → 31,457,280 バイト以下 → VC++ の再頒布可能パッケージの DLL（`vcruntime*`・`msvcp*`・`vccorlib*`・`concrt*`・`msvcr<数字>*`。UCRT は数えない）を見る。無い・中身違いはその zip の残りの項目を見ない
   - 問題を 1 つのリストに集めて `::error::` の行で全部出してから終了コード 1。`dumpbin` を動かせないのも、`vswhere` が無い（Windows でない）のも、例外で落とさず問題に数える。展開は一時のフォルダで行い終わりに消す
