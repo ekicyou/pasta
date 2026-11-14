@@ -72,6 +72,20 @@ Focus on capabilities and outcomes, not code structure.
 - If work must cross boundaries, make it an explicit integration task rather than a normal implementation task
 - Do not hide cross-boundary coordination inside a task that appears local
 
+### 5.5 Dispatch Tier
+
+**Every executable task declares the tier `/kiro-impl` dispatches it at** (added 2026-11-14 by developer request: the difficulty is already known when the work is decomposed, so it is decided here and reviewed at task approval; the tier → model/effort mapping lives in `kiro-impl/SKILL.md` Preflight):
+- Format: `_Dispatch: mechanical — <reason>_`, placed before `_Requirements:_`. The reason is one short phrase in the spec language naming the criterion that applied.
+- Optional effort override after the tier, only when the tier's effort clearly misfits (for example a standard task with a subtle algorithm): `_Dispatch: standard, effort high — <reason>_`. Levels: `low`, `medium`, `high`, `xhigh`.
+
+| Tier | Choose when |
+|---|---|
+| judgment | only when one of these applies: it newly draws a crate boundary or public contract with no precedent in the codebase; it newly designs concurrency, threading, timing or ordering guarantees; or the design leaves a structural decision that precedent does not settle. Integration tasks, boundary-crossing tasks and contract changes whose shape the design gives are `standard`. |
+| standard (default) | implementation whose design section specifies the change but leaves real code to work out (new logic or branches, wiring across boundaries) |
+| mechanical | the design, or an existing sibling the task copies, gives the exact shape inside one boundary: signature/rename/import follow-ups; adding a field, variant, log line or config key along an existing pattern; manifest or registration edits; tests whose expected values the design states; doc rewrites whose wording the design gives |
+
+Opus handles almost all implementation, so keep `judgment` rare. When torn between `mechanical` and `standard`, choose `mechanical` (a `REJECTED` review moves the task to Opus at once); when torn between `standard` and `judgment`, choose `standard`.
+
 ### 6. Flexible Task Sizing
 
 **Guidelines**:
@@ -130,7 +144,8 @@ Before writing `tasks.md`, review the draft task plan and repair local issues un
 - If many tasks require broad `_Boundary:_` scopes or repeated cross-boundary coordination, stop and return to design or roadmap decomposition instead of forcing the spec through task generation.
 - Merge or collapse tasks that are too small, bookkeeping-only, or not meaningful execution units.
 - Make implicit prerequisites explicit as preceding tasks.
-- Re-check `_Depends:_`, `_Boundary:_`, and `(P)` markers after edits so concurrency claims still match the design boundaries and dependency graph.
+- Every executable task has a `_Dispatch:_` line whose tier follows section 5.5.
+- Re-check `_Depends:_`, `_Boundary:_`, `_Dispatch:_`, and `(P)` markers after edits so concurrency claims and tiers still match the design boundaries and dependency graph.
 
 ### Review Loop
 

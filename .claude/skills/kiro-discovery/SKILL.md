@@ -21,10 +21,10 @@ Before scanning, merge the latest remote default branch into the current branch 
 
 1. **Remote**: `origin` if present, else the only remote. If there is no remote (or several without `origin`), warn once and skip this step.
 2. **Default branch**: `git symbolic-ref --quiet --short refs/remotes/{remote}/HEAD` minus the `{remote}/` prefix; if empty, `main`.
-3. `git fetch {remote}`. If it fails, STOP and report the error (do not run discovery on a possibly stale base).
-4. If the current branch is the default branch: `git merge --ff-only {remote}/{default-branch}`. Otherwise: `git merge --no-edit {remote}/{default-branch}`.
-5. If the merge fails (conflict, diverged default branch, or uncommitted changes in the way): run `git merge --abort` when a merge is in progress, then STOP and report the cause and the conflicting files. Never resolve conflicts silently or discard local changes.
-6. Report the result in one line (already up to date / merged N commits), then proceed.
+3. `git fetch {remote} {default-branch}`. If it fails, STOP and report the error (do not run discovery on a possibly stale base).
+4. If the current branch is the default branch: `git merge --ff-only {remote}/{default-branch}` (never a merge commit on the default branch). Otherwise: `git merge --no-edit {remote}/{default-branch}`.
+5. On a branch other than the default branch, resolve merge conflicts if any, then commit the merge. If the merge cannot go ahead (the default branch is not fast-forwardable, or uncommitted changes are in the way): run `git merge --abort` when a merge is in progress, then STOP and report the cause. Never force, reset, stash or discard local changes.
+6. Report the result in one line (already up to date / N commits came in), then proceed.
 
 ### Step 1: Lightweight Scan
 

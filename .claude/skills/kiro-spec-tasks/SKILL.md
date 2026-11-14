@@ -57,6 +57,7 @@ After all parallel research completes, synthesize findings before generating tas
 - Verify task progression is logical and incremental
 - Ensure each executable sub-task includes at least one detail bullet that states what "done" looks like in observable terms
 - Keep normal implementation tasks within a single responsibility boundary; if work crosses boundaries, make it an explicit integration task
+- Give every executable task a `_Dispatch:_` tier per `rules/tasks-generation.md` section 5.5
 - Apply `(P)` markers to tasks that satisfy parallel criteria when `!sequential`
 - Explicitly note dependencies preventing `(P)` when tasks appear parallel but are not safe
 - If sequential mode is true, omit `(P)` entirely
@@ -75,6 +76,7 @@ After all parallel research completes, synthesize findings before generating tas
   - Each executable sub-task includes an observable completion bullet
   - No implicit prerequisites remain hidden
   - `_Depends:_`, `_Boundary:_`, and `(P)` markers still match the dependency graph and architecture boundaries
+  - Every executable task has a `_Dispatch:_` tier that follows section 5.5
 - If issues are task-plan-local, repair the draft and re-run the review gate before writing
 - Keep the review bounded to at most 2 repair passes
 - If review exposes a real requirements/design gap or contradiction, stop and send the user back to requirements/design instead of inventing filler tasks
@@ -116,10 +118,10 @@ Proceed only when the Task Plan Review Gate is satisfied and the latest task-gra
 **Approval**:
 - If auto-approve flag (`-y`) is true:
   - Set `approvals.tasks.approved: true` in spec.json
-  - Display task summary (task count, major groups, parallel markers)
+  - Display task summary (task count, major groups, parallel markers, task count per `_Dispatch:_` tier)
   - Respond: "Tasks generated and auto-approved. Start implementation with `/kiro-impl {feature}`"
 - Otherwise (interactive):
-  - Display a summary of the generated tasks (task count, major groups, parallel markers)
+  - Display a summary of the generated tasks (task count, major groups, parallel markers, and the task IDs per `_Dispatch:_` tier so the developer can adjust a tier before approving)
   - Ask the user: "Tasks generated. Approve and proceed to implementation?"
   - If the user approves:
     - Set `approvals.tasks.approved: true` in spec.json
@@ -132,6 +134,7 @@ Proceed only when the Task Plan Review Gate is satisfied and the latest task-gra
 - **Task Integration**: Every task must connect to the system (no orphaned work)
 - **Boundary annotations**: Required for `(P)` tasks, recommended for all (`_Boundary: ComponentName_`)
 - **Explicit dependencies**: Cross-boundary non-obvious dependencies declared with `_Depends: X.X_`
+- **Dispatch tier**: Every executable task declares `_Dispatch: <tier> — <reason>_` (rules section 5.5); `/kiro-impl` picks the subagent model and effort from it
 - **Executable deliverable granularity**: Each task must produce a verifiable deliverable (file, endpoint, UI component, config). Infrastructure tasks (project scaffolding, manifest, host integration, build config) must be explicit — never assume they exist
 - **Observable done state**: Each executable sub-task must include at least one detail bullet that makes the completed state visible without adding new bookkeeping fields
 - **No implicit prerequisites**: If a task requires a runtime, SDK, framework setup, or config file, that setup must be a separate preceding task

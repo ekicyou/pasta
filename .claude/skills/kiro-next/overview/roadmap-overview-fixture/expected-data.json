@@ -61,13 +61,7 @@
           "prereqs": [
             {
               "name": "alpha-one",
-              "band": "0.9.0",
-              "done": false
-            },
-            {
-              "name": "done-spec",
-              "band": "0.9.0",
-              "done": true
+              "band": "0.9.0"
             }
           ],
           "ledger": {
@@ -97,8 +91,7 @@
           "prereqs": [
             {
               "name": "ghost-of-past",
-              "band": null,
-              "done": false
+              "band": null
             }
           ],
           "ledger": {
@@ -139,28 +132,5 @@
     "Wave 2（見込み）1本\nOpus\n/kiro-start beta-two",
     "Wave 3（見込み）リリース（0.9.0 の spec は 0 本）\n/release 0.9.0"
   ],
-  "completed": {
-    "rows": [
-      {
-        "phase": "1–2",
-        "topic": "古い土台（括弧の。は切らない）。後ろの文は一言に入らない",
-        "oneLiner": "古い土台",
-        "specs": "old-base, done-spec（v0.0.1 で公開・not-a-name-x は注）"
-      },
-      {
-        "phase": "—",
-        "topic": "二つ目の主題",
-        "oneLiner": "二つ目の主題",
-        "specs": "old-two"
-      }
-    ],
-    "extra": [
-      {
-        "name": "eps-done",
-        "oneLiner": "済んだがまだ畳んでいない",
-        "theme": 1
-      }
-    ]
-  },
   "warningCount": 0
 }

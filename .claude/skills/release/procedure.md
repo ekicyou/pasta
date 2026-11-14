@@ -1,8 +1,33 @@
-# リリースの手順（段 1〜9）
+# `/release` の手順（正本）
 
-`SKILL.md` の「段」が指す、実行するコマンド・合否の基準・判定表である。コマンドは、ここに書いてあるものを、波かっこ（`{V}` など）だけ置き換えて実行する。
+pasta のリリース 1 回分の手順（段 1〜9）。段・コマンド・合否の基準・判定表はこの文書が正本で、`SKILL.md` は約束と段の要約だけを持つ。コマンドは、ここに書いてあるものを、波かっこ（`{V}` など）だけ置き換えて実行する。
 
 かっこの中の番号（2.3 など）と、各段の表の `Requirements` は、もとになった要件（`.kiro/specs/completed/release-workflow/requirements.md`）の番号である。実行には使わない。
+
+すべての段は直列である。並行に行える段は無い。判定の結果、行わないと決まった段は、行わずに次へ進む。
+
+## してはいけない事
+
+- 接続先の URL を印字するコマンド（`git remote -v` など）。
+- `git push --tags`・`git push --follow-tags`。タグは名前（`refs/tags/v{V}`）を指して 1 本だけ押す。
+- `--force` の付く push と `git tag -f`。ただし「タグの付け直し」の 1 本は除く。
+- `git tag -d`・`git push --delete`。押したタグは消さない。
+
+## 止まり方
+
+「止まる」は、残りの段を行わず、次の形の報告を出して終えることである。
+
+```
+リリース未完了: v{V}（止まった段: 段 N・理由）
+- 公開済みの公開先: <定型コマンド A の「あり」の行。無ければ「なし」>
+- 残っている公開先: <公開先と status・reason。無ければ「なし」>
+- 原因の区分: <判定表の行の名前>
+- 公開前の段で止めた場合: どの公開先にも公開していない
+- 次に誰が何をするか: <開発者 / エージェント と、その内容>
+- 再開の方法: /release をもう 1 度実行する（状態から続きを判定する）
+```
+
+版が決まる前（段 1〜3）に止まるときは、1 行目を「リリースを開始できない（止まった段: 段 N・理由）」とし、何も公開していないことを書く。
 
 ## 実行変数
 
@@ -15,6 +40,7 @@
 | `V` | 今回リリースする版（`v` を付けない） | 段 3 の手順 5。再開のときは `V_MAIN` |
 | `BRANCH` | 作業ブランチ | `git rev-parse --abbrev-ref HEAD` |
 | `PR` | 版の更新の PR の番号 | `gh pr list --state all --head {BRANCH} --json number,title,state` |
+| `MAIN_H` | 見どころの材料（段 4 の H1）を出したときの `origin/main` の SHA | 取り直せない。覚えていなければ、段 5 の手順 3 の「main が動いていたら」を 1 回行う |
 | `TARGET` | タグを付けるコミットの SHA | 段 6 の手順 1 |
 | `RUN` | リリース CI の実行の ID | 定型コマンド A の `run` の行 |
 | `ATTEMPT` | 待つ対象の試行の番号（新しい実行は 1。再実行のたびに 1 増える） | 定型コマンド A の `run` の行の `attempt` |
@@ -28,7 +54,9 @@
 | Intent | リリースと関係のない変更を巻き込まない状態から始める |
 | Requirements | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 8.6 |
 
-手順 1 と 2 は何も変えない。どちらかで不合格なら、何も変えずに止まる。
+最初に `VREQ` を決める。開発者の指示（スキルの引数）に版の指定があれば、先頭の `v` を外したものを `VREQ` とする。無ければ `VREQ` は無しとする。`VREQ` が数字 3 つの形でなければ（段 3 の手順 3 のコマンドで確かめる）、エラーを示し、入力し直しを求める。
+
+手順 1〜3 は何も変えない。どれかで不合格なら、何も変えずに止まる。
 
 1. **ブランチ**（2.1・2.2）
 
@@ -49,7 +77,15 @@
 
    不合格なら、できない操作（上から順に: GitHub の認証、PR の統合の権限と squash の許可、リリース CI の閲覧、リモートのタグの読み取り）を示して止まる。
 
-3. **作業ツリー**（2.3）。`git status --porcelain` の出力が空で、`git merge-tree` の出力と `git rev-parse` の出力が同じであること。
+3. **版の表記のファイルを触る開いた PR**。次の出力を読み、`files` に版の表記の 6 ファイル（`Cargo.toml`・`Cargo.lock`・`editors/recipe/src-tauri/Cargo.lock`・`editors/vscode/package.json`・`editors/vscode/package-lock.json`・`book/src/introduction.md`）のどれかを持つ PR を数える。`headRefName` が `BRANCH` の PR（このリリースの PR）は数えない。`files` がちょうど 100 件の PR は、`gh pr diff {番号} --name-only` で読み直す（`files` は 1 本あたり 100 件までしか返らない）。
+
+   ```bash
+   gh pr list --state open --limit 200 --json number,title,headRefName,files
+   ```
+
+   当たる PR が 1 本でもあれば、その番号と題を示して止まる。この 6 ファイルを触らない PR が開いていても止まらない。
+
+4. **作業ツリー**（2.3）。`git status --porcelain` の出力が空で、`git merge-tree` の出力と `git rev-parse` の出力が同じであること。
 
    ```bash
    git fetch origin main
@@ -76,9 +112,9 @@
    - 1 つ目が 1 行だけで、`chore(release): vX.Y.Z`（`X.Y.Z` は数字 3 つ）の形である。
    - 2 つ目が、段 4 の 7 ファイル（版の表記の 6 ファイルと、見どころのファイル `doc/release-notes/v{V}.md`）だけである。
 
-   続け方: 件名の `X.Y.Z` を `V` として開発者に示す。`VREQ` があって `V` と違うときは、止まって開発者に確かめる。手順 4（main の取り込み）を行い、段 2 を飛ばして、段 3 の手順 4（重複の検査）と、段 4 の手順 6 の (3)(4)（`cargo metadata --locked` と `verify-content.mjs`）と、定型コマンド D（`-Version {V} -Head origin/main`）を行う。どれも合格（定型コマンド D は 5 行とも `合格`）なら、段 5 から続ける。不合格なら止まる。
+   続け方（以下「統合からの再開」と呼ぶ）: 件名の `X.Y.Z` を `V` として開発者に示す。`VREQ` があって `V` と違うときは、止まって開発者に確かめる。手順 5（main の取り込み）を行い、段 2 を飛ばして、段 3 の手順 4（重複の検査。候補を `V` として行い、条件を 1 つでも満たさなければ、別の版の入力を求めずに止まる）と、段 4 の手順 6 の (3)(4)（`cargo metadata --locked` と `verify-content.mjs`）と、定型コマンド D（`-Version {V} -Head origin/main`）だけを行う（ほかの手順は行わない。新しいコミットを作らない）。どれも合格（定型コマンド D は 5 行とも `合格`）なら、段 5 から続ける。不合格なら、ファイルを戻さずに止まる。
 
-4. **main の取り込み**（2.4・2.5）
+5. **main の取り込み**（2.4・2.5）
 
    ```bash
    git merge-base --is-ancestor origin/main HEAD
@@ -115,7 +151,9 @@
 
 - `V_MAIN` が 0.5.2 以下で、`GitHub Release` だけが `添付不足`（0.4.1 以下は `公開・添付 4/8`、0.4.2〜0.5.2 は `公開・添付 6/8`。5 クレートと Marketplace は `あり`）のときは、`集計` の公開済みを 7/7 と読み替えて表に当てる（S1・S3 に入る）。0.4.1 までの配布物は 3 つで、`pasta_check.zip`・`pasta-skills.zip` は 0.4.2 から、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` は 0.6.0 から添付する。
 - S4・S5 で `VREQ` が `V_MAIN` と違うときは、`V_MAIN` のリリースが未完了なので先に続きを行うこと、`VREQ` は始めていないことを開発者に示す。
+- 段 3 を飛ばす行（S4・S5・S7）では、`V` を `V_MAIN` とし、開発者に示す。段 6 も飛ばす行（S4・S5）では、`RUN` と `ATTEMPT` を、定型コマンド A の `run` の行の ID と `attempt` から取る。
 - 判定は毎回やり直す。前回の実行の会話の記録を使わない（8.4）。
+- 段 1 が「統合からの再開」に入ったときは、この段を行わない。
 - S2 は欠番である（CI での初回のリリースの確認のための行だった。確認は 2026-10-10 に済んだ）。
 
 ## 段 3: 版の決定
@@ -125,8 +163,11 @@
 | Intent | すでに出ている版と重ならない版を確定する |
 | Requirements | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 8.3 |
 
+0. **次のリリースへの申し送りを読む**。`.kiro/steering/roadmap.md` の節「次のリリースへの申し送り」を読む。項目の頭には、書いたときの最新の版が「`v{その版}` の後」の形で付いている。
+   - `V_MAIN` がその版より新しい項目は、前の回で済んだものとして読み飛ばし、段 9 の報告に「消してよい申し送り」として挙げる（この手順は roadmap を書き換えない）。
+   - 残った項目を 2 つに分ける。**版の決め方・見どころの材料**は、手順 2 の版と段 4 の H2 の見どころで使う。使う人が直さなければならない変更は、H2 で必ず見どころにする。**版の更新の 7 ファイルの外を触る仕事**は、この手順では行わない（版の更新の PR に版の更新以外を混ぜない）。1 つでも残っていたら、項目を示して止まり、先に別の PR で片づけるか、次の回へ送るかを開発者に確かめる。
 1. `VREQ` があれば、それを候補にして手順 3 へ進む（1.1）。
-2. `VREQ` が無ければ、段 2 で得た定型コマンド A の出力（出どころごとの `最大` と、`提案` の行）を開発者に示し、`提案` の行の版を候補にする（1.2）。承認を求めない。開発者の答えを待たずに、手順 3 へ進む（1.3）。候補にするのは `提案` の行の版（PATCH + 1）だけで、MINOR・MAJOR を自動では上げない（1.4）。`提案` の行が `出せない` のときは、`不明` の行を示して止まる（1.8）。
+2. `VREQ` が無ければ、段 2 で得た定型コマンド A の出力（出どころごとの `最大` と、`提案` の行）を開発者に示し、`提案` の行の版を候補にする（1.2）。承認を求めない。開発者の答えを待たずに、手順 3 へ進む（1.3）。候補にするのは `提案` の行の版（PATCH + 1）だけで、MINOR・MAJOR を自動では上げない（1.4）。ただし、手順 0 の材料が `提案` と違う版を求めているときは、自分で決めずに止まって開発者に確かめる。`提案` の行が `出せない` のときは、`不明` の行を示して止まる（1.8）。
 3. 候補が次の形かを確かめる（1.5）。`False` ならエラーを示し、入力し直しを求める（1.6）。先頭の `v` は外してから確かめる。
 
    ```powershell
@@ -189,7 +230,9 @@
   & "$PWD/.github/scripts/release/release-notes.ps1" -Tag v{V} -Repo ekicyou/pasta -Head origin/main
   ```
 
-- **H2 見どころのファイルを書く**。`doc/release-notes/README.md` の「書き方」に従い、H1 の一覧から見どころを選んで、`doc/release-notes/v{V}.md` を Write で作る。「動きが変わる変更」の見出しの下の項目は、すべて動きが変わる点として載せる。一覧の件名だけで足りないときは、`gh pr view {番号} --json title,body` と、マニュアル（`book/src/`）を読んでよい。読むだけである。
+  実行の前に `git rev-parse origin/main` の出力を `MAIN_H` として覚える。
+
+- **H2 見どころのファイルを書く**。`doc/release-notes/README.md` の「書き方」に従い、H1 の一覧と段 3 の手順 0 の材料から見どころを選んで、`doc/release-notes/v{V}.md` を Write で作る。「動きが変わる変更」の見出しの下の項目は、すべて動きが変わる点として載せる。一覧の件名だけで足りないときは、`gh pr view {番号} --json title,body` と、マニュアル（`book/src/`）を読んでよい。読むだけである。
 - **H3 確認**。定型コマンド D を `-Version {V} -Head origin/main` で実行する。5 行とも `合格` であること。合格なら、手順 6 へ進む。
 - **H4 不合格のとき**。`不合格` の行の値（材料に無い番号・載っていない番号・見つかった spec 名など）を直して、H3 をやり直す。直すのは 3 回までである。3 回直しても `合格` にならなければ、手順 7（取り消し）を行い、`不合格` の行を示して止まる。H3 が合格するまで、手順 8（コミット）を行わない。
 
@@ -253,14 +296,30 @@
 
    2 つ目の出力を `PR` とする。
 
-3. PR の CI を待たずに、squash で統合する。
+3. PR の CI を待たずに、squash で統合する。その直前に、main が動いていないかを確かめる。
+
+   **main が動いていたら**。`git fetch --quiet origin main` の後、`git rev-parse origin/main` が `MAIN_H` と同じなら何もしない。違えば（または `MAIN_H` を覚えていなければ）、次を上から行う。どれでも止まらない（取り込みの衝突と、定型コマンド D の 3 回の直しで直らないときだけ止まる）。
+
+   1. 新しく main に入った変更の件名を `git log --first-parent --format=%s {MAIN_H}..origin/main` で読んで控える（`MAIN_H` を覚えていなければ飛ばす）。
+   2. `git merge --no-edit origin/main` で取り込む。衝突したら `git merge --abort` を実行し、衝突したファイルを示して止まる。
+   3. 段 4 の H1 をやり直し（`MAIN_H` を新しい `origin/main` に覚え直す）、新しく入った変更に `doc/release-notes/README.md` の「必ず載せるもの」に当たるものがあるかを読む。あれば見どころのファイルに足す。
+   4. 段 4 の手順 6 の (3) と、定型コマンド D（`-Version {V} -Head origin/main`）を行う。D は 5 行とも `合格` であること（直すのは H4 と同じく 3 回まで）。
+   5. 見どころのファイルを直したときだけ、そのファイルだけをコミットし、push する。
+
+      ```bash
+      git add doc/release-notes/v{V}.md
+      git commit -m "chore(release): v{V} の見どころの直し"
+      git push -u origin HEAD
+      ```
+
+   6. 手順 1 の 1 つ目のコマンドの出力が、段 4 の 7 ファイルだけであることを確かめる。控えた件名と、足したかどうかを段 9 の報告に書く。
 
    ```bash
-   gh pr merge {PR} --squash --delete-branch --subject "chore(release): v{V}" --body "v{V} へ版を更新する。"
+   gh pr merge {PR} --squash --subject "chore(release): v{V}"
    gh pr view {PR} --json state,mergeCommit -q '.state + " " + (.mergeCommit.oid // "")'
    ```
 
-   統合の成否は、2 つ目の出力だけで判定する。`MERGED <SHA>` なら成功で、`<SHA>` を `TARGET` とする。`gh pr merge` の出すローカルブランチの削除の警告（`'main' already used by worktree` など）は、失敗ではない。
+   `--delete-branch` は付けない（作業ブランチは、公開の後に見どころの直しを頼まれたときに使う）。統合の成否は、2 つ目の出力だけで判定する。`MERGED <SHA>` なら成功で、`<SHA>` を `TARGET` とする。
 
    2 つ目のコマンドを実行できなかったとき（出力が得られなかったとき）だけ、代わりに次で判定する。2 つ目の出力が 1 行なら統合は成功で、その SHA を `TARGET` とする。空なら、統合を確かめられないので止まる。
 
@@ -314,7 +373,7 @@
 5. **タグだけを push**（5.4）
 
    ```bash
-   git push origin v{V}
+   git push --quiet origin refs/tags/v{V}
    git ls-remote --tags origin refs/tags/v{V}
    ```
 
@@ -340,19 +399,17 @@
    if ($run.Count) { "run | $($run[0].databaseId) | $($run[0].status) | attempt $($run[0].attempt) | $($run[0].url)" } else { 'run | 無し' }
    ```
 
-   `run | 無し` なら、完了と報告せず、リリース CI が起動していないことを示して止まる。それ以外は、ID を `RUN` とする。
+   `run | 無し` なら、完了と報告せず、リリース CI が起動していないことを示して止まる。それ以外は、ID を `RUN` とし、`ATTEMPT` を 1 とする。段 2 の S4・S5 から来たときは、この手順を行わず、段 2 で取った `RUN` と `ATTEMPT` を使う。
 
-2. **待機**（6.3）。次のコマンドを、ツールのタイムアウトを 10 分にして実行する。`{ATTEMPT}` は、待つ対象の試行の番号（最初は 1。再実行のたびに 1 増える）。出力が `completed` になるまで繰り返す。20 回（約 3 時間）繰り返しても `completed` にならなければ、「リリース CI が実行中」として止まる。
+2. **待機**（6.3）。次の 1 行を Bash ツールの `run_in_background` で実行し、終わりの知らせを待つ。`{ATTEMPT}` は、待つ対象の試行の番号（最初は 1。再実行のたびに 1 増える）。
 
-   ```powershell
-   $RUN = '{RUN}'; $ATTEMPT = {ATTEMPT}
-   foreach ($i in 1..17) {
-       $s = (gh run view $RUN --json status,attempt) -join "`n" | ConvertFrom-Json
-       if ($s.attempt -ge $ATTEMPT -and $s.status -eq 'completed') { break }
-       Start-Sleep -Seconds 30
-   }
-   "run | $RUN | $(if ($s.attempt -ge $ATTEMPT) { $s.status } else { 'waiting' }) | attempt $($s.attempt)"
+   ```bash
+   until [ "$(gh run view {RUN} --json attempt -q .attempt)" -ge {ATTEMPT} ]; do sleep 10; done; gh run watch {RUN} --exit-status --interval 60
    ```
+
+   終わったら、`gh run view {RUN} --json status,attempt -q '.status + " " + (.attempt|tostring)'` が `completed` と `{ATTEMPT}` 以上の試行を返すことを確かめる。`--exit-status` の終了コードは判定に使わない（判定は手順 3・4）。裏の待ちが上限で切れたら、同じ 1 行を掛け直す。待ち始めから約 3 時間たっても `completed` にならなければ、「リリース CI が実行中」として止まる。実行中は、完了と報告しない。
+
+   **再実行の後の追い方**: `gh run rerun {RUN} --failed` は、同じ `RUN` のまま試行を 1 つ足す。`ATTEMPT` を 1 増やして上の 1 行を掛け直す。頭の `until` が、新しい試行が立つまで待つので、終わった前の試行を読み違えない。`gh run watch` は実行のいちばん新しい試行を追う。
 
 3. **読み取り**（6.4・6.6）。定型コマンド B を `-Run {RUN}` で実行し、下の「結果表の作り方」で、7 つの公開先（5 クレート・Marketplace・GitHub Release）の `status`・`reason` と、GitHub Release の URL（`url=` の値）を決める。
 
@@ -432,7 +489,7 @@ gh run view {RUN} --log-failed | tail -n 60
 - 「そのまま再実行」: 上の「失敗した job の再実行」を行う（`N_AUTO` は増やさない）。
 - 「修正を main に入れた。タグを付け直してよい」: 下の「タグの付け直し」を行う。
 
-**タグの付け直し**（7.6）。開発者の承認が明示されているときだけ行う。
+**タグの付け直し**（7.6）。開発者がその回に明示して承認したときだけ行う。承認は 1 回の付け直しにだけ効く。
 
 1. 定型コマンド A（`-Version {V}`）で、公開済みが 0/7・`不明` が 0・`GitHub Release` が `無し` であることを確かめる。満たさなければ、付け直さずに止まる（7.7）。
 2. `git fetch origin main` の後、`git rev-parse origin/main` の出力を `TARGET` とする。定型コマンド C を `-Version {V} -Target {TARGET}` で実行し、5 行とも `合格` であることを確かめる。
@@ -440,7 +497,7 @@ gh run view {RUN} --log-failed | tail -n 60
 
    ```bash
    git tag -f -a v{V} -m "Release v{V}" {TARGET}
-   git push -f origin v{V}
+   git push --quiet --force origin refs/tags/v{V}
    ```
 
 4. 新しい実行が起動する。`{ATTEMPT}` を 1 に戻し、段 7 の手順 1 から続ける。
@@ -452,7 +509,7 @@ gh run view {RUN} --log-failed | tail -n 60
 | Intent | 完了を、取り違えようのない形で報告する |
 | Requirements | 9.1, 9.2 |
 
-段 7 の手順 4 を満たしたときだけ、次の形で報告する。`<...>` は結果表と定型コマンド B の出力から埋める。
+段 7 の手順 4 を満たしたときだけ、次の形で報告する。1 つでも満たさないときは、完了と報告しない。`<...>` は結果表と定型コマンド B の出力から埋める。
 
 ```
 リリース完了: v{V}
@@ -461,8 +518,59 @@ gh run view {RUN} --log-failed | tail -n 60
 - GitHub Release: <URL>
 - リリース CI の実行: <URL>
 - 再実行の回数: <最後の attempt から 1 を引いた数>
+- 途中で main を取り込んだ回: <取り込んだ件名と、見どころに足したかどうか / なし>
+- 使った申し送り・消してよい申し送り: <段 3 の手順 0 の項目 / なし>
 - 手順との食い違い: <なし / 手順どおりに動かなかった箇所>
+
+見どころの全文:
+<doc/release-notes/v{V}.md の中身をそのまま>
+
+直しが要れば言ってください。公開の頁と main のファイルを直します。
 ```
+
+- リリースの実行は、版の表記と見どころのファイルのほかに文書を変えない。手順の文書（このスキル・`crates/pasta_sample_ghost/RELEASE.md`・`.github/release-ci-setup.md`）と、実際の挙動が食い違ったところがあれば、この実行では文書を直さず、報告の「手順との食い違い」に書く。直すのは別の PR で行う。
+- 開発者が見どころの直しを頼んだら、下の「公開の後に見どころの直しを頼まれたら」を行う。
+
+## 公開の後に見どころの直しを頼まれたら
+
+開発者が段 9 の報告を読んで直しを頼んだときだけ行う。`V` は開発者の言う版（言われなければ、この作業ブランチの版の更新の PR の版）。タグのコミットの中のファイルは直せない（タグは動かさない）。直すのは、公開の頁の本文と、main のファイルの 2 つである。
+
+1. main を作業ブランチに取り込む。衝突したら `git merge --abort` を実行し、衝突したファイルを示して止まる。
+
+   ```bash
+   git fetch --quiet origin main
+   git merge --no-edit origin/main
+   ```
+
+2. `doc/release-notes/v{V}.md` を直し、定型コマンド D を `-Version {V}`（`-Head` を省く。タグの在る版を確かめる）で実行する。5 行とも `合格` であること。
+3. 頁の本文を作り直す。リリース CI の「Generate release notes」と同じスクリプトと引数（`-Tag`・`-Repo`・`-BodyFile`）で作るので、本文の形（見どころ・区切りの線・添付へのリンクと件数の行）が CI の作るものと同じになる。見どころは作業ディレクトリの直したファイルから読む。前のタグと `v{V}` が手元に要るので、先にタグを取る。
+
+   ```bash
+   git fetch --quiet --tags origin
+   ```
+
+   ```powershell
+   New-Item -ItemType Directory -Force target/release-notes | Out-Null; & "$PWD/.github/scripts/release/release-notes.ps1" -Tag v{V} -Repo ekicyou/pasta -OutFile target/release-notes/release-notes-v{V}.md -BodyFile target/release-notes/release-body-v{V}.md
+   ```
+
+4. 頁の本文を差し替える。
+
+   ```bash
+   gh release edit v{V} --notes-file target/release-notes/release-body-v{V}.md
+   ```
+
+5. 直したファイルだけを PR で main に入れる。`{PR}` は、ここで `gh pr create` が出した URL の末尾の番号（版の更新の PR の番号ではない）。`gh pr view` の出力が、そのファイル 1 つだけであることを確かめてから統合する。
+
+   ```bash
+   git add doc/release-notes/v{V}.md
+   git commit -m "docs(release): v{V} の見どころの直し"
+   git push -u origin HEAD
+   gh pr create --base main --head {BRANCH} --title "docs(release): v{V} の見どころの直し" --body "公開済みの v{V} の見どころを直す。Release の本文は gh release edit で差し替え済み。"
+   gh pr view {PR} --json files -q '.files[].path'
+   gh pr merge {PR} --squash
+   ```
+
+6. 判定: `gh release view v{V} --json body -q .body` を、ファイルへ流してから読む（端末の文字コードを通さない。`-q` は末尾に LF を 1 つ足す）。本文が、直した見どころのファイルの中身で始まる（どちらも改行を LF にそろえ、見どころのファイルの末尾の空白と空行を除いて、バイトの並びで比べる）。PR が `MERGED`。
 
 ## 定型コマンド A の出力（状態の照会）
 
@@ -509,3 +617,46 @@ gh run view {RUN} --log-failed | tail -n 60
 - C は、`.github/scripts/release/verify-tag.ps1` と同じ 5 つの条件を、タグを付けるコミットの中身（`git show`）で確かめる。先に `git fetch origin main` を済ませる。
 - D は、作業ディレクトリの `doc/release-notes/v{V}.md` を、`.github/scripts/release/release-notes.ps1` の出力（材料）と `.kiro/specs/` のフォルダの名前に照らして確かめる。タグの在る版を確かめるときは、`-Head origin/main` を省く。
 - 段 7 の手順 1・2 の待機のコマンドは短いので、段 7 に置いたままにする。
+
+## まだ実地で確かめていない読み方
+
+失敗した job の再実行（段 8 の `gh run rerun {RUN} --failed`）の後の読み方は、実地で確かめていない（CI での初回のリリース v0.3.8 では、失敗が起きなかった）。確かめることは次の 2 つである。
+
+- 再実行しなかった job の step の結論が、最新の `gh run view --json jobs`（定型コマンド B の `step` の行）に残る。
+- 前の attempt の `line` が、`--attempt` で読める（定型コマンド B の `line` の行に、前の attempt のものが出る）。
+
+初めて段 8 で再実行したリリースで、この 2 つを確かめ、結果を報告の「手順との食い違い」に書く。食い違いがあれば、推測で進めずに止まる（「止まり方」）。結果は、別の PR でこの節に反映する。
+
+確かめるまでは、このスキルを Opus で実行する。確かめたら Sonnet で実行してよい（開発者決定 2026-10-10）。
+
+## 見直すきっかけ
+
+次のどれかが変わったら、この文書と `scripts/` を合わせる。
+
+- `release.yml` の job 名・step 名・`status=` の行の形（定型コマンド B と「結果表の作り方」）。
+- `.github/scripts/release/verify-tag.ps1` の検査の条件（定型コマンド C）。
+- 公開対象のクレートの追加・削除、ワークスペースのクレートの追加（定型コマンド A のクレートの一覧、`Cargo.lock` の変更行の数）。
+- 版の表記の置き場所（`Cargo.toml` の節の構成、`package.json`、マニュアルの対象バージョン行の書式）と、版の更新のコミットに入るファイル（段 4 の「7 ファイル」。段 1 の手順 3・4、段 5 の手順 1 にも出る）。
+- 見どころのファイルの置き場所と名前、書き方の決まり（`doc/release-notes/README.md`）、詳しいリリースノートの見出し「動きが変わる変更」（定型コマンド C・D と、段 4 の節「見どころを書く」）。
+- リリース CI の「Generate release notes」の引数（「公開の後に見どころの直しを頼まれたら」の手順 3 が同じ引数で本文を作る）。
+- 配布物の名前・個数（定型コマンド A の「添付 8/8」の判定）。
+- main のブランチ保護・統合方式（squash）、`gh` の `run`・`pr` サブコマンドの出力の形。
+- この文書の節の名前（「止まり方」「タグの付け直し」「公開の後に見どころの直しを頼まれたら」「開発者の設定」「定型コマンドの呼び出し方」）。`SKILL.md` が名前で指している。
+
+リリースの実行中は、`release.ps1`・`release.yml` を触る変更を main に入れない（開発者の運用）。
+
+## 開発者の設定（初めて打つ前に）
+
+この手順は、開発者に聞かずに `gh pr merge` とタグの push を行う。許可の規則は、リポジトリの `.claude/settings.json` にある。手順の側から設定は触らない。今の規則は次のとおり。
+
+- `autoMode.allow` の文:
+
+  > release スキル（/release）での、版の更新の PR の作成と squash マージ、リリースタグ（vX.Y.Z）の push、リリース CI（release.yml）の実行の閲覧と失敗した job の再実行（gh run rerun）を許可する。手元からの cargo publish・vsce publish・gh release create は行わない。
+
+- `permissions.allow` の Bash の規則: `git fetch:*`・`git merge origin/main:*`・`git merge --abort`・`git push -u origin HEAD`・`git push origin v*`・`git push origin v*:*`・`gh pr create:*`・`gh pr merge:*`・`gh run list:*`・`gh run view:*`・`gh run rerun:*`。
+
+今の規則が覆わないもの。断られたら、言い直さずに止まり、開発者が規則を足すかを決める。
+
+- タグの push の形 `git push --quiet origin refs/tags/v{V}`（`Bash(git push origin v*)` に当たらない）。足すなら `Bash(git push --quiet origin refs/tags/v*)`。
+- 「公開の後に見どころの直しを頼まれたら」の `gh release edit v{V} --notes-file` と、`doc/release-notes/v{V}.md` だけを変える PR の作成と統合。
+- 「タグの付け直し」の `git tag -f` と `git push --quiet --force origin refs/tags/v{V}`。これは許可の規則に入れない。開発者がチャットで承認し、そのたびに許可の確認に答える。
