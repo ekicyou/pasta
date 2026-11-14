@@ -495,12 +495,12 @@ export function checkReleaseAssetLinks(repoRoot?: string): BrokenLink[];
 
 ### Unit Tests（自己テスト）
 
-- `link-check-test.mjs` の新しい節: ReleaseAssetLinkCheck の (1)〜(6)（上の Implementation Notes）。`BOOK_KINDS` に `release-asset` が入り、`reportLinkCheck` が [1] に出すことも 1 件確かめる。
+- `link-check-test.mjs` の新しい節: ReleaseAssetLinkCheck の (1)〜(7)（上の Implementation Notes）。`BOOK_KINDS` に `release-asset` が入り、`reportLinkCheck` が [1] に出すことも 1 件確かめる。
 - `verify-scripts-test.mjs`・`gen-skill-refs-test.mjs`: 一覧の章を除いた期待で、`node book/tools/verify-scripts-test.mjs`・`node book/tools/gen-skill-refs-test.mjs` が通る（NoTalkExemption の Implementation Notes）。
 
 ### Integration Tests（実リポジトリでの CI の検査）
 
-- `node book/tools/link-check.mjs`: ダウンロードのページの同じページの中のリンク 6 つ、5 章の `../download.md#…` の 7 つ、README の `download.html`、すべての固定リンクの名前が通る（1.3・3.2・3.3・3.7・5.x・6.1・7.5・7.8）。
+- `node book/tools/link-check.mjs`: ダウンロードのページの同じページの中のリンク 6 つ、5 章の `../download.md#…` の 6 つ、README の `download.html`、すべての固定リンクの名前が通る（1.3・3.2・3.3・3.7・5.x・6.1・7.5・7.8）。
 - `node book/tools/verify-content.mjs`: `F-version`・`F-luajit`・`F-future` が通り（4.5・4.6）、`T-notalk:download.md` が PASS、`D-voice`・`T-intro`・`T-outro` の `download.md` の項目が出ず、ほかの章の件数が変わらない（3.6・7.2・7.6）。`C-*`（入門ガイド）が通る（5.1・5.6）。
 - `node book/tools/verify-static.mjs --no-build --self-test`: 目次の全章の生成に `download.html` が入り、`8.4/8.6` が通る。CSS・JS・メニュー id の検査の対象に `download.html` が残る（1.1・7.2）。
 - `node book/tools/verify-search.mjs --no-build --self-test`: 「8.2: download.md の固有の語「やりたいこと」で章がヒットする」が PASS（1.4・7.7）。
