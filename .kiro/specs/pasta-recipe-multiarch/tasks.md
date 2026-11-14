@@ -60,7 +60,7 @@
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
 - [ ] 5. CI に組み込む
-- [ ] 5.1 リリース CI が 2 つの zip を作り、検査して渡す
+- [x] 5.1 リリース CI が 2 つの zip を作り、検査して渡す
   - build の job の rust の targets に `aarch64-pc-windows-msvc` を、cache の key に aarch64 を足す（`pasta-dll-multiarch` が先に入れていれば在るのを確かめる）
   - 道具の取得の loop と `env` の固定値を `install-tools.ps1 -Name wasm-pack,cargo-about` の呼び出しに置き換える
   - `Build pasta-recipe zips` で `package.ps1` を引数なしで呼び、`Verify release assets` の pasta-recipe の節を `verify-recipe-zips.ps1 -Version $env:VERSION -Dir release` の呼び出しにする。直書きの検査のエラーとスクリプトの終了コードの両方が出てから失敗する

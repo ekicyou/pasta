@@ -1,6 +1,6 @@
 # .github/workflows/release.yml
 # リリース CI（release-ci）。リリースタグ vX.Y.Z の push だけで起動し、
-# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（6 つの配布物）の順に進める。
+# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（7 つの配布物）の順に進める。
 # 上流の job が失敗したら後続は needs の既定で止まり、どの公開先にも公開しない。
 name: Release
 
@@ -18,12 +18,8 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-# ビルドツールの版の固定値（gate が呼ぶ build.yml には伝わらない）。
+# ビルドツール（wasm-pack・cargo-about）の版と SHA-256 の固定値は .github/scripts/release/install-tools.ps1 が持つ。
 env:
-  WASM_PACK_VERSION: '0.15.0'
-  CARGO_ABOUT_VERSION: '0.9.2'
-  WASM_PACK_SHA256: '518dc51180c7bc864699c9279b3bc99025bc109123e0249a34ba34d130a509bf'
-  CARGO_ABOUT_SHA256: '1c03e5890238562497c2d89a3b75b02560af349c1fc3e713d3284f532a5cd748'
   NODE_VERSION: '22'
   RELEASE_ENVIRONMENT: release
 
@@ -74,12 +70,12 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
-          targets: i686-pc-windows-msvc,x86_64-pc-windows-msvc
+          targets: i686-pc-windows-msvc,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: i686-x86_64-pc-windows-msvc
+          key: i686-x86_64-aarch64-pc-windows-msvc
 
       - name: Set Japanese locale for Shift-JIS support
         run: |
@@ -89,29 +85,7 @@ jobs:
 
       # ビルド済みバイナリを版固定で取得する（ランナーにはプリインストールされていない）。
       - name: Install wasm-pack and cargo-about
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          $tools = @(
-            @{ Name = 'wasm-pack'; Version = $env:WASM_PACK_VERSION; Sha256 = $env:WASM_PACK_SHA256
-               Url = "https://github.com/rustwasm/wasm-pack/releases/download/v$env:WASM_PACK_VERSION/wasm-pack-v$env:WASM_PACK_VERSION-x86_64-pc-windows-msvc.tar.gz" }
-            @{ Name = 'cargo-about'; Version = $env:CARGO_ABOUT_VERSION; Sha256 = $env:CARGO_ABOUT_SHA256
-               Url = "https://github.com/EmbarkStudios/cargo-about/releases/download/$env:CARGO_ABOUT_VERSION/cargo-about-$env:CARGO_ABOUT_VERSION-x86_64-pc-windows-msvc.tar.gz" }
-          )
-          foreach ($t in $tools) {
-            $dir = Join-Path $env:RUNNER_TEMP "tools/$($t.Name)"
-            New-Item -ItemType Directory -Force -Path $dir | Out-Null
-            $archive = "$dir.tar.gz"
-            Invoke-WebRequest -Uri $t.Url -OutFile $archive
-            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash
-            if ($hash -ne $t.Sha256) { throw "$($t.Name) の SHA-256 が決めた値と違う: $hash" }
-            & "$env:SystemRoot\System32\tar.exe" -xzf $archive -C $dir
-            $exe = Get-ChildItem -LiteralPath $dir -Recurse -Filter "$($t.Name).exe" | Select-Object -First 1
-            if (-not $exe) { throw "$($t.Name).exe が $($t.Url) の中に無い" }
-            $reported = & $exe.FullName --version
-            if ("$reported" -notmatch "\b$([regex]::Escape($t.Version))\b") { throw "$($t.Name) の版が $($t.Version) でない: $reported" }
-            Write-Output "$($t.Name): $reported"
-            Add-Content -LiteralPath $env:GITHUB_PATH -Value $exe.DirectoryName
-          }
+        run: pwsh -NoProfile -File .github/scripts/release/install-tools.ps1 -Name wasm-pack,cargo-about
 
       - name: Setup Node
         uses: actions/setup-node@v7
@@ -135,7 +109,8 @@ jobs:
           Move-Item -LiteralPath "pasta-vscode-$env:VERSION.vsix" -Destination ../../release/ -Force
 
       # tauri build も --locked を持たないため、後段の Cargo.lock の不変検査にアプリの lock を入れる。
-      - name: Build pasta-recipe.zip
+      # 引数なしで x64・arm64 の両方を作る（release/pasta-recipe.x64.zip・release/pasta-recipe.arm64.zip）。
+      - name: Build pasta-recipe zips
         run: pwsh -NoProfile -File editors/recipe/scripts/package.ps1
 
       - name: Verify release assets
@@ -215,31 +190,13 @@ jobs:
             }
           }
 
-          # pasta-recipe.zip: pasta-recipe.exe と THIRD_PARTY_LICENSES.txt の 2 つだけ・exe の版がタグの版・30 MB 以下・
-          # 表示にネイティブ（tauri）と画面の部品（monaco-editor）の両方の名前
-          $recipeZip = 'release/pasta-recipe.zip'
-          $recipe = @(Get-ZipEntries $recipeZip | Sort-Object)
-          if (($recipe -join '|') -ne 'pasta-recipe.exe|THIRD_PARTY_LICENSES.txt') {
-            $errors.Add("pasta-recipe.zip の中身が pasta-recipe.exe・THIRD_PARTY_LICENSES.txt の 2 つでない: $($recipe -join ', ')")
-          }
-          else {
-            $recipeDir = Join-Path $env:RUNNER_TEMP 'pasta-recipe'
-            Expand-Archive -LiteralPath $recipeZip -DestinationPath $recipeDir -Force
-            $vi = (Get-Item -LiteralPath (Join-Path $recipeDir 'pasta-recipe.exe')).VersionInfo
-            $exeVersion = "$($vi.FileMajorPart).$($vi.FileMinorPart).$($vi.FileBuildPart)"
-            if ($exeVersion -cne $env:VERSION) { $errors.Add("pasta-recipe.zip の pasta-recipe.exe の版が $env:VERSION でない: $exeVersion") }
-            $notice = Get-Content -LiteralPath (Join-Path $recipeDir 'THIRD_PARTY_LICENSES.txt') -Raw
-            foreach ($n in 'monaco-editor', 'tauri') {
-              if (-not $notice.Contains($n)) { $errors.Add("pasta-recipe.zip の THIRD_PARTY_LICENSES.txt に $n の名前が無い") }
-            }
-          }
-          $recipeSize = (Get-Item -LiteralPath $recipeZip).Length
-          if ($recipeSize -gt 31457280) { $errors.Add("pasta-recipe.zip が 30 MB（31,457,280 バイト）を超える: $recipeSize バイト") }
+          # pasta-recipe の 2 つの zip は、main の CI と同じスクリプトで検査する（問題は ::error:: の行で出る）。
+          # 直書きの検査のエラーとスクリプトの結果の両方を出してから失敗する。
+          pwsh -NoProfile -File .github/scripts/release/verify-recipe-zips.ps1 -Version $env:VERSION -Dir release
+          $recipeExit = $LASTEXITCODE
 
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Output "::error::$_" }
-            exit 1
-          }
+          $errors | ForEach-Object { Write-Output "::error::$_" }
+          if ($errors.Count -gt 0 -or $recipeExit -ne 0) { exit 1 }
           Write-Output "配布物の検査: 成功（版 $env:VERSION）"
 
       # release.ps1・wasm-pack・tauri build は --locked を付けないため、lock が書き換わっていないことをここで確かめる。
@@ -255,7 +212,8 @@ jobs:
             release/hello-pasta.nar
             release/pasta_check.zip
             release/pasta-skills.zip
-            release/pasta-recipe.zip
+            release/pasta-recipe.x64.zip
+            release/pasta-recipe.arm64.zip
             release/pasta-vscode-${{ needs.verify.outputs.version }}.vsix
           retention-days: 90
           if-no-files-found: error
