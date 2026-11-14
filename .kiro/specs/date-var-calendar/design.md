@@ -50,7 +50,7 @@
 
 - `pasta_core::calendar` は Rust の標準ライブラリと `thiserror`（既存）だけに依存する。日付のクレート（`chrono` など）と CSV のクレートは足さない。
 - `pasta_lua` のローダとランタイムは `pasta_core::calendar` を呼ぶ。`pasta_check` の核は `pasta_core::calendar` を呼び、`std::fs` に触れない（今の核の約束のまま）。
-- `act.lua` は `@pasta_calendar` を呼び出しのたびに `pcall(require, …)` で取る（`act.lua` の `@pasta_search` の前例）。`pasta_scripts` から `io.open` でファイルを読まない。
+- `act.lua` は `@pasta_calendar` を呼び出しのたびに `pcall(require, …)` で取る（`pasta/act.lua`・`pasta/actor.lua` の `@pasta_search` の前例）。`pasta_scripts` から `io.open` でファイルを読まない。
 - 依存の向き: `pasta_core::calendar` → `pasta_lua::loader::calendar`／`pasta_lua::runtime::calendar` → `act.lua`、および `pasta_core::calendar` → `pasta_check::validate::calendar` → 殻。逆向き（`pasta_core` が `pasta_lua`・`pasta_check` を知る）は違反とする。
 
 ### Revalidation Triggers
@@ -120,7 +120,7 @@ graph LR
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | 規則（Rust） | `pasta_core`（Rust 2024・既存の `thiserror`） | 日付の算術・祝日の規則・表の書式と照合・誤りの型 | 新しい依存なし。日付は通日（1970-01-01 起点）の整数算術 |
-| ランタイム（Rust） | `pasta_lua`（`mlua` 0.12・LuaJIT） | 段 1.6 の読み込み、`@pasta_calendar` の登録 | 既存の登録の型（`set_loaded_module` と同じ） |
+| ランタイム（Rust） | `pasta_lua`（`mlua` 0.12・LuaJIT） | 段 1.6 の読み込み、`@pasta_calendar` の登録 | 既存の登録の型（`runtime/module_registry.rs` の `set_loaded_module`） |
 | ランタイム（Lua） | `pasta_scripts/pasta/shiori/act.lua` | `＄祝日`・`＄行事` の転記 | 2 変数の追加のみ |
 | 検査 | `pasta_check`（核・CLI・WASM） | `calendar-invalid` の報告 | 殻のコードは変えない |
 | エディタ | `editors/vscode`（TypeScript） | `calendar.csv` の保存・作成・削除で再検査 | `ghostValidator.ts` の判定に 1 条件 |
@@ -184,6 +184,7 @@ book/src/getting-started/
 - `crates/pasta_sample_ghost/tests/touch_shortcuts_test.rs`・`crates/pasta_sample_ghost/README.md` — 「12 段目＝配布辞書」の記述を 13 段目に、ファイルの木に `13-calendar.pasta`・`calendar.csv`。
 - `book/src/getting-started/index.md`・`book/src/SUMMARY.md`・`book/src/getting-started/06-hour.md`・`book/src/debug/recipe.md` — 14 段目への付け替えとリンク。
 - `book/AUTHORING.md` — 入門の章の数（16→17）・段の章の範囲（`01-boot.md`〜`14-nar.md`）・辞書を持たない段（14 段目・`14-nar.md`）、`csv` ブロックは hello-pasta の `calendar.csv` と照合されること。
+- `.github/workflows/manual.yml` — push・pull_request の `paths` に `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/calendar.csv` を足し（`calendar.csv` だけを変えた PR でも `csv` ブロックの照合を走らせる）、注記の「入門の章 12 枚（01-boot.md〜12-lua.md）」を「13 枚（01-boot.md〜13-calendar.md）」に、照合の説明に `calendar.csv` ↔ `csv` ブロックを足す。
 - `book/tools/tutorial-check.mjs`・`book/tools/tutorial-check-test.mjs` — 入門の章の ```` ```csv ```` ブロックと hello-pasta の `calendar.csv` の逐語の照合、`13-nar.md` の見本を `14-nar.md` に。
 - `book/src/grammar/variables.md` — 日時変数の表・名前の衝突の注意文・振り分けの例に `＄祝日`・`＄行事`、新しい節「行事の表（calendar.csv）」。
 - `book/src/debug/validate.md` — `calendar-invalid` の行と、省く理由にならないことの一文。
@@ -276,6 +277,7 @@ sequenceDiagram
 | 5.8 | 警告で続けない・既定に戻さない | CalendarLoader | `LoaderError` | 段 1.6 |
 | 5.9 | 読み込みのときに 1 回 | CalendarLoader, CalendarModule | 捕まえた表 | 段 1.6 |
 | 5.10 | 読み込み直しで反映 | CalendarLoader | VM の作り直し | 段 1.6 |
+| 5.11 | 大文字・小文字だけ違う表が 2 つ以上 | CalendarLoader, CalendarCheck | `LoaderError::CalendarDuplicate`・重複の誤り | 段 1.6 |
 | 6.1 | `pasta_check validate` で検査 | CalendarCheck | `calendar::check` | — |
 | 6.2 | 検査の失敗として終わる | CalendarCheck | `Severity::Error` | — |
 | 6.3 | ファイルが無ければ何も報告しない | CalendarCheck | `calendar::check` | — |
@@ -345,7 +347,7 @@ sequenceDiagram
 - 「1.〜3. の祝日」（以下、基本の祝日）を `base(y, m, d) -> Option<&'static str>` で決める: 固定の日 10 個（Req 2.1 の名前どおり）、ハッピーマンデー 4 個（第 n 月曜日＝日が `7n−6`〜`7n` の月曜日）、春分の日・秋分の日（3 月・9 月の `equinox_day(y)` の日）。
 - `holiday_name(y, m, d)`: 基本の祝日ならその名前。そうでなく、前の日から遡って基本の祝日が切れ目なく続き、その中に日曜日があれば `振替休日`。そうでなく、前の日と次の日がどちらも基本の祝日なら `国民の休日`。どれでもなければ `None`。前後の日は通日の ±1 で数え、月・年をまたいでもよい。
 - 振替休日と国民の休日の両方に当たる日は `振替休日` を返す（法律の条の順。今の規則では起こらない組み合わせで、どちらも内閣府の CSV では `休日`）。
-- 春分・秋分の式（年の範囲で区切らない。Req 2.3）: `t = y − 1980`、春分の日 `= floor(20.8431 + 0.242194·t − floor(t / 4))`、秋分の日 `= floor(23.2488 + 0.242194·t − floor(t / 4))`。`floor(t / 4)` は整数の切り下げ（`div_euclid`）、外側は `f64::floor`。2022〜2028 年の官報・暦要項の日と一致することを単体テストで確かめる。
+- 春分・秋分の式（年の範囲で区切らない。Req 2.3）: `t = y − 1980`、春分の日 `= floor(20.8431 + 0.242194·t − floor(t / 4))`、秋分の日 `= floor(23.2488 + 0.242194·t − floor(t / 4))`。`floor(t / 4)` は整数の切り下げ（`div_euclid`）、外側は `f64::floor`。式は 1 年に約 0.0078 日ずれ、春分はおよそ 550〜4520 年、秋分はおよそ 990〜4830 年の外で月の日の範囲を外れるので、式の日を `i64` で求めて `1..=days_in_month(y, 3 または 9)` に収める（clamp。どの年でも春分の日・秋分の日を 1 日ずつ出す。Req 2.3）。2022〜2028 年の官報・暦要項の日と一致することを単体テストで確かめる。
 - 2019〜2021 年の特例・2019 年までの名前は持たない（Req 2.9）。日付が暦に無いとき（2 月 30 日など）は `None`。
 
 **Dependencies**
@@ -441,7 +443,7 @@ pub enum CalendarProblem {
 | Requirements | 3.3, 4.1, 4.8, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 5.10, 7.3, 10.7 |
 
 **Responsibilities & Constraints**
-- `base_dir`（`pasta.toml` のあるフォルダ＝`ghost/master`）を `read_dir` で 1 回見て、名前が `is_calendar_file_name` に当たる項目を集める（ファイルかフォルダかで絞らない）。OS に任せず一覧で探すので、大文字・小文字を区別するファイルシステムでも `Calendar.CSV` を読む。
+- `base_dir`（`pasta.toml` のあるフォルダ＝`ghost/master`）を `read_dir` で 1 回見て、名前が `is_calendar_file_name` に当たる項目を集める（ファイルかフォルダかで絞らない。ただしシンボリックリンクは `DirEntry::file_type().is_symlink()` で数えない。`pasta_check` の殻 `ghost_files::walk` と release の `copy.rs` がシンボリックリンクを飛ばすので、pasta.dll だけに効いて検査にも `.nar` にも入らない表を作らないため）。OS に任せず一覧で探すので、大文字・小文字を区別するファイルシステムでも `Calendar.CSV` を読む。
 - 0 個: 空の表（`＄行事` はいつも `なし`。エラーも警告も出さない）。2 個以上（大文字・小文字だけ違う名前。区別するファイルシステムでだけ起こる）: `CalendarDuplicate`。1 個: `fs::read` の失敗（権限・フォルダなど）は `LoaderError::Io(path, e)`、`String::from_utf8` の失敗は `CalendarNotUtf8(path)`、`CalendarTable::parse` の誤りは `Calendar { path, errors }`。
 - 段 1.6 は段 1.5（ロガー）の後、段 1.7（`LoaderContext`）の前。表は段 6 で `RuntimeConfig::with_calendar` に入れる。pasta 本体の既定の表は無い（Req 10.7）。
 
@@ -570,7 +572,7 @@ pub(super) fn check(input: &GhostInput, files: &BTreeMap<String, FileText>) -> V
 
 **Implementation Notes**
 - データの作り方（実装の作業。テストの実行時ではない）: データカタログ（`cao_20190522_0002`）のリソースの URL（2026-11-15 時点 `https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv`）から取得し、Shift_JIS を UTF-8 に、改行を LF に直してコミットする。中身は変えない（年の範囲も削らない）。data.go.jp のページは証明書の期限切れで取れないことがあるので、CKAN の API（`https://data.e-gov.go.jp/data/api/action/package_show?id=cao_20190522_0002`）でリソースの URL を確かめる。
-- 出典の文書 `README.md`（Req 8.7）: データセットの ID と URL、リソースの URL、取得した日付、ライセンス（カタログの表記どおり「CC BY」。版の書き方は OPEN QUESTION 1）、出典の表示（内閣府「「国民の祝日」について」）、Shift_JIS→UTF-8・CRLF→LF に直したこと、テストの答え合わせにだけ使い、ゴーストの配布物にも crates.io のパッケージにも入らないこと。既存の型（`book/tools/highlight/grammars/LICENSE.lua-grammar.md`）に倣う。
+- 出典の文書 `README.md`（Req 8.7）: データセットの ID と URL、リソースの URL、取得した日付、ライセンス（カタログの表記どおり「CC BY（データカタログの `license_id` は `cc-by`。版の記載なし）」と書き、確かめられない版（4.0 など）は書かない）、出典の表示（内閣府「「国民の祝日」について」）、Shift_JIS→UTF-8・CRLF→LF に直したこと、テストの答え合わせにだけ使い、ゴーストの配布物にも crates.io のパッケージにも入らないこと。既存の型（`book/tools/highlight/grammars/LICENSE.lua-grammar.md`）に倣う。
 - crates.io: `pasta_core/Cargo.toml` の `exclude` にデータのフォルダとこのテストのファイルを入れる（テストのファイルも外すのは、パッケージを展開して `cargo test` したときにデータが無くて落ちないため）。
 
 ### 見本のゴーストと入門
@@ -632,14 +634,14 @@ pub(super) fn check(input: &GhostInput, files: &BTreeMap<String, FileText>) -> V
 ## Testing Strategy
 
 ### Unit Tests
-- `holiday.rs`: Req 2.1・2.2 の各祝日を 1 年分、名前付きの事例（Req 8.3: 2026-05-06・2025-02-24 の振替休日、2026-09-22 の国民の休日、2024-01-08・2030-01-14 の成人の日の境目）、春分・秋分の式の 2022〜2028 年、特例を再現しないこと（2019-12-23・2019-10-14。Req 2.9）、1970 年より前と 2100 年より後でも春分・秋分を返すこと（Req 2.3）。
+- `holiday.rs`: Req 2.1・2.2 の各祝日を 1 年分、名前付きの事例（Req 8.3: 2026-05-06・2025-02-24 の振替休日、2026-09-22 の国民の休日、2024-01-08・2030-01-14 の成人の日の境目）、春分・秋分の式の 2022〜2028 年、特例を再現しないこと（2019-12-23・2019-10-14。Req 2.9）、1 年・1969 年・2100 年・9999 年でも 3 月と 9 月にちょうど 1 日ずつ春分の日・秋分の日を返すこと（clamp の両側を含む。Req 2.3）。
 - `table.rs`: 3 つの書き方・年またぎ（`1231-0103` の 12/31 と 1/3 と 1/4）・`0229`（2028 年は当たり 2027 年は暦に無い）・先勝ち（範囲と `YYYYMMDD` の重なりで先の行）・同じ名前の複数行・注釈・空行・BOM・CRLF・全角の空白・`なし` の名前（Req 8.4）、Req 5.1〜5.5 の各誤りの行番号と、複数の誤りを全部返すこと。
 - `civil.rs`: 通日⇄年月日の往復（1900〜2100 年の全日）と既知の曜日。
 - `is_calendar_file_name`: `calendar.csv`・`Calendar.CSV` は当たり、`calendar.csv.bak`・`dic/calendar.csv` は外れ。
 
 ### Integration Tests
 - `pasta_core/tests/holiday_cao_test.rs`: 2022 年〜CSV の最後の年の全日の答え合わせ（Req 2.8・8.1・8.8）。
-- `pasta_lua/tests/loader/calendar_test.rs`: 無いときの成功、`Calendar.CSV`、各誤りのエラー文のファイル名と行番号、Shift_JIS のバイト列で `CalendarNotUtf8`、フォルダの `calendar.csv` で `Io`、書き換えて読み込み直すと反映（Req 5.1〜5.10・7.3・8.5）。
+- `pasta_lua/tests/loader/calendar_test.rs`: 無いときの成功、`Calendar.CSV`、各誤りのエラー文のファイル名と行番号、Shift_JIS のバイト列で `CalendarNotUtf8`、フォルダの `calendar.csv` で `Io`、書き換えて読み込み直すと反映、unix 限定でシンボリックリンクの `calendar.csv` は数えない（`pasta_check` の一致テストにも同じ事例。Req 5.1〜5.11・6.4・7.3・8.5）。
 - `pasta_check/tests/validate_calendar_test.rs` と `validate_parity_test.rs`: 各誤りの報告と行、ランタイムとの一致、辞書の検査を省かないこと（Req 6.1〜6.5・8.5）。
 - `pasta_shiori/tests/virtual_clock_e2e_test.rs`: フィクスチャに `calendar.csv` を置き、`＊振り分け` に `＞「祝日_」＆＄祝日`・`＞「行事_」＆＄行事` を足して、`X-Pasta-Time` が祝日・行事の日と平日のときの振り分け（Req 8.6・1.3・3.6）。
 - Lua（`shiori_act_test.lua`）: 転記の 2 変数・日付が無いとき・代入（Req 1.1〜1.4・3.1〜3.3・3.7・7.1・7.4）。
@@ -654,6 +656,6 @@ pub(super) fn check(input: &GhostInput, files: &BTreeMap<String, FileText>) -> V
 
 ## Open Questions（設計ディスカッションへ）
 
-1. 出典の文書のライセンスの版の書き方（前提: カタログの表記どおり「CC BY（データカタログに版の記載なし）」と書き、4.0 とは書かない）。
+1. （設計ディスカッションで自明な修正として確定）出典の文書のライセンスは、カタログの表記どおり「CC BY（版の記載なし）」と書き、4.0 とは書かない。
 2. hello-pasta の 13 段目で `＞「行事_」＆＄行事` を呼ぶ場面（前提: 同名の `＊会話` を 1 つ足して本体を Call だけにし、`＊行事_なし` にふだんの台詞を持たせる。条件の属性は 1〜12 段目で教えていないので使わない）。
-3. 名前が大文字・小文字だけ違う表が 2 つ以上あるとき（大文字・小文字を区別するファイルシステムだけ）の扱い（前提: pasta.dll と `pasta_check` の両方で誤りにする。辞書のモジュール名の衝突を誤りにする前例に揃える）。
+3. （設計ディスカッションで自明な修正として確定）名前が大文字・小文字だけ違う表が 2 つ以上あるとき（大文字・小文字を区別するファイルシステムだけ）は、pasta.dll と `pasta_check` の両方で誤りにする（辞書のモジュール名の衝突を誤りにする前例。要件に Req 5.11 を足した）。
