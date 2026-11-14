@@ -1,0 +1,22 @@
+{
+  "feature_name": "manual-download-page",
+  "created_at": "2026-11-14T09:03:13Z",
+  "updated_at": "2026-11-14T09:08:12Z",
+  "language": "ja",
+  "phase": "requirements-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": false
+    },
+    "design": {
+      "generated": false,
+      "approved": false
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}
