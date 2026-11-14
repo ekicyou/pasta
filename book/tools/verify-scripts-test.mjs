@@ -68,11 +68,11 @@ log('\n== verify-content.mjs（コンテンツ整合・網羅レビュー検証�
   check('I-fact（機構網羅・概要章）を実行', count(/PASS {2}\[I-fact:/g) === 2,
     `I-fact PASS=${count(/PASS {2}\[I-fact:/g)}`);
   check('口調検査の走査対象に内部設計パートを含む', /PASS {2}\[D-voice:book\/src\/internals\//.test(out));
-  // 入門ガイド（C 系）が空回りしていない: 段の章 13 章の H2・入門 16 章の段落の検査と、
+  // 入門ガイド（C 系）が空回りしていない: 段の章 14 章の H2・入門 17 章の段落の検査と、
   // 段の章の本文・目次の並び・作例の照合が走って通る。
-  check('C-sections を段の章 13 章に実行', count(/PASS {2}\[C-sections:/g) === 13,
+  check('C-sections を段の章 14 章に実行', count(/PASS {2}\[C-sections:/g) === 14,
     `C-sections PASS=${count(/PASS {2}\[C-sections:/g)}`);
-  check('C-prose を入門 16 章に実行', count(/PASS {2}\[C-prose:/g) === 16,
+  check('C-prose を入門 17 章に実行', count(/PASS {2}\[C-prose:/g) === 17,
     `C-prose PASS=${count(/PASS {2}\[C-prose:/g)}`);
   for (const id of ['C-steps', 'C-order', 'C-tutorial-check']) {
     check(`${id} が PASS`, out.includes(`PASS  [${id}]`));
