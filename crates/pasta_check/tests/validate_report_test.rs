@@ -229,6 +229,7 @@ fn expected(kind: FindingKind) -> (Severity, &'static str) {
         ConfigLoaderType => (Error, "config-loader-type"),
         ConfigSceneAlias => (Error, "config-scene-alias"),
         ConfigActorFont => (Error, "config-actor-font"),
+        CalendarInvalid => (Error, "calendar-invalid"),
         ConfigPatternInvalid => (Error, "config-pattern-invalid"),
         PatternIgnored => (Warning, "pattern-ignored"),
         PatternNotPasta => (Warning, "pattern-not-pasta"),
@@ -272,6 +273,7 @@ fn every_kind_has_fixed_severity_and_code() {
         ConfigLoaderType,
         ConfigSceneAlias,
         ConfigActorFont,
+        CalendarInvalid,
         ConfigPatternInvalid,
         PatternIgnored,
         PatternNotPasta,
@@ -306,7 +308,7 @@ fn every_kind_has_fixed_severity_and_code() {
     let mut codes: Vec<&str> = kinds.iter().map(|k| expected(*k).1).collect();
     codes.sort();
     codes.dedup();
-    assert_eq!(codes.len(), 35);
+    assert_eq!(codes.len(), 36);
     for kind in kinds {
         let (sev, code) = expected(kind);
         assert_eq!(kind.severity(), sev, "{code}");
