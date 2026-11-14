@@ -44,7 +44,7 @@
   - _Requirements: 2.2, 2.4, 2.5, 2.7, 2.11_
 
 - [ ] 4. 添付とリリースの状態を 8 つにする
-- [ ] 4.1 GitHub Release の添付を 8 つにし、欠けの自己テストを合わせる
+- [x] 4.1 GitHub Release の添付を 8 つにし、欠けの自己テストを合わせる
   - `github-release.ps1` の名前の一覧を `pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-<V>.vsix`・`pasta_check.zip`・`pasta-skills.zip`・`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip`・`release-notes-<tag>.md` の 8 つにし、説明と飛ばした理由の文を「8 つ（配布物 7 つと詳しいリリースノート）」にする
   - `release-scripts-test.ps1` の項目 10・11 の置くファイルを 2 つの zip にし「添付 8 つのうち」に、項目 13 を「`pasta-recipe.x64.zip` だけが無い」に、項目 14「`pasta-recipe.arm64.zip` だけが無い」を足す（無い方の名前だけが出ることを見る）
   - 3.2 と同じ自己テストのファイルを書き換えるので、3.2 の後に行う
