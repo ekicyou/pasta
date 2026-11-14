@@ -18,6 +18,7 @@ local RELOAD = {
     "pasta.shiori.event.boot",
     "pasta.shiori.event.choice_select",
     "pasta.shiori.event.second_change",
+    "pasta.shiori.event.sys_resume",
     "pasta.shiori.event.virtual_dispatcher",
     "pasta.shiori.res",
     "pasta.shiori.act",

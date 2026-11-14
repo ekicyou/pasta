@@ -195,6 +195,7 @@ local function reload_event()
     package.loaded["pasta.store"] = nil
     package.loaded["pasta.shiori.event.boot"] = nil
     package.loaded["pasta.shiori.event.second_change"] = nil
+    package.loaded["pasta.shiori.event.sys_resume"] = nil
 
     local REG = require("pasta.shiori.event.register")
     require("pasta.store").reset()
@@ -620,6 +621,7 @@ local ENTRY_CLOSURE = {
     "pasta.shiori.event.boot",
     "pasta.shiori.event.choice_select",
     "pasta.shiori.event.second_change",
+    "pasta.shiori.event.sys_resume",
     "pasta.shiori.event.mouse",
     "pasta.shiori.event.scene_play",
     "pasta.shiori.event.external_control",
@@ -839,5 +841,6 @@ describe("REG:register - 後片付け", function()
         -- 振り分けと既定のハンドラが同じ新しい表を見ている
         expect(require("pasta.shiori.event.register")):toBe(REG)
         expect(type(rawget(REG, "OnSecondChange"))):toBe("function")
+        expect(type(rawget(REG, "OnSysResume"))):toBe("function")
     end)
 end)
