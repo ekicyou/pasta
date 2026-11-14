@@ -13,6 +13,8 @@
 //       - コードブロック (<pre><code class="language-...">) が生成されている（R3.3）
 //       - ハイライト用 CSS / JS が同梱されている（R3.3）
 //
+//   例外: talk.mjs の NO_TALK_CHAPTERS の章は、全章の台詞部品（両方の話し手）の要求から外す（CSS・JS・メニュー id は他章どおり検査する）
+//
 // 設計参照: design.md "Testing Strategy / Build & Static Output", "Site Foundation".
 //
 // 依存ゼロ（Node 標準ライブラリのみ）。検証成功で exit 0、失敗で exit 1。
@@ -28,7 +30,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { transformDir } from './talk/talk-html.mjs';
-import { SPEAKERS } from './talk/talk.mjs';
+import { SPEAKERS, NO_TALK_CHAPTERS } from './talk/talk.mjs';
 import { summaryChapters as readSummaryChapters } from './link-check.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -341,7 +343,7 @@ function analyzeTheme(root, pages) {
     if (!refs.some((r) => THEME_CSS_RE.test(r))) noCssRef.push(page);
     if (!refs.some((r) => THEME_JS_RE.test(r))) noJsRef.push(page);
     const speakers = SPEAKERS.map((s) => s.id).filter((id) => !html.includes(`class="talk talk-${id} `));
-    if (speakers.length > 0) missingTalk.push({ page, speakers });
+    if (speakers.length > 0 && !Object.hasOwn(NO_TALK_CHAPTERS, page.replace(/\.html$/, '.md'))) missingTalk.push({ page, speakers });
     const ids = MENU_IDS.filter((id) => !html.includes(`id="${id}"`));
     if (ids.length > 0) missingMenuIds.push({ page, ids });
   }

@@ -26,6 +26,12 @@
 //   checkReadmeManualLinks で book/src の章・見出しへ写像して照合し、[1] の区分に readme-manual-url として報告する
 //   （区分と文面は、どの文書でも同じ）。裸の URL は、空白・半角の括弧のほか、全角の括弧と句読点でも終わる。
 //
+// 最新版の固定リンクの名前の照合（manual-download-page タスク 2.4・要件 2.3, 7.1, 7.8）:
+//   book/src/**/*.md と読者に届く文書（上と同じ readerDocs）のフェンス外の
+//   `https://github.com/ekicyou/pasta/releases/latest/download/<名前>` を checkReleaseAssetLinks で拾い、
+//   名前が .github/workflows/release.yml の添付（`release/<名前>` の行）に無ければ [1] の区分に release-asset として報告する。
+//   添付の一覧が読めないときは release.yml の 1 件だけを返す。
+//
 // スキル自己完結検査（タスク 3.2・要件 5.3, 6.1, 6.4, 6.5, 10.2, 2.4）:
 //   .claude/skills/{pasta-ghost-authoring,pasta-lua-coding}/**/*.md を checkSkillSelfContained で
 //   検査する（skill-escape / skill-missing / skill-anchor / skill-forbidden-ref / skill-unlisted）。
@@ -452,22 +458,25 @@ function manualUrlProblem(repoRoot, url, anchorsOf) {
   return null;
 }
 
-export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
+// 読者に届く文書（絶対パス）。順は固定（同じ入力に同じ順）。無いファイルは飛ばす。
+function readerDocs(repoRoot) {
   const cratesDir = path.resolve(repoRoot, 'crates');
   const readmes = !fs.existsSync(cratesDir) ? [] : fs.readdirSync(cratesDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => path.join(cratesDir, d.name, 'README.md'))
     .sort();
-  // 対象の順は固定（同じ入力に同じ順）。無いファイルは飛ばす。
-  const targets = [
+  return [
     ...readmes,
     path.resolve(repoRoot, 'README.md'),
     path.resolve(repoRoot, 'doc/SOUL.md'),
     ...CHECKED_SKILLS.flatMap((skill) => listMarkdownFiles(path.resolve(repoRoot, '.claude/skills', skill)).sort()),
   ].filter((f) => fs.existsSync(f));
+}
+
+export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
   const anchorsOf = anchorReader();
   const broken = [];
-  for (const file of targets) {
+  for (const file of readerDocs(repoRoot)) {
     const relFile = path.relative(repoRoot, file).split(path.sep).join('/');
     maskFences(fs.readFileSync(file, 'utf8')).split('\n').forEach((line, i) => {
       const noCode = line.replace(CODE_SPAN_RE, '');
@@ -485,15 +494,58 @@ export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
   return broken;
 }
 
+// ---- 最新版の固定リンクの名前の照合（release-asset） ----
+// manual-download-page タスク 2.4（要件 2.3, 7.1, 7.8）。
+// 対象: book/src/**/*.md（パス順）と読者に届く文書（readerDocs）のフェンス外。リンク記法・`<…>`・裸の URL のどれも拾う。
+// 名前は [\w.-]* で取り、末尾の . を落とす。空の名前も違反。添付の名前の正は release.yml。
+const LATEST_DOWNLOAD_RE = new RegExp(`https://github\\.com/${REPO_SLUG}/releases/latest/download/([\\w.-]*)`, 'g');
+const RELEASE_YML = '.github/workflows/release.yml';
+
+// shortcut: release.yml の upload の path: が 1 行 1 つの release/<名前> であることに頼る。書き方を変えたら読み取りも直す。
+function releaseAssetNames(repoRoot) {
+  const abs = path.resolve(repoRoot, RELEASE_YML);
+  if (!fs.existsSync(abs)) return [];
+  return fs.readFileSync(abs, 'utf8').split(/\r?\n/)
+    .filter((line) => !line.includes('${{'))
+    .map((line) => line.match(/^\s*release\/(\S+)\s*$/))
+    .filter(Boolean)
+    .map((m) => m[1]);
+}
+
+export function checkReleaseAssetLinks(repoRoot = REPO_ROOT) {
+  const files = [...listMarkdownFiles(path.resolve(repoRoot, 'book/src')).sort(), ...readerDocs(repoRoot)];
+  const found = [];
+  for (const file of files) {
+    const relFile = path.relative(repoRoot, file).split(path.sep).join('/');
+    maskFences(fs.readFileSync(file, 'utf8')).split('\n').forEach((line, i) => {
+      for (const m of line.matchAll(LATEST_DOWNLOAD_RE)) {
+        found.push({ file: relFile, line: i + 1, target: m[0].replace(/\.+$/, ''), name: m[1].replace(/\.+$/, '') });
+      }
+    });
+  }
+  // 添付の一覧は固定リンクが 1 つでもあるときだけ読む。
+  if (found.length === 0) return [];
+  const names = releaseAssetNames(repoRoot);
+  if (names.length === 0) {
+    return [{ file: RELEASE_YML, target: '', kind: 'release-asset',
+      detail: 'リリース CI の添付の一覧が読めない（upload の path: の release/<名前> の行が 1 つも無い）' }];
+  }
+  return found.filter((f) => !names.includes(f.name)).map((f) => ({
+    file: f.file, target: f.target, kind: 'release-asset',
+    detail: `L${f.line}: 名前 "${f.name}" がリリース CI の添付に無い（添付: ${names.join(', ')}）`,
+  }));
+}
+
 // ---- オーケストレーション ----
 // 報告の [1]（リンク切れ）に入る種別。自己テストもここから読む。
-export const BOOK_KINDS = new Set(['internal-md', 'internal-anchor', 'github-repo-path', 'internals-path', 'readme-manual-url']);
+export const BOOK_KINDS = new Set(['internal-md', 'internal-anchor', 'github-repo-path', 'internals-path', 'readme-manual-url', 'release-asset']);
 
 export function runLinkCheck(repoRoot = REPO_ROOT) {
   const broken = [
     ...detectBrokenLinks(repoRoot),
     ...checkInternalsPaths(repoRoot),
     ...checkReadmeManualLinks(repoRoot),
+    ...checkReleaseAssetLinks(repoRoot),
     ...checkSkillSelfContained(repoRoot),
   ];
   return { broken, failed: broken.length > 0 };
@@ -513,7 +565,7 @@ export function reportLinkCheck(result) {
   };
   out.push('link-check (git 非依存)');
   out.push('');
-  out.push(`[1] リンク切れ（book 内 .md・見出し / リポジトリ内 GitHub URL / 内部設計章のパス / マニュアルの公開 URL）: ${book.length} 件`);
+  out.push(`[1] リンク切れ（book 内 .md・見出し / リポジトリ内 GitHub URL / 内部設計章のパス / マニュアルの公開 URL / 最新版の固定リンク）: ${book.length} 件`);
   list(book);
   out.push('');
   out.push(`[2] スキル自己完結（${CHECKED_SKILLS.join(', ')}）: ${skill.length} 件`);

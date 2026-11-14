@@ -11,7 +11,7 @@
 //   話し手名はカタカナの日本語名だけ（別名・欧文名なし）。
 //
 // 共用 export（talk-html.mjs・gen-skill-refs.mjs・verify-content.mjs などが import する）:
-//   SPEAKERS / DEFAULT_SPEAKER_ID / DEFAULT_FACE / FACE_DIR / MAX_FACE_BYTES / TALK_LINE_RE
+//   SPEAKERS / DEFAULT_SPEAKER_ID / DEFAULT_FACE / FACE_DIR / MAX_FACE_BYTES / TALK_LINE_RE / NO_TALK_CHAPTERS
 //   parseTalkTag(inner) … 【】の内側を解析
 //   faceFilePath(speaker, face) … 顔画像への相対パス（book/src と出力根から）
 //
@@ -43,6 +43,9 @@ export const MAX_FACE_BYTES = 20480;
 
 // 台詞の開始行（字下げも拾う。入れ子の引用・リスト内の判定は走査側で行う）。
 export const TALK_LINE_RE = /^\s*>\s*【/;
+
+// 台詞を置かない章（book/src からのパス）→ verify-search が台詞の最初の語の代わりに使う、その章に固有の語。
+export const NO_TALK_CHAPTERS = Object.freeze({ 'download.md': 'やりたいこと' });
 
 const SEP = '：';
 const DEFAULT_SPEAKER = SPEAKERS.find((s) => s.id === DEFAULT_SPEAKER_ID);

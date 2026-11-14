@@ -32,20 +32,14 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 | パート | 内容 |
 | ------ | ---- |
+| [ダウンロード](https://ekicyou.github.io/pasta/download.html) | やりたいことから取るファイルを選んで、最新版を落とす |
 | [入門ガイド](https://ekicyou.github.io/pasta/getting-started/index.html) | 辞書を 1 枚ずつ足しながら、13 段でゴーストを育てて配布するまで |
 | [Pasta DSL 文法](https://ekicyou.github.io/pasta/grammar/index.html) | マーカー・シーン・アクション行・変数・単語・アクター辞書 |
 | [Lua API / コーディング](https://ekicyou.github.io/pasta/lua/index.html) | 公開モジュール・SHIORI イベント・`scripts/` の書き方 |
 | [デバッグ](https://ekicyou.github.io/pasta/debug/index.html) | VSCode から動いているゴーストでシーンを鳴らす・保存変数を見る・SSP を起動せずに辞書を検査する |
 | [pasta.toml リファレンス](https://ekicyou.github.io/pasta/reference/pasta-toml.html) | 設定の全セクション・全キー |
 
-最新版の配布物は、次のリンクから直接ダウンロードできます（過去の版は [リリースページ](https://github.com/ekicyou/pasta/releases)）。
-
-- [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar) — サンプルゴースト（SSP へドロップして入れる。`pasta.dll` とシェルを含む）
-- [`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip) — SHIORI の本体（`pasta.dll` とライセンス表示）
-- [`pasta_check.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip) — 辞書の検査とゴーストの配布物を作る CLI（64 ビット版の `pasta_check.exe` とライセンス表示）
-- [`pasta-skills.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-skills.zip) — AI にゴーストを書かせるときの pasta のスキル 3 つ（`.claude/skills/` に展開する）
-- [`pasta-recipe.x64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.x64.zip)・[`pasta-recipe.arm64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.arm64.zip) — VSCode を使わずに `.pasta` を書くアプリ（x64 版と arm64 版の `pasta-recipe.exe` とライセンス表示。自分の Windows の種類に合うほうを選ぶ。[マニュアル](https://ekicyou.github.io/pasta/debug/recipe.html)）
-- [Pasta DSL VSCode 拡張](https://marketplace.visualstudio.com/items?itemName=ekicyou.pasta-vscode) — 構文ハイライト・診断・動いているゴーストへの開発支援コマンド
+配布物は、マニュアルの[ダウンロード](https://ekicyou.github.io/pasta/download.html)のページから入手できます（過去の版は[リリースページ](https://github.com/ekicyou/pasta/releases)）。
 
 ---
 

@@ -21,6 +21,7 @@
 //
 //   manual-claudia-theme タスク 3.6（要件 8.1, 8.2, 10.5）: SUMMARY 全章について、最初の台詞の
 //   本文から切り出した日本語片で検索し、その章がヒットする（台詞の本文が索引に入る）ことを確かめる。
+//   例外: talk.mjs の NO_TALK_CHAPTERS の章は台詞を置かないので、その表の語で検索して章がヒットすることを求める。
 //
 // 設計参照: design.md「Bigram Search」「Testing Strategy / 日本語検索」。
 //
@@ -39,7 +40,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { tokenize } from './bigram-index/tokenize.mjs';
-import { scanTalk } from './talk/talk.mjs';
+import { scanTalk, NO_TALK_CHAPTERS } from './talk/talk.mjs';
 import {
   resolveHashed,
   readSearchIndex,
@@ -229,11 +230,20 @@ log('');
 //   SUMMARY 全章について、最初の台詞の本文から切り出した語（talkQuery）で検索し、
 //   結果にその章の HTML（アンカー違いを含む）が含まれることを確かめる。
 //   台詞の無い章・4 文字以上の日本語片が無い章は、その章の失敗として報告する。
+//   例外: talk.mjs の NO_TALK_CHAPTERS の章は、一覧の固有の語で検索する。
 // =========================================================================
 log('--- 8.2/10.5 台詞の本文が索引に入る（台詞の語で章がヒット）---');
 {
   const srcDir = path.join(bookDir, 'src');
   for (const md of summaryChapters(repoRoot)) {
+    if (Object.hasOwn(NO_TALK_CHAPTERS, md)) {
+      const word = NO_TALK_CHAPTERS[md];
+      const r = searchResults(elasticlunr, indexObj, word);
+      check(`8.2: ${md} の固有の語「${word}」で章がヒットする`,
+        talkHit(r.urls, md.replace(/\.md$/, '.html')),
+        `urls=${JSON.stringify(r.urls.slice(0, 5))}`);
+      continue;
+    }
     const q = talkQuery(fs.readFileSync(path.join(srcDir, md), 'utf8'));
     if (q === null) {
       check(`8.2: ${md} の最初の台詞の語で章がヒットする`, false,

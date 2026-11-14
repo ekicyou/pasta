@@ -27,6 +27,7 @@ import {
   scanTalk,
   checkRegion,
   faceStats,
+  NO_TALK_CHAPTERS,
 } from './talk.mjs';
 import { summaryChapters } from '../link-check.mjs';
 import { spawnSync } from 'node:child_process';
@@ -454,6 +455,10 @@ log('\n== (J) 表情の集計 ==');
   const tocCount = summaryChapters().length;
   check(`J-9 --stats は目次の全 ${tocCount} 章（debug を含む）を並べる`,
     chapterRows.length === tocCount && chapterRows.some((l) => l.startsWith('| debug/')), String(chapterRows.length));
+
+  check('J-10 NO_TALK_CHAPTERS は凍結され download.md の語だけを持つ',
+    Object.isFrozen(NO_TALK_CHAPTERS) && NO_TALK_CHAPTERS['download.md'] === 'やりたいこと'
+      && Object.keys(NO_TALK_CHAPTERS).length === 1, JSON.stringify(NO_TALK_CHAPTERS));
 }
 
 // ============================================================

@@ -43,6 +43,7 @@ import {
   writeAll,
   checkAll,
 } from './gen-skill-refs.mjs';
+import { NO_TALK_CHAPTERS } from './talk/talk.mjs';
 import { REPO_ROOT, LINK_RE, MANUAL_URL, maskFences, listMarkdownFiles, summaryChapters } from './link-check.mjs';
 
 // --- 最小 assert ハーネス（依存ゼロ） ---
@@ -603,7 +604,8 @@ function legacyBodyRange(text) {
   const notInSrc = toc.filter((c) => !chapters.includes(c));
   check('K-10 book/src の章のファイルと目次の章が一致', notInToc.length === 0 && notInSrc.length === 0,
     `目次に無いファイル: [${notInToc.join(', ')}] / ファイルの無い目次の章: [${notInSrc.join(', ')}]`);
-  for (const ch of chapters) {
+  // 台詞を置かない章（一覧の章）は導入・本文・締めの 3 区画を持たないので、区画の抽出の検査から外す。
+  for (const ch of chapters.filter((c) => !Object.hasOwn(NO_TALK_CHAPTERS, c))) {
     const text = fs.readFileSync(path.join(src, ch), 'utf8');
     const e = thrown(() => chapterRegions(text, ch));
     const r = e ? null : chapterRegions(text, ch);

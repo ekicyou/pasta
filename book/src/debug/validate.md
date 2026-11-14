@@ -17,9 +17,7 @@
 
 ## 使い方
 
-`pasta_check` は、GitHub の Release から `pasta_check.zip` を落として入れる。最新版は次の固定のリンクで落とせる。
-
-<https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip>
+`pasta_check` は、`pasta_check.zip` を [ダウンロード](../download.md#検査の-cli) のページから落として入れる。
 
 落とした zip を好きなフォルダに展開する。中身は `pasta_check.exe` と `THIRD_PARTY_LICENSES.txt` で、`pasta_check.exe` は 64 ビット版の Windows 向けである。`pasta_check.exe` には署名が無いため、初めて起動するときに Windows の SmartScreen の警告が出ることがある。
 

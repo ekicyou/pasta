@@ -145,7 +145,7 @@ spot = 1
 
 > 【クローディア】残りの 3 つは、書くものではなく写すものですわ。完成した見本の hello-pasta を SSP にお招きして、そこから拝借いたしますの。
 
-1. [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)（最新版）をダウンロードする。
+1. `hello-pasta.nar`（最新版）を [ダウンロード](../download.md#サンプルゴースト) のページから落とす。
 2. `hello-pasta.nar` を SSP のウィンドウへドロップして、SSP に入れる。
 3. SSP をインストールしたフォルダの中の `ghost/hello-pasta/` を開く。
 4. 次の表の 3 つを、自分のゴーストの同じ場所へ写す。

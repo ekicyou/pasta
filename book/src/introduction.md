@@ -13,6 +13,7 @@
 
 <nav class="hero-toc">
 
+- [ダウンロード <small>Download</small>](download.md)
 - [入門／チュートリアル <small>Getting started</small>](getting-started/index.md)
 - [Pasta DSL 文法 <small>Grammar</small>](grammar/index.md)
 - [Lua API／コーディング <small>Lua API</small>](lua/index.md)
@@ -31,38 +32,15 @@
 作者が書いた Pasta DSL の辞書を Lua にトランスパイルし、「ゴースト」の頭脳として動作させる。
 本マニュアルは、ゴースト作者が pasta で辞書を書けるようになることを目的とした利用者向けガイドである。
 
+Pasta DSL の文法・公開 Lua API・`pasta.toml` の設定について、利用者向けの権威的な記述は本マニュアルである。ほかの文書と記述が食い違う場合は、本マニュアルを正とする。
+
+まず[ダウンロード](download.md)、それから[入門ガイド](getting-started/index.md)へ。
+
 ## 関連リンク
 
 | リンク | 内容 |
 | ------ | ---- |
 | [GitHub リポジトリ（ekicyou/pasta）](https://github.com/ekicyou/pasta) | ソースコード・ビルド方法などの開発者向け情報。[README](https://github.com/ekicyou/pasta/blob/main/README.md) も参照 |
-| [リリースページ](https://github.com/ekicyou/pasta/releases) | 各版の配布物（[`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip)・サンプルゴースト [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)・検査の CLI [`pasta_check.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip)・AI 向けのスキル [`pasta-skills.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-skills.zip)・VSCode を使わずに書くアプリ [`pasta-recipe.x64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.x64.zip)・[`pasta-recipe.arm64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.arm64.zip)・VSCode 拡張）と変更点。ファイル名のリンクは、最新版を直接ダウンロードする |
-
-## AI にゴーストを書かせるとき
-
-Claude Code などの AI のエージェントにゴーストを書かせるときは、pasta のスキルを読ませる。
-スキルは `pasta-skills.zip` にまとめて配布しており、中身は次の 3 つである。
-
-| スキル | 役目 |
-| ------ | ---- |
-| `pasta-ghost-authoring` | Pasta DSL の文法と辞書の書き方 |
-| `pasta-lua-coding` | ランタイムの Lua API と書き方の決まり |
-| `pasta-check` | `pasta_check` による辞書の検査とリリースビルド |
-
-`pasta-skills.zip` は、[最新版への固定のリンク](https://github.com/ekicyou/pasta/releases/latest/download/pasta-skills.zip)か、
-[リリースページ](https://github.com/ekicyou/pasta/releases)の各版の添付から入手する。
-入手した zip は、ゴーストの開発フォルダの `.claude/skills/` に展開する。展開すると、次の木ができる。
-
-```text
-.claude/skills/
-├── pasta-ghost-authoring/SKILL.md
-├── pasta-lua-coding/SKILL.md
-├── pasta-check/SKILL.md
-└── LICENSE
-```
-
-スキルは、使っている pasta と同じ版の `pasta-skills.zip` を使うこと。pasta の版を上げるときは、
-3 つのフォルダを消してから新しい版の zip を展開する。上書きで展開すると、新しい版で消えたファイルが古いまま残るためである。
 
 ## このマニュアルが対象とするバージョン
 
@@ -73,7 +51,7 @@ Claude Code などの AI のエージェントにゴーストを書かせると�
 | 対象プラットフォーム | Windows |
 
 本マニュアルは、上表の版の pasta を対象として記述する。対象バージョンはリリースのたびに更新される。
-これより古い版の pasta を使っている場合は、[リリースページ](https://github.com/ekicyou/pasta/releases)から
+これより古い版の pasta を使っている場合は、[ダウンロード](download.md)のページから
 新しい版を入手すること。
 
 ランタイムの Lua 方言は **LuaJIT 2.1** である。これは **Lua 5.1 系**の言語仕様を基礎とし、
@@ -93,20 +71,6 @@ LuaJIT 独自の拡張（`goto`/ラベルや一部の 5.2 互換機能など）�
 > 将来の版で挙動が変わる可能性がある。安定版として依存する前に、最新の情報を確認すること。
 
 注記のない通常の本文は、現行の版で安定して利用できる機能として記述している。
-
-## このマニュアルの歩き方
-
-目的に応じて、以下の各章へ進むとよい。
-
-- **[入門ガイド](getting-started/index.md)** — pasta を初めて触る人向けの、物語で導くガイド。13 の「こんな表現をしたい」を 1 章ずつ叶えながら、自分のゴーストを育てていく。
-- **[文法リファレンス概要](grammar/index.md)** — Pasta DSL の文法のリファレンス。シーン定義、アクション行、変数、単語定義などを章ごとに解説する。入門ガイドで出会った書き方を詳しく調べるときに引く。
-- **[Lua マニュアル概要](lua/index.md)** — ランタイムが公開する Lua API とコーディングパターンのリファレンス。DSL では足りない複雑なロジックを書くときに参照する。
-- **[外部リンク集](reference/external-links.md)** — Lua 言語リファレンスなど、本マニュアル外の参照先をまとめている。
-
-目次末尾の「内部設計（コントリビュータ向け）」パートは、pasta 本体のコードを読み・直す開発者向けの解説である。ゴーストを作るだけなら読む必要はない。
-
-Pasta DSL の文法・公開 Lua API・`pasta.toml` の設定について、利用者向けの権威的な記述は本マニュアルである。
-ほかの文書と記述が食い違う場合は、本マニュアルを正とする。
 
 ---
 

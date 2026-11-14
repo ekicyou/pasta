@@ -14,10 +14,7 @@ pasta-recipe の色分け・書きながらの診断・ゴースト全体の検�
 
 ## 入手と置き方
 
-pasta-recipe は、GitHub の Release から zip を落として入れる。zip は Windows の種類ごとに 2 つあり、最新版は次の固定のリンクで落とせる。
-
-- x64 版（`pasta-recipe.x64.zip`）: <https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.x64.zip>
-- arm64 版（`pasta-recipe.arm64.zip`）: <https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.arm64.zip>
+pasta-recipe は、zip を落として入れる。zip は Windows の種類ごとに x64 版（`pasta-recipe.x64.zip`）と arm64 版（`pasta-recipe.arm64.zip`）の 2 つあり、どちらも [ダウンロード](../download.md#vs-code-を使わずに書くアプリ) のページから落とせる。
 
 自分の Windows の種類は、Windows の「設定」→「システム」→「バージョン情報」の「システムの種類」で分かる。「x64 ベース プロセッサ」と出ていれば x64 版を、「ARM ベース プロセッサ」と出ていれば arm64 版を選ぶ。
 

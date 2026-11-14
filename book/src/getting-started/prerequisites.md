@@ -34,12 +34,12 @@
 
 > 【アンソニー】お嬢様、その `pasta.dll` は、どちらで手に入るのでございましょう。
 
-> 【クローディア】リリースページの `hello-pasta.nar` をお取りなさいまし。完成したゴーストがまるごと 1 体入っていて、`pasta.dll` もその中にありますわ。
+> 【クローディア】ダウンロードのページの `hello-pasta.nar` をお取りなさいまし。完成したゴーストがまるごと 1 体入っていて、`pasta.dll` もその中にありますわ。
 
-- 入手先: [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)（最新版が直接ダウンロードされる。過去の版は [リリースページ](https://github.com/ekicyou/pasta/releases) にある）
+- 入手先: `hello-pasta.nar` は [ダウンロード](../download.md#サンプルゴースト) のページにある（過去の版もそこから辿れる）
 - `hello-pasta.nar` — 完成版のゴースト一式。`pasta.dll`・`THIRD_PARTY_LICENSES.txt`・シェル（ゴーストの見た目）を含む
 - `hello-pasta.nar` から自分のゴーストへファイルを写す手順は、次の章の [hello-pasta から写す](setup.md#hello-pasta-から写す) で行う
-- `pasta.dll` だけを入れ替えるときは、[`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip)（最新版が直接ダウンロードされる）を使う
+- `pasta.dll` だけを入れ替えるときは、`pasta.dll.zip`（[ダウンロード](../download.md#shiori-の本体)のページにある）を使う
 
 > 【クローディア】`scripts/` というフォルダを見かけても、慌てることはありませんわ。Lua を動かす仕組みは `pasta.dll` の中に入っていますの。`scripts/` は、あなたが自分で書いたスクリプトを置く場所ですのよ。
 

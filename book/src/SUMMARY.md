@@ -1,6 +1,7 @@
 # Summary
 
 [はじめに](introduction.md)
+[ダウンロード](download.md)
 
 # 入門 / チュートリアル
 
