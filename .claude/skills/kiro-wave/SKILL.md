@@ -36,11 +36,11 @@ Think in English. Every developer-facing message (progress, warnings, the report
    - **unmerged commits**: `git log --oneline origin/<default>..HEAD`. Commits already squash-merged still show here, so when the list is not empty, check `gh pr list --head <branch> --state merged --json number,headRefOid`: if a merged PR's `headRefOid` equals `git rev-parse HEAD`, the commits are landed.
 3. Nothing left → say so in one line and go to Step 1.
 4. If the current branch is the default branch and something is left → STOP: changes on the default branch cannot go through a PR; ask the developer to move them to a worktree branch. Start nothing.
-5. Otherwise ask **once with `AskUserQuestion`** (the approval dialog; load it with `ToolSearch` if deferred). Question (persona language): this worktree has changes that are not on `origin/<default>`, and the new sessions need them there — land them with PR → squash merge and continue? Put the facts in the option descriptions: the branch, the unmerged commit subjects, the uncommitted files (at most ~10, then "ほか N 件"), and an open PR if `gh pr list --head <branch> --state open` finds one. Options:
+5. Otherwise ask **once with `AskUserQuestion`** (the approval dialog; load it with `ToolSearch` if deferred — this skill is the one exception to the rule of putting decisions in chat). Question (persona language): this worktree has changes that are not on `origin/<default>`, and the new sessions need them there — land them with PR → squash merge and continue? Put the facts in the option descriptions: the branch, the unmerged commit subjects, the uncommitted files (at most ~10, then "ほか N 件"), and an open PR if `gh pr list --head <branch> --state open` finds one. Options:
    - `PR→スクワッシュマージして続ける (Recommended)` — land, then start the sessions
    - `やめる` — start nothing
    Anything other than the first option → STOP and start nothing (say the wave can be started after the changes are merged).
-6. On approval, without asking again (developer 2026-10-10: no second confirmation between PR and merge):
+6. On approval, without asking again (the dialog is the approval for both PR and merge; developer 2026-10-10: no second confirmation between PR and merge):
    1. If there are uncommitted changes: `git add -A` and commit with a subject that says what changed (from the diff, conventional-commit style like the repository's history) and the session's attribution trailer.
    2. `git push -u origin <branch>` (masked output).
    3. Reuse the open PR if there is one; otherwise `gh pr create --base <default> --head <branch>` with the commit subject as the title (the latest subject if several, or a one-line summary) and a short bullet body ending with the attribution line. Avoid double backslashes in `gh` arguments.
@@ -53,7 +53,7 @@ Think in English. Every developer-facing message (progress, warnings, the report
    ```bash
    MSYS_NO_PATHCONV=1 git show origin/<default>:.kiro/steering/roadmap.md | python -I .claude/skills/kiro-wave/scripts/read-wave.py --models <name>...
    ```
-   Output: one `<Fable|Opus|unknown> <name>` line each (looked up in every roadmap table with `spec` and `要件定義` columns; Fable wins on conflict). For `unknown`, read the brief on `origin/<default>` and take the last line that contains `要件定義のモデル` (the latest 棚卸の再測定 section, e.g. `- **要件定義のモデル**: Opus。…`): its value starting with `Opus` → Opus; `Fable`, missing, or unclear → treat as Fable (excluded in Step 3, with the reason "モデルを確かめられない"). Check the spec exists before trusting `unknown` (Step 2).
+   Output: one `<Fable|Opus|unknown> <name>` line each (looked up in every roadmap table with `spec` and `要件定義` columns; Fable wins on conflict). For `unknown`, read the brief on `origin/<default>` and take the last line that contains `要件定義のモデル` (the latest 棚卸の再測定 section, e.g. `- **要件定義のモデル**: Opus。…`): ignoring `*`, its value starting with `Opus` → Opus; `Fable`, missing, or unclear → treat as Fable (excluded in Step 3, with the reason "モデルを確かめられない"). Check the spec exists before trusting `unknown` (Step 2).
 3. **Wave mode**: run, from the repository root:
    ```bash
    MSYS_NO_PATHCONV=1 git show origin/<default>:.kiro/steering/roadmap.md | python -I .claude/skills/kiro-wave/scripts/read-wave.py
