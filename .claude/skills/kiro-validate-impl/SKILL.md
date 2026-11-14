@@ -82,6 +82,8 @@ The following validation dimensions are independent and can be dispatched as **s
 
 For simple features (few tasks, small scope), run checks in main context without subagent dispatch.
 
+**Dispatch model** (added 2026-11-14 by developer request — same text as areka 967d0889: whatever model this session runs on, Fable only when the spec needs it): dispatches that **judge** (cross-task contract verification, requirement coverage, the GO/NO-GO verdict) use `model: "opus"`, or `model: "fable"` with `effort: "medium"` when the spec's tasks.md has a `_Dispatch: judgment_` task; dispatches that only **collect evidence** (running commands, grepping, counting) use `model: "sonnet"`. Record one line per dispatch: `dispatch model: <role> → <model> (<reason>)`.
+
 If the implementation run explicitly skipped task-local review (for example `--review off`), tighten scrutiny on obvious task-level gaps that surface during integration validation and call out that reduced review coverage in the report.
 
 #### Mechanical Checks (run commands, use results)

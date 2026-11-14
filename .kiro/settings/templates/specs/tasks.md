@@ -7,6 +7,7 @@ Use whichever pattern fits the work breakdown:
 ### Major task only
 - [ ] {{NUMBER}}.{{PARALLEL_MARK}} {{TASK_DESCRIPTION}}
   - {{DETAIL_ITEM_1}} (Include details only when needed. If the task stands alone, omit bullet items.)
+  - _Dispatch: {{TIER}} — {{TIER_REASON}}_ (Every executable task. See tasks-generation.md section 5.5.)
   - _Requirements: {{REQUIREMENT_IDS}}_
 
 ### Major + Sub-task structure
@@ -17,6 +18,7 @@ Use whichever pattern fits the work breakdown:
   - {{OBSERVABLE_COMPLETION_ITEM}} (At least one detail item should state the observable completion condition for this task.)
   - _Boundary: {{COMPONENT_NAMES}}_ (Only for (P) tasks. Omit when scope is obvious.)
   - _Depends: {{TASK_IDS}}_ (Only for non-obvious cross-boundary dependencies. Most tasks omit this.)
+  - _Dispatch: {{TIER}} — {{TIER_REASON}}_ (Every executable sub-task: `judgment`, `standard` or `mechanical`, optionally `, effort <level>` after the tier. See tasks-generation.md section 5.5.)
   - _Requirements: {{REQUIREMENT_IDS}}_ (IDs only; do not add descriptions or parentheses.)
 
 > **Parallel marker**: Insert ` (P)` immediately after the task number for tasks that can be executed in parallel. Omit the marker when running in `--sequential` mode.
