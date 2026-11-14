@@ -69,7 +69,7 @@
   - _Depends: 1.2, 2.1, 3.1_
   - _Requirements: 1.1, 1.7, 2.1, 2.7, 2.8, 2.9, 2.10, 7.3_
 
-- [ ] 5.2 main の CI の job `recipe` が 2 つの zip を作り、検査して残す
+- [x] 5.2 main の CI の job `recipe` が 2 つの zip を作り、検査して残す
   - targets を `x86_64-pc-windows-msvc,aarch64-pc-windows-msvc` にし、型の検査・フロントのテスト・`npm run build`・`cargo test --locked`・clippy は今のまま保つ
   - 最後の `npx tauri build --no-bundle` を、`install-tools.ps1 -Name cargo-about` → `package.ps1`（引数なし）→ `verify-recipe-zips.ps1 -Version <editors/vscode/package.json の version>` → `actions/upload-artifact@v7`（`pasta-recipe-zips`・2 つの zip・`if-no-files-found: error`）に置き換える
   - `build.yml` に公開の job も Release を作る段も足さない

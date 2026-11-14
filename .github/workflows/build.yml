@@ -162,7 +162,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
+          targets: x86_64-pc-windows-msvc,aarch64-pc-windows-msvc
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -195,9 +195,31 @@ jobs:
       - name: Clippy (-D warnings)
         run: cargo clippy --locked --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
 
-      # リリースと同じ形で exe が作れること（beforeBuildCommand が npm run build を走らせる）。
-      - name: tauri build --no-bundle
-        run: npx tauri build --no-bundle
+      # ここから先はリリース CI と同じスクリプトで 2 つの zip を作って検査する（pasta-recipe-multiarch 要件 6.1・7.1〜7.4）。
+      # 版はタグでなく editors/vscode/package.json から取る。公開も Release の作成もしない。
+      - name: Install cargo-about
+        working-directory: .
+        run: pwsh -NoProfile -File .github/scripts/release/install-tools.ps1 -Name cargo-about
+
+      # 引数なしで x64・arm64 の両方を作る（release/pasta-recipe.x64.zip・release/pasta-recipe.arm64.zip）。
+      - name: Build pasta-recipe zips
+        working-directory: .
+        run: pwsh -NoProfile -File editors/recipe/scripts/package.ps1
+
+      - name: Verify pasta-recipe zips
+        working-directory: .
+        run: |
+          $version = (Get-Content -LiteralPath editors/vscode/package.json -Raw | ConvertFrom-Json).version
+          pwsh -NoProfile -File .github/scripts/release/verify-recipe-zips.ps1 -Version $version -Dir release
+
+      - name: Upload pasta-recipe zips
+        uses: actions/upload-artifact@v7
+        with:
+          name: pasta-recipe-zips
+          path: |
+            release/pasta-recipe.x64.zip
+            release/pasta-recipe.arm64.zip
+          if-no-files-found: error
 
   # VS Code 拡張（editors/vscode）の試験（grammar・unit・e2e。偽の vscode で Node だけで走る）。
   # 共有（editors/shared）へ移した後の取りこぼしを main で見つける（pasta-recipe-dev-actions 要件 13.3）。
