@@ -80,11 +80,11 @@ Focus on capabilities and outcomes, not code structure.
 
 | Tier | Choose when |
 |---|---|
-| judgment | an explicit integration task or one that crosses `_Boundary:_` scopes; it changes a contract other tasks depend on (funnel, cache key, public API); it newly designs concurrency, threading, timing or ordering guarantees; or the design leaves a decision to the implementer |
-| standard (default) | ordinary implementation inside one boundary whose design section fully specifies the change |
-| mechanical | signature/rename/import follow-ups, manifest or registration edits, doc rewrites whose wording the design already gives, test re-derivation whose expected values are stated in the design |
+| judgment | only when one of these applies: it newly draws a crate boundary or public contract with no precedent in the codebase; it newly designs concurrency, threading, timing or ordering guarantees; or the design leaves a structural decision that precedent does not settle. Integration tasks, boundary-crossing tasks and contract changes whose shape the design gives are `standard`. |
+| standard (default) | implementation whose design section specifies the change but leaves real code to work out (new logic or branches, wiring across boundaries) |
+| mechanical | the design, or an existing sibling the task copies, gives the exact shape inside one boundary: signature/rename/import follow-ups; adding a field, variant, log line or config key along an existing pattern; manifest or registration edits; tests whose expected values the design states; doc rewrites whose wording the design gives |
 
-When torn between two tiers, choose `standard`.
+Opus handles almost all implementation, so keep `judgment` rare. When torn between `mechanical` and `standard`, choose `mechanical` (a `REJECTED` review moves the task to Opus at once); when torn between `standard` and `judgment`, choose `standard`.
 
 ### 6. Flexible Task Sizing
 

@@ -45,20 +45,23 @@ Select skills for the current task even when steering/spec context is already av
 
 #### Preflight
 
-**Determine dispatch model and effort** (added 2026-11-14 by developer request — same text as areka d76827a6: the tier comes from tasks.md and applies whatever model this session runs on):
+**Determine dispatch model and effort** (added 2026-11-14 by developer request — same text as areka 967d0889: the tier comes from tasks.md and applies whatever model this session runs on; Opus has handled almost all implementation, so Fable is kept for the narrow judgment tier and late escalation, and sonnet takes the first attempt whenever the design gives the exact shape):
 - Each executable task carries `_Dispatch: <tier>[, effort <level>] — <reason>_`, written by `/kiro-spec-tasks` with the criteria in `../kiro-spec-tasks/rules/tasks-generation.md` section "5.5 Dispatch Tier" (resolved relative to this skill's directory). Use that tier. A task without the line (tasks.md written before 2026-11-14) gets its tier from the same criteria, with the reason `(no annotation)`.
-- The tier sets the Agent tool's `model` and `effort` for the task's first implementer dispatch, independent of this session's own model: an Opus session still dispatches `"fable"` for a judgment task, and a Fable session still dispatches `"sonnet"` for a mechanical one.
+- Every dispatch sets the Agent tool's `model` and `effort` from one ladder, independent of this session's own model (an Opus session still dispatches `"fable"`, a Fable session still dispatches `"sonnet"`):
 
-  | Tier | `model` | `effort` |
+  | Step | `model` | `effort` |
   |---|---|---|
-  | judgment | `"fable"` | `"high"` |
-  | standard | `"opus"` | omit (session default) |
-  | mechanical | `"sonnet"` | `"low"` |
+  | 1 | `"sonnet"` | `"low"` |
+  | 2 | `"opus"` | omit (session default) |
+  | 3 | `"opus"` | `"high"` |
+  | 4 | `"fable"` | `"medium"` |
+  | 5 | `"fable"` | `"high"` |
+  | 6 | `"fable"` | `"xhigh"` |
 
-  An `effort <level>` in the annotation replaces the tier's effort for the first implementer dispatch.
-- Implementer re-dispatch after a `REJECTED` review or a debug round → one tier up from the previous attempt (mechanical → standard → judgment; judgment stays), effort per "Effort escalation" below.
-- Reviewer (Step 3c, and a fresh reviewer in manual mode): never a lower `model` than the implementer of the same task; judgment-tier tasks get a `"fable"` reviewer. Debugger (Step 3g): the model of the failing implementer's tier, one tier up on the second debug round of the same task.
-- Record every decision in the run output, one line per dispatch: `dispatch model: <task id> <role> → <model>/<effort> (<tier>: <reason>)`.
+- First implementer dispatch: mechanical → step 1, standard → step 2, judgment → step 4. An `effort <level>` in the annotation replaces that step's effort for the first dispatch only.
+- Every later implementer dispatch of the same task (after `REJECTED`, or the new implementer after `RETRY_TASK`) and every debugger dispatch (Step 3g) goes one step above the task's previous implementer or debugger dispatch, capped at step 6. `NEEDS_CONTEXT` and status/verdict format re-dispatches repeat the step of the dispatch they repeat.
+- Reviewer (Step 3c, and a fresh reviewer in manual mode): `"opus"` with `effort` omitted; `"fable"` with `effort: "medium"` when the task is judgment-tier or its latest implementer ran on Fable.
+- Record every decision in the run output, one line per dispatch: `dispatch model: <task id> <role> → <model>/<effort> (step <n>, <tier>: <reason>)`.
 
 **Validate approvals**:
 - Verify tasks are approved in spec.json (stop if not, see Safety & Fallback)
@@ -121,15 +124,9 @@ For each task (one at a time):
 - The implementer subagent will read the spec files and build its own Task Brief (acceptance criteria, completion definition, design constraints, verification method) before implementation
 - Preserve this task context, including selected skill guidance, on every implementer re-dispatch (context requests, review remediation, and debug retries); append the new context or feedback.
 - Append the two desk sentences of "Desk coordination (areka-impl-watch)" verbatim to the end of every implementer prompt (only the first while desk steps are off)
-- Dispatch via **Agent tool** as a fresh subagent; set `model` and `effort` from the Preflight tier for this task (see Effort escalation)
+- Dispatch via **Agent tool** as a fresh subagent; set `model` and `effort` from the Preflight ladder for this task
 
-**Effort escalation** (local customization — keep when regenerating this skill): this skill explicitly sets the Agent tool's `effort` parameter as follows. Only a mechanical task's first implementer dispatch (or an annotation's explicit `effort`) goes below the session default; every escalation is at least `"high"`.
-- First implementer dispatch → the tier's effort from Preflight (or the annotation's `effort <level>`)
-- `NEEDS_CONTEXT` re-dispatch and status/verdict format re-dispatch → the same effort as the dispatch it repeats
-- Reviewer dispatch → omit `effort` (session default)
-- Implementer re-dispatch after `REJECTED` (round 1-2) → `effort: "high"`, or `"xhigh"` when the previous attempt already ran at `"high"`
-- Debug subagent (section g) → `effort: "xhigh"`
-- New implementer after `NEXT_ACTION: RETRY_TASK` → `effort: "high"`
+**Effort escalation** (local customization — keep when regenerating this skill): this skill explicitly sets the Agent tool's `model` and `effort` on every implementer, reviewer and debugger dispatch from the Preflight ladder and reviewer rule. Only step 1 (a mechanical task's first attempt) or an annotation's explicit `effort` goes below the session default.
 
 **b) Handle implementer status**:
 - Parse implementer status only from the exact `## Status Report` block and `- STATUS:` field.
@@ -167,7 +164,7 @@ For each task (one at a time):
   - Parse reviewer verdict only from the exact `## Review Verdict` block and `- VERDICT:` field.
   - If `VERDICT` is missing, ambiguous, or replaced with prose, re-dispatch the reviewer once requesting the exact structured verdict only. Do NOT mark the task complete, commit, or continue to the next task without a parseable `APPROVED | REJECTED` value.
   - **APPROVED** → before marking the task `[x]` or making any success claim, apply `kiro-verify-completion` using fresh evidence from the current code state; then mark task `[x]` in tasks.md and perform selective git commit
-  - **REJECTED (round 1-2)** → re-dispatch implementer with review feedback (`effort: "high"`, see Effort escalation)
+  - **REJECTED (round 1-2)** → re-dispatch implementer with review feedback (one ladder step up, see Preflight)
   - **REJECTED (round 3)** → dispatch debug subagent (see section below)
 
 **e) Commit** (parent-only, selective staging):
@@ -186,13 +183,13 @@ For each task (one at a time):
 - Supply the task brief/boundary, exact spec references, failure output, reviewer findings, current changed files/diff, and relevant Implementation Notes/runtime constraints
 - Include attempted fixes and their observed results concisely, without copying the failed workers' conversation history
 - Append the two desk sentences of "Desk coordination (areka-impl-watch)" verbatim to the end of the prompt (only the first while desk steps are off)
-- Dispatch via **Agent tool** as a fresh subagent with `effort: "xhigh"` (see Effort escalation); it reads the canonical `kiro-debug` procedure itself. Set `model` by the Preflight debugger rule for this task
+- Dispatch via **Agent tool** as a fresh subagent with `model` and `effort` one ladder step up (see Preflight); it reads the canonical `kiro-debug` procedure itself
 
 **Handle debug report**:
 - Require a `## Debug Report` and parse its exact `- NEXT_ACTION:` field (`RETRY_TASK | BLOCK_TASK | STOP_FOR_HUMAN`). If the protocol or a valid report is missing, stop this feature (Desk timing 7) and report the missing input; do not guess a next action or dispatch another implementer.
 - If `NEXT_ACTION: STOP_FOR_HUMAN` → append `_Blocked: <ROOT_CAUSE>_` to tasks.md, stop the feature run (Desk timing 7), and report that human review is required before continuing
 - If `NEXT_ACTION: BLOCK_TASK` → append `_Blocked: <ROOT_CAUSE>_` to tasks.md, skip to next task
-- If `NEXT_ACTION: RETRY_TASK` → preserve the current worktree; do NOT reset or discard unrelated changes. Spawn a **new** implementer subagent (`effort: "high"`, see Effort escalation) with the original task context (including selected skill guidance), the debug report's `FIX_PLAN`, `NOTES`, and the current `git diff`, and require it to repair the task with explicit edits only
+- If `NEXT_ACTION: RETRY_TASK` → preserve the current worktree; do NOT reset or discard unrelated changes. Spawn a **new** implementer subagent (one ladder step up, see Preflight) with the original task context (including selected skill guidance), the debug report's `FIX_PLAN`, `NOTES`, and the current `git diff`, and require it to repair the task with explicit edits only
   - If the new implementer succeeds (READY_FOR_REVIEW → reviewer APPROVED) → normal flow
   - If the new implementer also fails → repeat debug cycle (max 2 debug rounds total). After 2 failed debug rounds → append `_Blocked: debug attempted twice, still failing — <ROOT_CAUSE>_` to tasks.md, skip
 - **Max 2 debug rounds per task**. Each round: fresh debug subagent → fresh implementer. If still failing after 2 rounds, the task is blocked.
