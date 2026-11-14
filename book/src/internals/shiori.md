@@ -606,7 +606,7 @@ VM の構築の途中で、`register_sakura_script_module`（`crates/pasta_lua/s
 
 `panic = "abort"` のため、リリースビルドでは panic がホストのプロセスごと中止させる。旧来の入口の `catch_unwind` と、版 3 の入口がパニックを `SHIORI_E_PANIC` で返す `shiori4_abi` の捕捉が効くのは、巻き戻すプロファイル（dev・test）だけである。リリースでは、どちらの入口でもパニックでプロセスが終わる。この扱いは変えない。
 
-ルートの `.cargo/config.toml` は、`i686-pc-windows-msvc` と `x86_64-pc-windows-msvc` の両方に `-Ctarget-feature=+crt-static` を与え、MSVC の CRT を静的にリンクする。pasta.dll は VC++ 再頒布可能パッケージ（`vcruntime140.dll` など）に依存しない。Cargo は `.cargo/config.toml` を作業ディレクトリから上へ探すため、ルートから `cargo build -p pasta_shiori` を実行する CI でも効くよう、クレートの下ではなくルートに置いている。
+ルートの `.cargo/config.toml` は、`i686-pc-windows-msvc`・`x86_64-pc-windows-msvc`・`aarch64-pc-windows-msvc` のそれぞれに `-Ctarget-feature=+crt-static` を与え、MSVC の CRT を静的にリンクする（aarch64 の段は pasta-recipe の arm64 版のため）。pasta.dll は VC++ 再頒布可能パッケージ（`vcruntime140.dll` など）に依存しない。Cargo は `.cargo/config.toml` を作業ディレクトリから上へ探すため、ルートから `cargo build -p pasta_shiori` を実行する CI でも効くよう、クレートの下ではなくルートに置いている。
 
 `crates/pasta_shiori/build.rs` は、`CARGO_PKG_VERSION` などから `VERSIONINFO` の `.rc` を `OUT_DIR` に生成し、`embed_resource::compile_for_cdylib` で pasta.dll にだけ埋め込む。数値のバージョンは「メジャー,マイナー,パッチ,0」で、文字列のバージョンは `CARGO_PKG_VERSION` そのものである。Windows で `rc.exe` が使えず埋め込みに失敗するとビルドを失敗させる（`manifest_required().unwrap()`）。Windows 以外では何もしない。
 
