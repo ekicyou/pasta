@@ -305,7 +305,8 @@ function M.wake_talk(act) end
 - Postconditions:
   - `CLOCK.steady(act.req)` が `nil`（`act.req.date` が無い）なら何も変えない。
   - `next_talk_time == 0`（読み込み直後・`restart_timers` の直後でまだ決めていない）なら何も変えない（`check_talk` の「初回は時刻を決めるだけ」の枝を飛ばさない。`restart_timers` の後の数え直しにも従う）。
-  - `CLOCK.suspend_count() > 0` で、かつ `talk_suspend_count == CLOCK.suspend_count()`（最後の `OnSysSuspend` より後に自動トークを出した）なら何も変えない（要件 3.4）。
+  - `CLOCK.suspend_count() == 0`（`OnSysSuspend` を一度も見ていない）なら何も変えない（前提 2。喋らない側に倒し、時報の直後のおしゃべりを戻さない）。
+  - `talk_suspend_count == CLOCK.suspend_count()`（最後の `OnSysSuspend` より後に自動トークを出した）なら何も変えない（要件 3.4）。
   - それ以外は `next_talk_time = CLOCK.steady(act.req)` にする（要件 3.1）。
 - Invariants: 門を飛ばさない。`next_hour_unix`・`seen_epoch`・`STORE` に触れない。同じスリープで 2 回呼ばれても、間に自動トークが出ていれば 2 回目は何も変えない。
 
@@ -414,7 +415,7 @@ function M.suspend_count() end
 
 - 「既定ハンドラと上書き」の表: `OnSysResume` の行を足し、「13 行」を「14 行」にする。動作は「イベント名でシーンを探して実行する。無ければ、復帰の後にまだ自動トークが出ていないとき、スリープ明けのおしゃべりを予約する（[OnSysResume](#onsysresumeスリープ明けのおしゃべり)）」。
 - 「主要イベント」の表: `時間`（または `システム`）の分類で `OnSysResume` の行を足す（「あり（同名のシーンを実行・スリープ明けのおしゃべり）」）。
-- 新しい節 `### OnSysResume（スリープ明けのおしゃべり）`（`### OnMinuteChange` の後）: Reference0 の表、出す条件（受けていない・`auto` でない・復帰の後にまだ自動トークが出ていない）、出す時機（次の門の開いた OnSecondChange。応答は 204）、出さない条件（受けている・`auto`・停止中・先に時報かランダムトークが出た）、出すシーン（ふつうの `＊OnTalk`・`＊会話`、続きがあれば続き）、受けているとみなす条件（シーン・`GLOBAL.OnSysResume`・`REG.OnSysResume` の代入・真の値を返す鎖）と止め方。止め方は DSL を先に示す（本文の無い `＊OnSysResume` を書けば、何も喋らずに既定を止める。[空のシーンで反応を止める](#空のシーンで反応を止める) と同じ考え）。Lua では何も返さない `REG.OnSysResume` を代入する。
+- 新しい節 `### OnSysResume（スリープ明けのおしゃべり）`（`### OnMinuteChange` の後）: Reference0 の表、出す条件（受けていない・`auto` でない・復帰の後にまだ自動トークが出ていない）、出す時機（次の門の開いた OnSecondChange。応答は 204）、出さない条件（受けている・`auto`・停止中・先に時報かランダムトークが出た）、出すシーン（ふつうの `＊OnTalk`・`＊会話`、続きがあれば続き）、受けているとみなす条件（シーン・`GLOBAL.OnSysResume`・`REG.OnSysResume` の代入・真の値を返す鎖）と止め方。止め方は DSL を先に示す（本文の無い `＊OnSysResume` を書けば、何も喋らずに既定を止める。[空のシーンで反応を止める](#空のシーンで反応を止める) と同じ考え）。Lua では何も返さない `REG.OnSysResume` を代入する。本文の無い時報のシーンも復帰の後の 1 回と数えること（`＊時報03` で黙らせた時刻をまたいだ復帰では、何も喋らずに時報から数え直す）と、`OnSysSuspend` を送らないベースウェアではスリープ明けのおしゃべりが出ないことを、それぞれ 1 行で書く。
 - 「`check_hour(act)`」節: brief の仮実装の 1 行（時報のシーンが見つかったら次のトーク時刻を決め直す・時報の直後は `talk_interval_min` 秒より前に出ない・候補が無ければ変えない）。本文の無い時報のシーンでも決め直すことも書く（要件 1.7）。
 - 「時刻の飛び」節: スリープ明けの文を「時報は 1 回出て、おしゃべりは時報から間隔を数え直して待つ。時報が出なければ、復帰の後の最初のおしゃべりが 1 回出る（溜まったランダムトークか、スリープ明けのおしゃべり。[OnSysResume](#onsysresumeスリープ明けのおしゃべり)）」に改める。
 - 「テスト用関数」節: `_get_internal_state()` の表に `talk_suspend_count` を足す。
@@ -433,7 +434,7 @@ references: `node book/tools/gen-skill-refs.mjs` で `.claude/skills/pasta-lua-c
 
 - 「自動トーク」: 仮想ディスパッチャが発行した時報（候補のシーンの thread）とランダムトーク（`STORE.co_scene` か OnTalk のシーンの thread）。外から起こした `OnTalk` とゴーストのハンドラが返すトークは含めない。
 - 「復帰の後」: 最後に `OnSysSuspend` を見た時点の後。`CLOCK.suspend_count()` の値が変わった後に自動トークが出たかを、`talk_suspend_count` と比べて決める。
-- 不変条件: `talk_suspend_count <= CLOCK.suspend_count()`。`talk_suspend_count == CLOCK.suspend_count() > 0` の間は、`wake_talk` は何も変えない。
+- 不変条件: `talk_suspend_count <= CLOCK.suspend_count()`。`CLOCK.suspend_count() == 0` の間と、`talk_suspend_count == CLOCK.suspend_count()` の間は、`wake_talk` は何も変えない。
 
 ## Error Handling
 
@@ -441,7 +442,7 @@ references: `node book/tools/gen-skill-refs.mjs` で `.claude/skills/pasta-lua-c
 
 - 新しいエラーの道は作らない。`act.req.date` が無いリクエスト（テストの手組みなど）では `wake_talk` は何もしない（`CLOCK.steady` が `nil`）。
 - 既定ハンドラの中の `SCENE.co_exec` のエラーは、今の `EVENT.fire` の決まり（`SHIORI.request` の xpcall）に任せる。シーンの中のエラーは止まるエラーとして今どおり表記になる。
-- `OnSysResume` が届かない・`OnSysSuspend` が届かないベースウェアでも、自動トークは今の間隔で出続ける（壊れる道は無い）。
+- `OnSysResume` が届かない・`OnSysSuspend` が届かないベースウェアでも、自動トークは今の間隔で出続ける（壊れる道は無い）。`OnSysSuspend` が届かないベースウェアでは、スリープ明けのおしゃべりは出ない（前提 2）。
 
 ### Monitoring
 
@@ -454,7 +455,7 @@ references: `node book/tools/gen-skill-refs.mjs` で `.claude/skills/pasta-lua-c
 - 6.1: brief の仮実装のテスト「正時の前に期限が来たおしゃべりは、時報の直後に出ず、時報から talk_interval_min 秒待つ」（10:59:40 に `hour_margin` で見送り → 11:00 に時報 → 待ちが 180〜300 秒 → 時報の 179 秒後の `check_talk` が `nil`）。直す前のコードでは落ちる。
 - 6.2: 「check_hour - all candidates miss」に、`next_talk_time` が呼ぶ前と同じであること（brief の形の 0 のまま）を足す。`vtest` の形で、`check_talk` で決めた 0 でない時刻が、候補の無い正時を過ぎても変わらないことも足す。
 - 6.3: 実機の順番のテスト（L978）の名前を「…時報は 1 回出て、おしゃべりは時報から数え直す」に改め、時報の 1 秒後の `check_talk` の期待を `nil` にする（brief の差分）。続けて `OnSysSuspend` を見た後に `wake_talk` を呼んでも `next_talk_time` が変わらないことを足す。正時をまたがない長いスリープ（最初の秒の `check_talk` が溜まったトークを返す）の後の `wake_talk` も `next_talk_time` を変えないことを足す。
-- `wake_talk` の単体: `OnSysSuspend` の後に自動トークが出ていなければ `next_talk_time` が今になり、次の秒の `check_talk` が thread を返すこと。`hour_margin` の間は `nil` で、正時を過ぎて時報の候補が無ければ出ること。時報の候補があれば時報の数え直しが勝つこと（要件 3.3・3.4）。`OnSysSuspend` を一度も見ていないときは今にすること（下の前提 2）。`act.req.date` が無ければ何もしないこと。`next_talk_time` が 0 のときは何もしないこと。
+- `wake_talk` の単体: `OnSysSuspend` の後に自動トークが出ていなければ `next_talk_time` が今になり、次の秒の `check_talk` が thread を返すこと。`hour_margin` の間は `nil` で、正時を過ぎて時報の候補が無ければ出ること。時報の候補があれば時報の数え直しが勝つこと（要件 3.3・3.4）。`OnSysSuspend` を一度も見ていないときは何もしないこと（下の前提 2）。`act.req.date` が無ければ何もしないこと。`next_talk_time` が 0 のときは何もしないこと。
 - 3.6 の単体: `wake_talk` の後に `restart_timers` を呼ぶと `next_talk_time` が 0 になること。
 - `virtual_clock_test.lua`: `OnSysSuspend` で `suspend_count()` が 1 増え、`OnSysResume`・`OnSecondChange` では増えないこと。`_reset` で 0 に戻ること。既存の実機の順番のテストが変わらず通ること（要件 3.10）。
 
@@ -479,10 +480,10 @@ references: `node book/tools/gen-skill-refs.mjs` で `.claude/skills/pasta-lua-c
 
 ## 前提（Design Assumptions）
 
-ディスカッションで確かめる前提を、番号付きで置く。設計はこの前提で書いてある。
+設計ディスカッション（2026-11-15）で、6 つとも確定した（2 は「回数 0 なら何もしない」に改めた）。
 
 1. **「復帰の後」は `OnSysSuspend` を見た回数で測る**。`clock.lua` に読み出しの口 `suspend_count()` と数え上げ 1 行を足す（飛びの判定・ほかの出力は変えない）。時間の窓（例: 最後の自動トークから 70 秒以内なら今にしない）と、時計がスリープの差を飲み込んだ秒の記録は採らない。窓は幅の根拠が無く短いスリープで外れる。飲み込んだ秒は 90 秒以下のスリープで記録されず、溜まったトークの二重の発行を防げない。`OnSysSuspend` は SSP が復帰の最初の秒より前に送り（2026-10-18 実機）、ほかのベースウェアのように眠る前に送っても、眠る前の数秒に自動トークが出ない限り同じ結果になる。
-2. **`OnSysSuspend` を一度も見ていないときの `OnSysResume` は、喋ってよいとみなす**（`suspend_count() == 0` なら今にする）。`OnSysResume` だけを送るベースウェアでは、溜まったトークが最初の秒に出ていると 2 回目が出ることがある。前のスリープの `OnSysSuspend` が残っていて今回は `OnSysSuspend` が来なかった場合は、前の回数と比べるので、前のスリープの後に自動トークが出ていれば今回は出さない。SSP は両方を送るので、どちらも特別な扱いを足さない。
+2. **`OnSysSuspend` を一度も見ていないときの `OnSysResume` は、何もしない**（`suspend_count() == 0` なら変えない）。今にすると、`OnSysResume` だけを送るベースウェアで正時をまたいで復帰したとき、時報の直後にランダムトークが出て、直す不具合そのものに戻る（設計検証の課題 2）。取りこぼしてもスリープ明けのおしゃべりが出ないだけで、ランダムトークはふつうの間隔に戻る。前のスリープの `OnSysSuspend` が残っていて今回は `OnSysSuspend` が来なかった場合は、前の回数と比べるので、前のスリープの後に自動トークが出ていれば今回は出さない。SSP は両方を送るので、どちらも特別な扱いを足さない。
 3. **`SecurityLevel` が `external` の `OnSysResume` も同じに扱う**。`CLOCK.observe` の `OnSysResume`・`OnSysSuspend` の印も SecurityLevel を見ない。害は次のトークが早まることだけである。
 4. **本文の無い時報のシーンもスリープ明けの 1 回と数える**（要件 1.7 と 3.4 から導かれる）。正時をまたいだスリープの時報を `＊時報03` で黙らせているゴーストでは、その時刻の復帰では何も喋らず、時報から間隔を数え直す。
 5. **マニュアルは `OnSysResume` の節を主要イベントに足し、止め方は本文の無い `＊OnSysResume` を先に示す**。`wake_talk` は内部設計の章にだけ書き、利用者向けの章の「仮想ディスパッチャ」の関数の節には足さない（ゴーストが呼ぶ関数ではないため）。
