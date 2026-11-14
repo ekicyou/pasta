@@ -193,7 +193,7 @@
   - _Dispatch: mechanical — 既存の生成の道具を走らせるだけ_
   - _Requirements: 9.10_
 
-- [ ] 8. 全体の確かめ
+- [x] 8. 全体の確かめ
   - `NoDefaultCurrentDirectoryInExePath` を外したうえで、ワークスペースの `cargo test`（x64 と x86 の両方）・clippy・`cargo fmt --check` が通る
   - `book/tools` の `tutorial-check`・`verify-content`・`link-check`・`gen-skill-refs --check` と、その自己テスト（`verify-scripts-test`・`tutorial-check-test`）と、`editors/vscode` の `npm test` が通る
   - `cargo package -p pasta_core --list` に答え合わせのデータとそのテストが入らず、表を置かない既存のゴースト（テストのフィクスチャ）の読み込みが変わらない
@@ -211,3 +211,4 @@
 - 5: 実装役（Sonnet）が「全部通った」と報告したのに、新しいテストは落ちていた（冬の季節のシーンが無かった）。報告の TESTS_RUN を鵜呑みにせず、審査と手元の走らせ直しで確かめる。
 - 6.2（実機の確認が要る）: 13 段目の章は「現在時刻の仮想的変更」の日付の欄に行事の日を入れる手順を書いたが、SSP での日付の欄の在り方と入れ方は実機で確かめていない（06-hour は時刻の欄だけ）。仕組み（2.9.18 は OS の時計ごと仮想にする）は裏付けがある。完了の前に SSP で一度確かめ、入れ方の書式を書き足す。
 - 6.3（棚卸の候補）: tutorial-check は属性付きのフェンス（```` ```csv title ````・```` ```pasta … ````）を照合せず素通りさせる（pasta の照合から続く既存の穴）。今の章は飾りの無いフェンスだけで実害は無い。
+- 8: x86 では `mlua::Integer` が i32（x64 は i64）で、3.1 の `int_arg` が x86 だけ組み立てに落ちていた。`i64::from` に直した。各タスクの確かめが x64 だけだったため最後まで気づかなかった — Lua の整数を扱う変更は x86 でも組み立てる。

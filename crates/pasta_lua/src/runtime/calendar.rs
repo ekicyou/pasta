@@ -10,9 +10,11 @@ use mlua::{Lua, Result as LuaResult, Table, Value};
 use pasta_core::{CalendarTable, holiday_name};
 
 /// Take one integer argument; anything else (float, string, nil) is a Lua error.
+// mlua::Integer is i32 on x86 LuaJIT and i64 on x64, so the widening is an identity on x64.
+#[allow(clippy::useless_conversion)]
 fn int_arg<T: TryFrom<i64>>(fname: &str, pos: usize, v: &Value) -> LuaResult<T> {
     let n = match v {
-        Value::Integer(n) => Some(*n),
+        Value::Integer(n) => Some(i64::from(*n)),
         Value::Number(f) if f.fract() == 0.0 => Some(*f as i64),
         _ => None,
     };
