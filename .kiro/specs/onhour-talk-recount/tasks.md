@@ -74,7 +74,7 @@
   - _Dispatch: mechanical — 設計が足す行と直す数を示している_
   - _Requirements: 5.4, 5.6_
 
-- [ ] 5. 全体の確かめ
+- [x] 5. 全体の確かめ
   - `NoDefaultCurrentDirectoryInExePath` を外して `cargo test -p pasta_lua` と `cargo test -p pasta_shiori` を通し、テストが書き換えた `sample.generated.lua` を戻す
   - 新しいファイルを含めて luacheck を通す（luarocks の lfs・argparse を LUA_PATH／LUA_CPATH に足せば同梱の luacheck が手元で動く）
   - 実機（SSP）の確かめを ghost_dev の「ぱすた開発」に頼むための項目（仮想時刻の年越しの時報・復帰の種類ごとの OnSysResume の回数と Reference0・短いスリープでの OnSysSuspend の順番）と、x86 の pasta.dll のありかを報告にまとめる。ghost_dev には触らない
