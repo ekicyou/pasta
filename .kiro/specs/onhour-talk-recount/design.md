@@ -304,6 +304,7 @@ function M.wake_talk(act) end
 - Preconditions: `REG.OnSysResume` の既定ハンドラが、ゴーストが受けておらず Reference0 が `auto` でないと決めた後に呼ぶ。
 - Postconditions:
   - `CLOCK.steady(act.req)` が `nil`（`act.req.date` が無い）なら何も変えない。
+  - `next_talk_time == 0`（読み込み直後・`restart_timers` の直後でまだ決めていない）なら何も変えない（`check_talk` の「初回は時刻を決めるだけ」の枝を飛ばさない。`restart_timers` の後の数え直しにも従う）。
   - `CLOCK.suspend_count() > 0` で、かつ `talk_suspend_count == CLOCK.suspend_count()`（最後の `OnSysSuspend` より後に自動トークを出した）なら何も変えない（要件 3.4）。
   - それ以外は `next_talk_time = CLOCK.steady(act.req)` にする（要件 3.1）。
 - Invariants: 門を飛ばさない。`next_hour_unix`・`seen_epoch`・`STORE` に触れない。同じスリープで 2 回呼ばれても、間に自動トークが出ていれば 2 回目は何も変えない。
@@ -453,7 +454,7 @@ references: `node book/tools/gen-skill-refs.mjs` で `.claude/skills/pasta-lua-c
 - 6.1: brief の仮実装のテスト「正時の前に期限が来たおしゃべりは、時報の直後に出ず、時報から talk_interval_min 秒待つ」（10:59:40 に `hour_margin` で見送り → 11:00 に時報 → 待ちが 180〜300 秒 → 時報の 179 秒後の `check_talk` が `nil`）。直す前のコードでは落ちる。
 - 6.2: 「check_hour - all candidates miss」に、`next_talk_time` が呼ぶ前と同じであること（brief の形の 0 のまま）を足す。`vtest` の形で、`check_talk` で決めた 0 でない時刻が、候補の無い正時を過ぎても変わらないことも足す。
 - 6.3: 実機の順番のテスト（L978）の名前を「…時報は 1 回出て、おしゃべりは時報から数え直す」に改め、時報の 1 秒後の `check_talk` の期待を `nil` にする（brief の差分）。続けて `OnSysSuspend` を見た後に `wake_talk` を呼んでも `next_talk_time` が変わらないことを足す。正時をまたがない長いスリープ（最初の秒の `check_talk` が溜まったトークを返す）の後の `wake_talk` も `next_talk_time` を変えないことを足す。
-- `wake_talk` の単体: `OnSysSuspend` の後に自動トークが出ていなければ `next_talk_time` が今になり、次の秒の `check_talk` が thread を返すこと。`hour_margin` の間は `nil` で、正時を過ぎて時報の候補が無ければ出ること。時報の候補があれば時報の数え直しが勝つこと（要件 3.3・3.4）。`OnSysSuspend` を一度も見ていないときは今にすること（下の前提 2）。`act.req.date` が無ければ何もしないこと。
+- `wake_talk` の単体: `OnSysSuspend` の後に自動トークが出ていなければ `next_talk_time` が今になり、次の秒の `check_talk` が thread を返すこと。`hour_margin` の間は `nil` で、正時を過ぎて時報の候補が無ければ出ること。時報の候補があれば時報の数え直しが勝つこと（要件 3.3・3.4）。`OnSysSuspend` を一度も見ていないときは今にすること（下の前提 2）。`act.req.date` が無ければ何もしないこと。`next_talk_time` が 0 のときは何もしないこと。
 - 3.6 の単体: `wake_talk` の後に `restart_timers` を呼ぶと `next_talk_time` が 0 になること。
 - `virtual_clock_test.lua`: `OnSysSuspend` で `suspend_count()` が 1 増え、`OnSysResume`・`OnSecondChange` では増えないこと。`_reset` で 0 に戻ること。既存の実機の順番のテストが変わらず通ること（要件 3.10）。
 
@@ -463,7 +464,7 @@ references: `node book/tools/gen-skill-refs.mjs` で `.claude/skills/pasta-lua-c
 
 - 6.4: 受けていないゴーストで、`OnSysSuspend` → 最初の `OnSecondChange`（何も出ない）→ `OnSysResume`（Reference0 `normal`）の応答が 204 で、次の門の開いた `OnSecondChange` の応答が OnTalk の出力の 200 であること。Status に `talking` がある秒は 204 で、解けた秒に出ること（要件 3.3）。
 - 6.3（結合）: `OnSysSuspend` → 最初の秒で時報が出る → `OnSysResume` → その後 `talk_interval_min` 秒より前の `OnSecondChange` では OnTalk が出ないこと。
-- 6.5: `＊OnSysResume` のシーンがあるとき（シーンが動き、`next_talk_time` が変わらない）、`GLOBAL.OnSysResume` の関数があるとき、`REG.OnSysResume` を代入したとき（ゴーストのハンドラだけが呼ばれる）、`REG:register` で真の値を返すとき、Reference0 が `auto` のとき、`＞自動トーク停止` の間に届いたとき（再開の後、すぐには出ない）に、スリープ明けのおしゃべりが出ないこと。逆に、鎖が全部 `nil` を返したとき（要件 4.3）と、`OnSysResume` の名前のシーンが条件漏れのとき（要件 4.4）は出ること。
+- 6.5: `＊OnSysResume` のシーンがあるとき（シーンが動き、`next_talk_time` が変わらない）、`GLOBAL.OnSysResume` の関数があるとき、`REG.OnSysResume` を代入したとき（ゴーストのハンドラだけが呼ばれる）、`REG:register` で真の値を返すとき、Reference0 が `auto` のとき、`＞自動トーク停止` の間に届いたとき（再開の後、すぐには出ない）に、スリープ明けのおしゃべりが出ないこと。逆に、鎖が全部 `nil` を返したとき（要件 4.3）と、`OnSysResume` の名前のシーンが条件漏れのとき（要件 4.4）は出ること。同じ復帰で Reference0 `auto` → `normal` の順に 2 回届いたとき、2 回目で出て、出た後の 3 回目では何も変わらないこと。
 - 6.6: 続きが待っているとき、本文の無い時報のシーンの後の決め直した時刻と、スリープ明けのおしゃべりの機会に、続きが出ること。台詞を出した時報は今どおり続きを捨てること（`EVENT.drive` を通すので、本物の続きの決まりで確かめる）。
 
 ### 既存のテスト（6.7）
@@ -471,7 +472,10 @@ references: `node book/tools/gen-skill-refs.mjs` で `.claude/skills/pasta-lua-c
 - 期待が変わるのは `virtual_dispatcher_spec.lua` L987 の 1 か所（時報の 1 秒後の `check_talk` が thread → `nil`）だけである。
 - 10 スイートの読み直しの並びに `sys_resume` を足す（期待は変えない）。
 - `cargo test -p pasta_lua`（Lua のスイートを含む）と `cargo test -p pasta_shiori` を通す。前に `NoDefaultCurrentDirectoryInExePath` を外し、テストが書き換えた `sample.generated.lua` は戻す。luacheck を新しいファイルにも通す。
-- 実機（SSP）の確かめは ghost_dev の「ぱすた開発」が受け持つ。pasta の側は x86（`i686-pc-windows-msvc`）の pasta.dll のありかを知らせるだけで、ghost_dev には触らない。
+- 実機（SSP）の確かめは ghost_dev の「ぱすた開発」が受け持つ。pasta の側は x86（`i686-pc-windows-msvc`）の pasta.dll のありかを知らせるだけで、ghost_dev には触らない。頼むときは次の項目を明記する（設計検証の課題 1）。
+  - 仮想時刻で 2026/12/31 23:59:30 → 1/1 0:00 の時報の後、`talk_interval_min` 秒より前にランダムトークが出ないこと。
+  - 利用者が起こした復帰と、スケジュールによる自動の復帰のそれぞれで、`OnSysResume` が何回届き、Reference0 が何か（`auto` しか来ないなら要件 3.7 を見直す）。
+  - 90 秒以下の短いスリープでも、`OnSysSuspend` が復帰の最初の秒より前に届くこと（SSP のスクリプトログか `pasta_log` で見る）。
 
 ## 前提（Design Assumptions）
 
