@@ -47,7 +47,7 @@
   - _Boundary: ReleaseAssetLinkCheck_
   - _Dispatch: standard — 新しい走査・名前の取り出し・読み取りの失敗の扱いを組む_
   - _Requirements: 2.3, 7.1, 7.8_
-- [ ] 2.5 (P) マニュアルの CI を添付の名前の変更でも走らせる
+- [x] 2.5 (P) マニュアルの CI を添付の名前の変更でも走らせる
   - マニュアルの CI の起動条件（push と pull request の paths）にリリース CI のファイルを足し、冒頭のコメントの起動条件にも書き足す
   - 起動条件の 2 つの paths の一覧にリリース CI のファイルが入り、ワークフローの YAML として読める
   - _Boundary: ManualCI_

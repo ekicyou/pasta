@@ -5,7 +5,9 @@
 #   クレート README（crates/*/README.md）・ルートの README.md・doc/SOUL.md（公開マニュアル URL の実在検査のため。
 #   pasta-runtime-internals-doc 要件 7.8・manual-link-anchor-check 要件 4）、
 #   hello-pasta の辞書（crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**。チュートリアルの照合のため）、
-#   pasta の TextMate 文法（editors/vscode/syntaxes/**。着色に使うため）。
+#   pasta の TextMate 文法（editors/vscode/syntaxes/**。着色に使うため）、
+#   リリース CI（.github/workflows/release.yml。link-check が最新版の固定リンクの名前を添付の名前と照らすため。
+#   manual-download-page 要件 7.8）。
 # PR とブランチでは検証（ビルド・検証スクリプト群）までを行い、Pages への公開は main のときだけ
 # （main への push と main での手動実行。github-pages の environment が main だけに公開を許すため）。
 # 権限はワークフロー全体を contents: read とし、pages: write・id-token: write は deploy ジョブにだけ与える。
@@ -31,6 +33,7 @@ on:
     paths:
       - 'book/**'
       - '.github/workflows/manual.yml'
+      - '.github/workflows/release.yml'
       - '.claude/skills/pasta-ghost-authoring/**'
       - '.claude/skills/pasta-lua-coding/**'
       - '.claude/skills/pasta-check/**'
@@ -44,6 +47,7 @@ on:
     paths:
       - 'book/**'
       - '.github/workflows/manual.yml'
+      - '.github/workflows/release.yml'
       - '.claude/skills/pasta-ghost-authoring/**'
       - '.claude/skills/pasta-lua-coding/**'
       - '.claude/skills/pasta-check/**'
