@@ -81,3 +81,8 @@
   - 完了の状態: 2 つの cargo test と luacheck が通り、作業ツリーに `sample.generated.lua` の差分が残っていない
   - _Dispatch: mechanical — 決まった検査を走らせるだけ_
   - _Requirements: 6.7, 2.6_
+
+## Implementation Notes
+
+- 完了時の棚卸（2026-11-15）: その場で解決 2 件（`clock.lua` の `suspend_count` の注釈・`sys_resume.lua` の `auto` の言い方。最終検証の指摘）、申し送り 3 件（`novel-talk-flow`・`novel-checkpoint-rollback`・`scene-exact-match` の brief。ディスパッチャの状態と `wake_talk`・`sys_resume.lua` の前方一致の入口）、起票 0 件。
+- 実機（SSP）の確かめは ghost_dev の「ぱすた開発」に頼む（年越しの時報の後の間隔・復帰の種類ごとの OnSysResume の回数と Reference0・短いスリープでの OnSysSuspend の順番）。結果で要件 3.7 か前提 1 が崩れたら、そのときに起票する。
