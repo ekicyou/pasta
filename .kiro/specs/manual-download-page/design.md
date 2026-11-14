@@ -141,7 +141,9 @@ book/
     ├── verify-static.mjs           # 8.4/8.6 の対象から一覧の章を外す
     ├── verify-search.mjs           # 8.2 で一覧の章は固有の語で検索する
     ├── link-check.mjs              # checkReleaseAssetLinks・種別 release-asset
-    └── link-check-test.mjs         # release-asset の自己テストの節
+    ├── link-check-test.mjs         # release-asset の自己テストの節
+    ├── verify-scripts-test.mjs     # T-intro/T-outro の期待件数から一覧の章を除き、T-notalk の件数を確かめる
+    └── gen-skill-refs-test.mjs     # 全章の chapterRegions の照合（K）から一覧の章を除く
 README.md                           # 配布物の一覧をページへのリンクに・パートの表の先頭に行
 .github/workflows/manual.yml        # paths に .github/workflows/release.yml
 ```
@@ -157,6 +159,7 @@ README.md                           # 配布物の一覧をページへのリン
 - `book/tools/talk/talk.mjs` — `NO_TALK_CHAPTERS` を足し、冒頭の共用 export の一覧に書き足す。
 - `book/tools/verify-content.mjs`・`verify-static.mjs`・`verify-search.mjs` — 「NoTalkExemption」のとおり。冒頭の説明コメントにも例外を 1 行書く。
 - `book/tools/link-check.mjs`・`link-check-test.mjs` — 「ReleaseAssetLinkCheck」のとおり。冒頭の説明コメントに検出の項を足す。
+- `book/tools/verify-scripts-test.mjs`・`gen-skill-refs-test.mjs` — 「NoTalkExemption」の Implementation Notes のとおり。目次の全章を数える・回す自己テストから一覧の章を除く（直さないと CI の「Book tools self-tests」が落ちる）。
 - `.github/workflows/manual.yml` — `on.push.paths` と `on.pull_request.paths` に `'.github/workflows/release.yml'` を足し、冒頭のコメントの起動条件に書き足す（添付の名前を変えたときにもマニュアルの検査が走るように）。
 
 ## System Flows
@@ -411,7 +414,10 @@ export const NO_TALK_CHAPTERS: Readonly<Record<string, string>>;
 
 **Implementation Notes**
 - Integration: `verify-content` の D と T の二つのループに 1 つずつ分岐を足す（`ch = rel.slice(SRC.length + 1)`）。`verify-static` は 715 行目の検査の直前で除外した配列を作る。`verify-search` は 8.2 のループの語の取り方に分岐を足す。
-- Validation: 自己テストへの響きは無い（`verify-static` の自己テストは `grammar/index.html` を壊す型・`verify-search` の自己テストは自前の写し・`verify-scripts-test` は件数を厳密に見ない）。実リポジトリでの通過が確かめになる。
+- Validation: 自己テストのうち 2 本が目次の全章に縛られているので、合わせて直す（設計の検証で見つかった。コードで確かめた）。
+  - `verify-scripts-test.mjs`（L82-85）は `T-intro`・`T-outro` の実行件数が目次の章の数と等しいことを求める。期待件数を「目次の章 − `NO_TALK_CHAPTERS` の章」にし、`T-notalk` が一覧の章の数だけ走ることを確かめる行を足す。`T-syntax` の件数と章の集合の照合は今のまま（外さないため）。
+  - `gen-skill-refs-test.mjs`（L596-612 の K）は `book/src` の全章で `chapterRegions` が投げないことを求める。`---` の無い一覧の章は `bad-structure` で投げるので、ループから `NO_TALK_CHAPTERS` の章を除く（`gen-skill-refs.mjs` は既に `talk.mjs` を import しているので依存の向きは変わらない）。K-10（ファイルと目次の章の一致）は今のまま。
+  - `verify-static` の自己テストは `grammar/index.html` を壊す型、`verify-search` の自己テストは自前の写し、`talk-test` の J-9 は区切りの無い章を飛ばすので、どれも影響しない。
 - Risks: 一覧が逃げ道に使われ得る。規約（AuthoringRules の 5）で「ダウンロードのページだけ」と縛る。
 
 #### ReleaseAssetLinkCheck（`book/tools/link-check.mjs`・`link-check-test.mjs`）
@@ -439,7 +445,7 @@ type BrokenLink = {
 };
 
 // 固定リンクの URL: https://github.com/${REPO_SLUG}/releases/latest/download/<名前>
-// <名前> は [\w.-]* で取る（ASCII の名前の外の文字で終わる。空の名前も違反）。
+// <名前> は [\w.-]* で取り、末尾の . を落とす（裸の URL の直後の句点を名前に含めない）。空の名前も違反。
 export function checkReleaseAssetLinks(repoRoot?: string): BrokenLink[];
 ```
 - 事前条件: なし（`book/src` が無ければ空を返す。既存の `listMarkdownFiles` と同じ）。
@@ -490,6 +496,7 @@ export function checkReleaseAssetLinks(repoRoot?: string): BrokenLink[];
 ### Unit Tests（自己テスト）
 
 - `link-check-test.mjs` の新しい節: ReleaseAssetLinkCheck の (1)〜(6)（上の Implementation Notes）。`BOOK_KINDS` に `release-asset` が入り、`reportLinkCheck` が [1] に出すことも 1 件確かめる。
+- `verify-scripts-test.mjs`・`gen-skill-refs-test.mjs`: 一覧の章を除いた期待で、`node book/tools/verify-scripts-test.mjs`・`node book/tools/gen-skill-refs-test.mjs` が通る（NoTalkExemption の Implementation Notes）。
 
 ### Integration Tests（実リポジトリでの CI の検査）
 
