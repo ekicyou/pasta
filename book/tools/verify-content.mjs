@@ -22,6 +22,7 @@
 //      章構造（extractBody）、題材章 8 章の必須 H2 7 種（この順）、機構語の網羅、概要章の対象外ツールと読者
 //   T. 台詞部品（manual-claudia-theme 4.7, 5.2, 7.1–7.3, 10.2, 10.3, 10.8） — 全章（D 系の章＋debug/＋雑記）の
 //      記法（T-syntax）・導入と締めが二人の台詞だけ（T-intro・T-outro）、顔画像（T-assets）、執筆規約の追従（T-authoring）
+//   例外: talk.mjs の NO_TALK_CHAPTERS の章は D-voice・T-intro・T-outro を外し、台詞が 1 つも無いこと（T-notalk）を求める（T-syntax は外さない）
 //
 // 成功で exit 0、失敗（1 件でも）で exit 1。
 
@@ -31,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { runTutorialCheck, listGuideChapters, findProseParagraphs } from './tutorial-check.mjs';
 import { GENERATION_MAP, findVoice, extractBody, chapterRegions } from './gen-skill-refs.mjs';
 import { maskFences, listMarkdownFiles, summaryChapters } from './link-check.mjs';
-import { SPEAKERS, FACE_DIR, MAX_FACE_BYTES, scanTalk, checkRegion } from './talk/talk.mjs';
+import { SPEAKERS, FACE_DIR, MAX_FACE_BYTES, NO_TALK_CHAPTERS, scanTalk, checkRegion } from './talk/talk.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '../..');
@@ -340,7 +341,8 @@ function listChapters(dirs) {
     const md = read(rel);
     // D1: 散文部（コードフェンス除去後）にキャラ口調がある = 導入/締めボイスの存在。
     const prose = stripCodeFences(md);
-    assert(
+    // 台詞を置かない章は口調を検査しない（記録もしない）。
+    if (!Object.hasOwn(NO_TALK_CHAPTERS, rel.slice(SRC.length + 1))) assert(
       `D-voice:${rel}`,
       hasVoice(prose),
       `${rel} の散文部にキャラ口調（導入/締め）がある`,
@@ -602,6 +604,12 @@ for (const ch of INTERNALS_CHAPTERS) {
     const { blocks, errors } = scanTalk(md);
     // T-syntax: 記法の不正を全件（章パス・行番号・種類・詳細）。
     report(`T-syntax:${ch}`, rel, errors, `${rel} の台詞部品の記法に不正なし`);
+    // T-notalk: 台詞を置かない章は導入・締めの代わりに台詞が 1 つも無いことを求める。
+    if (Object.hasOwn(NO_TALK_CHAPTERS, ch)) {
+      assert(`T-notalk:${ch}`, blocks.length === 0, `${rel} に台詞が 1 つも無い`,
+        `${rel} に台詞がある: ${blocks.map((b) => `${rel}:${b.line}`).join(' / ')}`);
+      continue;
+    }
     // T-intro・T-outro: 導入・締めが両話し手の台詞だけでできている（表紙だけ扉とクレジットを許す）。
     let regions;
     try {
