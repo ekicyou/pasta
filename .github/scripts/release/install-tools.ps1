@@ -29,7 +29,8 @@ try {
     # pwsh -File は `-Name a,b` を 1 つの文字列で渡すため、param の ValidateSet は使えない。分けてから受け付ける値と照合する。
     $names = $Name -split ','
     $bad = @($names | Where-Object { $tools.Keys -notcontains $_ })
-    if ($bad) { throw "-Name に受け付けない値: $($bad -join ', ')（受け付けるのは $($tools.Keys -join ', ')）" }
+    # @('') は偽になるので要素の数で見る（空の要素も弾く）
+    if ($bad.Count) { throw "-Name に受け付けない値: $(($bad | ForEach-Object { "'$_'" }) -join ', ')（受け付けるのは $($tools.Keys -join ', ')）" }
 
     # 手元では RUNNER_TEMP が無いので OS の一時フォルダを使う。
     $base = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }

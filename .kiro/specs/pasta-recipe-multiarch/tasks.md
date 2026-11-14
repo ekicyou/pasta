@@ -16,7 +16,7 @@
   - _Requirements: 7.3_
 
 - [ ] 2. arch ごとに 2 つの zip を作る
-- [ ] 2.1 配布物の作成スクリプトに arch の切り替えを入れる
+- [x] 2.1 配布物の作成スクリプトに arch の切り替えを入れる
   - `-Arch` を `ValidateSet('x64','arm64')`・既定は x64・arm64 の順で両方にし、arch と triple の表を 2 行持つ
   - arch ごとに、その arch の zip を消す → `--target <triple>` 付きの Tauri のビルド（x64 にも付ける）→ `target/<triple>/release/` の exe の在る確かめ → `cargo about --target <triple>` → 表示をつなぐ → `release/pasta-recipe.<arch>.zip` → 中身の並びの自己検査
   - `npm ci` は最初の 1 回。どの段の失敗でもその arch の zip を消して `ERROR:` の行と終了コード 1 で止まり、残りの arch は作らず、先に作り終えた arch の zip は残す
@@ -119,3 +119,4 @@
 ## Implementation Notes
 - 1.2: cargo-about 0.9.2 の `generate --target <triple>` は `about.toml` の `targets` を置き換える（`--help` の "Overrides the `targets` configuration value"。2 つの triple で表示が違う: x64 は MIT 226 件で `cpufeatures 0.3.1` の節が在り、aarch64 は 225 件で無い）。`windows_aarch64_msvc` は lock に在るが `jni`（Android だけ）経由でしか届かず、どちらの arch の表示にも出ない。arch の目印は `cpufeatures`。
 - 1.2: `install-tools.ps1 -Name a,b` は `pwsh -File` で 1 つの文字列になるので、`ValidateSet` でなく `,` で分けて照合する。`RUNNER_TEMP` が無ければ OS の一時フォルダ、`GITHUB_PATH` が無ければ足さずに置き場を出す。
+- 2.1: `package.ps1 -Arch` も `,` で分けて照合（`if ($bad.Count)`。`@('')` は偽になるので空の要素を通さない。install-tools.ps1 も同じ）。手元の zip: x64 4,411,365 バイト・arm64 4,298,602 バイト。
