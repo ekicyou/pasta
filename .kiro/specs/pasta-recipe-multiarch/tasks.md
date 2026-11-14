@@ -101,7 +101,7 @@
   - _Requirements: 1.7, 8.5, 8.7_
 
 - [ ] 7. タグを打たない確かめと完了の証拠
-- [ ] 7.1 手元で作成・検査・自己テストを通しで確かめ、古い名前の残りを調べる
+- [x] 7.1 手元で作成・検査・自己テストを通しで確かめ、古い名前の残りを調べる
   - 手元で `package.ps1`（引数なし）→ `verify-recipe-zips.ps1 -Version <リポジトリの版>` → `release-scripts-test.ps1` を走らせ、全部成功する
   - `completed/`・各 spec の `brief.md`・この spec の文書・`roadmap.md` のこの spec の行を除いて `pasta-recipe.zip` を grep し、0 件になる
   - 完了の状態: 3 つのコマンドの成功と grep の 0 件を記録に残す
@@ -122,3 +122,4 @@
 - 2.1: `package.ps1 -Arch` も `,` で分けて照合（`if ($bad.Count)`。`@('')` は偽になるので空の要素を通さない。install-tools.ps1 も同じ）。手元の zip: x64 4,411,365 バイト・arm64 4,298,602 バイト。
 - 3.2: 自己テストの偽の dumpbin は `.ps1` を `&` で呼ぶ（shebang・実行ビット不要）。偽の exe の版は 0.0.0 と読まれ版の問題が一緒に出る。Linux の pwsh では未確認（7.2 の CI の job `release-scripts` で確かめる）。
 - 4.2: release スキルの `/7` には 2 種ある。添付の数（今は 8）と、`集計`・状態の表の公開先の数（5 クレート＋Marketplace＋GitHub Release＝7）。後者は 7 のまま。
+- 7.1（2026-11-14 手元・cargo-about 0.9.2）: 引数なしの `package.ps1` → exit 0（x64 4,411,364 バイト・arm64 4,298,600 バイト）、`verify-recipe-zips.ps1 -Version 0.5.2` → exit 0、`release-scripts-test.ps1` → exit 0、Cargo.lock 不変。`pasta-recipe.zip` の grep は除外の外で roadmap.md の名前を変えた説明の 2 行（343・385 行）だけ。
