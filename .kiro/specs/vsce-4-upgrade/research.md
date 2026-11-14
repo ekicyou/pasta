@@ -211,17 +211,18 @@
 - **Selected Approach**: `origin/main` から作業用のブランチを切り、`package.json`・`package-lock.json` の 2 つだけをコミットして PR → squash マージ。その後 spec のブランチへ `git merge origin/main`
 - **Trade-offs**: ブランチが 1 本増える。spec の文書を main へ先に入れずに済む
 
-### Decision: 3.9.2 の基準の確かめを、版を上げる PR のマージの前に取る（仮置き・Q3）
+### Decision: 3.9.2 の基準の確かめを、版を上げる PR のマージの前に取る
 
 - **Context**: 要件 5.1・5.4 は「同じ設定の 3.9.2 では成功していたか」で分岐する。最後の `release-setup-check.yml` は 2026-10-08（Node 20）で、今の main（Node 22・3.9.2）では走らせていない
 - **Selected Approach**: マージの直前に main で一度 `release-setup-check.yml` を回して基準にする。v0.5.2 の `publish-vsce` の成功（2026-11-07）を代わりの基準にもできる
 - **Trade-offs**: dispatch が 1 回増える（公開なし・30 秒ほど）
+- **Decided**: 2026-11-14 の設計ディスカッションで推奨案（回す）に決めた。落ちたときに版のせいか設定のせいかを見分けるため
 
-### Decision: 要件 1.3 の `minimatch` は残ると仮に置く（Q1）
+### Decision: 要件 1.3 の `minimatch` は残し、理由を記録する
 
 - **Context**: 測った結果、4.1.1 では消えない
 - **Selected Approach**: `glob` が消えることを確かめ、`minimatch` は「消せない勧告」として理由（直った版が 11 系だけ・vsce 4.1.1・`eslint`・`typescript-eslint` が `^10` を要る）を記録する。`overrides` は使わない
-- **Follow-up**: 要件 1.3 の文言を直すかを、設計のディスカッションで決める
+- **Decided**: 2026-11-14 の設計ディスカッションで要件 1.3 の文言を直した。配る VSIX には入らない道具の中の DoS で、4.x にする主な目的（保守の続く版・`glob` の解消）は果たせるため
 
 ## 9. Risks & Mitigations
 

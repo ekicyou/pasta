@@ -20,7 +20,7 @@
 - `--oidc`（Marketplace の trusted publishing）への移行（確かめがだめだったときだけ比べる。要件 5.2）
 - `engines.vscode`・`@types/vscode`・`@types/node`・`typescript`・拡張のコード
 - Node の版（3 つのワークフローとも既に 22）
-- `minimatch` GHSA-g3hv-75wg-m249 の解消（4.1.1 では消えない。未決事項 Q1）
+- `minimatch` GHSA-g3hv-75wg-m249 の解消（4.1.1 では消えない。理由を記録して残す。要件 1.3）
 - `.vscodeignore` の既存の取りこぼし（`eslint.config.mjs` が VSIX に入る。3.9.2 から同じで、この spec の差ではない）
 - 開発機の大域の `vsce`（`release-state.ps1` の `show` 用。既に 4.0.0）
 
@@ -147,7 +147,7 @@ flowchart TB
 ```
 
 - **手元の確かめ（`Local`）**: 版を上げる PR を作る前に、spec のブランチで行う。lock の差分の確かめ（1.6）・`npx --no-install vsce --version` = 4.1.1（1.2）・`npm audit`（1.3・1.4）・本物の WASM での VSIX の比べ（2.1〜2.4）・`npm test`（2.5 の手元の代わり）・`release-scripts-test.ps1`（3.7）・`vsce show ekicyou.pasta-vscode --json`（4.6）
-- **基準（`Baseline`）**: 今の main（3.9.2）で `release-setup-check.yml` を一度回し、`verify-pat` と `show` が通ることを記録する。失敗の原因を vsce の版に帰すかどうか（5.1・5.4）の比べの相手になる（仮置き。未決事項 Q3）
+- **基準（`Baseline`）**: 今の main（3.9.2）で `release-setup-check.yml` を一度回し、`verify-pat` と `show` が通ることを記録する。失敗の原因を vsce の版に帰すかどうか（5.1・5.4）の比べの相手になる（2026-11-14 の設計ディスカッションで決めた。最後の setup-check は 2026-10-08 で、その後の Azure 側の変化を言い切れないため）
 - **版を上げる PR（`BumpPR`）**: `origin/main` から切ったブランチに、`package.json`・`package-lock.json` の 2 つだけを載せる（そのブランチの上で lock を作り直す。統合の手順を参照）。spec の文書は載せない（4.1）。`build.yml`（`vscode-test` を含む）の結果は待たずにマージしてよい（memory の運用）。ただし main が赤になれば追いかけて直す（2.5）
 - **確かめ（`Check`）**: マージの直後に、同じセッションで `gh workflow run release-setup-check.yml --ref main` を回す。マージから確かめまでの間はリリースタグを push しない（4.4）
 - **判定（`Judge`）**: run の緑だけでは判定しない（`verify-pat` の step は `continue-on-error`）。job summary の 2 つの行が「成功」であることで判定する（4.2・4.3）
@@ -159,7 +159,7 @@ flowchart TB
 |-------------|---------|------------|------------|-------|
 | 1.1 | 指定 `^4.1.1`・lock 4.1.1 | 依存の定義 | `package.json` 241 行・lock | Local |
 | 1.2 | `npm ci` 後に `vsce --version` = 4.1.1 | 依存の定義 | `npx --no-install vsce --version` | Local |
-| 1.3 | `glob`・`minimatch` の勧告が出ない | 依存の定義・勧告の照合 | `npm audit` | Local（`minimatch` は Q1） |
+| 1.3 | `glob`・`minimatch` の勧告が出ない | 依存の定義・勧告の照合 | `npm audit` | Local（`minimatch` は残る理由を記録） |
 | 1.4 | 新しい勧告の一覧と扱い | 勧告の照合 | `npm audit`・research.md | Local |
 | 1.5 | `engines.vscode` などを変えない | 依存の定義 | `package.json` の差分 | Local |
 | 1.6 | vsce 以外の直接の依存を変えない | 依存の定義 | lock の差分 | Local |
@@ -249,7 +249,7 @@ flowchart TB
 - 期待（2026-11-14 に測った）: `glob` GHSA-3g3m-2fjr-6pw4 は消える。`minimatch` GHSA-g3hv-75wg-m249 は残る（直った版は 11.0.1 以上だけ。vsce 4.1.1・`eslint` 10.14.0・`typescript-eslint` 8.72.2 が `minimatch ^10` を要る）。増える勧告は無い
 
 **Implementation Notes**
-- **仮置き（Q1）**: 要件 1.3 の `minimatch` の半分は満たせない。設計では `overrides` を使わず、残る理由を記録して扱う。要件の文言の直しはディスカッションで決める
+- 要件 1.3 のとおり、`minimatch` は `overrides` を使わず残る理由を記録して扱う（`overrides` は道具 3 つの確かめを増やし、要件 1.6 に反する）
 - 増えた勧告が出たら（1.4）、互換の範囲（`npm audit fix`・`--force` なし）で消し、消せないものは理由を書く
 
 #### VSIX の比べ
@@ -409,7 +409,7 @@ flowchart TB
 
 - lock の差分: `packages` の単位で数え、vsce の配下の外の差が 0（1.6）。`package.json` の差が 1 行（1.1・1.5）
 - `npm ci` の後に `npx --no-install vsce --version` が `4.1.1`（1.2）
-- `npm audit --json` を 3.9.2 と 4.1.1 で比べ、`glob` GHSA-3g3m が消え、増えた勧告が無いこと（1.3・1.4。`minimatch` は Q1）
+- `npm audit --json` を 3.9.2 と 4.1.1 で比べ、`glob` GHSA-3g3m が消え、増えた勧告が無いこと（1.3・1.4。`minimatch` は残る理由を記録）
 - 本物の WASM で作った 3.9.2 と 4.1.1 の VSIX の zip の項目の一覧が同じで、必須の 3 つを含み、名前が `pasta-vscode-<版>.vsix`（2.1〜2.4）
 - `npm test`（`vscode-test` と同じ。lock を入れ直した後の拡張の試験。2.5 の手元の代わり）
 - `pwsh -NoProfile -File .github/scripts/release/release-scripts-test.ps1` が項目 12 を含めて全項目合格（3.7）
@@ -435,8 +435,3 @@ flowchart TB
 ## Migration Strategy
 
 System Flows の「統合と確かめの順番」が移行の段階である。戻す引き金は「`verify-pat` が 4.1.1 だけで失敗」と「`vscode-test` が直せない赤」の 2 つで、戻し方は squash のコミットの revert の PR 1 つ。
-
-## 未決事項（設計のディスカッションへ）
-
-- **Q1（要件 1.3 と測りの食い違い）**: `minimatch` GHSA-g3hv-75wg-m249 は 4.1.1 でも消えない。仮置き: `glob` が消えることを 1.3 の合格とし、`minimatch` は残る理由を記録する。推奨: 要件 1.3 を「`glob` GHSA-3g3m-2fjr-6pw4 を報告しない。`minimatch` GHSA-g3hv-75wg-m249 は vsce 4.1.1・`eslint`・`typescript-eslint` が `minimatch ^10` を要るため残り、理由を記録する」に直す
-- **Q3（3.9.2 の基準の確かめ）**: 仮置き: 版を上げる PR のマージの前に、main で一度 `release-setup-check.yml` を回す。推奨: 回す（公開なし・30 秒ほどで、5.1 と 5.4 の見分けがはっきりする）

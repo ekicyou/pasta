@@ -3,7 +3,7 @@
 ## Project Description (Input)
 **誰が困っているか**: pasta のリリースを回す開発者（とリリース CI）。VSCode 拡張 `ekicyou.pasta-vscode` の VSIX のビルドと Marketplace への公開に、パッケージの道具 `@vscode/vsce` を使っている。
 
-**今の状況**: `editors/vscode/package.json` は `"@vscode/vsce": "^3.0.0"`、lock は 3.9.2。vsce は 4.x（最新 4.1.1・Node 22 以上が要る）が出ていて、3.x は追いかけるだけになる。3.x の配下に残る勧告（`glob` GHSA-3g3m-2fjr-6pw4・`minimatch` GHSA-g3hv-75wg-m249、どちらも moderate）は 4.x でしか消えない。リリース CI の Node は `ponytail-manual-ci` が 22 にした。公開は Azure/login の OIDC の後に `vsce publish --azure-credential`（`.github/scripts/release/publish-vsix.ps1`）で行っていて、この道が 4.x でも通るかは、公開してみるまで本当には分からない。`release-setup-check.yml`（`verify-pat --azure-credential` と `show`）は environment の保護規則で main からしか走らない。
+**今の状況**: `editors/vscode/package.json` は `"@vscode/vsce": "^3.0.0"`、lock は 3.9.2。vsce は 4.x（最新 4.1.1・Node 22 以上が要る）が出ていて、3.x は追いかけるだけになる。3.x の配下に残る勧告のうち `glob` GHSA-3g3m-2fjr-6pw4（moderate）は 4.x でしか消えない（`minimatch` GHSA-g3hv-75wg-m249 は、vsce 4.1.1・`eslint`・`typescript-eslint` が `minimatch ^10` を要り、直った版が 11.0.1 以上だけなので残る。2026-11-14 に測った）。リリース CI の Node は `ponytail-manual-ci` が 22 にした。公開は Azure/login の OIDC の後に `vsce publish --azure-credential`（`.github/scripts/release/publish-vsix.ps1`）で行っていて、この道が 4.x でも通るかは、公開してみるまで本当には分からない。`release-setup-check.yml`（`verify-pat --azure-credential` と `show`）は environment の保護規則で main からしか走らない。
 
 **何を変えたいか**: VSIX のビルドと Marketplace への公開が vsce 4.x で通るようにし、公開の道が 4.x で通ることを次のリリースの前に `release-setup-check.yml` で確かめてある状態にする。公開の認証は OIDC のまま（長期のトークン `VSCE_PAT` を置かない）。拡張の中身（`engines.vscode`・`@types/vscode`・`@types/node`）と typescript 7 は動かさない。
 
@@ -40,7 +40,7 @@ VSCode 拡張のパッケージと公開の道具 `@vscode/vsce` を 3.9.2 か�
 #### Acceptance Criteria
 1. The 拡張の依存の定義 shall `@vscode/vsce` の版を 4.x の範囲で指定し、lock で 4.1.1 に固定する（指定の範囲は `^4.1.1`。4.0.0 は OIDC のトークン交換が壊れていた版なので下限で外す）
 2. When `editors/vscode` で `npm ci` を行ったとき, the 拡張の開発環境 shall lock の 4.x の vsce を入れ、`npx --no-install vsce --version` が 4.1.1 を返す
-3. When 4.x へ上げた lock で `npm audit` を行ったとき, the 拡張の依存 shall `glob` GHSA-3g3m-2fjr-6pw4 と `minimatch` GHSA-g3hv-75wg-m249 を報告しない
+3. When 4.x へ上げた lock で `npm audit` を行ったとき, the 拡張の依存 shall `glob` GHSA-3g3m-2fjr-6pw4 を報告せず、開発者は残る `minimatch` GHSA-g3hv-75wg-m249 の理由（vsce 4.1.1・`eslint`・`typescript-eslint` が `minimatch ^10` を要り、直った版が 11.0.1 以上だけ。配る VSIX には入らない）を記録する。`overrides` で上げない
 4. If 4.x へ上げた lock に、3.9.2 の lock には無かった勧告が現れたとき, the 開発者 shall その勧告を一覧にして、互換の範囲で消せるものは消し、消せないものは理由を残す
 5. The 拡張の依存の定義 shall `engines.vscode`・`@types/vscode`・`@types/node`・`typescript` の版の指定を変えない
 6. The 拡張の依存の定義 shall vsce 以外の直接の依存の版の指定を変えない（lock の中の推移的な依存の入れ替わりは、vsce を上げたことによるものだけ）
