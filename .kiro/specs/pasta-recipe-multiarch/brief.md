@@ -78,7 +78,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 ## Existing Spec Touchpoints
 
 - **Extends**: なし（`pasta-recipe` は `completed/` にあり、範囲外にしていた arm64 をこの spec が引き取る）。
-- **Adjacent**: `pasta-dll-multiarch`（`.cargo/config.toml` の aarch64 の行と `release.yml` を共有する。同じウェーブに置かない）。`vsce-4-upgrade`（`release.yml`。同じウェーブに置かない）。
+- **Adjacent**: `pasta-dll-multiarch`（`.cargo/config.toml` の aarch64 の行と `release.yml` を共有する。同じウェーブに置かない）。`vsce-4-upgrade` は 2026-11-14 に入った（`release.yml` の vsce まわりを変えたので、着手の前に今の `release.yml` を読み直す）。
 
 ## Constraints
 

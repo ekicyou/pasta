@@ -11,3 +11,4 @@ package-lock.json
 wasm/README.md
 wasm/package.json
 out/test/**
+eslint.config.mjs
