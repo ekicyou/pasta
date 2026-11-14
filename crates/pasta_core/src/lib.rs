@@ -19,6 +19,7 @@
 //! ```
 
 pub mod actor_font;
+pub mod calendar;
 pub mod error;
 pub mod registry;
 
