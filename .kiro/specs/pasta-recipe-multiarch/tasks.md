@@ -77,7 +77,7 @@
   - _Depends: 1.2, 2.1, 3.1_
   - _Requirements: 6.1, 6.2, 6.3, 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 5.3 main の CI に arm64 のランナーの 2 つの job を足す
+- [x] 5.3 main の CI に arm64 のランナーの 2 つの job を足す
   - `recipe-arm64-test`（`windows-11-arm`・`needs` なし）: checkout → rust-toolchain（host の aarch64）→ rust-cache（`editors/recipe/src-tauri`）→ setup-node 22 → `npm ci` → `npm run build` → `cargo test --locked --manifest-path src-tauri/Cargo.toml`
   - `recipe-arm64-smoke`（`windows-11-arm`・`needs: recipe`・checkout なし）: `pasta-recipe-zips` を落として arm64 の zip を展開し、exe を起動して 30 秒まで 1 秒ごとに見る。exe が終わった → 失敗（終了コード）、`ParentProcessId` が exe の `msedgewebview2.exe` が在る → 成功、30 秒で無い → 失敗。最後に exe を止める
   - 5.2 と同じ `build.yml` を書き換えるので 5.2 の後に行う

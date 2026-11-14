@@ -221,6 +221,82 @@ jobs:
             release/pasta-recipe.arm64.zip
           if-no-files-found: error
 
+  # arm64 のランナーで pasta-recipe の Rust のテストを走らせる（pasta-recipe-multiarch 要件 6.4）。
+  recipe-arm64-test:
+    name: pasta-recipe (arm64 test)
+    runs-on: windows-11-arm
+    defaults:
+      run:
+        working-directory: editors/recipe
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # targets を書かなければ host の aarch64-pc-windows-msvc だけになる。
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: editors/recipe/src-tauri
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: editors/recipe/package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      # generate_context! が dist/ を要る。
+      - name: Frontend build
+        run: npm run build
+
+      - name: Rust tests
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+
+  # job recipe が x64 のランナーで作った arm64 の exe を、arm64 のランナーで起動して落ちないことを見る（要件 6.5）。
+  # 合格は「30 秒のうちに exe の子の msedgewebview2.exe が立ち、その時点で exe が生きている」（2026-11-14 設計議題 2）。
+  recipe-arm64-smoke:
+    name: pasta-recipe (arm64 smoke)
+    needs: recipe
+    runs-on: windows-11-arm
+    steps:
+      - name: Download pasta-recipe zips
+        uses: actions/download-artifact@v8
+        with:
+          name: pasta-recipe-zips
+          path: zips
+
+      - name: Extract arm64 zip
+        run: Expand-Archive -LiteralPath zips/pasta-recipe.arm64.zip -DestinationPath "$env:RUNNER_TEMP/recipe-arm64"
+
+      - name: Smoke test (start exe and wait for WebView2)
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'recipe-arm64/pasta-recipe.exe'
+          $p = Start-Process -FilePath $exe -PassThru
+          $null = $p.Handle  # すぐ終わったときも ExitCode を読めるよう handle を先に開く
+          $ok = $false
+          try {
+            for ($i = 1; $i -le 30; $i++) {
+              Start-Sleep -Seconds 1
+              if ($p.HasExited) { Write-Error "pasta-recipe.exe exited after $i s (exit code $($p.ExitCode))"; break }
+              if (Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe' AND ParentProcessId = $($p.Id)") {
+                Write-Host "OK: msedgewebview2.exe started as a child of pasta-recipe.exe after $i s"
+                $ok = $true; break
+              }
+            }
+            if (-not $ok -and -not $p.HasExited) { Write-Error 'msedgewebview2.exe did not start within 30 s' }
+          } finally {
+            # 木ごと止める（WebView2 の子を残すとランナーが待つ）。
+            if (-not $p.HasExited) { taskkill /T /F /PID $p.Id | Out-Null }
+          }
+          # taskkill の終了コードを step の結果にしない。
+          if ($ok) { exit 0 } else { exit 1 }
+
   # VS Code 拡張（editors/vscode）の試験（grammar・unit・e2e。偽の vscode で Node だけで走る）。
   # 共有（editors/shared）へ移した後の取りこぼしを main で見つける（pasta-recipe-dev-actions 要件 13.3）。
   # wasm/ は wasm-pack で作る生成物なので作らず、本物の WASM を読む 3 本だけを外す（PASTA_VSCODE_NO_WASM）。
