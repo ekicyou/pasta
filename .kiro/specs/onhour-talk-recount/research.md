@@ -200,3 +200,47 @@
 6. OPEN QUESTION 4: 鎖で全部見送った回・条件漏れの回を「受けていない」とみなすか。既定を鎖の底に置けば、今の決まりで自然にそうなる。
 7. 既定ハンドラの置き場所（新しいファイル `event/sys_resume.lua` か、既存のファイルに同居か）と、既定ハンドラの表を「14 行」にすること。
 8. 仮実装の差分（brief）を写し直すときの扱い: この作業ツリーには無いので、brief の差分を正として当て直す。
+
+## 8. 設計フェーズの調査と決定（2026-11-14・kiro-spec-design）
+
+### 8.1 調査の範囲
+
+- 種類: Light（既存の仮想ディスパッチャと既定ハンドラの延長。新しい外部依存なし。Web の調査はしていない。ukadoc の `OnSysResume` は §2.3 のまま）。
+- 読んだもの: `virtual_dispatcher.lua`（全文）・`clock.lua`（全文）・`event/boot.lua`・`event/second_change.lua`・`event/external_control.lua`（冒頭）・`event/init.lua`（既定ハンドラの読み込みの並び・`EVENT.no_entry`・`EVENT.drive`・`EVENT.fire`）・`event/register.lua`（鎖の決まり）・`entry.lua`（`pause_auto_talk`／`resume_auto_talk`）・`pasta_shiori/src/lua_request.rs`（すべてのリクエストに `req.date` が入る）・`build.rs`（pasta_scripts はツリーを歩いて zip にするので、新しいファイルの登録は要らない）。
+- テストの作法: `virtual_dispatcher_spec.lua`（`vtest`・`mk_act`・`pass`・L978 の実機の順番のテスト）・`virtual_clock_test.lua`（L383-445 のスリープの印のテスト）・依存の閉包を読み直すスイート（`pasta.shiori.event.boot` を並べるのは 10 本: actor_proxy_act_delegation・auto_talk_pause・chain_talk_interrupt・event_clock_hook・event_coroutine・recommend_menu・reg_handler_chain・scene_condition・scene_play_event・shiori_entry）。
+- マニュアル: `lua/shiori-events.md`（既定ハンドラの表「13 行」・主要イベントの表・`check_hour`・`check_talk`・時刻の飛び・テスト用関数）・`internals/shiori.md`（モジュール表 L115-120・読み込みの木 L425-437・ディスパッチャの段落 L505-524・時計の状態の表 L529-541。表の前の「ローカル変数 6 つ」は表の 7 行と合っていない）。`gen-skill-refs.mjs` の対応表では `lua/shiori-events.md` だけが references になり、`internals/shiori.md` はならない。
+- 使ったスキル: `kiro-spec-design`（規則 design-principles・design-discovery-light・design-synthesis・design-review-gate）。`pasta-lua-coding` はゴーストの Lua 向けで、その正本はマニュアルの章なので、スキルを読まずにマニュアルの章を直接読んだ。
+- REG のキーを数えるテスト・pasta_check／LSP の既定ハンドラの一覧は無い（grep で確かめた）。Rust のテストに `OnSysResume` を送るものは無い。
+
+### 8.2 「復帰の後」の測り方（申し送りの決定）
+
+| 案 | 中身 | 判定 |
+|---|---|---|
+| M1 `OnSysSuspend` を見た回数 | `CLOCK` が `OnSysSuspend` を見るたびに数え、`suspend_count()` で読ませる。ディスパッチャは自動トークを出すたびにその値を `talk_suspend_count` に控え、`wake_talk` で「同じ値なら復帰の後に出した」と決める | **採る**。`epoch()`／`seen_epoch` と同じ形。SSP は `OnSysSuspend` を復帰の最初の秒より前に送るので、最初の秒の時報・溜まったトークを正しく「復帰の後」と数える。眠る前に送るベースウェアでも結果は同じ。`clock.lua` の変更は数え上げ 1 行と読み出しの口だけで、飛びの判定は変えない（要件 3.10） |
+| M2 時計がスリープの差を飲み込んだ秒 | `watch_jump` が `_resumed`／`_suspended` で飛びを数えなかった秒を記録する | 採らない。差が 90 秒以下のスリープでは記録されず、溜まったトークが最初の秒に出た後にもう 1 回出る |
+| M3 時間の窓 | 最後の自動トークから一定の秒数以内なら今にしない | 採らない。幅の根拠が無い。短いスリープで「眠る前の自動トーク」を復帰の後と取り違える |
+| M4 `REG.OnSysSuspend` の既定か鎖で見る | 既定ハンドラの中で印を付ける | 採らない。ゴーストが `REG.OnSysSuspend` を書くか鎖で止めると印が付かない。`OnSysSuspend` への応答は範囲外 |
+
+- `clock.lua` は read-only の口（`suspend_count()`）と状態 1 つを足す。ほかの出力（`now`・`date`・`steady`・`epoch`・`offset`）と印の扱いは変えない。
+
+### 8.3 総合（synthesis）
+
+- **一般化**: 「自動トークを発行した」を 1 つの考えにまとめた（時報の候補の thread か、`check_talk` が返す thread）。要件 1.7（出力の有無にかかわらず）・3.4（時報かランダムトーク）・3.5（続き）が同じ記録で決まる。
+- **作るか使うか**: 「受けているか」の判定は作らない。`REG.X = REG.X or function` と鎖の底の決まり、`SCENE.co_exec`（シーン関数フォールバックと同じ探し方）をそのまま使う（選択肢 A）。門（Status・`hour_margin`・停止）も作らず、`wake_talk` は `next_talk_time` を今にするだけで今の `dispatch`／`check_talk` に任せる。
+- **簡単にしたもの**: 既定ハンドラで自動トークの停止を見ない（`restart_timers` が `next_talk_time` を 0 に戻すので持ち越さない）。`restart_timers` で `talk_suspend_count` を戻さない。ログを足さない。`wake_talk` は値を返さない（テストは `_get_internal_state` で見る）。スリープ明け専用のシーン名・設定キーを設けない。
+
+### 8.4 設計の前提（ディスカッションへ）
+
+design.md の「前提（Design Assumptions）」の 6 つ。要点:
+
+1. 「復帰の後」は `OnSysSuspend` の回数で測る（M1。`clock.lua` に読み出しの口）。
+2. `OnSysSuspend` を一度も見ていない `OnSysResume` は喋ってよいとみなす（`OnSysResume` だけを送るベースウェアでは二重になりうる）。
+3. SecurityLevel `external` の `OnSysResume` も同じに扱う。
+4. 本文の無い時報もスリープ明けの 1 回と数える（要件 1.7・3.4 から導かれる結果）。
+5. マニュアルに `### OnSysResume（スリープ明けのおしゃべり）` を足し、止め方は本文の無い `＊OnSysResume` を先に示す。`wake_talk` は内部設計の章にだけ書く。
+6. 既定ハンドラは新しいファイル `event/sys_resume.lua`。
+
+### 8.5 リスク
+
+- SSP が `OnSysSuspend` を最初の秒より後に送る版では、溜まったトークの後に `OnSysResume` でもう 1 回出る（実機 2026-10-18 の順番に頼る）。CI では順番の再現しかできず、確かめは作者の PC のスリープだけである。
+- references の作り直しは `.claude/skills/` の下に書く。分類器に拒まれたら、入った分と残りを示して開発者に頼む（MEMORY の「.claude/skills 編集は分類器が拒否」）。
