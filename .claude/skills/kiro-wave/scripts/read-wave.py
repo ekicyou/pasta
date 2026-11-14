@@ -6,8 +6,8 @@ Usage:
   ... | python -I read-wave.py --models <name>...   (requirements model of named specs)
   python -I read-wave.py --self-test
 
-Prints one line per spec: "<model> <name>" (model is Fable or Opus), then
-"date <YYYY-MM-DD>" for the wave. Warnings go to stderr as "WARN ...".
+Prints "date <YYYY-MM-DD>" for the wave, then one line per spec: "<model> <name>"
+(model is Fable or Opus). Warnings go to stderr as "WARN ...".
 When the block is the release form ("/release <X.Y.Z>" and no /kiro-start), prints
 "release <X.Y.Z>" instead of the spec lines.
 A spec is Fable when the code block lists it under Fable OR the wave table's

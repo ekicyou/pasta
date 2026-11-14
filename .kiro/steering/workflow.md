@@ -29,7 +29,7 @@ requirements → design → tasks → implementation → implementation-complete
 すべて同時に満たすこと：
 
 1. **Spec Gate**: 全フェーズ承認済み
-2. **Test Gate**: `cargo test --all` 成功
+2. **Test Gate**: `cargo test --all` 成功（`/kiro-complete` では、アーカイブをコミットした後に `cargo fmt --check`・`cargo clippy --all-targets --workspace -- -D warnings` と合わせて 1 回だけ回す）
 3. **Doc Gate**: 仕様差分を反映
 4. **Steering Gate**: 既存ステアリングと整合
 5. **Soul Gate**: [doc/SOUL.md](../../doc/SOUL.md) との整合性確認（タスク生成時に自動追加）
@@ -87,6 +87,8 @@ requirements → design → tasks → implementation → implementation-complete
 
 ## 実装完了時アクション
 
+仕様の実装が完了し、**開発者が明示的に「承認」した**際は、`/kiro-complete {feature}` を実行する（このスキルが以下を中断なく完遂する）。手順実体は `.claude/skills/kiro-complete/SKILL.md` を権威とし、本節の 1・3・4 はその要約である。DoD の Gate 6・7、§2 のスキルドキュメント更新検討、§3 の CI とリリースタグの扱いは本ファイルが権威で、`kiro-complete` はそれを読んで発火する。
+
 ### 1. コミット
 ```powershell
 git add -A; git commit -m "<type>(<scope>): <summary>"
@@ -118,64 +120,34 @@ git add -A; git commit -m "<type>(<scope>): <summary>"
 
 ### 3. リモート同期（ブランチ戦略）
 
-リモート同期は **PR（Pull Request）ベース**で行う。これが唯一の手順実体であり、各スキルはこのフローを複製せず本セクションを権威定義として参照する。
+リモート同期は **PR（Pull Request）ベース**で行う。手順実体は `kiro-complete` のステップ8 で、本節はその要約である（CI とリリースタグの扱いは本節が権威）。
 
-> **権威定義**: フィーチャーブランチ／ワークツリーの生成は Claude Code（ハーネス）のワークツリー機能が供給する。スキルは自前でブランチ／ワークツリーを作成せず、「commit → PR 作成 → PR の squash マージ → ブランチ削除」だけを担う。1つの feature = 1つのブランチ = 1つの PR とし、完了時に1回だけ PR を作成して squash マージする。**デフォルトブランチ（main）への直接 push は行わない。**
-
-**フロー（commit → PR 作成 → squash マージ → ブランチ削除）**:
-
-前提として、`{remote}`（`origin` → 単一リモート → none）と `{default-branch}`（`git symbolic-ref` → `main` → `master` → 現ブランチ）を決定的に解決し、`origin`/`main` のハードコードを避ける。
+> フィーチャーブランチ／ワークツリーは Claude Code（ハーネス）のワークツリー機能が供給する。スキルは自前でブランチ／ワークツリーを作成しない。1つの feature = 1つのブランチ = 1つの PR とし、完了時に1回だけ PR を作成して squash マージする。**デフォルトブランチ（main）への直接 push は行わない。**
 
 ```powershell
-$branch = git rev-parse --abbrev-ref HEAD   # 現在の作業ブランチ（ハーネス供給）
-
-# 1. ローカルコミット（§1 のコミット規約に従う）
-git add -A; git commit -m "<type>(<scope>): <summary>"   # 既にコミット済みならスキップ
-
-# 2. 現在ブランチを push して PR を作成（base = デフォルトブランチ, head = 現在ブランチ）
+git push -u {remote} $branch
 gh pr create --base {default-branch} --head $branch --title "<subject>" --body "<body>"
-
-# 3. squash マージ（--squash 固定、--delete-branch でリモートブランチを API 削除）
-#    --subject / --body は下記「squash コミットメッセージの生成方針」に従って供給する
-gh pr merge --squash --delete-branch --subject "<subject>" --body "<body>"
+gh pr merge --squash --delete-branch --subject "<subject>" --body "<body>"   # subject/body は {default-branch}..HEAD の履歴を開発単位で要約する
 ```
 
 **CI を待たない**: squash マージは PR の CI 完了を待たずに行う。マージ前の関門は DoD の Test Gate（ローカルの `cargo test --all` と `cargo clippy --all-targets --workspace -- -D warnings`）であり、CI の緑を人や AI が見張る運用はしない。CI にしか見えない失敗（x86 ターゲット・ランナー固有のパス・cargo-deny・クリーンチェックアウト）で main が赤くなった場合は、次の作業より先に追いかけの修正で直す。取り消せない公開の前の検査は、リリース CI（`release.yml`）がタグのコミットで行う（verify と、`build.yml` の検査をすべて行う gate）。エージェントは main の CI の結果を公開の条件にしない。
 
-**ブランチ削除のタイミング**: リモートの feature ブランチは `gh pr merge --delete-branch` が **PR マージ成功後に** API で削除する。**マージ成功前にブランチを削除しない**（復旧可能性を確保するため）。ローカルブランチおよびワークツリーは、カレントワークツリーで実行中のため構造的に削除できない。これらの後始末はハーネスのワークツリー teardown に委ねる（`--delete-branch` のローカル削除試行がブロックされて警告を出しても、これは非致命でありマージ成功を覆さない）。
-
-**フォールバック（PR 不可時）**: 現在のブランチがデフォルトブランチである / `{remote}` が不在・オフライン / `gh` 未認証 のいずれかの場合は、**警告を出力して PR 操作・push をスキップ**し、ローカルコミットを保持したまま継続する。**デフォルトブランチへの直接 push は一切行わない。**
-
-**中断条件**: PR の作成またはマージ（API）が失敗した（コンフリクト / mergeable でない / 権限不足等）場合は、**ブランチを削除せず**処理を中断し開発者へ報告する（復旧可能性を確保するため）。マージ成否の判定はマージ API の結果のみに基づき、`--delete-branch` のローカル削除警告とは区別する。
+- **ブランチの後始末**: リモートの feature ブランチは `--delete-branch` がマージ成功の後に API で消す。ローカルブランチとワークツリーはハーネスの teardown に任せる（ローカル削除の警告は非致命）。
+- **PR 不可**（デフォルトブランチ上 / `{remote}` 不在 / `gh` 未認証）: 警告して PR・push をスキップし、ローカルコミットを保持する。
+- **中断**: PR の作成・マージ（API）が失敗したら、ブランチを消さずに中断して開発者へ報告する。
 
 > **release タグ公開のカーブアウト**: リリース手順（`release` スキル。`/release [X.Y.Z]` で実行する）は、版の更新の main 反映を、spec 完了と同じ **PR の squash マージ**（`gh pr merge --squash`）で行い、**デフォルトブランチへの直接 push は行わない**。リリースタグは、統合の後に main のコミット（squash マージでできたコミット）へ付ける。リリースが行う **タグ ref の push**（`git push origin vX.Y.Z`。ブランチ push ではない）のみが本セクションの直接 push 禁止の対象外であり、main のブランチ保護のもとでも成立する。`.claude/settings.json` はタグ push の許可（`git push origin v*`）を持ち、main への push の許可を持たない。
 
-#### squash コミットメッセージの生成方針
-
-`gh pr merge --squash` に渡す `--subject` / `--body` は、**分岐点以降のコミット履歴を要約**して作成する（固定文言にしない）。
-
-1. **履歴を収集**: `git log --no-merges --pretty=format:"%h %s%n%b" {default-branch}..HEAD`（= `merge-base..HEAD`）で分岐点以降の全コミットを取得する。
-2. **意図を補強**: 対象 spec の `requirements.md` / `design.md` のタイトル・概要も参照し、機能の目的を正確に反映する。
-3. **要約してメッセージ化**:
-   - **subject**（`--subject`）: `<type>(<scope>): <機能全体を1文で表す要約>`
-   - **body**（`--body`）: 主な開発仕様・変更内容を箇条書き（3〜7項目目安）。関連コミットは1項目へ統合し、`fixup` / typo修正 / WIP などの些末な履歴は集約・省略する。
-   - 個々のコミットを羅列するのではなく、**「何を・なぜ作ったか」の開発単位**で再構成する。
-
 ### 4. 仕様アーカイブ
 
-**重要**: spec.json更新は仕様移動の**直後**に実行（移動前に更新するとVSCode仕様でファイルが復活する場合がある）
+移動を先に行い、移動後に `spec.json` の `phase` を `"completed"`、`updated_at` を現在日時にする（移動前に更新すると VSCode の仕様でファイルが復活する場合がある）。参照パス（spec 文書とソース全域）を `.kiro/specs/completed/<spec-name>/` へ直し、アーカイブのコミットを作ってから全体テストを 1 回回す。
 
 **例外: 繰り返し仕様**: `review-improvement-loop` のような繰り返し実行型仕様は `completed/` に移動しない。`/kiro-impl` 実行のたびにタスクがリセットされ、常に `.kiro/specs/` 直下に留まる。
 
 ```powershell
-# 1. 仕様ディレクトリを移動
 Move-Item .kiro/specs/<spec-name> .kiro/specs/completed/
-
-# 2. spec.jsonのphaseを"completed"に更新
-# （エディタまたはjqコマンドで .kiro/specs/completed/<spec-name>/spec.json を編集）
-
-# 3. コミット（プッシュは §3 リモート同期（ブランチ戦略）に従う）
-git add -A; git commit -m "chore(spec): <spec-name>をcompletedへ移動"
+# .kiro/specs/completed/<spec-name>/spec.json の phase と updated_at を更新
+git add -A; git commit -m "chore(<spec-name>): spec完了・アーカイブ"
 ```
 
 ---

@@ -34,14 +34,14 @@
 
 ### Out of Boundary
 
-- `kiro-impl` / `kiro-review` / `kiro-debug` / `kiro-verify-completion` / `karpathy-guidelines` 各スキルの内部実装（本設計はこれらの公開プロトコルを呼ぶだけ）
+- `kiro-impl` / `kiro-review` / `kiro-debug` / `kiro-verify-completion` / `ponytail`（user scope のプラグイン） 各スキルの内部実装（本設計はこれらの公開プロトコルを呼ぶだけ）
 - `release-workflow` spec（リリース・配布フロー）
 - `book/` マニュアルの内容拡充（次元 7 での同期確認のみ In）
 - 改善対象コードの機能仕様（各クレートの外部仕様は不変）
 
 ### Allowed Dependencies
 
-- 既存スキル群の公開プロトコル: kiro-impl（実行器）、kiro-review（`VERDICT`）、kiro-debug（`NEXT_ACTION`）、kiro-verify-completion（`STATUS`）、karpathy-guidelines（簡素化基準）
+- 既存スキル群の公開プロトコル: kiro-impl（実行器）、kiro-review（`VERDICT`）、kiro-debug（`NEXT_ACTION`）、kiro-verify-completion（`STATUS`）、ponytail（簡素化基準）
 - 対象プロジェクトの品質検証インフラ（本リポジトリでは cargo test/clippy/audit、luacheck/lua_test、npm scripts、book ツール群）
 - steering（workflow.md の DoD・Git 安全規則、tech.md の品質基準）
 - dev 環境へのツール導入（cargo-deny / cargo-machete — リポジトリ非変更・レポート記録必須）
@@ -322,7 +322,7 @@ stateDiagram-v2
 | G1 テスト網羅 | D1 | 未テストの公開挙動・未到達分岐の特定とテスト追加。不要テストの除外は根拠明記の上で慎重に（R2.2, 2.3） | 低（安全網を先に張る） |
 | G2 静的衛生 | D4+D5 | lint 警告ゼロ化（機械修正優先）・デッドコード/未使用 pub/未使用依存の除去（R2.6, 2.7） | 低〜中 |
 | G3 ハードニング | D3+D6 | 脆弱性レビューと対策・到達可能パニック経路の Result 化（FFI 境界最優先）（R2.5, 2.8, 3.6, 3.7） | 中（挙動変化は回帰テストで境界明示） |
-| G4 簡素化 | D2 | karpathy-guidelines 準拠検証と是正（R2.4） | 中（テスト安全網必須） |
+| G4 簡素化 | D2 | ponytail 準拠検証と是正（R2.4） | 中（テスト安全網必須） |
 | G5 文書/依存整合 | D7 領域分 | 領域のドキュメント同期・依存整合（R2.9 の領域スコープ部分） | 低 |
 
 実行順序は G1→G2→G3→G4→G5 の昇リスク順（領域内でテスト安全網を先に確立する）。資産種別に適用不能な次元は作業せず matrix.md に「N/A＋理由」を記録する（R2.10）。

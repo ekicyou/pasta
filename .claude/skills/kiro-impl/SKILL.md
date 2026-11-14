@@ -27,10 +27,6 @@ You operate in two modes:
 - Also accept clear natural-language opt-outs such as `skip review` or `without review` as `off`
 - If the request is ambiguous, keep `required`
 
-> **Branch & commit model (compatibility note):** kiro-impl operates on the single feature working branch supplied by the Claude Code harness worktree. It **only commits to the current branch** and does NOT create branches or push — branch creation is the harness's responsibility, and push happens later in the kiro-complete PR flow. This note documents existing behavior; it introduces no new branch/push logic.
->
-> If `tasks.md` was not committed in a prior phase, there is **no dedicated task-phase commit**: the uncommitted `tasks.md` is picked up by the per-task commits below, which already include `tasks.md` in their selective staging (changed files + `tasks.md`). This stays within the existing selective-staging convention — it does **not** authorize `git add -A` or `git add .`.
-
 ## Execution Steps
 
 ### Step 1: Gather Context
@@ -414,6 +410,7 @@ pwsh -NoProfile -File C:\home\maz\git\areka\tools\impl-watch-install.ps1
 Add that it should be run in an areka working copy that has taken in the latest default branch. The skill only shows this command and never runs it.
 
 ## Critical Constraints
+- **Out-of-scope findings go to the completion inventory, not to chips**: when implementation, review, debug or validation finds a problem outside the current spec (another crate's flaky test, an unrelated bug), do NOT call the harness `spawn_task` chip tool. Record it in `## Implementation Notes` of tasks.md; `/kiro-complete`'s opening inventory tickets it with `/kiro-discovery` (brief.md + roadmap row). Chips make the developer click and instruct each one and never reach the roadmap (developer, 2026-10-04).
 - **Strict Handoff Parsing**: Never infer implementer `STATUS` or reviewer `VERDICT` from surrounding prose; only the exact structured fields count
 - **No Destructive Reset**: Never use `git checkout .`, `git reset --hard`, or similar destructive rollback inside the implementation loop
 - **Selective Staging**: NEVER use `git add -A` or `git add .`; always stage explicit file paths
@@ -440,7 +437,7 @@ Add that it should be run in an areka working copy that has taken in the latest 
 
 **Tasks Not Approved or Missing Spec Files**:
 - **Stop Execution**: All spec files must exist and tasks must be approved
-- **Suggested Action**: "Complete previous phases: `/kiro-spec-requirements`, `/kiro-design`, `/kiro-spec-tasks`"
+- **Suggested Action**: "Complete previous phases: `/kiro-start`, `/kiro-design`, `/kiro-spec-tasks`"
 
 **Test Failures**:
 - **Stop Implementation**: Fix failing tests before continuing

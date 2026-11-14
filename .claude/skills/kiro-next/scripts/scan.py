@@ -111,7 +111,7 @@ def residents(lines):
 
 def latest_remeasure(text):
     """The newest 棚卸の再測定 section of a brief (the last one), else the whole brief."""
-    parts = re.split(r"(?m)^(?=## )", text)
+    parts = re.split(r"(?m)^(?=## )", text.replace("\r\n", "\n"))
     hits = [p for p in parts if REMEASURE in p.split("\n", 1)[0]]
     return hits[-1] if hits else text
 
@@ -120,7 +120,8 @@ def path_tokens(text):
     seen = []
     for t in PATH_TOKEN.findall(text):
         t = t.removeprefix("./").rstrip("、。,")
-        if t and t not in seen and not t.startswith("http"):
+        # a slash command, or a bare top-level folder (`tools/`), names nothing worth matching
+        if t and t not in seen and not t.startswith(("http", "/")) and not re.fullmatch(r"[^/]+/", t):
             seen.append(t)
     return seen
 
@@ -137,12 +138,13 @@ def touches(token, path):
     return path == token or path.endswith("/" + token)
 
 
-def pick(goal_specs, unfinished, briefs, diff, landed, rows):
-    """[(spec, reason)] to re-measure: unfinished goal specs, then specs whose latest
-    measurement names a changed file, or whose functional predecessor landed."""
-    out = [(s, "goal") for s in goal_specs if s in unfinished]
+def pick(goal_specs, candidates, briefs, diff, landed, rows):
+    """[(spec, reason)] to re-measure: every unfinished goal spec, then the other candidates (the
+    version-free fillers) whose latest measurement names a changed file, or whose functional
+    predecessor landed. Beyond-goal specs wait until their goal is the current one."""
+    out = [(s, "goal") for s in goal_specs]
     diff = [p for p in diff if not QUIET.match(p)]
-    for s in sorted(unfinished):
+    for s in sorted(candidates):
         if s in goal_specs:
             continue
         hit = next((p for t in path_tokens(latest_remeasure(briefs.get(s, ""))) for p in diff if touches(t, p)), None)
@@ -206,7 +208,8 @@ def main():
     me = git("rev-parse", "--abbrev-ref", "HEAD").strip()
     branches = [b.strip() for b in git("branch", "-r", "--format=%(refname:short)").split() if b.startswith("origin/claude/")]
     branches += [l.split("refs/heads/")[1] for l in git("worktree", "list", "--porcelain").splitlines() if l.startswith("branch refs/heads/")]
-    inflight = sorted({(s, b) for b in branches if me not in b for s in unfinished if s in b})
+    merged = set(git("branch", "-r", "--merged", base, "--format=%(refname:short)").split())
+    inflight = sorted({(s, b) for b in branches if me not in b and b not in merged for s in unfinished if s in b})
 
     print(f"prev {date} {prev_sha} -> base {base[:8]}")
     print(f"landed ({len(landed)}): {', '.join(landed) or 'none'}")
@@ -222,8 +225,10 @@ def main():
     print(f"counts: completed {len(os.listdir(SPECS + '/completed'))}, briefs {len(unfinished)}, resident {', '.join(res) or 'none'}")
     print("roadmap headings (line ranges):")
     for s, e, h in headings(lines):
-        print(f"  L{s}-{e} {h}")
-    picks = pick(goal_specs, unfinished, briefs, diff, set(landed), rows)
+        print(f"  L{s}-{e} {h[:80]}")
+    # shortcut: the roadmap has no version-free group, so no filler is a candidate; with no goal every
+    # unfinished spec is already a goal spec. Pass the version-free group here once the roadmap has one.
+    picks = pick(goal_specs, set(), briefs, diff, set(landed), rows)
     print(f"re-measure ({len(picks)}):")
     for s, why in picks:
         print(f"  {s} -- {why}")
@@ -257,7 +262,7 @@ BRIEF = """# Brief: far-one
 ## 2026-01-01 棚卸の再測定（main `aaa`）
 - 触るファイル: `crates/a/old.rs`
 ## 2026-01-02 棚卸の再測定（main `bbb`）
-- 触るファイル: `crates/b/new.rs`、`book/src/x/`、https://example.com/a.md は無視
+- 触るファイル: `crates/b/new.rs`、`book/src/x/`、`tools/`、`/kiro-next`、https://example.com/a.md は無視
 """
 
 
