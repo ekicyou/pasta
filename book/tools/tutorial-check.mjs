@@ -21,9 +21,13 @@
 //   2. 章から辞書へ: 入門のどの章の ```pasta ブロックも、同じ名前の辞書の全体か、
 //      連続した行の抜き出しである（違えば not-in-dic。辞書の無い章なら no-dic）。
 //      字下げ・引用の中の ```pasta フェンスは抽出できないので indented-fence で失敗にする。
+//   3. 行事の表 calendar.csv も同じ規則の対で照合する（date-var-calendar 要件 10.6）。
+//      calendar.csv があれば、その全体と一致する ```csv ブロックがどこかの章にある（無ければ
+//      no-matching-block）。どの章の ```csv ブロックも calendar.csv の全体か連続した行の抜き出し
+//      （違えば not-in-calendar。calendar.csv が無ければ no-calendar）。章の名前は問わない。
 //
 // 照合方式（堅牢性のため正規化して比較）:
-//   - 情報文字列が pasta のフェンスだけを見る（text・toml の転記は照合しない）。
+//   - 情報文字列が pasta・csv のフェンスだけを見る（text・toml の転記は照合しない）。
 //   - 改行コード（CRLF/LF/CR）と末尾の余分な空白行のみ正規化（内容・全角空白等は不変）。
 //   - 辞書も章も列挙から導く（固定一覧なし。辞書を足せば自動で照合対象に入る）。
 //
@@ -42,6 +46,9 @@ export const GUIDE_REL = 'book/src/getting-started';
 
 // hello-pasta の SSOT（dist-src は廃止）。入門の章が逐語転記している dic 群。
 export const HELLO_DIC_REL = 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic';
+
+// hello-pasta の行事の表。入門の章の ```csv ブロックが逐語転記している。
+export const CALENDAR_REL = 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/calendar.csv';
 
 // ---- 入門の章: GUIDE_REL 直下の *.md を辞書順に（ファイル名のみ） ----
 // フォルダが無ければ空配列。
@@ -67,18 +74,20 @@ export function listDicFiles(repoRoot = REPO_ROOT) {
     .sort();
 }
 
-// ---- ```pasta フェンス内コードブロックを全抽出 ----
+// ---- ```pasta（lang を渡せばその言語）フェンス内コードブロックを全抽出 ----
 // 言語注記 `pasta`（行末まで他の語が無い）の、3 つ以上のバッククォートで始まるフェンスのみ対象。
 // 閉じは開きと同じ長さ以上のバッククォートだけの行（CommonMark のフェンス規則）。
 // よって ````pasta の中の ```lua … ``` は閉じにならず中身として残る。未閉鎖のフェンスは捨てる。
-export function extractPastaBlocks(markdown) {
+// lang は英数字だけの言語名（pasta・csv）を渡す（正規表現にそのまま埋め込む）。
+export function extractPastaBlocks(markdown, lang = 'pasta') {
   const blocks = [];
   let fence = null; // 開いているフェンスのバッククォート列
   let body = [];
+  const opener = new RegExp('^(`{3,})' + lang + '[^\\S\\r\\n]*$');
   for (const line of markdown.split('\n')) {
     const text = line.replace(/\r$/, '');
     if (fence === null) {
-      const open = /^(`{3,})pasta[^\S\r\n]*$/.exec(text);
+      const open = opener.exec(text);
       if (open) {
         fence = open[1];
         body = [];
@@ -122,7 +131,7 @@ export function isExcerptOf(dicContent, block) {
   return `\n${normalizeForCompare(dicContent)}\n`.includes(`\n${want}\n`);
 }
 
-// ---- 字下げ・引用の中にある ```pasta フェンスの開き行を拾う ----
+// ---- 字下げ・引用の中にある ```pasta・```csv フェンスの開き行を拾う ----
 // extractPastaBlocks は行頭のフェンスしか抽出しないので、字下げ・引用・リストの中の
 // フェンスは照合をすり抜ける。ここで開き行を拾って失敗にする。
 // 行頭のフェンス（言語を問わない）の中は中身なので見ない。
@@ -135,7 +144,7 @@ function findIndentedFences(markdown) {
       const open = /^(`{3,})[^`]*$/.exec(text);
       if (open) {
         fence = open[1];
-      } else if (/^(?:[\s>]|[-*+]\s|\d+[.)]\s)+`{3,}pasta\s*$/.test(text)) {
+      } else if (/^(?:[\s>]|[-*+]\s|\d+[.)]\s)+`{3,}(?:pasta|csv)\s*$/.test(text)) {
         heads.push(text);
       }
     } else if (/^`+\s*$/.test(text) && text.trimEnd().length >= fence.length) {
@@ -203,22 +212,24 @@ export function findProseParagraphs(markdown) {
  * @property {number} line 段落の先頭行（1 始まり）
  * @property {string} head 段落の先頭行の文字列（名指し用）
  *
- * @typedef {object} DicResult 辞書 1 ファイルの結果（辞書から章へ）
- * @property {string} file 辞書（リポジトリルートからの相対）
- * @property {string} chapter 対応する章（同上。無くても期待するパスを入れる）
+ * @typedef {object} DicResult 辞書 1 ファイル（と calendar.csv）の結果（辞書から章へ）
+ * @property {string} file 辞書（リポジトリルートからの相対。calendar.csv なら CALENDAR_REL）
+ * @property {string} chapter 対応する章（同上。無くても期待するパスを入れる。calendar.csv は
+ *   全体のある章・無ければ `${GUIDE_REL}/*.md`）
  * @property {boolean} matched
  * @property {'verbatim-match' | 'no-chapter' | 'no-matching-block'} reason
  *
- * @typedef {object} BlockProblem 章のブロックの問題（章から辞書へ）
+ * @typedef {object} BlockProblem 章のブロックの問題（章から辞書・calendar.csv へ）
  * @property {string} chapter 章（リポジトリルートからの相対）
  * @property {string} head ブロックの先頭行（名指し用。indented-fence はフェンスの開き行）
- * @property {'not-in-dic' | 'no-dic' | 'indented-fence'} reason
+ * @property {'not-in-dic' | 'no-dic' | 'not-in-calendar' | 'no-calendar' | 'indented-fence'} reason
  *
  * @typedef {object} TutorialCheckResult
  * @property {boolean} ok fatal が無く、results がすべて matched で、problems が空
  * @property {string | null} fatal 入門の章のフォルダが無い・辞書が 1 件も無い
  * @property {number} chapters 見た章の数
  * @property {number} blocks 見た pasta ブロックの数
+ * @property {number} csvBlocks 見た csv ブロックの数
  * @property {DicResult[]} results 辞書 1 ファイルにつき 1 件
  * @property {BlockProblem[]} problems
  */
@@ -226,7 +237,7 @@ export function findProseParagraphs(markdown) {
 // ---- オーケストレーション ----
 /** @returns {TutorialCheckResult} */
 export function runTutorialCheck(repoRoot = REPO_ROOT) {
-  const empty = { ok: false, chapters: 0, blocks: 0, results: [], problems: [] };
+  const empty = { ok: false, chapters: 0, blocks: 0, csvBlocks: 0, results: [], problems: [] };
   if (!fs.existsSync(path.resolve(repoRoot, GUIDE_REL))) {
     return { ...empty, fatal: `入門の章のフォルダが見つからない: ${GUIDE_REL}` };
   }
@@ -280,8 +291,37 @@ export function runTutorialCheck(repoRoot = REPO_ROOT) {
     }
   }
 
+  // csv ブロック ↔ calendar.csv（pasta ブロックと同じ規則の対。章の名前は問わない）。
+  const calPath = path.resolve(repoRoot, CALENDAR_REL);
+  const calendar = fs.existsSync(calPath) ? fs.readFileSync(calPath, 'utf8') : undefined;
+  let csvBlocks = 0;
+  let calChapter = null; // 全体と一致する csv ブロックのある最初の章
+  for (const [name, markdown] of chapters) {
+    const chapter = `${GUIDE_REL}/${name}`;
+    for (const block of extractPastaBlocks(markdown, 'csv')) {
+      csvBlocks++;
+      if (calendar !== undefined && isExcerptOf(calendar, block)) {
+        if (calChapter === null && matchDicFile(calendar, [block])) calChapter = chapter;
+        continue;
+      }
+      problems.push({
+        chapter,
+        head: normalizeForCompare(block).split('\n')[0],
+        reason: calendar === undefined ? 'no-calendar' : 'not-in-calendar',
+      });
+    }
+  }
+  if (calendar !== undefined) {
+    results.push({
+      file: CALENDAR_REL,
+      chapter: calChapter ?? `${GUIDE_REL}/*.md`,
+      matched: calChapter !== null,
+      reason: calChapter !== null ? 'verbatim-match' : 'no-matching-block',
+    });
+  }
+
   const ok = results.every((r) => r.matched) && problems.length === 0;
-  return { ok, fatal: null, chapters: chapters.size, blocks, results, problems };
+  return { ok, fatal: null, chapters: chapters.size, blocks, csvBlocks, results, problems };
 }
 
 // ---- レポート ----
@@ -295,7 +335,8 @@ export function reportTutorialCheck(result) {
   }
   out.push(`  入門の章: ${result.chapters} 枚`);
   out.push(`  抽出 pasta コードブロック: ${result.blocks} 件`);
-  out.push(`  検証対象 dic ファイル: ${result.results.length} 件`);
+  out.push(`  抽出 csv コードブロック: ${result.csvBlocks} 件`);
+  out.push(`  検証対象 dic ファイル（calendar.csv を含む）: ${result.results.length} 件`);
   out.push('');
   for (const r of result.results) {
     const tag = r.matched ? 'MATCH   ' : 'MISMATCH';
@@ -306,11 +347,13 @@ export function reportTutorialCheck(result) {
   }
   out.push('');
   if (result.ok) {
-    out.push('RESULT: OK（全 dic が同じ名前の章と逐語一致・章の pasta ブロックはすべて辞書の全体か抜き出し）');
+    out.push('RESULT: OK（全 dic が同じ名前の章と逐語一致・章の pasta ブロックはすべて辞書の全体か抜き出し・'
+      + 'csv ブロックはすべて calendar.csv の全体か抜き出し）');
   } else {
     out.push('RESULT: FAIL（章の作例と実ファイルの逐語転記が崩れている → 公開中断）');
     out.push('  対処: 章の ```pasta ブロックを辞書の現内容に合わせること（辞書の全体か、連続した行の抜き出し）。');
     out.push(`        辞書と同じ名前の章が無いときは ${GUIDE_REL}/<辞書の名前>.md を書くこと。`);
+    out.push(`        章の \`\`\`csv ブロックは ${CALENDAR_REL} の全体か連続した行の抜き出しにし、全体をどこかの章に置くこと。`);
   }
   return out.join('\n');
 }

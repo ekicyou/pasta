@@ -4,7 +4,8 @@
 #   book/**・本ワークフロー・スキル 3 種（pasta-ghost-authoring / pasta-lua-coding / pasta-check）、
 #   クレート README（crates/*/README.md）・ルートの README.md・doc/SOUL.md（公開マニュアル URL の実在検査のため。
 #   pasta-runtime-internals-doc 要件 7.8・manual-link-anchor-check 要件 4）、
-#   hello-pasta の辞書（crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**。チュートリアルの照合のため）、
+#   hello-pasta の辞書（crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**）と行事の表（同 master/calendar.csv）
+#   （チュートリアルの照合のため）、
 #   pasta の TextMate 文法（editors/vscode/syntaxes/**。着色に使うため）、
 #   リリース CI（.github/workflows/release.yml。link-check が最新版の固定リンクの名前を添付の名前と照らすため。
 #   manual-download-page 要件 7.8）。
@@ -18,7 +19,7 @@
 #     -> mdbook build book -> 着色 -> 台詞部品の変換（talk-html）-> 日本語 bigram 索引を再生成
 #     -> node book/tools/link-check.mjs（本の中のリンクと見出し（#…）・読者に届く文書（クレートの README・
 #        ルートの README.md・doc/SOUL.md・スキル）の公開マニュアル URL・スキル自己完結の検証。失敗で中断）
-#     -> チュートリアルの照合（入門の章 12 枚 ↔ hello-pasta の辞書。辞書の検査は build.yml の cargo test が受け持つ）
+#     -> チュートリアルの照合（入門の章 13 枚 ↔ hello-pasta の辞書と calendar.csv。辞書の検査は build.yml の cargo test が受け持つ）
 #     -> 静的性・検索（この 2 つは --self-test で検査ロジック自身の
 #        自己テストも実行）・コンテンツ検証・ツール自己テスト
 #     -> 旧版の生成（固定コミット CLASSIC_REF の book/ を旧版のツールで book/book/classic へ。印刷用のページは作らない。
@@ -41,6 +42,7 @@ on:
       - 'README.md'
       - 'doc/SOUL.md'
       - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
+      - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/calendar.csv'
       - 'editors/vscode/syntaxes/**'
   pull_request:
     branches: [main]
@@ -55,6 +57,7 @@ on:
       - 'README.md'
       - 'doc/SOUL.md'
       - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
+      - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/calendar.csv'
       - 'editors/vscode/syntaxes/**'
   workflow_dispatch:  # 手動実行
 
@@ -132,9 +135,11 @@ jobs:
         run: node book/tools/link-check.mjs
 
       # チュートリアル成果物ガード その1（要件 6.2 / design「Content: Getting Started」）。
-      # 入門の段の章 12 枚（book/src/getting-started/01-boot.md〜12-lua.md）の ```pasta ブロックを、
+      # 入門の段の章 13 枚（book/src/getting-started/01-boot.md〜13-calendar.md）の ```pasta ブロックを、
       # 同じ名前の辞書（crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/X.pasta ↔ X.md）と
       # 両方向に逐語照合する（辞書の全体が章にあること・章のブロックが辞書の全体か連続した抜き出しであること）。
+      # 章の ```csv ブロックも hello-pasta の行事の表（ghost/master/calendar.csv）と同じ規則で両方向に照合する
+      # （calendar.csv の全体がどこかの章にあること・csv ブロックが calendar.csv の全体か連続した抜き出しであること）。
       # 崩れていれば exit 1 で公開中断。スクリプトはリポジトリルートを自己解決するため引数不要。
       - name: Tutorial artifact match check
         run: node book/tools/tutorial-check.mjs
