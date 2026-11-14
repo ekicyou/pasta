@@ -126,6 +126,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 2. The main の CI shall pasta-recipe の x64 の型の検査・テスト・静的解析・exe の作成を、今のとおり続ける。
 3. When リリース CI が関門として main の CI を呼ぶとき, the main の CI shall 6.1 の arm64 の作成も関門に含める。
 4. Where arm64 のランナーで pasta-recipe の検査を行う形が選ばれたとき, the main の CI shall arm64 のランナーで pasta-recipe の Rust のテストを走らせる。（**仮置き**。範囲に入れるかは OPEN QUESTION 3 で決める）
+5. The main の CI shall pasta-recipe の依存の検査（脆弱性の勧告・ライセンス・取得元）に、arm64 の exe にだけ入る依存も含める。
 
 ### Requirement 7: タグを打たない確かめ
 
