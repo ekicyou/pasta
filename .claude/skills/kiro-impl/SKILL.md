@@ -51,7 +51,7 @@ Select skills for the current task even when steering/spec context is already av
 
   | Step | `model` | `effort` |
   |---|---|---|
-  | 1 | `"sonnet"` | `"low"` |
+  | 1 | `"sonnet"` | `"medium"` |
   | 2 | `"opus"` | omit (session default) |
   | 3 | `"opus"` | `"high"` |
   | 4 | `"fable"` | `"medium"` |
