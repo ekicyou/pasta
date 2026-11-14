@@ -279,7 +279,7 @@ sequenceDiagram
   4. exe の PE ヘッダの Machine が表の値（違えば zip の名前・期待した値・実際の値。PE でなければその旨）。
   5. `THIRD_PARTY_LICENSES.txt` に `tauri`・`monaco-editor` の名前（欠けた名前ごとに zip の名前と名前）。
   6. zip の大きさが 31,457,280 バイト以下（超えれば zip の名前と大きさ）。
-  7. `dumpbin /nologo /dependents` の DLL の名前に、VC++ の再頒布可能パッケージの DLL（`vcruntime*`・`msvcp*`・`vccorlib*`・`concrt*`・`msvcr<数字>*`）が無い（あれば zip の名前と DLL の名前。大文字小文字を区別しない）。`dumpbin` を動かせなければ、それも問題に数える。UCRT（`ucrtbase.dll`・`api-ms-win-crt-*`）は数えない。`+crt-static` で作った今の x64 の exe も手元で作った arm64 の exe も `api-ms-win-crt-*` を読み（research.md R1）、UCRT は Windows 10 から OS の部品なので 1.6 に効かない。
+  7. `dumpbin /nologo /dependents` の DLL の名前に、VC++ の再頒布可能パッケージの DLL（`vcruntime*`・`msvcp*`・`vccorlib*`・`concrt*`・`msvcr<数字>*`）が無い（あれば zip の名前と DLL の名前。大文字小文字を区別しない）。`dumpbin` を動かせなければ、それも問題に数える。UCRT（`ucrtbase.dll`・`api-ms-win-crt-*`）は数えない。`+crt-static` で作った今の x64 の exe も手元で作った arm64 の exe も `api-ms-win-crt-*` を読み（research.md R1）、UCRT は Windows 10 から OS の部品なので 1.6 に効かない。pasta.dll（x64）は UCRT も取り込んでいるが、静的 CRT の目的は「サポート中の Windows で VC++ の再頒布可能パッケージを要らないこと」で、完全な静的は求めない（2026-11-14 設計議題 3 で確定。開発者「MS がセキュリティを保証しないプラットフォームに出すつもりはない」）。どの依存が UCRT を DLL で引くかは調べない。
 - 展開は一時のフォルダ（`[IO.Path]::GetTempPath()` の下）に行い、終わりに消す。
 - ほかの配布物は見ない。`package.ps1` を呼ばない。
 
@@ -418,7 +418,7 @@ sequenceDiagram
 
 1. **`cargo-about` の取得の共有**（InstallTools）: 確定（2026-11-14 設計議題 1）。`install-tools.ps1` へ出す。`pasta-dll-multiarch/brief.md` へ申し送り済み。
 2. **煙試験の合格の形と、`windows-11-arm` で起動できるか**（ArmSmoke）: WebView2 ランタイムと対話の画面の有無は公式の文書で確かめられていない。最初の `workflow_dispatch` で確かめ、起動できなければ開発者に戻す（6.5）。
-3. **VC++ ランタイムの検査から UCRT を外すこと**（Verify）: `+crt-static` の今の x64 の exe も UCRT を DLL で読む。外さなければ x64 から落ちる。
+3. **VC++ ランタイムの検査から UCRT を外すこと**（Verify）: 確定（2026-11-14 設計議題 3）。UCRT は数えない。対象はサポート中の Windows 10・11 だけで、UCRT はその OS の部品。
 - 危険: `windows-latest` でのクロスのビルドは手元でだけ確かめた。`main` の CI は arm64 の LTO の release ビルド 1 回ぶん長くなる。
 
 ## Security Considerations

@@ -56,7 +56,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 3. The リリース CI shall 各 zip の `THIRD_PARTY_LICENSES.txt` を、その zip の arch の exe に入っているネイティブの部品と、画面の部品の両方の表示にする。
 4. The リリース CI shall 2 つの zip の `pasta-recipe.exe` の版を、タグの版（`X.Y.Z`）にする。
 5. The リリース CI shall `pasta-recipe.x64.zip` の exe を機械の種類が x64 の実行ファイルに、`pasta-recipe.arm64.zip` の exe を機械の種類が arm64 の実行ファイルにする。
-6. The リリース CI shall 2 つの zip の exe を、VC++ の再頒布可能パッケージを入れていない Windows でも起動できる形（ランタイムを exe に静的に入れた形）で作る。
+6. The リリース CI shall 2 つの zip の exe を、VC++ の再頒布可能パッケージを入れていない Windows でも起動できる形（VC++ ランタイムを exe に静的に入れた形）で作る。対象は Microsoft がサポートしている Windows（Windows 10・11）で、その OS の部品である UCRT（`ucrtbase.dll`・`api-ms-win-crt-*.dll`）は DLL で読んでよい（2026-11-14 設計議題 3。開発者「MS がセキュリティを保証しないプラットフォームに出すつもりはない」）。
 7. The リリース CI shall `pasta-recipe.zip` の名前の配布物を作らず、どこにも添付しない。
 
 ### Requirement 2: リリース CI の配布物の検査
@@ -75,7 +75,7 @@ pasta-recipe（VS Code を使わない pasta DSL のエディタ）は、Windows
 8. If 配布物の検査が失敗したとき, the リリース CI shall crates.io・Marketplace・GitHub Release のどこにも公開しない。
 9. If 2 つの zip を作る間に、ルートまたはアプリの `Cargo.lock` が書き換わったとき, the リリース CI shall 失敗する。
 10. When 2 つの zip が検査を通ったとき, the リリース CI shall 2 つの zip を、ほかの配布物と同じく後続の公開の job へ渡す。
-11. If どちらかの zip の exe が VC++ ランタイムの DLL（`vcruntime*.dll`・`msvcp*.dll` など）を読み込む形で作られているとき, the リリース CI shall その zip の名前と読み込む DLL の名前を示して失敗する。
+11. If どちらかの zip の exe が VC++ ランタイムの DLL（`vcruntime*.dll`・`msvcp*.dll` など。UCRT は含めない。1.6）を読み込む形で作られているとき, the リリース CI shall その zip の名前と読み込む DLL の名前を示して失敗する。
 
 ### Requirement 3: 手元での 2 つの zip の作成
 
