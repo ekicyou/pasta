@@ -169,3 +169,28 @@ requirements.md の「未決の論点」1〜9 に加え、コードを調べて�
 
 - 要件ディスカッション（`/kiro-requirements-discussion date-var-calendar`）で、未決の論点 1〜9 と上の論点 A〜E を決める。
 - 要件が決まったら `/kiro-design date-var-calendar` で設計へ進む。
+
+## 9. 設計の調べ（1 回目・2026-11-15。設計の関門で要件の穴が見つかり、design.md は書かずに止めた）
+
+### 9.1 答え合わせのデータのライセンス（要調査 1 の結果）
+
+- data.go.jp のデータセットのページ（https://www.data.go.jp/data/dataset/cao_20190522_0002）は、2026-11-15 も証明書の期限切れで取れなかった。
+- 同じカタログの CKAN の API（https://data.e-gov.go.jp/data/api/action/package_show?id=cao_20190522_0002）は取れた:
+  - データセット: 題名「「国民の祝日」について（毎年更新）」、組織 内閣府、`extras.creator` 大臣官房総務課、`metadata_modified` 2026-10-28。データセットの階の `license_id`・`license_title` は `null`。
+  - リソース（1 つ）: `url` https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv、`format` CSV、**`license_id` は `cc-by`**、`copyright`・`terms_and_conditions` は空。
+  - カタログのライセンスの一覧（`license_list`）で `cc-by` の項は `title` が「CC BY」、`url` は空。**版（4.0 など）はカタログに書かれていない**。
+- 出典の表示は「CC BY（版の記載なし）」として、データセットの ID・リソースの URL・取得日・UTF-8 と LF に直したこと・配布物に入らないことを書くのが、確かめられた事実の範囲。版を 4.0 と書くかは設計のディスカッションで決める（推測で書かない）。
+
+### 9.2 見本のゴースト（hello-pasta）の作り
+
+- 辞書は `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/01-boot.pasta`〜`12-lua.pasta` の 12 本。**この 12 本は入門ガイドの段階の辞書そのもの**で、`STAGES.md`（段階表の正本）が「1 段 1 ファイル」「段階表の追加するファイルの集まり＝`dic/*.pasta` の集まり」を定め、`tests/tutorial_stages_test.rs` の `stage_table_matches_dic_files` が機械で確かめる。
+- さらに `book/tools/tutorial-check.mjs`（manual.yml）が、`dic/X.pasta` ↔ `book/src/getting-started/X.md` の逐語の一致を確かめる。辞書に行を足せば同じ名前の章の作例も、ファイルを足せば章そのものも要る。
+- `tests/tutorial_stages_test.rs` の `scene_names_do_not_prefix_collide` が、全 `dic/*.pasta` のグローバルシーン名について「どの名前もほかの名前で始まらない」ことを確かめる（前方一致の候補に混ざるため）。
+- `tests/common/mod.rs` の `master_copy` は `ghost/master` を（`profile/`・`pasta.dll` 以外）まるごと写すので、`calendar.csv` を置けば全段階の読み込みの検査に乗る（中身が正しければ段階の検査は壊れない）。
+- `pasta_check` の `validate_cli_test.rs` の `test_validate_hello_pasta_clean` は「誤り 0 件、注意 0 件」を確かめる。`pasta_check` は前方一致の衝突を報告しない。
+- イベントのシーンで `＞「行事_」＆＄行事` を呼べる場所の候補: `＊OnBoot`（1 段目。「以後の段階で変えない」と `STAGES.md` が定める）、7 段目の挨拶（`07-greeting.pasta`）、8 段目の `OnMouseDoubleClick`（ショートカットのシーン）、6 段目の日時変数（`06-hour.pasta`）。どれを選んでも入門ガイドの章と段階表に手が入る。
+
+### 9.3 設計の関門で見つかった要件の穴
+
+1. **`クリスマス` と `クリスマスイブ` の前方一致の衝突（Req 10.1・10.2）**: Call は前方一致で候補を集める（`book/src/grammar/call-jump.md`「前方一致によるターゲット解決」）。Req 10.1 が求める `1225,クリスマス` と `1224,クリスマスイブ` を Req 10.2 どおり `＊行事_クリスマス`・`＊行事_クリスマスイブ` で受けると、12 月 25 日に `＞「行事_」＆＄行事`（＝`＞行事_クリスマス`）が `＊行事_クリスマスイブ` も候補にし、クリスマスの日にイブのトークがランダムに混ざる。あわせて hello-pasta の `scene_names_do_not_prefix_collide`（入門ガイドの spec の不変条件）が落ちる。直すには要件の表の名前を変える（例: `1224,イブ`）か、条件の属性で逃がす（`＊行事_クリスマスイブ　＆＄行事＝「クリスマスイブ」`。不変条件のテストは落ちたまま・回避のレシピになる）かで、どちらも Req 10.1 の文言か、ほかの spec の不変条件に手が入る。**作者が自分の表に付ける名前（`誕生日` と `誕生日前日` など）でも同じことが起きる**が、Req 9（マニュアル）にこの注意が無い（`＄節句`・`＄祝日` の名前どうしは前方一致しないので、今まで要らなかった）。
+2. **入門ガイドへの波及が範囲に無い（Req 10.2・Boundary Context）**: hello-pasta の辞書は入門ガイドの段階の辞書なので、行事のシーンを足すと、段階表（`STAGES.md`）・入門の章（`book/src/getting-started/*.md` の逐語の作例）・段階の検査に必ず手が入る（新しい段を作るか、既存の段の辞書と章を育てるか）。Boundary Context の In scope は hello-pasta の `calendar.csv` とトークだけを挙げ、入門ガイドの章と段階表を挙げていない。どの段に入れるか（新しい段を作るか）は入門の構成の決定で、要件で決める必要がある。
