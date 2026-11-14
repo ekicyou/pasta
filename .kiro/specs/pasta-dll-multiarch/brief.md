@@ -115,3 +115,7 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
   - Current State の行番号は古い（上の行が正しい）。`.cargo/config.toml` 11 行「出荷ターゲットは x86（i686）・x64（x86_64）の両方」は x64 の `pasta_check.exe` のことで、x64 の pasta.dll は配っていない（すぐ直せる誤り。前回から残る）。
   - 前回から残る: CI で arm64 を作るには、arm64 の Windows の runner か x64 からのクロスビルドが要る。aarch64 の LuaJIT と `embed-resource` の VERSIONINFO は、要件の前に試す。
   - `pasta-recipe` と前後して入るときは、後から入る側が添付の数と `github-release.ps1` 72 行・`release-state.ps1` 84 行・`release-scripts-test.ps1` 項目 10 の名前の並びを合わせる。
+
+## 申し送り（2026-11-14 の discovery「pasta-recipe-multiarch」より）
+
+- `pasta-recipe-multiarch` も、ルートの `.cargo/config.toml` に `[target.aarch64-pc-windows-msvc]` の `crt-static` を要る。先に入った方が足し、後の方は在るのを確かめる（二重に足さない）。`release.yml` も共有するので、同じウェーブに置かない。

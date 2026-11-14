@@ -341,6 +341,7 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 - `scene-exact-match`（2026-10-21 起票。ghost_dev のヒアリング）: 中身は台帳の行にある。0.6.0 の `novel-talk-flow` が前提にするので、遅くとも 0.6.0。選び方の `scene-pick-modes` は 0.5.0 で入った。
 - `scene-anchor-link`（2026-10-08 起票）: 中身は上の「Phase 11 の残り」の「文中のシーンリンク」にある。先に置いた `scene-condition-attributes` は入った。
 - `vsce-4-upgrade`（2026-10-24 起票）: 中身は下の「依存の更新」にある。
+- `pasta-recipe-multiarch`（2026-11-14 起票）: 中身は台帳の行にある。推奨は 0.5.3（リリースの前に入れれば `pasta-recipe.zip` の名前は一度も出ない）。
 
 ## 依存の更新（2026-10-24 起票）
 
@@ -382,6 +383,8 @@ Wave 3（見込み）リリース（0.5.3 の spec は 0 本）
 - [ ] vsce-4-upgrade -- `@vscode/vsce` を 4.x に上げる。リリース CI の Node は `ponytail-manual-ci` が 22 にした。`--azure-credential` の公開の道を `release-setup-check.yml` で確かめる。だめなら 4.x の OIDC の口へ移すかを決める（2026-10-24 起票。`/update` から）。版は未定。`pasta-dll-multiarch`・`pasta-recipe`（`release.yml`）、`pasta-recipe-dev-actions` は入った（`editors/vscode/package.json`・lock は変えず、`build.yml` に job `vscode-test` を足した）。Dependencies: none（`ponytail-manual-ci` は入った）
 - [x] pasta-recipe -- VS Code を使わない pasta DSL のエディタ（仮名）。Tauri 2 ＋ Vite ＋ Monaco の Windows x64 の単一の exe。ゴーストのフォルダのドラッグドロップで `ghost/master` を開き、最近開いたものを TOML で残す。ファイルとシーンのツリー、`.pasta` の着色（TextMate ＋ セマンティックトークン）と診断、ゴースト全体の検査、コードブロックの Lua の着色と `.lua` の編集、保存。解析は Rust の側で `pasta_lsp`・`pasta_check` を直接呼ぶ。`editors/recipe/`（`src-tauri` は別の Cargo ワークスペース）。リリースの成果物 `pasta-recipe.zip` とマニュアル（2026-11-12 起票。開発者の依頼「最優先事項」）。0.5.3 のウェーブ 1（2026-11-12 の棚卸）。`pasta-dll-multiarch`・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`vscode-scene-outline-play` は入った）
 - [x] pasta-recipe-dev-actions -- VS Code 拡張の実行の流れ（MCP クライアント・リロード・シーン実行・変数ダンプ）を `editors/shared/` へ移し、入出力（HTTP の POST・ファイルの読み取り・更新時刻）だけを Node と Tauri で差し込む。拡張の振る舞いは変えない。`pasta-recipe` に、シーンの ▶・リロード・出力の欄・保存変数の表（`OnPastaSetSaveVariable` で書き換え・削除。表は見るだけ）・ローカル変数を入れた実行を足す（2026-11-12 起票。`pasta-recipe` から分けた）。0.5.3 のウェーブ 2 の見込み。`vsce-4-upgrade`（`editors/vscode/package.json`）と同じウェーブに置かない。Dependencies: pasta-recipe（`scene-play-locals`・`vscode-scene-outline-play` は入った）
+
+- [ ] pasta-recipe-multiarch -- pasta-recipe を x64 と arm64 の 2 つで作り、`pasta-recipe.x64.zip`・`pasta-recipe.arm64.zip` としてリリース CI で検査して添付する（`pasta-recipe.zip` の名前は出さない）。x64 のランナーで `--target` を付けて 2 回作る（arm64 はクロス）。`package.ps1`・ルートの `.cargo/config.toml`（aarch64 の `crt-static`）・`release.yml`（PE ヘッダの arch の検査も）・`build.yml` の job `recipe`・`github-release.ps1` と自己テスト・`release` スキルの添付の数え方・マニュアルと README。x64 も含めた CI のビルドの完成までが範囲（開発者の指示）。アプリは LuaJIT を持たない。クロスで通るかは要確認（2026-11-14 起票。開発者「arm64 を起票して」）。版は未定（推奨 0.5.3）。`pasta-dll-multiarch`（`.cargo/config.toml`・`release.yml`）・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: none（`pasta-recipe`・`pasta-recipe-dev-actions` は入った）
 
 ## Existing Spec Updates
 
