@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. 土台: arm64 の設定と道具の取得
-- [ ] 1.1 aarch64 の静的 CRT と、依存の表示・検査の targets を足す
+- [x] 1.1 aarch64 の静的 CRT と、依存の表示・検査の targets を足す
   - ルートの `.cargo/config.toml` に `[target.aarch64-pc-windows-msvc]` の `+crt-static` の段を足し、頭の説明を出荷の target に pasta-recipe の arm64 を含む形へ直す。`pasta-dll-multiarch` が先に入れていれば、在るのを確かめるだけにして足し直さない
   - `editors/recipe/src-tauri/about.toml` の `targets` を x64 と aarch64 の 2 つにし、`package.ps1` が arch ごとに `--target` で置き換えることを説明の行に書く
   - `editors/recipe/src-tauri/deny.toml` の `[graph] targets` に `aarch64-pc-windows-msvc` を足す

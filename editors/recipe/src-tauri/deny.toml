@@ -1,7 +1,7 @@
 # cargo-deny 設定: pasta-recipe の別の Cargo.lock 用（ルートの deny.toml は変えない）。
 # [licenses].allow は about.toml の accepted と揃えること。勧告・取得元の設定はルートと同じ。
 [graph]
-targets = ["x86_64-pc-windows-msvc"]
+targets = ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"]
 
 [licenses]
 allow = [
