@@ -1,16 +1,16 @@
 {
   "feature_name": "pasta-recipe-multiarch",
   "created_at": "2026-11-14T03:26:35Z",
-  "updated_at": "2026-11-14T03:31:49Z",
+  "updated_at": "2026-11-14T04:21:25Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {
