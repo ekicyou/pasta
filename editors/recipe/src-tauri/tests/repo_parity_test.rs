@@ -109,7 +109,9 @@ fn app_lock_matches_root_lock_for_analyzer_and_check_core() {
             // ルートに無い名前は比べない。lock の依存は木全体で機能を合わせた結果なので、
             // アプリ側だけで有効な機能（例: Tauri が入れる futures-util の io）の分が混ざる
             let root_vs = root_versions.get(name)?;
-            if root_vs == app_vs {
+            // ルートは木全体の lock なので、pasta_lsp・pasta_check の外で使う版（例: syn 2）も載る。
+            // アプリの版がどれもルートに在れば揃っている
+            if app_vs.is_subset(root_vs) {
                 return None;
             }
             let join = |vs: &BTreeSet<String>| vs.iter().cloned().collect::<Vec<_>>().join(", ");
