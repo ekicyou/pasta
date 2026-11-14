@@ -203,3 +203,9 @@
 - **要件定義のモデル**: Fable のまま。控えは `novel-save-slots` がスロットへ書く保存の形で、areka が頼る。区切りの決まりは、Rust の 5 秒の待ち・Lua のコルーチン・SHIORI の応答にまたがる時の流れの決まりで、推奨案がまだ無い。今回の 5 本は、この決まりを決めていない。
 - **分割の案**: 不要（2026-10-17 に分けた後の 14〜16）。
 - **見つけた穴・古くなった記述**: 「Current State」の行番号（2026-11-03 の節で直した値から、さらに動いた）: `sakura_builder.lua` 463〜471 行 → 595〜601 行、`init.lua` 110 行 → 114 行（`set_co_scene`）・324・327・330 行 → 328・331・334 行、`entry.lua` 99 行 → 101 行、`shiori/act.lua` 312〜341 行 → 322 行の `get_property`、`external_control.lua` 89・121 行 → 97・129 行。`virtual_dispatcher.lua` 62・88〜89・227〜229 行、`callback.lua` 121・198 行は合っている。並べ替えの位置は `scene_table.rs` 73 行の `cache`・299 行の `select_from_cache`（前は 64・315 行）。roadmap の `sakura_builder.lua` 557 行は 690 行。
+
+## 申し送り（onhour-talk-recount より、2026-11-15）
+
+- **仮想ディスパッチャの状態と口が増えた**: `virtual_dispatcher.lua`（335 行）の状態は 4 つになった（`next_hour_unix`・`seen_epoch`・`next_talk_time`・新しい `talk_suspend_count`＝最後に自動トークを出したときの `CLOCK.suspend_count()`。22〜23 行）。`check_hour` は時報の thread を返すとき（192〜196 行）に `next_talk_time` を決め直して回数を控え、`check_talk` は thread（止まっている場面 `STORE.co_scene` か新しい OnTalk）を返すとき（234〜237 行）に回数を控える。止まっている場面を返す所は 234 行に動いた。公開の関数 `wake_talk(act)`（294 行）が増え、`next_talk_time` を今にする（門は飛ばさない。`restart_timers` が 0 に戻して予約を消す）。
+- **OnSysResume に既定が入った**: 新しいモジュール `event/sys_resume.lua` が `REG.OnSysResume` の既定を置く（`init.lua` 92 行で読む）。シーンが無く Reference0 が `auto` でなければ `wake_talk` を呼び、次の門の開いた OnSecondChange でスリープ明けのおしゃべりが 1 回出る。ランダムトークを止める道を `dispatch` の門の外に作ると、この予約がその道をすり抜けて出るおそれがある。止める設計は `dispatch` の門で止めるか、`wake_talk` の条件に足す（本 spec の design.md の Revalidation Triggers）。
+- **触るファイルの行数**: 上の「2026-11-12 棚卸の再測定」の `virtual_dispatcher.lua` 315（止まっている場面を返す所 227〜229 行）は、335 行（234 行）に読み替える。`init.lua` の読み込みの並びは 85〜92 行（末尾に `sys_resume` が増えた）。

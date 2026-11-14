@@ -170,3 +170,7 @@
   - 英大文字の続きの規則は、条件の述語（`CondFn`。`SceneInfo` を受ける）に混ぜない。述語で落とすと、`＊OnInstallCompleteAll` しか無いときに「名前が無い」でなく `unmet`（条件漏れ）になり、Call の道では止まるエラー（`SCENE_UNMET`）の扱いに入る。候補を集める段で外し、外した並びには別の `SceneCacheKey` を使う（今の鍵は 名前・`exact`・持ち主のローカル だけなので、同じ `OnInstallComplete` の `＞` と受け口の並びが混ざる）。
   - 「Current State」の行番号と「使っているのはデバッグのキックと撫で・つつきの 1〜8 段目だけ」は古い。完全一致の今の使い手は、撫で・つつき（`mouse.lua` 120 行）・`OnPastaScene`（`scene_play.lua` 110 行）・チェイントーク中断（`init.lua` 189 行）。
   - 前回から残る: 「Approach」2 の「今の 5 段」は 4 つしか挙げていない（1 段目の「実行中のシーンの表の完全一致」が抜けている）。`＞＞` に要るのは 2 段目と 5 段目の完全一致で、`search_scene_where(…, exact = true, cond)` を通せば条件・`＆優先`・`＆重み`・`＆順番` まで揃う。`OnPastaScene`・`OnPastaSceneAt` は既定のハンドラが常にあるので、英大文字の規則の例にならない。撫で・つつきの「止めている間は、つつきは 9 段目だけ」も、完全一致のモードでの 9 段目の論点に含める。
+
+## 申し送り（onhour-talk-recount より、2026-11-15）
+
+- **前方一致で探すイベントの入口が 1 つ増えた**: 新しい `event/sys_resume.lua` 19 行の `SCENE.co_exec(act, act.req.id, nil, nil)`（`REG.OnSysResume` の既定。`＊OnSysResume` や `GLOBAL.OnSysResume` を探す）。完全一致・モードを入口に従わせるなら、ここも数える。`virtual_dispatcher.lua` は 335 行になった（時報の候補と OnTalk を探す `create_scene_thread` は今も前方一致）。

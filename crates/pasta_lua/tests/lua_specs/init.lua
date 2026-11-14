@@ -74,6 +74,7 @@ local specs = {
     "recommend_menu_test",                -- おすすめメニューの組み込みと既定のハンドラのテスト (recommend-menu-scenes 3.1)
     "scene_attrs_test",                   -- SCENE.attrs・set_attrs・STORE.scene_attrs のテスト (scene-attribute-store 4.2)
     "scene_condition_test",               -- イベントの act の自動転記・条件漏れの扱いのテスト (scene-condition-attributes 3.2)
+    "sys_resume_event_test",              -- OnSysResume スリープ明けのおしゃべり (onhour-talk-recount 3.1–4.5, 6.3–6.6)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

@@ -116,7 +116,7 @@ off()
 
 ### 既定ハンドラと上書き
 
-次の表のイベントとリソースの ID（13 行）には、pasta が既定のハンドラを `REG` に登録している。ゴーストが `REG` の同じキーにハンドラを代入すると、そのイベントでは既定ハンドラの代わりにゴーストのハンドラが呼ばれる。
+次の表のイベントとリソースの ID（14 行）には、pasta が既定のハンドラを `REG` に登録している。ゴーストが `REG` の同じキーにハンドラを代入すると、そのイベントでは既定ハンドラの代わりにゴーストのハンドラが呼ばれる。
 
 | イベント | 既定ハンドラの動作 |
 | -------- | ------------------ |
@@ -125,6 +125,7 @@ off()
 | `OnMouseDoubleClick` | つつきのショートカットのシーンを探して実行する。無ければイベント名でシーンを探して実行する（[OnMouseDoubleClick](#onmousedoubleclick)） |
 | `OnMouseMove` | 撫でを判定し、撫でたと決めたときは撫でのショートカットのシーンを探して実行する。それ以外はイベント名でシーンを探して実行する（[OnMouseMove](#onmousemove)） |
 | `OnSecondChange` | コールバックのタイムアウト処理と、仮想ディスパッチャによる OnTalk・OnHour の発行を行う（[OnSecondChange](#onsecondchange)） |
+| `OnSysResume` | イベント名でシーンを探して実行する。無ければ、復帰の後にまだ自動トークが出ていないとき、スリープ明けのおしゃべりを予約する（[OnSysResume](#onsysresumeスリープ明けのおしゃべり)） |
 | `OnPastaScene` | デバッグが有効なとき、名前で指名したシーンを再生する（[OnPastaScene](#onpastascene名前でシーンを再生)） |
 | `OnPastaSceneAt` | デバッグが有効なとき、ファイルと行で指名したシーンを再生する（[OnPastaSceneAt](#onpastasceneat位置でシーンを再生)） |
 | `OnPastaDumpVariables` | デバッグが有効なとき、グローバル変数をファイルに書き出す（[OnPastaDumpVariables](#onpastadumpvariablesグローバル変数を書き出す)） |
@@ -343,6 +344,7 @@ end
 | マウス | `OnMouseMove` | あり（撫での判定とショートカット・同名のシーンを実行） |
 | 時間 | `OnSecondChange` | あり（コールバックのタイムアウト処理・仮想ディスパッチャ） |
 | 時間 | `OnMinuteChange` | なし（同名のシーンを実行） |
+| 時間 | `OnSysResume` | あり（同名のシーンを実行・スリープ明けのおしゃべり） |
 | コールバック | `OnPastaCallBack{N}` | `REG` より先に処理される |
 | 時計 | `OnPastaClock` | `REG` より先に処理される（仮想時刻の読み取り） |
 | デバッグ | `OnPastaScene` | あり（名前で指名したシーンを再生。デバッグが有効なときだけ） |
@@ -664,6 +666,43 @@ end
 ```
 
 正時の時報は、OnMinuteChange ではなく [OnHour](#onhour) で書ける。
+
+### OnSysResume（スリープ明けのおしゃべり）
+
+スリープ・休止状態から復帰したときに送られる。
+
+| Reference | 内容 |
+| --------- | ---- |
+| `act.req.reference[0]` | 復帰の種類。ふつうの復帰は `normal`、システムのスケジュールによる自動の復帰は `auto`（SSP）。空のこともある |
+
+ゴーストが `OnSysResume` を受けていなければ、pasta は復帰の直後にランダムトークを 1 回出す。スリープから戻ったときは、利用者が画面を見ている見込みが高いからである。
+
+- 出す条件は、ゴーストが `OnSysResume` を受けていないこと、Reference0 が `auto` でないこと、復帰の後にまだ自動トーク（時報かランダムトーク）が出ていないことの 3 つである。
+- `OnSysResume` への応答そのものは 204 No Content で、トークは返さない。次に自動トークの門が開いた OnSecondChange で出す。
+- 出すのは、ふつうの `＊OnTalk`・`＊会話` のシーンである。チェイントークの続きがあれば、続きを出す（[OnTalk](#ontalk)）。
+- 次のときは出さない。ゴーストが受けているとき、Reference0 が `auto` のとき、自動トークを止めているとき、先に時報かランダムトークが出たとき（`OnSysResume` が届く前に出たものも含む）。
+- 復帰の後に喋るのは 1 回だけである。時報が出れば、それがその 1 回になる。本文の無い時報のシーンも 1 回と数える。`＊時報03` を本文なしで書いて黙らせた時刻をまたいだ復帰では、何も喋らずに時報から数え直す。
+- `OnSysSuspend` を送らないベースウェアでは、スリープ明けのおしゃべりは出ない。ランダムトークは今の間隔で出続ける。
+
+次のどれかがあれば、ゴーストが `OnSysResume` を受けているとみなして、おしゃべりは出さない。
+
+- `OnSysResume` という名前のシーン（条件を満たして実行されるもの）や、`GLOBAL.OnSysResume` の関数
+- `REG.OnSysResume` への代入
+- `REG:register("OnSysResume", …)` で重ねたハンドラのうち、真の値を返して止めたもの（全部が見送れば受けていないものとして扱う）
+
+おしゃべりを止めるには、本文の無い `＊OnSysResume` を書く。何も喋らずに既定を止める（[空のシーンで反応を止める](#空のシーンで反応を止める)と同じ考え）。
+
+```pasta
+＊OnSysResume
+```
+
+Lua では、何も返さない `REG.OnSysResume` を代入する。
+
+```lua
+REG.OnSysResume = function(act)
+    return nil
+end
+```
 
 ### OnPastaScene（名前でシーンを再生）
 
@@ -1404,6 +1443,7 @@ local co = dispatcher.check_hour(act)
 - 前の呼び出しから[時刻の飛び](#時刻の飛び)があれば、次の正時を決め直す。決め直しは現在時刻の 70 秒前から数えるので、70 秒ほど前までに過ぎた正時は、1 回だけ時報になる。
 - 現在時刻が記録した正時に達していれば、次の正時を記録し直してから、4 つの候補でシーンを探す。
 - 一度に何時間分も進んでいても、時報は 1 回だけである。`{HH}` は進んだ先の時になる。
+- 時報のシーンが見つかったら、次のトーク時刻をその時点から決め直す。時報の直後は、`talk_interval_min` 秒より前にランダムトークが出ない。本文の無い時報のシーンでも決め直す。候補が無く時報を出さなかったときは、次のトーク時刻を変えない。
 
 ### OnTalk
 
@@ -1444,7 +1484,7 @@ pasta は、OnSecondChange が届くたびに、前の OnSecondChange からの�
 
 - 飛びがあると、時報の次の正時を決め直す（[check_hour](#check_houract)）。仮想時刻を入れ直しても、余分な時報は出ない。
 - おしゃべりの間隔・撫での判定・コールバックの待ち時間（[get_property](script-api.md#get_propertyname_or_names-timeout-timeout_message)）は、飛びの分を差し引いた時計で数える。仮想時刻を 3 時間進めても、次のおしゃべりまでの残りは変わらない。
-- スリープから復帰した後の最初の差は、飛びとみなさない（`OnSysSuspend` か `OnSysResume` が届いた後の最初の飛び）。時報は 1 回出て、おしゃべりはすぐ出る。
+- スリープから復帰した後の最初の差は、飛びとみなさない（`OnSysSuspend` か `OnSysResume` が届いた後の最初の飛び）。時報は 1 回出て、おしゃべりは時報から間隔を数え直して待つ。時報が出なければ、復帰の後の最初のおしゃべりが 1 回出る（溜まったランダムトークか、スリープ明けのおしゃべり。[OnSysResume](#onsysresumeスリープ明けのおしゃべり)）。
 - `X-Pasta-Time` ヘッダのあるリクエストでは、飛びを見ない。その日時をそのまま使う。
 - 飛びの記録は保存しない。SHIORI の load から unload までの間だけ保たれる。
 
@@ -1489,7 +1529,7 @@ dispatcher._reset()
 
 -- 内部状態の取得
 local state = dispatcher._get_internal_state()
--- { next_hour_unix = 次の正時の Unix 時刻（仮想時刻）, next_talk_time = 次のトーク時刻, seen_epoch = 前に見た時刻の飛びの通し番号 }
+-- { next_hour_unix = 次の正時の Unix 時刻（仮想時刻）, next_talk_time = 次のトーク時刻, seen_epoch = 前に見た時刻の飛びの通し番号, talk_suspend_count = 最後に自動トークを出したときに時計が数えていた OnSysSuspend の回数 }
 
 -- シーンを探して実行する関数の差し替え（nil を渡すと解除）
 dispatcher._set_scene_executor(function(event_name, act)

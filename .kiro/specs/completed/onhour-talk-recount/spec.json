@@ -1,0 +1,22 @@
+{
+  "feature_name": "onhour-talk-recount",
+  "created_at": "2026-11-14T14:28:12Z",
+  "updated_at": "2026-11-15T01:30:00Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

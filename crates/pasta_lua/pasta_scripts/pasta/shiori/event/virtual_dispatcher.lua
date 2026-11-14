@@ -20,6 +20,7 @@ local CLOCK = require("pasta.shiori.clock")
 local next_hour_unix = 0   -- 次の正時タイムスタンプ（CLOCK.now の時刻で数える）
 local seen_epoch = 0       -- 前回見た時刻の飛びの通し番号（CLOCK.epoch）
 local next_talk_time = 0   -- 次回トーク発行予定時刻（CLOCK.steady の時刻で数える）
+local talk_suspend_count = 0 -- 最後に自動トークを出したときの CLOCK.suspend_count()
 local scene_executor = nil -- テスト用: シーン実行関数のオーバーライド
 
 -- 3. モジュールテーブル宣言
@@ -188,7 +189,12 @@ function M.check_hour(act)
     local candidates = { "時報" .. hh, "OnHour" .. hh, "時報その他", "OnHourOther" }
     for _, name in ipairs(candidates) do
         local t = create_scene_thread(name, act)
-        if t then return t end
+        if t then
+            -- 時報が出るので、次のトークの時刻をこの時点から決め直す（時報の直後にトークが続かないように）
+            next_talk_time = calculate_next_talk_time(CLOCK.steady(act.req))
+            talk_suspend_count = CLOCK.suspend_count()
+            return t
+        end
     end
     return nil
 end
@@ -223,14 +229,13 @@ function M.check_talk(act)
     next_talk_time = calculate_next_talk_time(current_unix)
 
     -- チェイントーク継続確認（OnTalk発動タイミングで判定）
+    -- 続きがあれば継続用コルーチン（新規シーン検索スキップ）、なければ新規シーンのthread（実行しない）
     local STORE = require("pasta.store")
-    if STORE.co_scene then
-        -- 継続用コルーチンを返す（新規シーン検索スキップ）
-        return STORE.co_scene
+    local t = STORE.co_scene or create_scene_thread("OnTalk", act)
+    if type(t) == "thread" then
+        talk_suspend_count = CLOCK.suspend_count()
     end
-
-    -- 新規シーンのthreadを返す（実行しない）
-    return create_scene_thread("OnTalk", act)
+    return t
 end
 
 --- 仮想イベントディスパッチ（メインエントリポイント、thread返却形式）
@@ -282,6 +287,19 @@ function M.restart_timers(act)
     end
 end
 
+--- スリープ明けのおしゃべりを予約する。復帰の後にまだ自動トークを出していなければ、次のトーク時刻を今にする。
+--- 発行はしない。次の OnSecondChange からの check_talk が、今の門を通ったうえで出す。
+---@param act ShioriAct act.req.date から今（CLOCK.steady）を取る
+---@return nil
+function M.wake_talk(act)
+    local now = act.req and CLOCK.steady(act.req)
+    -- 初回の時刻決め・OnSysSuspend 未受信・最後のスリープの後に出し済みのときは動かさない
+    if now == nil or next_talk_time == 0 then return end
+    local n = CLOCK.suspend_count()
+    if n == 0 or talk_suspend_count == n then return end
+    next_talk_time = now
+end
+
 -- 6. テスト用関数（内部状態リセット）
 
 --- テスト用: 内部状態をリセット
@@ -289,6 +307,7 @@ function M._reset()
     next_hour_unix = 0
     seen_epoch = 0
     next_talk_time = 0
+    talk_suspend_count = 0
     scene_executor = nil
 end
 
@@ -299,6 +318,7 @@ function M._get_internal_state()
         next_hour_unix = next_hour_unix,
         next_talk_time = next_talk_time,
         seen_epoch = seen_epoch,
+        talk_suspend_count = talk_suspend_count,
     }
 end
 

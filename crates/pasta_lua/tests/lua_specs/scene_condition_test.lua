@@ -15,6 +15,7 @@ local function reload()
     package.loaded["pasta.shiori.event.register"] = nil
     package.loaded["pasta.shiori.event.boot"] = nil
     package.loaded["pasta.shiori.event.second_change"] = nil
+    package.loaded["pasta.shiori.event.sys_resume"] = nil
 
     local STORE = require("pasta.store")
     STORE.reset()

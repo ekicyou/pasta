@@ -418,7 +418,7 @@ local RELOAD = {
     "pasta.shiori.entry", "pasta.shiori.event", "pasta.shiori.event.register",
     "pasta.shiori.event.callback", "pasta.shiori.event.boot", "pasta.shiori.event.choice_select",
     "pasta.shiori.event.second_change", "pasta.shiori.event.mouse", "pasta.shiori.event.scene_play",
-    "pasta.shiori.event.external_control",
+    "pasta.shiori.event.external_control", "pasta.shiori.event.sys_resume",
     "pasta.shiori.event.virtual_dispatcher", MODULE, "pasta.shiori.res", "pasta.shiori.stop",
     "pasta.shiori.act", "pasta.shiori.sakura_builder", "pasta.act", "pasta.actor", "pasta.scene",
     "pasta.word", "pasta.global", "pasta.store", "pasta.config", "pasta.save",
