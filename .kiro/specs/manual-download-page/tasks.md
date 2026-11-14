@@ -111,7 +111,7 @@
   - _Dispatch: mechanical — 直す 6 か所と文言を設計が与える_
   - _Requirements: 7.3_
 
-- [ ] 5. マニュアルの CI の検査を通しで走らせて仕上げる
+- [x] 5. マニュアルの CI の検査を通しで走らせて仕上げる
   - 先に準備を確かめる: book/node_modules が無ければ book で npm ci を走らせ、mdbook 0.5.4 があることを確かめる（無いことによる失敗は環境の失敗で、spec の失敗ではない）
   - CI と同じ順で、スキルの写しの鮮度の照合 → ビルドと変換 → 索引 → リンクの検査 → 入門ガイドの照合 → 着せ替え・検索・内容の検査 → 自己テストを走らせ、すべて通す
   - リンクの検査で、ページの中のリンク 6 つ・5 章のリンク・README の download.html・すべての固定リンクの名前が通り、release-asset と internal-anchor が 0 件
@@ -127,3 +127,4 @@
 ## Implementation Notes
 
 - 4.2: 5 章の `../download.md#…` のリンクは 6 つが正しい（設計の付け替え表の 7 行のうち prerequisites の台詞の行は語の言い替えだけでリンクを置かない）。tasks.md・design.md の「7 つ」は表の行数。
+- 5: CI と同じ順の通しで全段 exit 0（直しなし・差分なし）。download.html が目次の全章に入り、T-notalk:download.md と「download.md の固有の語「やりたいこと」で章がヒットする」が PASS、口調・導入・締めの項目は出ない。対象バージョンの行は 1 件。
