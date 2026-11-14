@@ -1,6 +1,6 @@
 # 設計レビュー: manual-download-page
 
-- 対象: `.kiro/specs/manual-download-page/design.md`（requirements.md・research.md・steering と照合）
+- 対象: `.kiro/specs/completed/manual-download-page/design.md`（requirements.md・research.md・steering と照合）
 - 実施日: 2026-11-14
 - 方法: kiro-validate-design（非対話）。設計の主張は `book/tools/` の実コード・`.github/workflows/release.yml`・`manual.yml`・`book/src/` の該当章・`book/AUTHORING.md` で確かめた。
 
