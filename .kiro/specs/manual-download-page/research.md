@@ -301,3 +301,12 @@ mdBook 0.5.4 と `link-check.mjs` の `headingSlug` は、記号を落とす。�
 - ponytail（最小の完全な変更）の指針: 新しいファイル・依存・抽象を足さず、既存の登録簿と検査の型に乗せた。
 - pasta のドメインのスキル（`pasta-ghost-authoring`・`pasta-lua-coding`・`pasta-check`）は、この spec がマニュアルの構成と検査だけを扱うので読んでいない。
 - 設計の review gate: 要件 42 件の ID がすべて対応表に出ることを機械で確かめ、1 回の修正（3.1 の版の注意を各節の中身に入れる）で通った。
+
+## 設計ディスカッションの決定（2026-11-14）
+
+開発者が 6 件すべてを推奨案で承認した（design.md「決定の記録」）。推奨の根拠の要点:
+
+- 例外は `NO_TALK_CHAPTERS` の 1 か所に置く。4 か所に散らすと直し忘れるため。代わりの要求（台詞 0・固有の語の検索）と対にする。
+- 見出しは役目の日本語にする。`pasta-dll-multiarch` で `pasta.dll.zip` の形が変わる見込みがあり、ファイル名の見出しではアンカーが壊れるため。
+- 固定リンクの検査は、読者に届く文書にも広げる。要件ディスカッションで直接の固定リンクを残すと決めた `crates/pasta_check/README.md` と `pasta-check` のスキルが、名前の変更で黙って 404 になるのを防ぐため。対象の一覧は `checkReadmeManualLinks` と共有する。要件 7.8 の範囲もこれに合わせて広げた。
+- 設計の検証で見つかった自己テスト 2 本（`verify-scripts-test.mjs`・`gen-skill-refs-test.mjs`）の直しは、自明な修正として設計に入れた。
