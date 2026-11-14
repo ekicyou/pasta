@@ -1,6 +1,6 @@
 # 設計レビュー: date-var-calendar
 
-- 対象: `.kiro/specs/date-var-calendar/design.md`（requirements.md・research.md・steering と照合）
+- 対象: `.kiro/specs/completed/date-var-calendar/design.md`（requirements.md・research.md・steering と照合）
 - 実施日: 2026-11-15
 - 方式: kiro-validate-design（非対話。Analysis → Critical Issues → Strengths → GO/NO-GO）
 
