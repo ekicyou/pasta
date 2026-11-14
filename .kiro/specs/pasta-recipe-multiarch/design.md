@@ -126,7 +126,7 @@ graph TB
 ### New Files
 
 - `.github/scripts/release/verify-recipe-zips.ps1` — 2 つの zip の検査（2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7・2.11・7.1）。リリース CI と main の CI が呼ぶ。手元でも呼べる。
-- `.github/scripts/release/install-tools.ps1` — 版と SHA-256 を固定したビルド済みの道具（wasm-pack・cargo-about）を取り、`GITHUB_PATH` に足す。`release.yml` の build の job の今の取得の loop と `env` の固定値をここへ移す（OPEN QUESTION 1）。
+- `.github/scripts/release/install-tools.ps1` — 版と SHA-256 を固定したビルド済みの道具（wasm-pack・cargo-about）を取り、`GITHUB_PATH` に足す。`release.yml` の build の job の今の取得の loop と `env` の固定値をここへ移す（2026-11-14 設計議題 1 で確定）。
 
 ### Modified Files
 
@@ -307,7 +307,7 @@ sequenceDiagram
 - Trigger: `pwsh -NoProfile -File .github/scripts/release/install-tools.ps1 -Name wasm-pack,cargo-about`（`release.yml`）／`-Name cargo-about`（`build.yml`）。
 - 中身: 今の `release.yml` の `Install wasm-pack and cargo-about` の loop と、`env` の `WASM_PACK_VERSION`・`WASM_PACK_SHA256`・`CARGO_ABOUT_VERSION`・`CARGO_ABOUT_SHA256` の値をそのまま移す（取得・SHA-256 の照合・`--version` の照合・`GITHUB_PATH`）。`-Name` は `ValidateSet('wasm-pack','cargo-about')`。
 - 失敗: SHA-256・版の違い・取得の失敗で終了コード 1（今と同じ）。
-- **仮定**: この部品は OPEN QUESTION 1 で (2) が選ばれたときだけ作る。
+- **決定**（2026-11-14 設計議題 1）: 版と SHA-256 を 1 か所に持つため、このスクリプトに出す。`build.yml` へ写す形（版を上げるとき 2 か所を直す）と `cargo install --locked`（毎回のソースのビルドで遅く、SHA-256 の照合を失う）は採らない。
 
 ### CI
 
@@ -381,6 +381,7 @@ sequenceDiagram
 - 項目 15: arm64 の zip の exe の Machine が `0x8664` → 終了コード 1・出力に `pasta-recipe.arm64.zip`・`0xAA64`・`0x8664`（2.4）。
 - 項目 16: x64 の zip が無く、arm64 の zip の表示に `monaco-editor` が無い → 終了コード 1・両方の文が出る（2.2・2.5・2.7）。
 - 項目 17: 偽の `-DumpbinCommand` が `VCRUNTIME140.dll` を返す → 終了コード 1・出力に zip の名前と `VCRUNTIME140.dll`（2.11）。
+- 2.3（版の違い）と 2.6（30 MB）の失敗の経路は自己テストに入れない（2026-11-14 設計議題 4）。版は Windows でないと読めず、30 MB の zip は重い。成功の経路は job `recipe` の実物で確かめる。偽の版を読ませる差し込み口はスクリプトに作らない。
 - 偽の exe は、`MZ`・`e_lfanew`・`PE\0\0`・Machine の 2 バイトだけを書いた小さなファイル。ネットワーク・gh・Windows の道具を使わない（`ubuntu-latest` で走る）。
 
 #### ReleaseSkill（`release-state.ps1`・`procedure.md`）
@@ -415,7 +416,7 @@ sequenceDiagram
 
 ## Open Questions / Risks
 
-1. **`cargo-about` の取得の共有**（InstallTools）: 仮に `install-tools.ps1` へ出す形で書いた。`build.yml` に `env` と loop を写す形もある。決まったら `pasta-dll-multiarch/brief.md` へ `release.yml` の `env` の行が動くことを申し送る。
+1. **`cargo-about` の取得の共有**（InstallTools）: 確定（2026-11-14 設計議題 1）。`install-tools.ps1` へ出す。`pasta-dll-multiarch/brief.md` へ申し送り済み。
 2. **煙試験の合格の形と、`windows-11-arm` で起動できるか**（ArmSmoke）: WebView2 ランタイムと対話の画面の有無は公式の文書で確かめられていない。最初の `workflow_dispatch` で確かめ、起動できなければ開発者に戻す（6.5）。
 3. **VC++ ランタイムの検査から UCRT を外すこと**（Verify）: `+crt-static` の今の x64 の exe も UCRT を DLL で読む。外さなければ x64 から落ちる。
 - 危険: `windows-latest` でのクロスのビルドは手元でだけ確かめた。`main` の CI は arm64 の LTO の release ビルド 1 回ぶん長くなる。
