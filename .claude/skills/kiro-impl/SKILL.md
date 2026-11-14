@@ -126,7 +126,7 @@ For each task (one at a time):
 - Append the two desk sentences of "Desk coordination (areka-impl-watch)" verbatim to the end of every implementer prompt (only the first while desk steps are off)
 - Dispatch via **Agent tool** as a fresh subagent; set `model` and `effort` from the Preflight ladder for this task
 
-**Effort escalation** (local customization — keep when regenerating this skill): this skill explicitly sets the Agent tool's `model` and `effort` on every implementer, reviewer and debugger dispatch from the Preflight ladder and reviewer rule. Only step 1 (a mechanical task's first attempt) or an annotation's explicit `effort` goes below the session default.
+**Effort escalation** (local customization — keep when regenerating this skill): this skill explicitly sets the Agent tool's `model` and `effort` on every implementer, reviewer and debugger dispatch from the Preflight ladder and reviewer rule; an explicit level may sit below the session default, and that is intended.
 
 **b) Handle implementer status**:
 - Parse implementer status only from the exact `## Status Report` block and `- STATUS:` field.
