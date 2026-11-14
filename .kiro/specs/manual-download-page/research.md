@@ -205,3 +205,99 @@ mdBook 0.5.4 と `link-check.mjs` の `headingSlug` は、記号を落とす。�
 ## 次の段
 
 要件ディスカッション（`/kiro-requirements-discussion manual-download-page`）で上の議題を決め、そのあと `/kiro-design manual-download-page` で設計へ進む。
+
+---
+
+# 設計フェーズの調べと決定（2026-11-14・`/kiro-spec-design -y`）
+
+## Summary
+
+- **Feature**: `manual-download-page`
+- **Discovery Scope**: Extension（既存のマニュアルと検査の延長。light discovery。外部の調べものは無い。新しい依存なし）
+- **Key Findings**:
+  - 台詞の無い章の例外は、登録簿 `talk/talk.mjs` に一覧を 1 つ置くのがいちばん小さい。3 つの検査はすでに `talk.mjs` を import しており、依存の向き（`link-check` ← `talk` ← `verify-*`）を変えずに済む。
+  - 固定リンクの名前の正は `release.yml` の「Upload release-assets」の `path:` の 7 行（`release/<名前>`）。VSIX の行は `${{ … }}` を含むので名前が固まらない。マニュアルの固定リンクには、リンク記法のほかに `<…>` の自動リンク（`debug/recipe.md`・`debug/validate.md`）があるので、`extractLinks` では拾えない。
+  - `manual.yml` の起動条件に `release.yml` が無い。添付の名前だけを変える変更ではマニュアルの検査が走らない。
+
+## Research Log
+
+### 台詞を置かない章を外す場所
+- **Context**: 要件 7.2・7.6・7.7。ギャップ分析で 4 つの検査が 5 件落ちると分かっていた。
+- **Sources Consulted**: `book/tools/talk/talk.mjs`・`verify-content.mjs`（D は L322-360、T は L595-620）・`verify-static.mjs`（`analyzeTheme` L326-345、検査 L703-725）・`verify-search.mjs`（`talkQuery` L105、8.2 L228-248）。
+- **Findings**:
+  - `verify-content` の D は `book/src/...` の形のパス、T は `book/src` からのパス（`ch`）で回る。どちらも `rel.slice(SRC.length + 1)` で一覧のキーにそろう。
+  - `analyzeTheme` は同じ `pages` で CSS・JS・メニュー id・台詞を見る。`pages` から章を外すと CSS・JS の検査からも外れるので、外すのは `missingTalk` の数え方の側にする。
+  - `verify-search` の 8.2 は `summaryChapters` の `md`（`download.md`）で回るので、一覧のキーがそのまま使える。
+  - 自己テスト（`verify-static`・`verify-search`・`verify-scripts-test`）は、どれもこの分岐で期待が変わらない。
+- **Implications**: 一覧は `Readonly<Record<章, 検索の語>>`。検索の語を一覧の値に持たせると、章を足すときに代わりの語を必ず決めることになる。
+
+### 固定リンクの名前の検査の置き場所
+- **Context**: 要件 7.8。
+- **Sources Consulted**: `link-check.mjs`（`detectBrokenLinks`・`BOOK_KINDS`・`runLinkCheck`）・`link-check-test.mjs`（一時フォルダのフィクスチャの型）・`.github/workflows/release.yml` L205-220・`manual.yml` の `paths`。
+- **Findings**:
+  - `link-check` はリンクの検査の持ち場で、[1] の区分に種別を足す型（`internals-path`・`readme-manual-url`）が既にある。`verify-content` はコンテンツの網羅の持ち場なので合わない。
+  - 既存の自己テストのフィクスチャには `release.yml` が無い。固定リンクが見つかったときだけ一覧を読めば、既存の節の期待は変わらない。
+- **Implications**: `checkReleaseAssetLinks` を足し、種別 `release-asset` を `BOOK_KINDS` に入れる。`manual.yml` の `paths` に `release.yml` を足す。
+
+### 見出しの slug
+- **Context**: 要件 3.7。
+- **Findings**: `headingSlug` で候補を計算した（「サンプルゴースト」→`サンプルゴースト`、「SHIORI の本体」→`shiori-の本体`、「検査の CLI」→`検査の-cli`、「AI 向けのスキル」→`ai-向けのスキル`、「VS Code の拡張」→`vs-code-の拡張`、ファイル名の `pasta.dll.zip` → `pastadllzip`）。`book/src` に `<a id>` の明示のアンカーの前例は無く、日本語の見出しのアンカー（`debug/recipe.md#入手と置き方` など）が家の型である。
+- **Implications**: 役目の日本語の見出しにする。ファイル名に依らないので、`pasta-dll-multiarch` などの改名でアンカーが変わらない。
+
+### 検索の固有の語
+- **Findings**: 「やりたいこと」は今の `book/src` に 0 件。要件 2.1 が表の列の名前として決めているので、ページから消えにくい。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A: 登録簿に一覧 | `talk.mjs` の `NO_TALK_CHAPTERS` を 3 つのツールが読む | 例外の定義が 1 か所・代わりの要求も同じ所で決まる | 逃げ道に使われ得る（規約で縛る） | **採用** |
+| B: ツールごとに直書き | 各ツールに `'download.md'` | 1 つ 1 つの差分が小さい | 4 か所に散り直し忘れる | 不採用 |
+| C: 掛け合いを置く | 検査を変えない | ツールの変更 0 | 要件 3.6 に反する | 要件で却下済み |
+| D: `checkRegion` に寄せる | 台詞なしの扱いを判定関数へ | 表紙の `cover` と並ぶ | 判定関数の意味が広がる・`verify-static`/`verify-search` は結局 A と同じ | 不採用 |
+
+## Design Decisions
+
+### Decision: 台詞を置かない章の一覧を `talk.mjs` に 1 つ置く
+- **Context**: 7.2・7.6・7.7。
+- **Alternatives Considered**: 上の表の B・D。
+- **Selected Approach**: `NO_TALK_CHAPTERS = Object.freeze({ 'download.md': 'やりたいこと' })`。`D-voice` は外す。`T-intro`/`T-outro` の代わりに `T-notalk`（台詞が 0）。`verify-static` は `missingTalk` から外す。`verify-search` は値の語で検索する。
+- **Rationale**: 依存の向きを変えず、既存の import のまま 1 か所で決まる。
+- **Trade-offs**: `D-voice` を逆にして「口調が無い」まで求める案は採らない（要件は台詞の有無だけを機械にし、常体は人のレビュー）。
+- **Follow-up**: 実装後に `verify-content` の件数が、`download.md` の `T-syntax`・`T-notalk` の 2 件だけ増えることを確かめる。
+
+### Decision: 固定リンクの検査は `link-check.mjs`・対象は `book/src`
+- **Context**: 7.8。
+- **Alternatives Considered**: `verify-content.mjs` に置く／読者に届く文書（README・クレートの README・3 スキル）まで広げる。
+- **Selected Approach**: `book/src/**/*.md` のフェンスの外を正規表現で走査し、名前を `release.yml` の `release/<名前>` の行と照らす。一覧が読めなければ 1 件の失敗にする。
+- **Rationale**: リンクの検査の持ち場で、[1] 区分の型に乗る。YAML の解釈器を入れずに済む（行の正規表現。`shortcut:` のコメントで限界を残す）。
+- **Trade-offs**: `release.yml` の書き方に頼る。崩れたら読めない旨の失敗で知らせる。
+- **Follow-up**: 範囲を README 類へ広げるかは設計の議論（OPEN QUESTION 5）。
+
+### Decision: 見出しは役目の日本語
+- **Selected Approach**: 「サンプルゴースト」「SHIORI の本体」「VS Code を使わずに書くアプリ」「VS Code の拡張」「検査の CLI」「AI 向けのスキル」「過去の版」。表の左の列から同じページの中でリンクする。
+- **Rationale**: 家の型（日本語の見出しのアンカー）に合い、配布物の改名に強い。文言は今の `introduction.md` の関連リンクのセルと README の言い方に合わせた。
+
+### Decision: トップページの細部
+- **Selected Approach**: 権威の一文は説明の 3 行の直後に 1 行。「まずダウンロード → 入門ガイド」は見出しなしの 1 行。関連リンクは見出しと 1 行の表のまま。対象バージョンの節の「リリースページから新しい版を入手」はダウンロードのページへのリンクに替える。
+- **Rationale**: 差分が最小で、要件の文言（4.4 の「セルを除き」・4.7 の「すぐ後ろに 1 行」）にそのまま合う。
+
+## Synthesis
+
+- **Generalization**: 4 つの検査の例外は「台詞を置かない章」という 1 つの概念の変種。接口（一覧）は一般にし、中身は 1 件だけにした。
+- **Build vs. Adopt**: mdBook の前付けの章と検索の索引・既存の `headingSlug`・`maskFences`・`listMarkdownFiles`・`BOOK_KINDS` をそのまま使う。新しいライブラリ（YAML の解釈器など）は入れない。
+- **Simplification**: 明示のアンカー（`<a id>`）・新しい検査のファイル・逆向きの網羅の検査・`D-voice` の逆の検査・固有の語の一意性の検査は入れない。
+
+## Risks & Mitigations
+
+- 見出しの文言を後で直すとアンカーが変わる — 5 章のリンクは `link-check` が止めるので取りこぼさない。
+- `release.yml` の upload の書き方が変わる — 一覧が読めない旨の失敗で知らせる。`manual.yml` の `paths` に `release.yml` を足して、変えたときに走らせる。
+- 一覧が台詞を書かない逃げ道になる — 規約で「ダウンロードのページだけ」と縛る。
+- 対象バージョンの行を誤って触る — 行に触らない。`F-version` とリリース手順の `grep -cF` が守る。
+
+## 参照したスキルと指針
+
+- `kiro-spec-design` の規則（design-principles・design-discovery-light・design-synthesis・design-review-gate）。
+- ponytail（最小の完全な変更）の指針: 新しいファイル・依存・抽象を足さず、既存の登録簿と検査の型に乗せた。
+- pasta のドメインのスキル（`pasta-ghost-authoring`・`pasta-lua-coding`・`pasta-check`）は、この spec がマニュアルの構成と検査だけを扱うので読んでいない。
+- 設計の review gate: 要件 42 件の ID がすべて対応表に出ることを機械で確かめ、1 回の修正（3.1 の版の注意を各節の中身に入れる）で通った。
