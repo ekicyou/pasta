@@ -2558,7 +2558,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_check"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "getrandom 0.4.3",
  "glob",
@@ -2570,7 +2570,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_core"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "rand",
  "thiserror 2.0.21",
@@ -2578,7 +2578,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_dsl"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "pest",
  "pest_derive",
@@ -2587,7 +2587,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_lsp"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "pasta_check",
  "pasta_dsl",
