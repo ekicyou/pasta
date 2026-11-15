@@ -122,7 +122,7 @@
   - _Dispatch: standard — 新ジョブと report の行を既存の契約に合わせて書く_
   - _Requirements: 1.4, 4.1, 4.5, 5.2, 5.5, 5.6, 11.1, 11.2_
 
-- [ ] 5. Integration: 実機とリハーサルでの確認
+- [x] 5. Integration: 実機とリハーサルでの確認
 - [x] 5.1 実機の SSP で更新が通ることの確認
   - 新しい nar を作業ツリーで作る（`release.ps1` または `pasta_check release`。LuaJIT のビルドがあるため、環境変数 `NoDefaultCurrentDirectoryInExePath` を外してから実行する）
   - 旧版の nar（v0.6.1。Release の添付なので、取得は許可を得てから。2.1 で取った nar があれば使い回す）を、readonly・別ポートの別の SSP に入れ、`homeurl` をローカルの静的サーバーに向ける。新しい nar を `build` で展開して配信する
@@ -134,7 +134,7 @@
   - _Dispatch: standard, effort high — 実機での確認と原因の切り分けを含む_
   - _Requirements: 1.3, 2.3, 10.1, 10.2, 10.3, 10.5_
 
-- [ ] 5.2 起動経路のリハーサルと `return_run_details` の確認（人の操作を挟む）
+- [x] 5.2 起動経路のリハーサルと `return_run_details` の確認（人の操作を挟む）
   - 手元の `gh` で、`workflow_dispatch` の REST 応答に `workflow_run_id` が含まれるかを確かめる
   - ブランチをリモートへ置く操作（push）は人が行うので、必要になった時点で止めて許可を求める。拒否されたら、飛ばした範囲を `research.md` に記録して先へ進む
   - ブランチが置かれたら、`-Ref <ブランチ>` で起動・run の特定・待ち・結論の判定までをリハーサルする（`deploy` は `main` 限定なので組み立てまで。見比べは行わない）

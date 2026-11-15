@@ -212,7 +212,7 @@
 
 ### 9.5 追加の Research Needed（実装の早い段で確かめる）
 
-1. `return_run_details=true` の応答に `workflow_run_id` が入ること（REST 文書のパラメーター欄に載っていない）。入らなければ一覧探索の副の経路が主になる。
+1. `return_run_details=true` の応答に `workflow_run_id` が入ること（REST 文書のパラメーター欄に載っていない）。入らなければ一覧探索の副の経路が主になる。 → **解決**（11.3: 入っていた）。
 2. `GITHUB_TOKEN`（ジョブの `permissions: actions: write`）で `manual.yml` を `ref=main` で起動できること（最初の実リリースで確認。それまでは `gh workflow run` の手元実行で組み立て側を確認）。
 3. 実機確認 10.1〜10.3（SSP の dll の差し替え・書き換えの上書き・ローカルの `updates.txt` 方式で通ること。`updates2.dau` が無いサーバーで `updates.txt` に落ちること）。
 4. 実機確認 10.4（初回の `main` 公開の直後の実 URL で `.dll`・`.pasta`・`.png` が無変換）。
@@ -269,3 +269,11 @@
   - 更新後: 立ち絵は消えずに表示されたまま。ダブルクリックに応えた（D「ん？ なにか用事？」・E「わっ、」と表情の変化）。SSP の更新ログは `Ready … 2 files` → 2 ファイルの `MD5 : OK`（UpdateDef とダウンロードの md5 が一致）→ `Delete : (no files to delete)` → `Update OK : 2 files.`。SSP のエラーログは空、エラーの窓は出なかった。
   - 照合: D・E とも、新しい nar の `updates.txt` と 40 行中 38 行が一致し、違う 2 行は手で書き換えた `pasta.toml`・`02-talk.pasta`（上書きされない。前の B・C と同じ）。
   - 片付け: 試験用の SSP は MCP の SakuraScript `\-` で閉じた（強制終了・WM_CLOSE はしていない）。サーバーは止め、SSP の複製は消した。
+
+### 11.3 起動経路のリハーサル（2026-11-15・タスク 5.2）
+
+- 開発者の許可を得て作業ブランチ `claude/hello-pasta-network-update-25a681` を origin へ push し、手元の pwsh から `publish-ghost-site.ps1 -Tag v0.6.1 -DescriptPath crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/descript.txt -Ref claude/hello-pasta-network-update-25a681` を実行した（`GITHUB_REPOSITORY=ekicyou/pasta`、認証は手元の `gh`）。
+- `return_run_details`: `POST …/actions/workflows/manual.yml/dispatches`（`ref`＝ブランチ・`return_run_details=true`）の応答に `workflow_run_id` が含まれていた（一覧から探す代わりの道には入らず、「起動した run: 43689000874」）。設計の想定どおりで、設計の直しは要らない。
+- run: https://github.com/ekicyou/pasta/actions/runs/43689000874（event `workflow_dispatch`・headBranch がブランチ）。`build-manual` は success、`deploy-manual` は skipped（`main` 限定）。CI 上でも「Fetch latest hello-pasta.nar」（`releases/latest/download` の取得、v0.6.1）と「Build hello-pasta update site」が通った。
+- スクリプトは待ちの後に結論 `success` を判定し、リハーサルとして見比べに進まず終了コード 0 で終わった（`rehearsal: … の結論は success。deploy は main 限定なので見比べない`）。
+- 確かめていないこと: リリースの run の `GITHUB_TOKEN`（`actions: write`）での起動と、`main` での公開後の見比べ。実リリースでの初回の結果（`report` の置き場所の行）は完了後の確認事項とする。
