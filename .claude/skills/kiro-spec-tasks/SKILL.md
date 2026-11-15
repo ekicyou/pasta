@@ -78,7 +78,7 @@ After all parallel research completes, synthesize findings before generating tas
   - `_Depends:_`, `_Boundary:_`, and `(P)` markers still match the dependency graph and architecture boundaries
   - Every executable task has a `_Dispatch:_` tier that follows section 5.5
 - If issues are task-plan-local, repair the draft and re-run the review gate before writing
-- Keep the review bounded to at most 2 repair passes
+- Keep repairing and re-running the review gate until it passes; failing twice (or more) is not a reason to stop. Stop only when review exposes a requirements/design gap (next bullet)
 - If review exposes a real requirements/design gap or contradiction, stop and send the user back to requirements/design instead of inventing filler tasks
 
 ### Step 3.5: Run Task-Graph Sanity Review
@@ -97,10 +97,10 @@ Before writing `tasks.md`, run one lightweight independent sanity review of the 
   - `PASS`
   - `NEEDS_FIXES`
   - `RETURN_TO_DESIGN`
-- If `NEEDS_FIXES`, repair the draft once and re-run the sanity review one time.
-- If the second verdict is not `PASS`, stop without writing `tasks.md` or approving the task plan. Report the remaining findings; do not retry again or advance to Finalize.
+- If `NEEDS_FIXES`, repair the draft and re-run the sanity review. Repeat until the verdict is `PASS`; a second (or later) `NEEDS_FIXES` is not a reason to stop. Do not write `tasks.md` or advance to Finalize until the latest verdict is `PASS`.
+- If a finding comes back unchanged after a repair that addressed it, the gap lives in requirements/design: treat the verdict as `RETURN_TO_DESIGN` instead of repairing again.
 - If `RETURN_TO_DESIGN`, stop without writing `tasks.md` and point back to the exact gap in requirements/design.
-- Keep this bounded. Do not turn it into a second full planning cycle.
+- Keep each pass lightweight: re-check only the scope above. Do not turn a pass into a second full planning cycle.
 
 ### Step 4: Finalize
 
