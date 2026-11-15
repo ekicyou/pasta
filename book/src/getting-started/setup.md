@@ -160,7 +160,7 @@ spot = 1
 - シェル（`shell/master/`）は、hello-pasta のものをそのまま使う。中のファイルには手を入れない
 - `scripts/` は写さない。自分のゴーストに `scripts/` を作る必要もない（自分で Lua スクリプトを書くときに使う場所である。[前提環境と準備](prerequisites.md)）
 - SSP に入れた hello-pasta は、完成版の見本としてそのまま残す。hello-pasta はネットワーク更新に対応していて、更新で変わったファイルは新しい版で上書きされる。hello-pasta の辞書や `pasta.toml` に手で入れた変更は、更新で消えることがある
-- `descript.txt` も hello-pasta から写したときは、`homeurl` の行を消すか、自分のゴーストの更新の置き場所に直す。残すと、SSP の更新確認で hello-pasta の更新を取りに行き、自分の辞書や `pasta.toml` が hello-pasta のもので上書きされることがある。`pasta_check validate` は、この `homeurl` を見つけると注意を出す（[辞書を検査する](../debug/validate.md#誤りと注意)）
+- `descript.txt` も hello-pasta から写したときは、`homeurl` の行を消すか、自分のゴーストの更新の置き場所に直す。残すと、SSP の更新確認で hello-pasta の更新を取りに行き、自分の辞書や `pasta.toml` が hello-pasta のもので上書きされることがある。`pasta_check validate` は、この `homeurl` を見つけると注意を出す（[辞書を検査する](../debug/validate.md#descripttxt)）
 
 > 【アンソニー】お嬢様、ライセンスの文書まで写すのでございますか。
 
