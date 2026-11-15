@@ -65,12 +65,12 @@
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.7, 11.8_
 
 - [ ] 4. 並びの直しの確かめと説明
-- [ ] 4.1 既存の試験をすべて通す
+- [x] 4.1 既存の試験をすべて通す
   - `editors/recipe` で `npx tsc --noEmit`・`npm test`・`npm run build`、`src-tauri` で `cargo test --locked`・`cargo clippy -- -D warnings`・`cargo fmt --check`（CI の job `recipe` と同じ）がすべて通る
   - `Cargo.lock` と `package-lock.json` が変わっていない（新しい依存を足していない）
   - _Dispatch: mechanical — 決まった検査を回して結果を見る_
   - _Requirements: 11.10_
-- [ ] 4.2 (P) pasta-recipe の章に並びの変え方を書く
+- [x] 4.2 (P) pasta-recipe の章に並びの変え方を書く
   - 節「画面と操作」の頭の段落の後に、3 つの境をドラッグと矢印のキーで動かせること・下の欄の左右の境は 2 つの面で共通なこと・「左右を入れ替える」で出力と保存変数を入れ替えられること・次に開いたときも残ること・最小の幅と高さがあることを、短い段落 1 つで書く
   - 節「入手と置き方」の書く場所の文に、並びの記録（`layout.toml`。`recent.toml` と同じフォルダ）を足す
   - 書いたボタンの名前が 3.2 の画面の文と同じである
