@@ -277,3 +277,10 @@
 - run: https://github.com/ekicyou/pasta/actions/runs/43689000874（event `workflow_dispatch`・headBranch がブランチ）。`build-manual` は success、`deploy-manual` は skipped（`main` 限定）。CI 上でも「Fetch latest hello-pasta.nar」（`releases/latest/download` の取得、v0.6.1）と「Build hello-pasta update site」が通った。
 - スクリプトは待ちの後に結論 `success` を判定し、リハーサルとして見比べに進まず終了コード 0 で終わった（`rehearsal: … の結論は success。deploy は main 限定なので見比べない`）。
 - 確かめていないこと: リリースの run の `GITHUB_TOKEN`（`actions: write`）での起動と、`main` での公開後の見比べ。実リリースでの初回の結果（`report` の置き場所の行）は完了後の確認事項とする。
+
+### 11.4 マージ直後の実 URL の確認（2026-11-15・Requirements 10.4）
+
+- PR #276 の squash マージ（`04fef83c`）の push で `Manual` が `main` で走り（run https://github.com/ekicyou/pasta/actions/runs/43692835434）、`build-manual`・`deploy-manual` とも success。置き場所 `https://ekicyou.github.io/pasta/hello-pasta/` が、最新 Release（v0.6.1。`homeurl` を足す前の版）の nar の展開で初めて公開された。
+- その直後に手元から `node book/tools/ghost-site/ghost-site.mjs verify-live --nar <v0.6.1 の hello-pasta.nar> --base https://ekicyou.github.io/pasta/hello-pasta/ --attempts 30 --interval 30 --full` を実行し、`OK updates.txt: 1 回目で一致（--full: 40 ファイルも一致）`・終了コード 0。`updates.txt` に載る 40 ファイル（`pasta.dll`・`*.pasta`・`*.png`・`*.txt`・`pasta.toml` など）が md5・大きさとも nar と一致し、Pages が変換せずに返すことを確かめた。
+- 入口 `hello-pasta/` は 200（`text/html; charset=utf-8`）、`ghost/master/pasta.dll` は 200（`application/octet-stream`）、マニュアルの本体 `https://ekicyou.github.io/pasta/` も 200 のまま。
+- 10.4 は通った。`RELEASE.md` の「リリース前の確認」を満たしたので、次のリリースを出してよい（10.6）。残る確認は、実リリースでの `publish-ghost-site` の初回の結果（`GITHUB_TOKEN` での起動）。
