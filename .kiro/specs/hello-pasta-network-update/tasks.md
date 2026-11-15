@@ -201,7 +201,7 @@
 ## マージ後の確認事項（タスクではない・`/kiro-complete` の後に人が行う）
 
 - PR のマージ直後の最初の公開（前の版の nar）の後に、実 URL で `verify-live --full` を 1 回実行し、`.dll`・`.pasta`・`.png` などが変換されずに返ることを `research.md` に記録する（Requirements 10.4）。
-- 通らなければ次のリリースを出さず、直す PR を先に入れる（Requirements 10.5, 10.6）。実リリースでの初回の起動結果（置き場所の行）も記録する。
+- 通らなければ次のリリースを出さず、直す PR を先に入れる（Requirements 10.6）。実リリースでの初回の起動結果（置き場所の行）も記録する。
 
 ## Implementation Notes
 
