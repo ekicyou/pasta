@@ -72,7 +72,7 @@
   - _Dispatch: mechanical — 値の差し替えと既存の表明の追従_
   - _Requirements: 2.1, 2.2_
 
-- [ ] 3.2 派生ゴーストの `homeurl` の判定（純関数）と検査の種類の追加
+- [x] 3.2 派生ゴーストの `homeurl` の判定（純関数）と検査の種類の追加
   - `descript.txt` の bytes から、`name` が `hello-pasta` でないゴーストの `homeurl` が置き場所を指していれば注意を返す純関数と、置き場所の定数を用意する
   - 読み方: 緩い UTF-8・BOM 除去・キー重複は最初の行・`name` は trim の完全一致（大文字小文字を区別）・`name` 無しは hello-pasta でない扱い。`homeurl` は小文字化・`http(s)://` と末尾 `/` を除いて比べ、配下のパスも指すとみなす（`hello-pasta-foo` は指さない）
   - 検査の結果の種類に `hello-pasta-homeurl` を末尾に足し、重さは注意で固定し、文言を用意する

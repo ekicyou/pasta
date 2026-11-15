@@ -260,6 +260,7 @@ fn expected(kind: FindingKind) -> (Severity, &'static str) {
         ChoiceTargetMissing => (Warning, "choice-target-missing"),
         RecommendItemInvalid => (Warning, "recommend-item-invalid"),
         RecommendMenuTalk => (Warning, "recommend-menu-talk"),
+        HelloPastaHomeurl => (Warning, "hello-pasta-homeurl"),
     }
 }
 
@@ -304,11 +305,12 @@ fn every_kind_has_fixed_severity_and_code() {
         ChoiceTargetMissing,
         RecommendItemInvalid,
         RecommendMenuTalk,
+        HelloPastaHomeurl,
     ];
     let mut codes: Vec<&str> = kinds.iter().map(|k| expected(*k).1).collect();
     codes.sort();
     codes.dedup();
-    assert_eq!(codes.len(), 36);
+    assert_eq!(codes.len(), 37);
     for kind in kinds {
         let (sev, code) = expected(kind);
         assert_eq!(kind.severity(), sev, "{code}");
@@ -322,6 +324,10 @@ fn every_kind_has_fixed_severity_and_code() {
 /// 文言の表（design.md の Report）どおりの理由
 #[test]
 fn messages_follow_wording_table() {
+    assert_eq!(
+        msg::hello_pasta_homeurl(),
+        "homeurl が hello-pasta の更新の置き場所を指しています。ネットワーク更新のたびに、このゴーストの辞書が hello-pasta のもので上書きされます。homeurl の行を消すか、自分の更新の置き場所に直してください"
+    );
     assert_eq!(
         msg::folder_matches_pattern(),
         "辞書のパターンに一致するフォルダです。pasta.dll はこのフォルダを辞書として読めず、ゴーストを読み込めません"

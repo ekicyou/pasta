@@ -8,6 +8,7 @@ mod calendar;
 mod conditions;
 mod config;
 mod discovery;
+mod homeurl;
 mod input;
 mod module_name;
 mod recommend;
@@ -21,6 +22,7 @@ use std::collections::BTreeMap;
 
 use pasta_dsl::parser::Span;
 
+pub use homeurl::{HELLO_PASTA_UPDATE_URL, derived_homeurl_finding};
 pub use input::{FileText, GhostInput, TomlSource};
 pub use report::{Finding, FindingKind, Report, Severity, SkipReason, Stats, msg};
 pub use syntax::syntax_finding;
