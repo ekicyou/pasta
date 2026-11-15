@@ -29,14 +29,22 @@ export class Panels {
   #check: Section;
   #reason: HTMLParagraphElement;
   #faces: Record<Face, { button: HTMLButtonElement; body: HTMLElement }>;
+  #swap: HTMLButtonElement;
   /** 動かす面の 2 つの `.panel`。中身は devPanels.ts が満たす */
   readonly output: PanelSection;
   readonly variables: PanelSection;
   /** 最後の検査の結果。文字列は検査できない理由（9.10）。まだ検査していなければ null */
   #report: Report | string | null = null;
+  /** 2 つの面の左右の欄の間の仕切り（書く面・動かす面の順。11.3）。ドラッグとキーは layoutMount が受ける */
+  readonly splitters: readonly HTMLElement[];
+  /** 下の欄（#panels） */
+  readonly area: HTMLElement;
+  /** 入れ替えのボタンが押されたとき（11.4）。layoutMount が差し替える */
+  onSwap: () => void = () => {};
 
   constructor(el: HTMLElement, docs: PanelsDocs) {
     this.#docs = docs;
+    this.area = el;
     const bar = document.createElement("div");
     bar.className = "panels-bar";
     el.append(bar);
@@ -51,6 +59,12 @@ export class Panels {
     };
     this.#faces = { write: face(""), run: face("出力・保存変数") };
     for (const f of ["write", "run"] as const) this.#faces[f].button.onclick = () => this.show(f);
+    // 面のタブのすぐ右（帯の右の端は画面の右下のゴーストに隠れる）。作り直さないので押した後も焦点が残る
+    this.#swap = document.createElement("button");
+    this.#swap.textContent = "左右を入れ替える";
+    this.#swap.setAttribute("aria-label", "出力と保存変数の左右を入れ替える");
+    this.#swap.onclick = () => this.onSwap();
+    bar.append(this.#swap);
 
     const write = this.#faces.write.body;
     this.#diag = withList(this.#section(write, "panel-diagnostics"));
@@ -60,6 +74,7 @@ export class Panels {
     this.#check.list.before(this.#reason);
     this.output = this.#section(this.#faces.run.body, "panel-output", "出力");
     this.variables = this.#section(this.#faces.run.body, "panel-variables", "保存変数");
+    this.splitters = [splitter(this.#diag.section, "診断と検査の境"), splitter(this.output.section, "出力と保存変数の境")];
     this.show("write");
     this.update();
   }
@@ -73,6 +88,25 @@ export class Panels {
       const lost = f !== face && !body.hidden && body.contains(document.activeElement);
       body.hidden = f !== face;
       if (lost) button.focus();
+    }
+    this.#swap.hidden = face !== "run";
+  }
+
+  /** 左の欄の幅の割合を 2 つの面に当て、動かす面の 2 つの欄の順を見た目の順にする（11.3・11.4） */
+  setSplit(leftShare: number, swapped: boolean): void {
+    const run = this.#faces.run.body;
+    const [left, right] = swapped ? [this.variables.section, this.output.section] : [this.output.section, this.variables.section];
+    // DOM の順＝Tab と読み上げの順。変わらないときは触らない。動かすとスクロールが戻るので保つ
+    if (run.firstElementChild !== left) {
+      const tops = [left.scrollTop, right.scrollTop];
+      run.prepend(left);
+      run.append(right);
+      [left.scrollTop, right.scrollTop] = tops;
+    }
+    // 境は位置で決まる（入れ替えても境は動かず、中身だけが入れ替わる）
+    for (const [l, r] of [[this.#diag.section, this.#check.section], [left, right]]) {
+      l.style.flexGrow = String(leftShare);
+      r.style.flexGrow = String(1 - leftShare);
     }
   }
 
@@ -139,6 +173,18 @@ export class Panels {
     });
     if (focused && !list.contains(document.activeElement)) (list.lastElementChild?.firstElementChild as HTMLElement | null)?.focus();
   }
+}
+
+/** 面の左の欄のすぐ後に仕切りを置く（左の欄・仕切り・右の欄） */
+function splitter(left: HTMLElement, label: string): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "splitter vertical";
+  el.setAttribute("role", "separator");
+  el.tabIndex = 0;
+  el.setAttribute("aria-orientation", "vertical");
+  el.setAttribute("aria-label", label);
+  left.after(el);
+  return el;
 }
 
 function withList(s: PanelSection): Section {

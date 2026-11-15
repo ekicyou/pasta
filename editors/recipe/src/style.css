@@ -270,6 +270,7 @@ dialog input {
 /* 面を切り替える帯（約 27px）。ボタンはタブの列と同じ形で、今の面を aria-pressed で示す */
 .panels-bar {
   display: flex;
+  overflow: hidden;
   background: var(--bg-chrome);
   border-bottom: 1px solid var(--border);
 }
@@ -302,9 +303,6 @@ dialog input {
   flex: 1;
   overflow: auto;
   min-width: 0;
-}
-.panel + .panel {
-  border-left: 1px solid var(--border);
 }
 .panel h2 {
   position: sticky;
@@ -408,11 +406,37 @@ dialog input {
   right: 0;
   bottom: -3px;
 }
+/* 下の欄の左右の仕切り: 2 つの欄の間の 1px の境の線そのもの。掴める 5px の帯は ::before で線に重ねる */
+.panels-face > .splitter {
+  position: relative;
+  flex: none;
+  width: 0;
+  /* 線は枠線で引く（強制色では背景が Canvas に塗り替えられ消えるため。前の .panel + .panel と同じ） */
+  border-left: 1px solid var(--border);
+}
+.panels-face > .splitter::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* 絶対配置の基準は枠線の内側なので、線（-1px〜0）の中心に 5px を合わせて -3px */
+  left: -3px;
+  width: 5px;
+}
 .splitter:hover,
 .splitter:focus-visible,
-.splitter.dragging {
+.splitter.dragging,
+.splitter:hover::before,
+.splitter:focus-visible::before,
+.splitter.dragging::before {
   background: var(--accent);
   outline: none;
+}
+/* 強制色では背景の強調が消えるので、焦点は輪郭で示す（ツールバーの主のボタンと同じ CanvasText） */
+@media (forced-colors: active) {
+  .splitter:focus-visible {
+    outline: 2px solid CanvasText;
+  }
 }
 /* 開始の画面の間は、開いたゴーストの部品（ツールバー・ツリー・エディタ・一覧）を出さない（焦点も入らない） */
 body:has(#start:not([hidden])) > :not(#start, #dialog-root, script) {
