@@ -64,7 +64,7 @@
   - _Dispatch: standard — ポインタとキーと大きさの見張りを DOM に結ぶ_
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.7, 11.8_
 
-- [ ] 4. 並びの直しの確かめと説明
+- [x] 4. 並びの直しの確かめと説明
 - [x] 4.1 既存の試験をすべて通す
   - `editors/recipe` で `npx tsc --noEmit`・`npm test`・`npm run build`、`src-tauri` で `cargo test --locked`・`cargo clippy -- -D warnings`・`cargo fmt --check`（CI の job `recipe` と同じ）がすべて通る
   - `Cargo.lock` と `package-lock.json` が変わっていない（新しい依存を足していない）
@@ -77,7 +77,7 @@
   - _Boundary: RecipeManualNote_
   - _Dispatch: mechanical — 書く中身と場所を設計が与える_
   - _Requirements: 11.9_
-- [ ] 4.3 手元のビルドを作り、画面で並びの直しを確かめる
+- [x] 4.3 手元のビルドを作り、画面で並びの直しを確かめる
   - `editors/recipe` で `npx tauri build --no-bundle`、`crates/pasta_sample_ghost/release.ps1`（先に `NoDefaultCurrentDirectoryInExePath` を外す）で、撮る exe と pasta.dll を作る。`release.ps1` が追跡中のファイルに改行だけの差分を残したら戻す
   - `git diff --stat v0.6.1..HEAD -- editors crates` に流れ A のほかの変更があれば、撮る前に開発者に示す
   - 記録の写しを取ってから（在る写しは上書きしない）、リモートデバッグを付けた起動でゴーストを開き、CDP で確かめる: 3 本のドラッグで幅・高さ・割合が変わり最小で止まる／書く面でも左右の境が動き、面を替えても位置が同じ／矢印のキーで動き読み上げの値が変わる／入れ替えで左右と Tab の順が替わり境は動かない／閉じて開き直すと 4 つとも残り `layout.toml` に同じ値がある／窓を縮めると最小を守り、広げ直すと覚えた並びに戻る／記録が無いと今の見た目と同じ
@@ -185,3 +185,4 @@
 - 2.2: `dragLayout("panels", offset)` の offset は範囲（#workspace＋下の欄の面）の下の端からの px で、そのまま下の欄の面の高さになる。3.3 の取り付けで帯（`.panels-bar`）の高さを差し引いて渡す。幅 320 px 未満では leftShare を 0.5 にする。
 - 1: 書き出しには無音の AAC のトラックが必ず付き、約 860 kb/s（80 秒で約 8.6 MB の見込み）。6.3 で ffmpeg による音声の除去と 5 MB への詰め直しが要る見込み（research.md 10 節）。
 - 3.3: 下の欄の高さを当て直すと #workspace の大きさが変わるため、"ResizeObserver loop completed with undelivered notifications" がコンソールに 1 回出ることがある。次のフレームで同じ値に収まって止まるので、不具合ではない（4.3 の実機の確かめで見ても慌てない）。
+- 4.3: Tauri の minWidth・minHeight は WM_GETMINMAXINFO で効く（利用者が縁を引いたとき）。外からの SetWindowPos は最小を無視する。実物の確かめでは最小の数を直す必要は無かった（ツリー 120・エディタ 240×120・下の欄 60・左右の欄 160 のどれも、目で見て狭すぎも広すぎもしない）。
