@@ -411,14 +411,16 @@ pasta のリリース 1 回分の手順（段 1〜9）。段・コマンド・�
 
    **再実行の後の追い方**: `gh run rerun {RUN} --failed` は、同じ `RUN` のまま試行を 1 つ足す。`ATTEMPT` を 1 増やして上の 1 行を掛け直す。頭の `until` が、新しい試行が立つまで待つので、終わった前の試行を読み違えない。`gh run watch` は実行のいちばん新しい試行を追う。
 
-3. **読み取り**（6.4・6.6）。定型コマンド B を `-Run {RUN}` で実行し、下の「結果表の作り方」で、7 つの公開先（5 クレート・Marketplace・GitHub Release）の `status`・`reason` と、GitHub Release の URL（`url=` の値）を決める。
+3. **読み取り**（6.4・6.6）。定型コマンド B を `-Run {RUN}` で実行し、下の「結果表の作り方」で、8 つの公開先（5 クレート・Marketplace・GitHub Release・GitHub Pages hello-pasta）の `status`・`reason` と、GitHub Release の URL（`url=` の値）を決める。
 
 4. **完了の判定**（6.5・9.1）。次のすべてを満たせば完了で、段 9 へ進む。
    - 定型コマンド B の `run` の行の結論が `success`
-   - 結果表の 7 つがすべて `published` か `skipped`
+   - 結果表の 8 つがすべて `published` か `skipped`
    - 定型コマンド A（`-Version {V}`）の `集計` が、公開済み 7/7・`不明` 0（`GitHub Release` の行の URL を、報告の URL とする）
 
    1 つ目と 2 つ目を満たすのに 3 つ目が 7/7 でないときは、1 分後に定型コマンド A を 1 度だけ実行し直す。それでも 7/7 でなければ、未完了として止まる。1 つ目か 2 つ目を満たさないときは、段 8 へ進む。
+
+   GitHub Pages hello-pasta（置き場所）は定型コマンド A の 7 つに入らない。置き場所の状態は、リリース CI の見比べ（結果表の 8 行目）を正とし、手元で照会しない。
 
 ### 結果表の作り方
 
@@ -429,6 +431,7 @@ pasta のリリース 1 回分の手順（段 1〜9）。段・コマンド・�
 | crates.io `pasta_core`・`pasta_dsl`・`pasta_lua`・`pasta_shiori`・`pasta_check` | `Auth crates.io (<クレート>)` | `Publish <クレート>` |
 | Marketplace `ekicyou.pasta-vscode` | `Azure login (OIDC)` | `Publish VSIX to Marketplace` |
 | GitHub Release | なし | `Create GitHub Release` |
+| GitHub Pages hello-pasta（job `publish-ghost-site`） | なし | `Publish hello-pasta ghost site` |
 
 規則は上から当て、最初に当てはまったものを使う。リリース CI の集約の step（`Summarize ...`）と同じ読み方である。
 
@@ -441,6 +444,7 @@ pasta のリリース 1 回分の手順（段 1〜9）。段・コマンド・�
 
 - 「区別できない」は、完了の判定では `published` か `skipped` として扱う。報告には「区別できない」と書く。
 - `not-run` は、上流の失敗の結果である。それ自体は対応の対象にしない。
+- GitHub Pages hello-pasta の `published` は「今回更新した」、`skipped` は「最新ではないタグのため飛ばした」（`reason=stale-tag`。古いタグの再実行で、何も起こしていない）である。どちらも完了の判定では他の行と同じに扱う。
 
 ## 段 8: 失敗への対応
 
@@ -459,9 +463,10 @@ pasta のリリース 1 回分の手順（段 1〜9）。段・コマンド・�
 | F4 | どれかが `failed`・`not-registered` | セットアップ（7.3） | 再実行しない。手順書 11 節「新しいクレートの初回公開」を示して止まる。続きは F3 と同じ |
 | F5 | GitHub Release が `failed`・`immutable` | 手作業（7.9） | 再実行しない。公開済みの Release に足りない配布物（定型コマンド A の `添付不足` の行）を、実行の artifact `release-assets` から手で添付する必要があることを案内して止まる |
 | F6 | どれかが `failed`・`transient` | 一時的な失敗（7.1） | `N_AUTO` が 3 未満なら、失敗した job を再実行する。3 なら、自動の再実行をやめ、未完了として止まる（7.2） |
-| F7 | どれかが `failed`・`publish`、または `failed`・`不明` | 切り分け | `F7_DONE` が「いいえ」で `N_AUTO` が 3 未満なら、`F7_DONE` を「はい」にして、失敗した job を 1 度だけ再実行する。そうでなければ「再実行では直らない失敗」 |
+| F8 | `failed` が GitHub Pages hello-pasta だけで、その `reason` が `dispatch` か `build` | 置き場所の失敗 | 再実行しない。crates.io・Marketplace・GitHub Release は公開済みで、版を上げる必要が無いことと、`crates/pasta_sample_ghost/RELEASE.md` の「失敗したときの回復」3 と、`reason` ごとの次の手の表を示して止まる。ただし `build` が、壊れた `latest` の nar で `Manual` の照合に止まったときは、同じ 3 の「`latest` の nar が壊れていたとき」のとおり、直す PR を `main` へ入れて新しい版を切る必要があることを示す |
+| F7 | どれかが `failed`・`publish`、または `failed`・`不明`、または GitHub Pages hello-pasta が `failed`・`verify` | 切り分け | `F7_DONE` が「いいえ」で `N_AUTO` が 3 未満なら、`F7_DONE` を「はい」にして、失敗した job を 1 度だけ再実行する。そうでなければ「再実行では直らない失敗」 |
 
-F2 は欠番である（CI での初回のリリースだけの行だった）。
+F2 は欠番である（CI での初回のリリースだけの行だった）。F8 は後から足した行で、F7 より先に当てる。
 
 **失敗した job の再実行**（F6・F7）
 
@@ -480,6 +485,7 @@ gh run view {RUN} --log-failed | tail -n 60
 **再実行では直らない失敗**（F7 の 2 度目）。定型コマンド A（`-Version {V}`）を実行する。
 
 - 公開済みが 0/7 で、`GitHub Release` が `無し`: F1 と同じ報告をして止まる（何も公開していない。修正の後にタグを付け直せる）。
+- 公開済みが 7/7 で、`failed` が GitHub Pages hello-pasta だけ: 版を上げず、F8 と同じ報告をして止まる。
 - それ以外: タグを付け直さない。公開済みの公開先と未公開の公開先を示し、版を上げて出し直す必要があることを報告して止まる（7.7）。
 
 **セットアップを直した後の続き**（7.4）。開発者が設定を直したと伝えたら、同じ会話なら上の「失敗した job の再実行」から続ける。新しい会話なら、`/release` の再実行で段 2 の S5 に入り、同じ失敗が残っていれば、また F3・F4 で止まる。そのときは、開発者の「直した」という指示を受けて、失敗した job を再実行する。
@@ -516,6 +522,7 @@ gh run view {RUN} --log-failed | tail -n 60
 - crates.io: pasta_core <status> / pasta_dsl <status> / pasta_lua <status> / pasta_shiori <status> / pasta_check <status>
 - VSCode Marketplace（ekicyou.pasta-vscode）: <status>
 - GitHub Release: <URL>
+- GitHub Pages hello-pasta（置き場所）: <status>（skipped なら「最新ではないタグのため飛ばした」）
 - リリース CI の実行: <URL>
 - 再実行の回数: <最後の attempt から 1 を引いた数>
 - 途中で main を取り込んだ回: <取り込んだ件名と、見どころに足したかどうか / なし>
@@ -633,7 +640,7 @@ gh run view {RUN} --log-failed | tail -n 60
 
 次のどれかが変わったら、この文書と `scripts/` を合わせる。
 
-- `release.yml` の job 名・step 名・`status=` の行の形（定型コマンド B と「結果表の作り方」）。
+- `release.yml` の job 名・step 名・`status=` の行の形（定型コマンド B と「結果表の作り方」。B は `scripts/ci-result-test.ps1` で確かめる）。
 - `.github/scripts/release/verify-tag.ps1` の検査の条件（定型コマンド C）。
 - 公開対象のクレートの追加・削除、ワークスペースのクレートの追加（定型コマンド A のクレートの一覧、`Cargo.lock` の変更行の数）。
 - 版の表記の置き場所（`Cargo.toml` の節の構成、`package.json`、マニュアルの対象バージョン行の書式）と、版の更新のコミットに入るファイル（段 4 の「7 ファイル」。段 1 の手順 3・4、段 5 の手順 1 にも出る）。

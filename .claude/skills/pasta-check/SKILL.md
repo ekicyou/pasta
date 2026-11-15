@@ -50,9 +50,9 @@ pasta_check validate --target <path>
 | `--target <path>` | ✅ | ゴースト開発フォルダー（ghost/master を含むルート。ghost/master そのものは不可） |
 
 - 問題を 1 件 1 行（`パス:行:列: 誤り|注意: 理由`）で標準出力に出し、最後にまとめの行（辞書ファイルの数・誤りと注意の件数）を出す。
-- 誤り＝pasta.dll が読み込みに失敗する・知らせずに辞書の内容を失うもの。注意＝読み込めるが意図とずれやすいもの（名前の重なり・飛び先の無い Call や選択肢）。
+- 誤り＝pasta.dll が読み込みに失敗する・知らせずに辞書の内容を失うもの。注意＝読み込めるが意図とずれやすいもの（名前の重なり・飛び先の無い Call や選択肢・`descript.txt` の `homeurl` が hello-pasta の更新の置き場所を指している派生ゴースト）。
 - 終了コード: 誤りが 1 件以上で 1、無ければ 0（注意だけなら 0）。使い方の誤り・`--target` のフォルダの誤り（無い・フォルダでない・ghost/master を含まない）も 1（`Error: ` で始まる理由を標準エラー出力へ）。
-- 同じ検査を VSCode 拡張が保存のたびにエディタの診断として出す（source は `pasta validate`）。
+- 同じ検査を VSCode 拡張が保存のたびにエディタの診断として出す（source は `pasta validate`）。`descript.txt` の検査だけはコマンド（`validate`・`release`）にしか無い。
 - 検査の項目・各報告の意味と直し方・読むだけでは決まらない範囲は、マニュアルの [辞書を検査する（pasta_check validate）](https://ekicyou.github.io/pasta/debug/validate.html) を参照。
 
 ### release サブコマンド

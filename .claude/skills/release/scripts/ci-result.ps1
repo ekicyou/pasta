@@ -14,14 +14,14 @@ param([Parameter(Mandatory)][string]$Run)
 $r = (gh run view $RUN --json status,conclusion,attempt,url,headSha,jobs) -join "`n" | ConvertFrom-Json
 "run | $RUN | $($r.status) | $(if ($r.conclusion) { $r.conclusion } else { '-' }) | attempt $($r.attempt) | $($r.url)"
 $r.jobs | ForEach-Object { "job | $($_.name) | $($_.conclusion)" }
-$r.jobs | Where-Object { $_.name -in 'publish-crates', 'publish-vsce', 'github-release' } | ForEach-Object {
+$r.jobs | Where-Object { $_.name -in 'publish-crates', 'publish-vsce', 'github-release', 'publish-ghost-site' } | ForEach-Object {
     $job = $_.name
     $_.steps | Where-Object { $_.name -match '^(Auth crates\.io|Publish |Azure login|Create GitHub Release)' } | ForEach-Object {
         $sec = if ($_.startedAt -and $_.completedAt) { [int](([datetime]$_.completedAt) - ([datetime]$_.startedAt)).TotalSeconds } else { 0 }
         "step | $job | $($_.name) | $($_.conclusion) | $sec 秒$(if ($_.name -like 'Publish pasta_*') { " | 期限まで $(1800 - $sec) 秒" })"
     }
 }
-$pattern = '^(publish-crates|publish-vsce|github-release)\t(Publish [^\t]*|Create GitHub Release)\t\S+ (status=(published|skipped|failed)\b.*)$'
+$pattern = '^(publish-crates|publish-vsce|github-release|publish-ghost-site)\t(Publish [^\t]*|Create GitHub Release)\t\S+ (status=(published|skipped|failed)\b.*)$'
 1..$r.attempt | ForEach-Object {
     $a = $_
     gh run view $RUN --attempt $a --log 2>$null | Select-String -Pattern $pattern | ForEach-Object {
