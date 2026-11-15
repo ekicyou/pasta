@@ -64,7 +64,7 @@
   - _Requirements: 3.7, 11.1, 11.2_
 
 - [ ] 3. Core: ゴースト側の設定と派生ゴーストの警告
-- [ ] 3.1 hello-pasta の `homeurl` を置き場所に向ける
+- [x] 3.1 hello-pasta の `homeurl` を置き場所に向ける
   - `descript.txt` の `homeurl` を置き場所（末尾の `/` を含む）にする。これを唯一の正とする
   - `homeurl` を表明している既存の統合テストを新しい値に直す
   - 完了時は、`pasta_check release` で作った nar の `updates.txt` が新しい `descript.txt` の md5・大きさを持ち、既存のテストが通る
