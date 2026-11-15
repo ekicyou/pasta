@@ -61,6 +61,7 @@ pub enum FindingKind {
     ChoiceTargetMissing,
     RecommendItemInvalid,
     RecommendMenuTalk,
+    HelloPastaHomeurl,
 }
 
 impl FindingKind {
@@ -80,7 +81,8 @@ impl FindingKind {
             | CallTargetMissing
             | ChoiceTargetMissing
             | RecommendItemInvalid
-            | RecommendMenuTalk => Severity::Warning,
+            | RecommendMenuTalk
+            | HelloPastaHomeurl => Severity::Warning,
             _ => Severity::Error,
         }
     }
@@ -549,5 +551,8 @@ pub mod msg {
         format!(
             "メニューのシーン「{scene}」の台詞はメニューに入らずに捨てられます（項目は ＞おすすめ項目 で足します）"
         )
+    }
+    pub fn hello_pasta_homeurl() -> String {
+        "homeurl が hello-pasta の更新の置き場所を指しています。ネットワーク更新のたびに、このゴーストの辞書が hello-pasta のもので上書きされます。homeurl の行を消すか、自分の更新の置き場所に直してください".into()
     }
 }

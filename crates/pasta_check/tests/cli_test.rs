@@ -273,6 +273,42 @@ fn run_release(temp: &TempDir, target: &Path) -> Output {
     ])
 }
 
+/// 派生ゴーストの homeurl の注意は release を止めず、行を出して nar を作る（Req 8.7・8.8）
+#[test]
+fn test_release_derived_homeurl_warns_and_creates_nar() {
+    let temp = TempDir::new().unwrap();
+    let target = temp.path().join("target_ghost");
+    write_min_ghost(&target);
+    fs::write(
+        target.join("ghost/master/descript.txt"),
+        "charset,UTF-8
+name,my-ghost
+homeurl,https://ekicyou.github.io/pasta/hello-pasta/
+",
+    )
+    .unwrap();
+    fs::write(
+        target.join("install.txt"),
+        "charset,UTF-8
+type,ghost
+",
+    )
+    .unwrap();
+
+    let output = run_release(&temp, &target);
+
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let stdout = stdout_of(&output);
+    assert!(
+        stdout
+            .lines()
+            .any(|l| l.starts_with("ghost/master/descript.txt:3: 注意: ")),
+        "{stdout}"
+    );
+    assert!(stdout.contains("[6/6]"), "{stdout}");
+    assert!(temp.path().join("out.nar").is_file());
+}
+
 /// homeurl の無い同梱バルーン: 警告を `Warning: ` 付きで stderr に出し、
 /// 止めずにバルーン用 updates.txt と nar を作って終了コード 0（Req 4.9・7.3・7.4）
 #[test]

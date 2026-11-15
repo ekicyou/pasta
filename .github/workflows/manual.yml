@@ -24,6 +24,7 @@
 #        自己テストも実行）・コンテンツ検証・ツール自己テスト
 #     -> 旧版の生成（固定コミット CLASSIC_REF の book/ を旧版のツールで book/book/classic へ。印刷用のページは作らない。
 #        新版の検査の後に置き、検査の対象に含めない。失敗で中断。manual-claudia-theme 要件 11）
+#     -> hello-pasta の更新の置き場所（最新 Release の hello-pasta.nar を展開・照合して book/book/hello-pasta へ。失敗で中断。hello-pasta-network-update）
 #     -> Pages artifact（./book/book）をアップロード -> deploy-pages で公開。
 # すべて build ジョブ内で検証するため、失敗時は deploy（needs: build）が走らず公開されない。
 name: Manual
@@ -188,6 +189,20 @@ jobs:
           [ -f "$out/index.html" ] || { echo "::error::classic snapshot is missing index.html"; exit 1; }
           [ ! -e "$out/print.html" ] || { echo "::error::classic snapshot must not have print.html"; exit 1; }
           compgen -G "$out/searchindex*.js" > /dev/null || { echo "::error::classic snapshot is missing searchindex*.js"; exit 1; }
+
+      # 最新 Release の hello-pasta.nar を取る。Release・nar が無ければここで失敗し、置き場所を欠いたサイトを公開しない
+      # （hello-pasta-network-update 要件 4.4）。PR・ブランチでも取得と組み立てまで走らせ、失敗は警告にしない。
+      - name: Fetch latest hello-pasta.nar
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/hello-pasta.nar" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/hello-pasta.nar"
+
+      # nar を展開して updates.txt と照合し、book/book/hello-pasta/ に置く（検査の後・アップロードの前。
+      # 置き場所はマニュアルの検査の対象に入らない。要件 1.1, 3.5）。照合の失敗は exit 1 で公開を止める。
+      - name: Build hello-pasta update site
+        run: node book/tools/ghost-site/ghost-site.mjs build --nar "$RUNNER_TEMP/hello-pasta.nar" --out book/book/hello-pasta --index book/tools/ghost-site/index.html
 
       # 公開は main のときだけ（ブランチの手動実行では検査だけ走らせて緑で終える）。
       # v4 から . で始まるファイルを既定で外すため、mdBook の .nojekyll を入れるよう指定する。
