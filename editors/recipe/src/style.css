@@ -79,9 +79,10 @@ dialog button:hover,
   flex: 1;
   display: flex;
   min-height: 0;
+  position: relative;
 }
 #tree {
-  width: 260px;
+  width: var(--tree-width, 260px);
   overflow: auto;
   background: var(--bg-side);
   border-right: 1px solid var(--border);
@@ -292,7 +293,7 @@ dialog input {
 }
 .panels-face {
   display: flex;
-  height: 180px;
+  height: var(--panels-height, 180px);
 }
 .panels-face[hidden] {
   display: none;
@@ -382,6 +383,36 @@ dialog input {
 }
 .variables-table td button + button {
   margin-left: 4px;
+}
+/* 仕切り: 1px の境の線に重なる 5px の透明な帯（場所を取らない）。#workspace の子なので開始の画面の間は隠れる */
+.splitter {
+  position: absolute;
+  z-index: 2;
+  touch-action: none;
+}
+.splitter.vertical {
+  width: 5px;
+  cursor: col-resize;
+}
+.splitter.horizontal {
+  height: 5px;
+  cursor: row-resize;
+}
+#tree-splitter {
+  top: 0;
+  bottom: 0;
+  left: calc(var(--tree-width, 260px) - 2px);
+}
+#panels-splitter {
+  left: 0;
+  right: 0;
+  bottom: -3px;
+}
+.splitter:hover,
+.splitter:focus-visible,
+.splitter.dragging {
+  background: var(--accent);
+  outline: none;
 }
 /* 開始の画面の間は、開いたゴーストの部品（ツールバー・ツリー・エディタ・一覧）を出さない（焦点も入らない） */
 body:has(#start:not([hidden])) > :not(#start, #dialog-root, script) {
