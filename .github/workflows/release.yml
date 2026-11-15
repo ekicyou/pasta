@@ -536,12 +536,64 @@ jobs:
             ''
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
 
+  # hello-pasta の置き場所（GitHub Pages）の更新。Release の公開後に manual.yml を main で起動して待ち、
+  # 公開後の実 URL の updates.txt を Release の nar と見比べる（4.1・5.1）。github-release が成功したときだけ走る。
+  # 追加の権限（actions: write）はこの job だけ（4.5）。Release には触れない（読むだけ）。
+  # 末尾の集約 step は常に動き、status・reason を job outputs に書く（skipped でも reason を残す）。
+  publish-ghost-site:
+    name: publish-ghost-site
+    needs: [verify, github-release]
+    if: needs.github-release.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: write
+      contents: read
+    defaults:
+      run:
+        shell: pwsh
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+      reason: ${{ steps.result.outputs.reason }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # 最新のタグの判定・起動・待ち・見比べはスクリプトが行い、summary にも 1 行書く。nar は $RUNNER_TEMP 以下に取る。
+      - name: Publish hello-pasta ghost site
+        id: site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./.github/scripts/release/publish-ghost-site.ps1 -Tag $env:GITHUB_REF_NAME -DescriptPath crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/descript.txt
+
+      # status 契約: スクリプトが書いた値を使う。書いていなければ（checkout・Node の失敗、スクリプトの異常終了・時間切れ）
+      # この job の失敗なので failed/publish。
+      - name: Summarize ghost site result
+        id: result
+        if: always()
+        env:
+          STATUS: ${{ steps.site.outputs.status }}
+          REASON: ${{ steps.site.outputs.reason }}
+        run: |
+          $status, $reason = $env:STATUS, $env:REASON
+          if (-not $status) {
+            $status, $reason = 'failed', 'publish'
+            "- 置き場所（hello-pasta）``$env:GITHUB_REF_NAME``: **failed**（reason=publish） — スクリプトが結果を書かずに終えた。ログを読む" |
+              Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          }
+          "status=$status", "reason=$reason" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
+
   # 結果の報告（二次情報）。常に動き、各 job の outputs と結果を 1 枚の表にまとめる。
   # 一次情報は各 job の summary。outputs が空のときは、job が走らなかった（skipped）ものだけを not-run とし、
   # それ以外は推論せず「job の summary を参照」と出す。report 自体は結果に依らず成功で終える。
   report:
     name: report
-    needs: [verify, gate, build, publish-crates, publish-vsce, github-release]
+    needs: [verify, gate, build, publish-crates, publish-vsce, github-release, publish-ghost-site]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -560,8 +612,15 @@ jobs:
             failed    = '失敗した'
             'not-run' = '前の段の失敗で行わなかった'
           }
+          # 置き場所の行だけのラベル（公開でなく更新、飛ばす理由も公開済みでなく最新ではないタグ）
+          $siteLabel = @{
+            published = '今回更新した'
+            skipped   = '最新ではないタグのため飛ばした'
+            failed    = '失敗した'
+            'not-run' = '前の段の失敗で行わなかった'
+          }
           # 公開先 1 つ分の行。outputs の status が空なら、job が skipped のときだけ not-run とし、他は推論しない。
-          function Row([string]$Target, [string]$Job, [string]$Prefix) {
+          function Row([string]$Target, [string]$Job, [string]$Prefix, [hashtable]$Label = $label) {
             $outputs = $needs[$Job].outputs
             $status = if ($outputs) { $outputs["${Prefix}status"] }
             $reason = if ($outputs) { $outputs["${Prefix}reason"] }
@@ -569,7 +628,7 @@ jobs:
               if ($needs[$Job].result -eq 'skipped') { $status, $reason = 'not-run', '' }
               else { return "| $Target | job の summary を参照（$Job の結果: $($needs[$Job].result)） | |" }
             }
-            "| $Target | $status（$($label[$status])） | $reason |"
+            "| $Target | $status（$($Label[$status])） | $reason |"
           }
           # 関門の段（verify・gate・build）で失敗・取り消しになった job。後続の skipped は数えない。
           $gateFailed = @('verify', 'gate', 'build' | Where-Object { $needs[$_].result -notin 'success', 'skipped' })
@@ -592,6 +651,7 @@ jobs:
           }
           $lines += Row 'Marketplace `ekicyou.pasta-vscode`' 'publish-vsce' ''
           $lines += Row 'GitHub Release' 'github-release' ''
+          $lines += Row 'GitHub Pages hello-pasta' 'publish-ghost-site' '' $siteLabel
           $lines += ''
           $lines += if ($url) { "GitHub Release の URL: $url" } else { 'GitHub Release の URL: なし' }
           $lines += ''

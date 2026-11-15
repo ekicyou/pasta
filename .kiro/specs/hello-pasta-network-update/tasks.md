@@ -91,7 +91,7 @@
   - _Dispatch: standard — 既存の殻への組み込みと並べ直しの確認_
   - _Requirements: 8.3, 8.4, 8.7, 8.8_
 
-- [ ] 4. Core: リリース CI の新ジョブ
+- [x] 4. Core: リリース CI の新ジョブ
 - [x] 4.1 `publish-ghost-site.ps1` の骨格：最新タグの判定・引数・`-DryRun`
   - タグと `releases/latest` を数字 3 つで比べ、古ければ起動せず `skipped`（reason `stale-tag`）、新しければ取り直し（10 秒×6 回）して、それでも新しくならなければ `failed`（reason `transient`）にする
   - `-Tag`・`-DescriptPath`（`homeurl` は判定の後・見比べの直前にだけ読む）・`-LatestTag`・`-DryRun`・`-Ref`（既定 `main`）と待ちの値の引数を持つ。`status`/`reason` は既存の流儀（`GITHUB_OUTPUT` が無ければ標準出力）で出す
@@ -112,7 +112,7 @@
   - _Dispatch: standard, effort high — 起動・待ち・取り消しの扱いなど順序と時間の判断を含む_
   - _Requirements: 4.1, 4.7, 5.1, 5.3, 5.4, 6.2_
 
-- [ ] 4.3 `release.yml` に新ジョブと `report` の行を足す
+- [x] 4.3 `release.yml` に新ジョブと `report` の行を足す
   - `publish-ghost-site` ジョブを `github-release` の後に足す。権限は `actions: write` と `contents: read` だけ、`timeout-minutes: 60`、`github-release` が成功したときだけ走る。steps は checkout → Node → スクリプト → 結果の集約（`if: always()`）にする
   - `report` の `needs` に足し、関門（`gateFailed`）には含めない。`Row` に任意のラベル引数を足し、置き場所の行（見出し `GitHub Pages hello-pasta`）を `published`＝今回更新した・`skipped`＝最新ではないタグ・`failed`・`not-run` のラベルで出す。他の行は変えない
   - `release/<名前>` だけの行を書かず、Release の添付の名前・数を変えない
