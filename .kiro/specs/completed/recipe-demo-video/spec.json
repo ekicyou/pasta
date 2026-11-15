@@ -1,9 +1,9 @@
 {
   "feature_name": "recipe-demo-video",
   "created_at": "2026-11-15T05:40:25Z",
-  "updated_at": "2026-11-15T09:00:00Z",
+  "updated_at": "2026-11-15T11:03:58Z",
   "language": "ja",
-  "phase": "tasks-generated",
+  "phase": "completed",
   "approvals": {
     "requirements": {
       "generated": true,
