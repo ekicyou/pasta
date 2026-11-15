@@ -603,7 +603,7 @@ https://ekicyou.github.io/pasta/hello-pasta/
 ### E2E / 実機（Requirement 10）
 
 - 手順（結果は `research.md` に記録）:
-  1. 旧版の nar（v0.6.1 の Release の添付）を、readonly・別ポートの別の SSP（`ssp-ghost-test-launch` の流儀）に入れる。入れた `descript.txt` の `homeurl` を、ローカルの静的サーバーの `http://127.0.0.1:<ポート>/hello-pasta/` に書き換える（置き場所の実 URL と同じ階層にするため、サーバーのルートの直下に `hello-pasta/` を置く）。
+  1. 旧版の nar（v0.6.1 の Release の添付）を、別ポートの別の SSP に入れる。`--option readonly` の SSP は手動のネットワーク更新もしないので使えない（実機で確認・`research.md` 11.2）。SSP 本体を一時フォルダの外へ複製し、`--option bootunlock,standalone --sstp-listen <ポート> --ghost <旧版>` で立てる。入れた `descript.txt` の `homeurl` を、ローカルの静的サーバーの `http://127.0.0.1:<ポート>/hello-pasta/` に書き換える（置き場所の実 URL と同じ階層にするため、サーバーのルートの直下に `hello-pasta/` を置く）。
   2. 新しい nar（作業ツリーで `release.ps1` を実行して作る。`pasta.dll` が旧版と違う）を `ghost-site.mjs build` で展開した `hello-pasta/` を、ローカルの静的サーバーで配信する。
   3. 更新確認の前に、インストール済みの辞書と `pasta.toml` を手で書き換えておく（10.3）。ゴーストを動かしたまま（`pasta.dll` を読み込んだまま）更新確認を行う（10.2）。
   4. 確認: 一式（`pasta.dll` を含む）が新しい nar の中身に差し替わったか（md5）、書き換えた辞書・`pasta.toml` が上書きされたか（10.3 の結果）、更新後にゴーストが再起動して応答するか、`OnUpdate*` の流れで pasta が壊れないか。

@@ -245,3 +245,27 @@
 - コマンド: `node book/tools/ghost-site/ghost-site.mjs build --nar <手元の nar> --out <スクラッチ>/site21 --index book/tools/ghost-site/index.html`（`manual.yml` の「Build hello-pasta update site」と同じ引数）。
 - 結果: 終了コード 0。`updates.txt` の 41 行すべてがエントリと md5・大きさで一致。nar のエントリ 42（ファイル）、出力のファイル 43（＝エントリ＋`index.html`）。
 - `manual.yml` の 2 段（Fetch latest hello-pasta.nar・Build hello-pasta update site）は `actionlint` で検査済み（指摘なし）。CI での実際の取得は PR の実行で確かめる。
+
+### 11.2 実機の SSP での更新の確認（2026-11-15・タスク 5.1）
+
+- 材料: 旧版は v0.6.1 の Release の添付 `hello-pasta.nar`（11.1 と同じ。3,670,302 バイト・`pasta.dll` の md5 `432e91aa05ef7309bf012c9f16ff2c5f`・3,670,016 バイト・`homeurl,https://github.com/ekicyou/pasta`）。新版は作業ツリーで `release.ps1` を現行の pwsh から直に実行して作った `release/hello-pasta.nar`（3,670,691 バイト・sha256 `f50044459e13f3b3137fe82cfdf4bae6b5f394a2f2417e94ca867e6dd37d5860`・`pasta.dll` の md5 `78be68f2df5f84662ec7844547bc1a89`・3,668,992 バイト・`homeurl,https://ekicyou.github.io/pasta/hello-pasta/`）。新旧で中身が違うのは `ghost/master/descript.txt` と `ghost/master/pasta.dll` の 2 つだけ（`updates.txt` の 40 行のうち 38 行は同じ md5）。
+- 置き場所: `ghost-site.mjs build --nar <新しい nar> --out <スクラッチ>/srv51/hello-pasta --index book/tools/ghost-site/index.html`（終了コード 0）。`<スクラッチ>/srv51` を、要求をすべて記録する小さな node:http の静的サーバーで `127.0.0.1:8751` から配信。`http://127.0.0.1:8751/hello-pasta/updates.txt` と `pasta.dll` は手元とバイト一致（`cmp`・md5）。
+- 入れた旧版: 旧 nar をスクラッチのゴーストのフォルダに展開し、`descript.txt` の `name`（同名の衝突を避ける）と `homeurl`（`http://127.0.0.1:8751/hello-pasta/`）だけを書き換えた。更新の前に、`ghost/master/pasta.toml` と `ghost/master/dic/02-talk.pasta` の末尾に行を手で足した（md5: `pasta.toml` は `04f8f404…` → `3b2df06c…`、`02-talk.pasta` は `0a1e3fd9…` から変更）。
+- **設計の手順のとおり `--option readonly` で立てた SSP では更新が始まらない**。`ssp.exe --option readonly --sstp-listen 9802 --ghost <旧版>` で立てて更新を指示しても、置き場所への要求は 1 件も来なかった。SSP のヘルプ（起動オプション一覧）に「readonly は本体・ゴースト…の自動更新を行わない。手動でのネットワーク更新・NAR のインストールも行わない」とある。readonly は更新の実機確認には使えない（design.md の E2E の手順 1 と、手順書に書く確認の手順はこの点を直す必要がある）。
+- そこで、普段の SSP と設定を共有しないよう、SSP 本体（`ssp.exe`・`data/`・`balloon/` など。`ghost/`・`plugin/` は空）を一時フォルダの外（作業ツリーの無視される `target/` の下）に複製し、`ssp.exe --option bootunlock,standalone --sstp-listen 9803 --ghost <旧版>` で別の SSP を立てた（一時フォルダの中に置くと「Temp フォルダ内で起動しています」の確認が出て止まる）。普段の SSP（9801）には何も届いていない（更新のログは空のまま）。
+- 更新の指示: SSTP の SEND で送った `\![updatebymyself]` は効かなかった（置き場所への要求が来ない）。手で書き換える辞書（`02-talk.pasta`）に `＊更新テスト`（`\![updatebymyself]` を出すだけのシーン）を足し、SSTP の NOTIFY `OnPastaCallFunction`（Reference0 = `更新テスト`）で呼んで、ゴースト自身の応答から更新を始めた（更新実行理由 `script`）。ゴーストは動かしたまま（`pasta.dll` を読み込んだまま）。
+- 実行は 2 回（フォルダは毎回旧 nar から作り直した）。B: hello-pasta の辞書のまま（`OnUpdate*` のシーンなし）。C: 流れを見るため `＊OnUpdateBegin`・`＊OnUpdateReady`・`＊OnUpdateComplete`・`＊OnUpdateFailure` に一言ずつ返すシーンを足した（pasta は 204 の応答をログに書かないため）。結果は両方とも同じ。
+- SSP の要求（サーバーの記録）: `updates2.dau`（404）→ `updates.txt`（200）→ `ghost/master/descript.txt` → `ghost/master/pasta.dll`。この 2 つ以外は取りに来なかった。
+- `OnUpdate*` の流れ（C の `pasta.log`）: `OnUpdateBegin`（Reference3 `ghost`・Reference4 `script`）→ `OnUpdateReady`（Reference1 `ghost/master/descript.txt,ghost/master/pasta.dll`）→ `SHIORI.unload` → 差し替え → 新しい `pasta.dll` の `load`（自己展開の `pasta_scripts` も新しい版で展開し直し）→ `OnUpdateComplete`（Reference0 `changed`・Reference1 `descript.txt,pasta.dll`）。`OnUpdateComplete` には差し替え後の新しい `pasta.dll` が応答した。`ERROR` は 0 件（`WARN` は初回起動の save.toml が無い旨の 1 件だけ）。B でも unload〜load は同じ順で、エラーなし。
+- 10.1 一式の差し替え: 更新後のフォルダを新しい nar の `updates.txt` と md5・大きさで照合すると 40 行中 38 行が一致し、違う 2 行は手で書き換えた `pasta.toml`・`02-talk.pasta`（下の 10.3）。`pasta.dll`・`descript.txt` は新しい nar のものになった。ルートの `updates.txt` はサーバーのものに置き換わった。**通る**。
+- 10.2 読み込み中の `pasta.dll`: SSP は SHIORI を unload してから差し替え、読み込み直す。**差し替えられる**（静的 CRT・常駐の機能があっても問題なし）。
+- 10.3 手で書き換えた辞書・`pasta.toml`: **上書きされなかった**（手で足した行が残り、md5 は書き換えた後のまま）。SSP は手元のファイルの md5 を計らず、サーバーの `updates.txt` と手元の `updates.txt`（前に入れた版の一覧）を比べて、md5 が変わった行のファイルだけを取る。このため、手で書き換えたファイルは、新しい版でそのファイル自体が変わっていなければそのまま残り（版と合わない中身のまま）、変わっていればサーバーの中身で上書きされて手の変更は消える。後者は `descript.txt` で確かめた（手で書き換えた `name`・`homeurl` が新しい nar のものになった）。
+- 更新後の応答: `OnUpdateComplete` に新しい `pasta.dll` が応答し、SSTP で呼んだ `会話` のシーン（台詞を返す）にも応答した。**再起動して応答する**。
+- 更新後の `homeurl` は新しい nar の Pages の URL に戻る（設計の想定どおり）。続けて同じ指示を出すと、ローカルの置き場所には要求が来なかった（Pages を見に行った）。
+- 片付け: 試験用の SSP 2 つ（readonly の 1 つと複製の 1 つ）はプロセスを指定して強制終了（WM_CLOSE は送っていない）。普段の SSP は動いたまま。サーバーは止め、SSP の複製は消した。
+- 目視の確認（同じ日・普段の SSP を開発者が落とした後）: 前と同じ立て方（SSP の複製・`--option bootunlock,standalone`・`--sstp-listen` なし）で、旧 nar から作り直したゴーストで 2 回（D・E）確かめた。SSP の MCP が届くので、更新は `raise_event`（`OnPastaCallFunction`・`更新テスト`）で始めた。
+  - 起動: 2 人の立ち絵と最初の台詞の吹き出しが出た（D では SSP のウインドウモードの窓が最小化で始まったので戻した）。
+  - 更新中: 女の子の吹き出しの台詞「更新を確かめるね。」の下の行に、SSP の進み具合の表示が出た（左に接続の表示、右に `ghost/master/pasta.dll 2/2` の形の取得中のファイルと番号）。E は表示を見るため、サーバーで `pasta.dll` の応答を 15 秒遅らせた。SSP は約 10 秒で切って取り直しを繰り返し、遅らせない配信に戻すと取れて完了した（SSP の更新ログに切れた回の `MD5 : NG` が 1 件。これは遅らせたためで、通常の配信では出ていない）。
+  - 更新後: 立ち絵は消えずに表示されたまま。ダブルクリックに応えた（D「ん？ なにか用事？」・E「わっ、」と表情の変化）。SSP の更新ログは `Ready … 2 files` → 2 ファイルの `MD5 : OK`（UpdateDef とダウンロードの md5 が一致）→ `Delete : (no files to delete)` → `Update OK : 2 files.`。SSP のエラーログは空、エラーの窓は出なかった。
+  - 照合: D・E とも、新しい nar の `updates.txt` と 40 行中 38 行が一致し、違う 2 行は手で書き換えた `pasta.toml`・`02-talk.pasta`（上書きされない。前の B・C と同じ）。
+  - 片付け: 試験用の SSP は MCP の SakuraScript `\-` で閉じた（強制終了・WM_CLOSE はしていない）。サーバーは止め、SSP の複製は消した。

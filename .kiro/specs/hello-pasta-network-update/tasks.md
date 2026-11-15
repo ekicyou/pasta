@@ -123,7 +123,7 @@
   - _Requirements: 1.4, 4.1, 4.5, 5.2, 5.5, 5.6, 11.1, 11.2_
 
 - [ ] 5. Integration: 実機とリハーサルでの確認
-- [ ] 5.1 実機の SSP で更新が通ることの確認
+- [x] 5.1 実機の SSP で更新が通ることの確認
   - 新しい nar を作業ツリーで作る（`release.ps1` または `pasta_check release`。LuaJIT のビルドがあるため、環境変数 `NoDefaultCurrentDirectoryInExePath` を外してから実行する）
   - 旧版の nar（v0.6.1。Release の添付なので、取得は許可を得てから。2.1 で取った nar があれば使い回す）を、readonly・別ポートの別の SSP に入れ、`homeurl` をローカルの静的サーバーに向ける。新しい nar を `build` で展開して配信する
   - インストール済みの辞書と `pasta.toml` を手で書き換え、ゴーストを動かしたまま（`pasta.dll` を読み込んだまま）更新確認を行う
