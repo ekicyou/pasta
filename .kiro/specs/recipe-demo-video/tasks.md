@@ -185,4 +185,4 @@
 - 2.2: `dragLayout("panels", offset)` の offset は範囲（#workspace＋下の欄の面）の下の端からの px で、そのまま下の欄の面の高さになる。3.3 の取り付けで帯（`.panels-bar`）の高さを差し引いて渡す。幅 320 px 未満では leftShare を 0.5 にする。
 - 1: 書き出しには無音の AAC のトラックが必ず付き、約 860 kb/s（80 秒で約 8.6 MB の見込み）。6.3 で ffmpeg による音声の除去と 5 MB への詰め直しが要る見込み（research.md 10 節）。
 - 3.3: 下の欄の高さを当て直すと #workspace の大きさが変わるため、"ResizeObserver loop completed with undelivered notifications" がコンソールに 1 回出ることがある。次のフレームで同じ値に収まって止まるので、不具合ではない（4.3 の実機の確かめで見ても慌てない）。
-- 4.3: Tauri の minWidth・minHeight は WM_GETMINMAXINFO で効く（利用者が縁を引いたとき）。外からの SetWindowPos は最小を無視する。実物の確かめでは最小の数を直す必要は無かった（ツリー 120・エディタ 240×120・下の欄 60・左右の欄 160 のどれも、目で見て狭すぎも広すぎもしない）。
+- 4.3: Tauri の minWidth・minHeight は WM_GETMINMAXINFO で効く（利用者が縁を引いたとき）。外からの SetWindowPos は最小を無視する。実物の CDP の確かめでは、どの仕切りも決まりの最小と最大で止まった。最小の数の見え方（狭すぎないか）はまだ目で見ておらず、5.4 の試し撮りのコマで見る。
