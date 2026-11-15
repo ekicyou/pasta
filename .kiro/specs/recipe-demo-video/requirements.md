@@ -142,8 +142,8 @@
 4. The 撮影の作業 shall 撮るゴーストを、普段の SSP とは別に立てた試験用の SSP で動かす。
 5. The 撮影の作業 shall pasta-recipe を操作する間、開発者のマウスとキーボードを使わない（開発者のデスクトップの操作を奪わない）。
 6. The 撮影の作業 shall リポジトリの hello-pasta を変えず、写しで撮る（前提 A2）。
-7. The 撮影の作業 shall 撮影の前に、pasta-recipe の最近開いたゴーストの記録（`%APPDATA%\io.github.ekicyou.pasta-recipe\recent.toml`）の写しを取る。
-8. When 撮影を終えた（途中で止めたときも含む）, the 撮影の作業 shall 最近開いたゴーストの記録を撮影の前の中身に戻し、試験用の SSP と pasta-recipe を閉じ、hello-pasta の写しを `C:\pasta-demo` ごと消す。普段の SSP は動いたままにする。
+7. The 撮影の作業 shall 手元のビルドの pasta-recipe を初めて起動する前に、pasta-recipe の最近開いたゴーストの記録（`%APPDATA%\io.github.ekicyou.pasta-recipe\recent.toml`）と、並びの記録（同じフォルダの `layout.toml`。要件 11.7）の写しを取る。
+8. When 撮影を終えた（途中で止めたときも含む）, the 撮影の作業 shall 最近開いたゴーストの記録と並びの記録を撮影の前の中身に戻し（無かったものは消す）、撮影の作業が起動した試験用の SSP と pasta-recipe を閉じ、hello-pasta の写しを `C:\pasta-demo` ごと消す。普段の SSP は動いたままにする。
 9. If 7.8 の後片付けで戻せないものが残った, then the 撮影の作業 shall 残ったものとその場所を開発者に知らせる。
 10. When 撮影を終えた（途中で止めたときも含む）, the 撮影の作業 shall 撮影のために開発者が自分で変えた設定（前提 A11 に挙げたものと、撮影の途中で開発者が足したもの）を 1 つずつ挙げ、元に戻したかを開発者に尋ねる。
 11. The 撮影の作業 shall 開発者が自分で変えた OS の設定を、自分では変えも戻しもしない。

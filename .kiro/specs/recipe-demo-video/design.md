@@ -163,6 +163,7 @@ C:\pasta-demo\
 └── work\                          # StageSetup・ShootScript・ExportCheck の作業ファイル
     ├── stage.ps1                  #   起動・窓の位置の指定・閉じる
     ├── shoot.mjs                  #   CDP の台本
+    ├── launched.json              #   撮影の作業が起動したプロセスの番号（後片付けで閉じる相手）
     ├── actions.json               #   操作の記録（setPointerTrack と編集の元）
     └── recipe-dev-actions-demo.mp4 #  書き出し（確かめてからリポジトリへ写す）
 %APPDATA%\io.github.ekicyou.pasta-recipe\
@@ -213,7 +214,7 @@ Openscreen のプロジェクト（題名 recipe-dev-actions-demo）            
 ```mermaid
 flowchart TD
     Build[要件 11 を入れてビルド] --> Pre[前の確かめ]
-    Pre -->|Openscreen につながらない| Stop[止まって開発者に頼む]
+    Pre -->|確かめが 1 つでも外れた| Stop[止まって開発者に頼む]
     Pre --> Backup[記録の写しを取る]
     Backup --> Stage[舞台を作る]
     Stage --> Trial[試し撮りとコマ]
@@ -233,6 +234,7 @@ flowchart TD
     Frames -->|通った| Docs[マニュアルの直しと検査]
     Docs --> Clean[後片付けと設定の確かめ]
     Defect --> Clean
+    Defect -.->|直した後に入り直す| Build
     Stop --> Clean
 ```
 
@@ -334,7 +336,7 @@ flowchart TD
 | StageSetup | B・撮影 | 舞台を作り、開発者の承認を取る | 1.1・1.10・2.12・2.13・3.1・3.2・7.3・7.4・7.11・7.13〜7.15 | DemoGhostCopy・LayoutStore の形（P0） | Batch・State |
 | ShootScript | B・撮影 | CDP で流れを操作し、記録と確かめを残す | 1.2〜1.9・2.1・2.5・2.13・7.5・8.1〜8.3 | StageSetup（P0） | Batch |
 | TakeEdit | B・編集 | 録画・切り抜き・ポインタ・寄り・見出し・書き出し | 1.1・2.1〜2.11・3.1・4.2・7.1 | Openscreen の MCP（P0） | Batch |
-| ExportCheck | B・確かめ | 書き出しを数とコマで確かめる | 1.7・2.4・2.6・2.7・2.13・3.1・3.3・3.4・4.2・4.3・7.12 | TakeEdit（P0）・ffmpeg（P1） | Batch |
+| ExportCheck | B・確かめ | 書き出しを数とコマで確かめる | 1.7・2.1・2.3〜2.7・2.10・2.11・2.13・3.1・3.3・3.4・4.2・4.3・7.12 | TakeEdit（P0）・ffmpeg（P1） | Batch |
 | ManualVideoEdits | B・文書 | 動画の差し替えと 2 つの章の直し | 4.1・4.4・4.5・5.1〜5.4・6.1〜6.4 | ExportCheck（P0） | — |
 | ManualChecks | B・検査 | CI と同じ順の検査 | 4.5・5.4・6.4・9.1・9.2 | 今の道具（P0） | Batch |
 | RetakeRecord | B・文書 | 撮り直しの記録 | 10.1・10.2 | なし | — |
@@ -459,7 +461,7 @@ export function separatorValue(prefs: LayoutPrefs, id: SplitterId, space: Layout
 - Preconditions: `space` の数は 0 以上（部品が隠れていて 0 のときも落ちない）。
 - Postconditions（`space` が窓の最小の大きさ以上のとき）: `tree ≤ treeWidth ≤ width − editorWidth`、`panels ≤ panelsHeight ≤ height − editorHeight`、出力と保存変数の幅はどちらも `panel` 以上。
 - 窓の最小より小さい `space`（起こらない見込み）では、ツリー・下の欄・2 つの欄の最小を先に守り、エディタが残りを取る。
-- `dragLayout`・`nudgeLayout` は、今の窓に収めた値（`fitLayout` の結果）から動かす。入れ替えているときの `run` は、左の欄が保存変数なので `outputShare = 1 − 左の欄の割合` になる。
+- `dragLayout`・`nudgeLayout` は、今の窓に収めた値（`fitLayout` の結果）から動かす。返す並びは、**動かした仕切りのキーだけ**を新しい値にし、触っていないキーは受け取った `prefs`（覚えた値）のまま返す。狭い窓で 1 本を動かしても、ほかの 2 本の覚えた値は収めた値に書き換わらない（11.8）。入れ替えているときの `run` は、左の欄が保存変数なので `outputShare = 1 − 左の欄の割合` になる。
 
 **Implementation Notes**
 
@@ -480,7 +482,7 @@ export function separatorValue(prefs: LayoutPrefs, id: SplitterId, space: Layout
 - ドラッグは Pointer Events とポインタの捕まえ（`setPointerCapture`）で受ける。動かしている間は文字の選択を止める。
 - キーボード: 仕切りに焦点があるとき、縦の仕切り（ツリー・出力｜保存変数）は ←・→、横の仕切り（下の欄）は ↑・↓ で `KEY_STEP` ずつ動かす。ほかのキーは触らない。
 - 読み上げ: 動かすたびに `aria-valuenow`・`aria-valuemin`・`aria-valuemax` を `separatorValue` で更新する。
-- 覚えさせるのは操作の終わりだけ（`pointerup`・矢印のキーの `keyup`・入れ替え）。値が変わっていなければ書かない。
+- 覚えさせるのは操作の終わりだけ（`pointerup`・矢印のキーの `keyup`・入れ替え）。値が変わっていなければ書かない。書くのは覚えた並び（`LayoutRules` が返したもの）で、窓に収めて当てた値ではない。
 - `#workspace` を `ResizeObserver` で見張り、大きさが変わったら `fitLayout` で当て直す（覚えた値は変えない・書かない）。
 
 **Dependencies**
@@ -546,7 +548,7 @@ export function mountLayout(targets: LayoutTargets, initial: LayoutPrefs): void;
 **Implementation Notes**
 
 - Integration: `devPanels.ts`・`devActions.ts` は変えない。
-- Risks: 帯が狭い窓で溢れる。帯は溢れた分を隠し、ボタンの文を短くしてある。
+- Risks: 帯が狭い窓で溢れる。帯は溢れた分を隠し、ボタンの文を短くしてある。今の境の線（`style.css` の `.panel + .panel { border-left }`）は、2 つの欄の間に仕切りの要素が入ると当たらなくなる。動かす面の境の線は、仕切りの要素の側で引く（見た目は今の 1 px のまま）。
 
 #### SplitterMarkup（`index.html`・`src/style.css`）
 
@@ -557,7 +559,7 @@ export function mountLayout(targets: LayoutTargets, initial: LayoutPrefs): void;
 
 #### WindowMinimum（`src-tauri/tauri.conf.json`）
 
-- `app.windows[0]` に `minWidth: 400`・`minHeight: 320` を足す。`LAYOUT_MIN` の和（幅は 120＋240 と 160×2 の大きいほう、高さはツールバー 40＋120＋帯 27＋60）に余りを足した数である。これで、窓をどう縮めても 11.6 の最小が守れる（11.8）。
+- `app.windows[0]` に `minWidth: 400`・`minHeight: 320` を足す。`LAYOUT_MIN` の和（幅は 120＋240 と 160×2 の大きいほう、高さはツールバー 40＋120＋帯 27＋60）に余りを足した数である。これで、窓をどう縮めても 11.6 の最小が守れる（11.8）。幅 400 ではツールバーのボタンが折り返して 40 px より高くなるので、和の「ツールバー 40」は目安である。並びの決まりは `#workspace` の大きさを DOM から測るので、折り返しても最小は守られる。
 
 #### RecipeManualNote（`book/src/debug/recipe.md`）
 
@@ -602,7 +604,7 @@ export function mountLayout(targets: LayoutTargets, initial: LayoutPrefs): void;
 | Openscreen の `listSources` が返る（画面が 2 枚） | 止まって、開発者に Openscreen の起動か `/mcp` の再接続を頼む。ほかの録画の道具に替えない（7.2） |
 | areka が動いていない（送る相手が 2 つになり、選ぶ窓が映る） | 止まって開発者に知らせる |
 | 開発者の pasta-recipe が動いていない（単一起動なので、撮影用の起動がそちらへ渡って終わる） | 止まって開発者に知らせる（閉じるのは開発者） |
-| 正時の前後 5 分でない（時報。1.10） | 待つ |
+| 正時の前後 5 分でない（時報。1.10）。舞台を作る前だけでなく、`startRecording` を呼ぶ直前（試し撮り・本番）にも毎回確かめる | 待つ |
 
 #### StageSetup
 
@@ -643,12 +645,12 @@ swapped = false
 4. ゴーストと吹き出しを目標へ動かす。送った後、`get_property` で `currentghost.scope(0).rect`・`scope(1).rect` を読み、目標と ±2 px で合うまで直す。吹き出しは、▶ で 1 回鳴らして出ている間に `currentghost.balloon.scope(n).rect` を読んで合わせる。合わせきれないときは、開発者にドラッグを頼む。
 5. pasta-recipe を起動する: 環境変数 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333` をその起動だけに付け、引数に `C:\pasta-demo\hello-pasta\ghost\master\dic\10-save.pasta` を渡す（開始の画面と「最近開いたもの」を映さない。3.2）。窓を目標の矩形へ動かす。前面にはしない（開発者の作業の焦点を奪わない。7.5）。
 6. `＊会話` を 1 回鳴らし、「保存変数を表示」を押して、吹き出しと表を出す。
-7. Openscreen で 2〜3 秒の試し撮りをし、切り抜きと 4 つの画（TakeEdit の表）を置いて、`getFrames` でコマを取る。ダイアログを開いたコマも 1 枚取る。**コマと数字（上の 2 つの表）を開発者に見せ、この配置でよいかを尋ねる（7.13）**。
+7. 試し撮りも画面を録るので、先に 10 と同じ知らせを開発者に伝える（7.15）。Openscreen で 2〜3 秒の試し撮りをし、切り抜きと 4 つの画（TakeEdit の表）を置いて、`getFrames` でコマを取る。ダイアログを開いたコマも 1 枚取る。**コマと数字（上の 2 つの表）と、見出しの 6 つの文（ShootScript の表。2 は押すボタンの名前に「書き換えて」を足した文である）を開発者に見せ、この配置でよいかを尋ねる（7.13）**。
 8. 直すよう言われたら、直して 6〜7 をやり直す。**よいと言われるまで本番を撮らない（7.14）**。
 9. よいと言われたら、録画なしで台本を 1 回通す（通し稽古。待ちの秒を測り、読み取り専用の SSP でも書き換えた保存変数が読み込み直しの後に残って「100 回目」になることを確かめる）。その後、最初の状態に立て直す: pasta-recipe と試験用の SSP を閉じ、写しの `profile/` を消し、写しの `10-save.pasta` を撮る前の中身に戻し、2〜5 をやり直す。位置は、承認された数字と合うことを 4 の読み取りで確かめる（readonly の SSP は位置を覚えない）。
 10. **撮る画面（ノート PC の画面）と、撮影の間（約 3 分）その画面に窓とマウスを入れず、どこも押さないでほしいことを、開発者に知らせる（7.15）**。
 
-- 試し撮りで一緒に確かめること: `listSources` のどちらの画面が主画面か。録画のバーとカウントダウンの映り込み。切り抜いた後の寄りの中心が切り抜いた画に対する割合か。ポインタが ▶ の上に乗るか（`actions.json` の割合の式）。吹き出しに送り主の表示（`from MCP (local)`）が出ていないこと（▶ で鳴らした台詞には出ない）。壁紙の白の上で窓と吹き出しの縁が見えること。隠れたタスクバーの線が下の辺に無いこと。
+- 試し撮りで一緒に確かめること: `listSources` のどちらの画面が主画面か。録画のバーとカウントダウンの映り込み。切り抜いた後の寄りの中心が切り抜いた画に対する割合か。ポインタが ▶ の上に乗るか（`actions.json` の割合の式）。吹き出しに送り主の表示（`from MCP (local)`）が出ていないこと（▶ で鳴らした台詞には出ない）。壁紙の白の上で窓と吹き出しの縁が見えること。隠れたタスクバーの線が下の辺に無いこと。吹き出しの文字の大きさ（12 px と見込んだ。2.6 の 9 px に届くかは、この実測で決まる）。写しに足した `＊天気` で、下の欄の帯の診断・検査の件数が変わっていないこと（誤り 0 件・警告 0 件のまま）。
 - 撮影の作業は OS の設定（タスクバー・アイコン・通知・拡大率・壁紙）を変えない（7.11）。
 
 #### ShootScript（`C:\pasta-demo\work\shoot.mjs`）
@@ -732,7 +734,7 @@ swapped = false
 | 順 | 道具 | 中身 |
 | -- | -- | -- |
 | 1 | `startRecording`（画面の番号）→ 台本 → `stopRecording` | マイク・システムの音は取らない（2.7）。ポインタは記録として持つ（既定） |
-| 2 | `setEditorSettings` | 余白 0・枠なし・角丸 0・影 0・動きのぼかし 0・背景 `#ffffff`・形 16:10。ポインタは矢印・大きめ・押したときの弾みと波紋（3.1・2.1） |
+| 2 | `setEditorSettings`・`setAspectRatio` | 余白 0・枠なし・角丸 0・影 0・動きのぼかし 0・背景 `#ffffff`。ポインタは矢印・大きめ・押したときの弾みと波紋。形は `setAspectRatio` で 16:10（3.1・2.1） |
 | 3 | `setClipRange` | `cropRegion`（舞台の目標の表）だけを指定する。クリップの出入りの点は動かさない（定規の秒をずらさない） |
 | 4 | `setPointerTrack` | `actions.json` の `at`・`x`・`y`・`click`。自動で付いた寄りは外す（押すたびに画が動くため） |
 | 5 | `addTrim` | 頭（録画のバーとカウントダウン）と尻、`wait-start`〜`wait-end`（読み込み直しの待ち・吹き出しが閉じる待ち）。寄りの出入りの最中は切らない（2.4） |
@@ -750,16 +752,16 @@ swapped = false
 | Field | Detail |
 | -- | -- |
 | Intent | 書き出した動画を、数とコマで確かめてからリポジトリへ写す |
-| Requirements | 1.7, 2.4, 2.6, 2.7, 2.13, 3.1, 3.3, 3.4, 4.2, 4.3, 7.12 |
+| Requirements | 1.7, 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 2.10, 2.11, 2.13, 3.1, 3.3, 3.4, 4.2, 4.3, 7.12 |
 
 | 確かめ | 物差し | 外れたとき |
 | -- | -- | -- |
 | 長さ | 60〜90 秒（2.4） | 編集し直す |
 | 大きさ | 5 MB 以下（4.3） | ShareX 同梱の ffmpeg で詰め直す（7.12） |
 | 音声 | 音声のトラックが無い（2.7） | ffmpeg でトラックを除く（7.12） |
-| 形式 | mp4・H.264・1152×720（か 1728×1080）（4.2） | 編集し直す。直らなければ開発者に示す |
-| コマ | `getFrames` で、操作 1〜6 の「押した直後」と「結果が出た後」・始めのコマ・終わりのコマを見る（3.3） | 下の表 |
-| 再生 | 検査の後の出力の `debug/recipe.html` を手元のファイルとして開き、動画が再生できる（4.2・5.4） | 編集し直す |
+| 形式 | mp4・H.264・yuv420p・1152×720（か 1728×1080）。Edge・Chrome・Firefox がそのまま再生できる形であることは、この形式の読み取りで確かめる（4.2） | 編集し直す。直らなければ開発者に示す |
+| コマ | `getFrames` で、操作 1〜6 の「押す直前」「押した直後」「結果が出た後」・始めのコマ・終わりのコマを見る（3.3）。1 回に取れるのは 12 コマまでなので、分けて取る | 下の表 |
+| 再生 | 検査の後の出力の `debug/recipe.html` を手元のファイルとして開き、動画が再生できる（手元に在る Chromium 系のブラウザで見る。4.2・5.4） | 編集し直す |
 
 コマで見ること:
 
@@ -771,9 +773,20 @@ swapped = false
 | 見出しの文とボタン・メニュー・窓の題名が、`recipe.md` の名前と同じ | 1.7 |
 | 寄りの画の文字が、式で 10 px（吹き出しは 9 px）以上 | 2.6 |
 | 頼んでいない台詞・送り主の表示が無い | 1.10 |
+| 最初のコマと最後のコマが引きの画（窓の全部とゴースト）である | 2.3 |
+| 押す直前のコマでポインタが押す所にあり、押した直後のコマに波紋がある（操作 1〜6） | 2.1 |
+| 結果のコマが、押したコマと同じ寄りの画か、続けて滑らせた寄りの画である | 2.10 |
+
+編集の記録で見ること（`getCurrentDocument` の切り・速さの区間と `actions.json` を突き合わせる）:
+
+| 見ること | 要件 |
+| -- | -- |
+| `result-shown`〜`hold-end`（台詞と結果が出そろった後の 2 秒以上）に、切りも速さも掛かっていない | 2.5 |
+| 台詞が出ている区間（`press`〜`hold-end`）に速さの区間が重なっていない | 2.11 |
 
 - 1 つでも 3.1・3.2 に反するコマがあれば、その動画をリポジトリに置かない（3.4）。編集で直らないものは撮り直す。
 - ffmpeg を使うのは、5 MB を超えたときの詰め直しと、音声のトラックの除去だけである（その前の、トラックの有無と大きさの読み取りを含む）。切り抜きや寄りには使わない。
+- ffmpeg で詰め直した・音声を除いたときは、できたファイルを `getFrames`（ファイルのパスを渡す形）でもう一度コマの確かめにかけ、形式・長さ・大きさも読み直す。リポジトリへ写すのは、最後にできたファイルである。
 
 #### ManualVideoEdits（`book/src/debug/`）
 
@@ -842,15 +855,16 @@ swapped = false
 
 | 順 | すること | 要件 |
 | -- | -- | -- |
-| 1（撮影の前） | `%APPDATA%\io.github.ekicyou.pasta-recipe\` の `recent.toml` と `layout.toml` を `C:\pasta-demo\backup\` へ写す。無いファイルは「無かった」と印を残す | 7.7 |
-| 2 | pasta-recipe を閉じる（窓へ WM_CLOSE）。先に閉じる（閉じた後に記録を書き直させない） | 7.8 |
-| 3 | 試験用の SSP を閉じる（送る前の確かめの後で `\-\e`）。普段の SSP には触れない | 7.8・7.3 |
+| 1（手元のビルドを初めて起動する前） | `%APPDATA%\io.github.ekicyou.pasta-recipe\` の `recent.toml` と `layout.toml` を `C:\pasta-demo\backup\` へ写す。無いファイルは「無かった」と印を残す。**写しが既に在るときは上書きしない**（前の回が途中で止まった印である。先に 4 で戻してから取り直す） | 7.7 |
+| 2 | 撮影の作業が起動した pasta-recipe を閉じる（窓へ WM_CLOSE）。先に閉じる（閉じた後に記録を書き直させない）。閉じるのは、起動のときに控えたプロセスの番号（`C:\pasta-demo\work\launched.json`）のものだけ。開発者が自分で開いていた pasta-recipe には触れない | 7.8 |
+| 3 | 試験用の SSP を閉じる（送る前の確かめの後で `\-\e`）。これも控えたプロセスの番号のものだけ。普段の SSP には触れない | 7.8・7.3 |
 | 4 | `recent.toml`・`layout.toml` を写しから戻す。「無かった」ものは消す。戻した後の中身が写しと同じことを確かめる | 7.8 |
 | 5 | `C:\pasta-demo` ごと消す（写し・記録の写し・作業ファイル） | 7.8 |
-| 6 | 残ったものを確かめる: pasta-recipe と試験用の SSP の動きが残っていない・`C:\pasta-demo` が無い・普段の SSP が動いていたなら動いたまま。戻せないものがあれば、物と場所を開発者に知らせる | 7.9 |
+| 6 | 残ったものを確かめる: 控えた番号の pasta-recipe と試験用の SSP が残っていない・`C:\pasta-demo` が無い・普段の SSP が動いていたなら動いたまま。戻せないものがあれば、物と場所を開発者に知らせる | 7.9 |
 | 7 | 開発者が自分で変えた設定を 1 つずつ挙げ、元に戻したかを尋ねる: タスクバーの自動で隠す・デスクトップのアイコン・通知・拡大率（100% → 元は 200%）と、撮影の途中で開発者が足したもの。撮影の作業は自分では戻さない | 7.10・7.11 |
 
-- 途中で止めたときも 2〜7 を通る。写しを取る前に止まったときは 4 を飛ばす。
+- 途中で止めたときも 2〜7 を通る。写しを取る前に止まったときは 4 を飛ばす。何も起動していないとき（Preflight で止まったとき）は、2・3 で閉じる物が無い。
+- 流れ A の画面の確かめ（Testing Strategy の E2E）も、手元のビルドでゴーストを開き、仕切りを動かすので、`recent.toml` と `layout.toml` を書き換える。この確かめも 1・2・4 で挟む（写しを取ってから起動し、閉じたら戻す）。
 - Openscreen のプロジェクトは消さない（前提 A10）。
 
 ## Data Models
@@ -937,7 +951,7 @@ ShootScript の `ShootAction` の並び。`setPointerTrack` へは `at`・`x`・
 
 - 台本の確かめ（ShootScript。1.2〜1.6・1.8・1.9）と、書き出しの確かめ（ExportCheck の 2 つの表）。
 - マニュアルの検査（ManualChecks。9.1）。`dev-actions.md` のリンクが `recipe.md` の小節へ届くこと（`link-check.mjs`。6.4）。
-- 後片付けの確かめ（Cleanup の 6）。`git status` で、リポジトリの hello-pasta に差分が無いこと（7.6）。
+- 後片付けの確かめ（Cleanup の 6）。`git status` で、リポジトリの hello-pasta に差分が無いこと（7.6）。`release.ps1` が追跡中のファイル（`surfaces.txt` など）に改行だけの差分を残したときは、`git checkout --` で戻してから確かめる。
 
 ## Security Considerations
 
@@ -947,7 +961,7 @@ ShootScript の `ShootAction` の並び。`setPointerTrack` へは `at`・`x`・
 
 ## Migration Strategy
 
-- 実行の順: (1) 流れ A の実装と試験 → (2) `recipe.md` の並びの説明（11.9）→ (3) 手元のビルド → (4) 流れ A の画面の確かめ（CDP）→ (5) 撮影（Preflight → StageSetup → ShootScript → TakeEdit → ExportCheck）→ (6) マニュアルの直しと検査 → (7) `SCREENSHOTS.md` → (8) 後片付け。
+- 実行の順: (1) 流れ A の実装と試験 → (2) `recipe.md` の並びの説明（11.9）→ (3) 手元のビルド → (4) 流れ A の画面の確かめ（CDP。記録の写しと戻しで挟む）→ (5) 撮影（Preflight → StageSetup → ShootScript → TakeEdit → ExportCheck）→ (6) マニュアルの直しと検査 → (7) `SCREENSHOTS.md` → (8) 後片付け。
 - 並びの記録は新しいファイルなので、移行は無い。`layout.toml` が無い人は今の見た目のまま開く。
 - 動画は main から公開される。仕切りと入れ替えは次のリリースで届くので、動画が先に公開される（前提 A1 で認めている）。
 
