@@ -92,7 +92,7 @@
   - _Requirements: 8.3, 8.4, 8.7, 8.8_
 
 - [ ] 4. Core: リリース CI の新ジョブ
-- [ ] 4.1 `publish-ghost-site.ps1` の骨格：最新タグの判定・引数・`-DryRun`
+- [x] 4.1 `publish-ghost-site.ps1` の骨格：最新タグの判定・引数・`-DryRun`
   - タグと `releases/latest` を数字 3 つで比べ、古ければ起動せず `skipped`（reason `stale-tag`）、新しければ取り直し（10 秒×6 回）して、それでも新しくならなければ `failed`（reason `transient`）にする
   - `-Tag`・`-DescriptPath`（`homeurl` は判定の後・見比べの直前にだけ読む）・`-LatestTag`・`-DryRun`・`-Ref`（既定 `main`）と待ちの値の引数を持つ。`status`/`reason` は既存の流儀（`GITHUB_OUTPUT` が無ければ標準出力）で出す
   - `release-scripts-test.ps1` に、古いタグ・`homeurl` の無い古いタグ・新しすぎるタグ・同じタグの 4 項目を足す。完了時は 4 項目が通る

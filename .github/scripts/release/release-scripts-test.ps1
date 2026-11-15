@@ -1,7 +1,7 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1・添付の欠けを見る github-release.ps1・公開済みなら飛ばす publish-vsix.ps1・pasta-recipe の 2 つの zip を検査する verify-recipe-zips.ps1）を、一時の git リポジトリで実際に動かして確かめる。
+  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1・添付の欠けを見る github-release.ps1・公開済みなら飛ばす publish-vsix.ps1・pasta-recipe の 2 つの zip を検査する verify-recipe-zips.ps1・最新のタグを判定する publish-ghost-site.ps1）を、一時の git リポジトリで実際に動かして確かめる。
 .DESCRIPTION
   一時のフォルダに git リポジトリを作り、決まった件名のコミットとタグ（v0.0.1・v0.0.2）を積んで、スクリプトを子の pwsh で呼ぶ。
   ネットワークと gh を使わない。一時のフォルダは終わりに消し、リポジトリの作業ツリーを変えない。
@@ -329,6 +329,40 @@ try {
             if (-not $r.Output.Contains("$n の pasta-recipe.exe が VC++ ランタイムの DLL を読む: VCRUNTIME140.dll")) { "出力に $n の VCRUNTIME140.dll の文が無い: $($r.Output)" }
         }
         if ($r.Output -match 'DLL を読む: (KERNEL32|api-ms-win-crt)') { "OS の部品まで VC++ ランタイムに数える: $($r.Output)" }
+    }
+
+    # --- publish-ghost-site.ps1（-LatestTag で最新タグを渡し、待ちを 0 にする。ネットワークと gh を使わない）---
+    $descript = Join-Path $tmp 'ghost-descript.txt'
+    Write-Utf8 $descript "charset,UTF-8`nhomeurl,https://example.invalid/hello-pasta/`n"
+
+    Test-Item 18 'publish-ghost-site.ps1 が、最新より古いタグ（v0.0.9 < v0.0.10）で、status=skipped・reason=stale-tag・終了コード 0 で終わる' {
+        $r = Invoke-Script publish-ghost-site.ps1 @('-Tag', 'v0.0.9', '-LatestTag', 'v0.0.10', '-DescriptPath', $descript, '-LatestWaitSeconds', '0', '-DryRun')
+        if ($r.Exit -ne 0) { "終了コード $($r.Exit)（0 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('status=skipped')) { "出力に status=skipped が無い: $($r.Output)" }
+        if (-not $r.Output.Contains('reason=stale-tag')) { "出力に reason=stale-tag が無い: $($r.Output)" }
+        if ($r.Output.Contains('dry-run:')) { "古いタグなのに計画まで進んだ: $($r.Output)" }
+    }
+
+    Test-Item 19 'publish-ghost-site.ps1 が、homeurl の無い（無いファイルを指す）古いタグでも、status=skipped・reason=stale-tag で終わる（homeurl を判定の後に読む）' {
+        $r = Invoke-Script publish-ghost-site.ps1 @('-Tag', 'v0.0.1', '-LatestTag', 'v0.0.2', '-DescriptPath', (Join-Path $tmp 'no-such-descript.txt'), '-LatestWaitSeconds', '0', '-DryRun')
+        if ($r.Exit -ne 0) { "終了コード $($r.Exit)（0 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('status=skipped')) { "出力に status=skipped が無い: $($r.Output)" }
+        if (-not $r.Output.Contains('reason=stale-tag')) { "出力に reason=stale-tag が無い: $($r.Output)" }
+    }
+
+    Test-Item 20 'publish-ghost-site.ps1 が、最新より新しすぎるタグ（待ち 0）で、status=failed・reason=transient・終了コード 1 で終わる' {
+        $r = Invoke-Script publish-ghost-site.ps1 @('-Tag', 'v0.1.0', '-LatestTag', 'v0.0.2', '-DescriptPath', $descript, '-LatestWaitSeconds', '0', '-DryRun')
+        if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('status=failed')) { "出力に status=failed が無い: $($r.Output)" }
+        if (-not $r.Output.Contains('reason=transient')) { "出力に reason=transient が無い: $($r.Output)" }
+    }
+
+    Test-Item 21 'publish-ghost-site.ps1 -DryRun が、最新と同じタグで、起動の手前の計画（manual.yml・ref main）を出して終了コード 0 で終わる' {
+        $r = Invoke-Script publish-ghost-site.ps1 @('-Tag', 'v0.0.2', '-LatestTag', 'v0.0.2', '-DescriptPath', $descript, '-LatestWaitSeconds', '0', '-DryRun')
+        if ($r.Exit -ne 0) { "終了コード $($r.Exit)（0 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('dry-run:')) { "出力に計画（dry-run:）が無い: $($r.Output)" }
+        if (-not ($r.Output.Contains('manual.yml') -and $r.Output.Contains('ref=main'))) { "計画に manual.yml・ref=main が無い: $($r.Output)" }
+        if ($r.Output.Contains('status=')) { "計画で status まで書いた（起動の手前で終わるはず）: $($r.Output)" }
     }
 }
 finally {
