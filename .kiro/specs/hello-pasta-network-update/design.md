@@ -351,7 +351,7 @@ export function extractNar(files, outDir) {}
 /** 読み出し → 照合 → 展開 → index.html の複写 → 出力の一覧が nar のエントリ＋index.html と一致することの確認。nar に index.html があれば失敗。 @param {{ narPath: string, outDir: string, indexPath: string }} opts @returns {void} */
 export function buildSite(opts) {}
 
-/** 実 URL の updates.txt を nar の updates.txt とバイト一致で見比べる。一致するまで attempts 回まで intervalMs おきに取り直す。full なら一覧の全ファイルの md5・大きさも取って照合する。 @param {{ files: NarFile[], base: string, attempts: number, intervalMs: number, full: boolean, fetchFn?: typeof fetch }} opts @returns {Promise<CheckResult>} */
+/** 実 URL の updates.txt を nar の updates.txt とバイト一致で見比べる。一致するまで attempts 回まで intervalMs おきに取り直す。full なら一覧の全ファイルの md5・大きさも取って照合する。 @param {{ files: NarFile[], base: string, attempts: number, intervalMs: number, full: boolean, fetchFn?: typeof fetch }} opts @returns {Promise<CheckResult & { attempts: number }>}（attempts は updates.txt を取った回数。一致した回・上限・nar に updates.txt が無ければ 0） */
 export async function verifyLive(opts) {}
 ```
 
@@ -363,7 +363,7 @@ export async function verifyLive(opts) {}
 
 - CLI（終了コード 0＝成功、1＝失敗。問題は 1 行 1 件で標準出力、GitHub Actions では `::error::` 注釈も出す）:
   - `node ghost-site.mjs build --nar <file> --out <dir> --index <html>`
-  - `node ghost-site.mjs verify-live --nar <file> --base <url> [--attempts 30] [--interval 30] [--full]`
+  - `node ghost-site.mjs verify-live --nar <file> --base <url> [--attempts 30] [--interval 30] [--full]`（成功は標準出力に 1 行 `OK updates.txt: <n> 回目で一致`。`<n>` は取った回数で、`--full` では `（--full: <m> ファイルも一致）` を続ける）
 - 冪等: 同じ nar からは同じ出力。副作用は `--out` への書き込みだけ。
 - 問題の表示例: `NG ghost/master/pasta.dll: md5 が違う（updates.txt: …、nar: …）`、`NG updates.txt: nar の直下に無い`、`NG index.html: nar にも index.html があり、入口と衝突する`。
 

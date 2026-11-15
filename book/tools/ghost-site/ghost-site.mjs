@@ -4,6 +4,7 @@
 // タスク 1.1: readNar（zip の読み出しと名前の安全性）・parseUpdates（updates.txt の解析）。
 // タスク 1.2: checkIntegrity（updates.txt とエントリの照合）・extractNar（出力先への展開）。
 // タスク 1.3: buildSite（置き場所の組み立て）と CLI `build`。
+// タスク 1.4: verifyLive（実 URL の見比べ）と CLI `verify-live`。
 
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
@@ -207,28 +208,128 @@ export function buildSite({ narPath, outDir, indexPath }) {
   if (diff.length > 0) throw new Error(diff.join('\n'));
 }
 
+const md5Of = (buf) => crypto.createHash('md5').update(buf).digest('hex');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 1 回取る。HTTP の状態と中身、またはネットワークの失敗を返す（投げない）。
+async function fetchOnce(fetchFn, url) {
+  try {
+    const res = await fetchFn(url);
+    return { status: res.status, body: Buffer.from(await res.arrayBuffer()) };
+  } catch (e) {
+    return { error: e.cause?.message ? `${e.message}: ${e.cause.message}` : e.message };
+  }
+}
+const stateOf = (r) => (r.error ? `取得できない（${r.error}）` : `HTTP ${r.status}・長さ ${r.body.length}・md5 ${md5Of(r.body)}`);
+
+/**
+ * 実 URL の updates.txt を nar の updates.txt とバイト一致で見比べる。一致するまで attempts 回まで intervalMs おきに取り直す
+ * （HTTP 200 以外・ネットワークの失敗も取り直す。最後の回の後は待たない）。取得には一意のクエリ cb=<ラベル>-<回数> を付ける。
+ * full なら、一致の後に updates.txt の各行のファイルを 1 回ずつ取って md5・大きさを照合し、問題を 1 件 1 行で全部集める。
+ * 戻り値の attempts は updates.txt を取った回数（一致した回、諦めたときは上限。nar に updates.txt が無ければ 0）。
+ * @param {{ files: NarFile[], base: string, attempts: number, intervalMs: number, full: boolean, fetchFn?: typeof fetch }} opts
+ * @returns {Promise<CheckResult & { attempts: number }>}
+ */
+export async function verifyLive({ files, base, attempts, intervalMs, full, fetchFn = fetch }) {
+  const local = files.find((f) => f.name === 'updates.txt');
+  if (!local) return { ok: false, problems: ['NG updates.txt: nar の直下に無い'], attempts: 0 };
+  const root = base.endsWith('/') ? base : `${base}/`;
+  const { GITHUB_RUN_ID: id, GITHUB_RUN_ATTEMPT: at } = process.env;
+  // 再実行（同じ run ID）でも別のクエリになるよう試行の番号も入れる。
+  const label = id && at ? `${id}.${at}` : id || Date.now().toString(36);
+  const urlOf = (p, cb) => {
+    const u = new URL(p.split('/').map(encodeURIComponent).join('/'), root);
+    u.searchParams.set('cb', `${label}-${cb}`);
+    return u.href;
+  };
+
+  let last;
+  let n = 1;
+  for (; n <= attempts; n++) {
+    last = await fetchOnce(fetchFn, urlOf('updates.txt', n));
+    if (last.status === 200 && last.body.equals(local.data)) break;
+    last.mismatch = true;
+    if (n < attempts) await sleep(intervalMs);
+  }
+  if (last.mismatch) {
+    return {
+      ok: false,
+      problems: [`NG updates.txt: ${attempts} 回取っても nar と一致しない（最後: ${stateOf(last)}、nar: 長さ ${local.data.length}・md5 ${md5Of(local.data)}）`],
+      attempts,
+    };
+  }
+  if (!full) return { ok: true, problems: [], attempts: n };
+
+  let records;
+  try {
+    records = parseUpdates(local.data.toString('utf8'));
+  } catch (e) {
+    return { ok: false, problems: [`NG updates.txt: ${e.message}`], attempts: n };
+  }
+  const problems = [];
+  for (const r of records) {
+    const got = await fetchOnce(fetchFn, urlOf(r.path, 'full'));
+    if (got.status !== 200) {
+      problems.push(`NG ${r.path}: ${stateOf(got)}`);
+      continue;
+    }
+    const actual = md5Of(got.body);
+    if (actual !== r.md5) problems.push(`NG ${r.path}: md5 が違う（updates.txt: ${r.md5}、実 URL: ${actual}）`);
+    if (got.body.length !== r.size) problems.push(`NG ${r.path}: 大きさが違う（updates.txt: ${r.size}、実 URL: ${got.body.length}）`);
+  }
+  return { ok: problems.length === 0, problems, attempts: n };
+}
+
 const USAGE = `使い方:
-  node ghost-site.mjs build --nar <file> --out <dir> --index <html>`;
+  node ghost-site.mjs build --nar <file> --out <dir> --index <html>
+  node ghost-site.mjs verify-live --nar <file> --base <url> [--attempts 30] [--interval 30] [--full]
+    （--interval は秒）`;
+
+const usage = (msg) => {
+  console.error(msg ? `${msg}\n${USAGE}` : USAGE);
+  return 1;
+};
 
 // 終了コード 0＝成功、1＝失敗（引数の誤りも 1）。問題は 1 行 1 件で標準出力、GitHub Actions では ::error:: 注釈も出す。
-function main(argv) {
+async function main(argv) {
   const [cmd, ...rest] = argv;
   let values;
   try {
     ({ values } = parseArgs({
       args: rest,
-      options: { nar: { type: 'string' }, out: { type: 'string' }, index: { type: 'string' } },
+      options: {
+        nar: { type: 'string' },
+        out: { type: 'string' },
+        index: { type: 'string' },
+        base: { type: 'string' },
+        attempts: { type: 'string', default: '30' },
+        interval: { type: 'string', default: '30' },
+        full: { type: 'boolean', default: false },
+      },
     }));
   } catch (e) {
-    console.error(`${e.message}\n${USAGE}`);
-    return 1;
+    return usage(e.message);
   }
-  if (cmd !== 'build' || !values.nar || !values.out || !values.index) {
-    console.error(USAGE);
-    return 1;
+  let run;
+  if (cmd === 'build' && values.nar && values.out && values.index) {
+    run = async () => buildSite({ narPath: values.nar, outDir: values.out, indexPath: values.index });
+  } else if (cmd === 'verify-live' && values.nar && values.base) {
+    const attempts = Number(values.attempts);
+    const interval = Number(values.interval);
+    if (!Number.isInteger(attempts) || attempts < 1) return usage(`--attempts は 1 以上の整数: ${values.attempts}`);
+    if (!Number.isInteger(interval) || interval < 0) return usage(`--interval は 0 以上の整数（秒）: ${values.interval}`);
+    run = async () => {
+      const files = readNar(fs.readFileSync(values.nar));
+      const r = await verifyLive({ files, base: values.base, attempts, intervalMs: interval * 1000, full: values.full });
+      if (!r.ok) throw new Error(r.problems.join('\n'));
+      const listed = values.full ? parseUpdates(files.find((f) => f.name === 'updates.txt').data.toString('utf8')).length : 0;
+      console.log(`OK updates.txt: ${r.attempts} 回目で一致${values.full ? `（--full: ${listed} ファイルも一致）` : ''}`);
+    };
+  } else {
+    return usage();
   }
   try {
-    buildSite({ narPath: values.nar, outDir: values.out, indexPath: values.index });
+    await run();
     return 0;
   } catch (e) {
     for (const line of e.message.split('\n')) {
@@ -240,5 +341,5 @@ function main(argv) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = main(process.argv.slice(2));
+  process.exitCode = await main(process.argv.slice(2));
 }
