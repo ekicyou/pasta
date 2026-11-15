@@ -27,7 +27,8 @@ impl Default for Layout {
             tree_width: 260,
             panels_height: 180,
             left_share: 0.5,
-            swapped: false,
+            // 出力は普段見ないので、保存変数を左に置く
+            swapped: true,
         }
     }
 }
@@ -98,6 +99,19 @@ mod tests {
             left_share: l,
             ..Layout::default()
         }
+    }
+
+    #[test]
+    fn default_puts_variables_left() {
+        assert_eq!(
+            Layout::default(),
+            Layout {
+                tree_width: 260,
+                panels_height: 180,
+                left_share: 0.5,
+                swapped: true
+            }
+        );
     }
 
     #[test]

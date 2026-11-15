@@ -18,8 +18,8 @@ const wide = { width: 1200, height: 700 };
 const narrow = { width: 400, height: 220 };
 const prefs: LayoutPrefs = { treeWidth: 400, panelsHeight: 300, leftShare: 0.3, swapped: false };
 
-test("既定の並びは今の見た目（260・180・半分ずつ・入れ替えなし）", () => {
-  assert.deepEqual(DEFAULT_LAYOUT, { treeWidth: 260, panelsHeight: 180, leftShare: 0.5, swapped: false });
+test("既定の並びは 260・180・半分ずつ・保存変数が左", () => {
+  assert.deepEqual(DEFAULT_LAYOUT, { treeWidth: 260, panelsHeight: 180, leftShare: 0.5, swapped: true });
   assert.equal(KEY_STEP, 16);
   assert.deepEqual(LAYOUT_MIN, { tree: 120, editorWidth: 240, editorHeight: 120, panels: 60, panel: 160 });
 });
@@ -96,7 +96,7 @@ test("読み上げの値: ツリーと下の欄は px、左右は左の欄の %�
 });
 
 test("数でない値は既定に替え、大きさ 0 でも落ちない", () => {
-  const bad = { treeWidth: Number.NaN, panelsHeight: Number.POSITIVE_INFINITY, leftShare: Number.NaN, swapped: false };
+  const bad = { treeWidth: Number.NaN, panelsHeight: Number.POSITIVE_INFINITY, leftShare: Number.NaN, swapped: undefined as unknown as boolean };
   assert.deepEqual(fitLayout(bad, wide), DEFAULT_LAYOUT);
   assert.deepEqual(fitLayout({ ...prefs, leftShare: 1.5 }, wide).leftShare, 0.5);
   assert.deepEqual(fitLayout({ ...prefs, treeWidth: -5, panelsHeight: -5 }, wide), { ...prefs, treeWidth: 120, panelsHeight: 60 });

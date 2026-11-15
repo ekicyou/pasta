@@ -24,7 +24,8 @@ export interface LayoutSpace {
 
 export type SplitterId = "tree" | "panels" | "split";
 
-export const DEFAULT_LAYOUT: LayoutPrefs = { treeWidth: 260, panelsHeight: 180, leftShare: 0.5, swapped: false };
+// 出力は普段見ないので、既定は保存変数が左
+export const DEFAULT_LAYOUT: LayoutPrefs = { treeWidth: 260, panelsHeight: 180, leftShare: 0.5, swapped: true };
 export const LAYOUT_MIN = {
   tree: 120,
   editorWidth: 240,
@@ -59,7 +60,7 @@ export function fitLayout(prefs: LayoutPrefs, space: LayoutSpace): LayoutPrefs {
     treeWidth: fitTree(num(prefs.treeWidth, DEFAULT_LAYOUT.treeWidth), width),
     panelsHeight: fitPanels(num(prefs.panelsHeight, DEFAULT_LAYOUT.panelsHeight), size(space.height)),
     leftShare: fitShare(share, width),
-    swapped: prefs.swapped === true,
+    swapped: typeof prefs.swapped === "boolean" ? prefs.swapped : DEFAULT_LAYOUT.swapped,
   };
 }
 
