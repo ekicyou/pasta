@@ -8,6 +8,7 @@ import {
   dragLayout,
   fitLayout,
   nudgeLayout,
+  sameLayout,
   separatorValue,
   swapLayout,
   type LayoutPrefs,
@@ -106,5 +107,12 @@ test("数でない値は既定に替え、大きさ 0 でも落ちない", () =>
     for (const v of Object.values(dragLayout(prefs, id, Number.NaN, zero))) assert.ok(typeof v === "boolean" || Number.isFinite(v));
     for (const v of Object.values(nudgeLayout(prefs, id, 1, zero))) assert.ok(typeof v === "boolean" || Number.isFinite(v));
     for (const v of Object.values(separatorValue(prefs, id, zero))) assert.ok(Number.isFinite(v));
+  }
+});
+
+test("同じ並びかを 4 つのキーで比べる（値が変わらなければ書かない。11.7）", () => {
+  assert.equal(sameLayout(prefs, { ...prefs }), true);
+  for (const diff of [{ treeWidth: 401 }, { panelsHeight: 301 }, { leftShare: 0.31 }, { swapped: true }]) {
+    assert.equal(sameLayout(prefs, { ...prefs, ...diff }), false);
   }
 });

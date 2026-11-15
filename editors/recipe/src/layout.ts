@@ -1,4 +1,5 @@
-// 純粋: 窓の中の並び（仕切り 3 本と出力・保存変数の左右）の数を決める（11.1〜11.6・11.8）。DOM・Tauri を import しない。
+// 窓の中の並び（仕切り 3 本と出力・保存変数の左右）。上は数を決める純粋な決まり（11.1〜11.6・11.8）、
+// 下の mountLayout はそれを DOM に当てる取り付け（11.1〜11.5・11.7・11.8）。どちらも何も import しない（Panels は形で受ける）。
 // 覚えた並びは作者の操作でだけ変わる。窓に収めるときは新しい値を返すだけで、覚えた値は書き換えない。
 
 /** 覚える並び（layout.toml と 1 対 1。layout.ts に置き、ipc.ts は型だけを借りる） */
@@ -108,4 +109,123 @@ export function separatorValue(prefs: LayoutPrefs, id: SplitterId, space: Layout
       return { now: Math.round(fit.leftShare * 100), min: Math.round(lo * 100), max: Math.round((1 - lo) * 100) };
     }
   }
+}
+
+/** 同じ並びか（値が変わらなければ書かない） */
+export function sameLayout(a: LayoutPrefs, b: LayoutPrefs): boolean {
+  return a.treeWidth === b.treeWidth && a.panelsHeight === b.panelsHeight && a.leftShare === b.leftShare && a.swapped === b.swapped;
+}
+
+/** Panels のうち並びが使う所（panels.ts を読み込まず、形で受ける） */
+export interface PanelsSplit {
+  /** 2 つの面それぞれの、左右の欄の間の仕切り（role="separator"。出ている面のものだけが見える） */
+  readonly splitters: readonly HTMLElement[];
+  /** 下の欄（#panels。幅と左の端を測る） */
+  readonly area: HTMLElement;
+  /** 左の欄の幅の割合を 2 つの面に当て、動かす面の 2 つの欄の順を当てる */
+  setSplit(leftShare: number, swapped: boolean): void;
+  /** 入れ替えのボタンが押されたときに呼ばれる */
+  onSwap: () => void;
+}
+
+export interface LayoutTargets {
+  /** CSS の変数を当てる要素（document.documentElement） */
+  root: HTMLElement;
+  /** #workspace（範囲を測る・見張る） */
+  workspace: HTMLElement;
+  treeSplitter: HTMLElement;
+  panelsSplitter: HTMLElement;
+  panels: PanelsSplit;
+  /** 操作の終わりに呼ぶ。失敗しても投げない */
+  save(prefs: LayoutPrefs): void;
+}
+
+/** 仕切り 3 本の操作を受け、並びを当て、操作の終わりに覚えさせる。呼んだ直後に initial を窓に収めた並びが当たっている */
+export function mountLayout(t: LayoutTargets, initial: LayoutPrefs): void {
+  /** 覚えた並び（作者の操作でだけ変わる） */
+  let prefs = initial;
+  /** 最後に書いた（か読んだ）並び */
+  let saved = initial;
+  /** 今当てている下の欄の面の高さ（CSS の既定と同じ値から始める） */
+  let face = DEFAULT_LAYOUT.panelsHeight;
+  const parts: [HTMLElement, SplitterId][] = [
+    [t.treeSplitter, "tree"],
+    [t.panelsSplitter, "panels"],
+    ...t.panels.splitters.map((el): [HTMLElement, SplitterId] => [el, "split"]),
+  ];
+  // #workspace の高さ＋面の高さ（仕切りを動かしても変わらない和）
+  const space = (): LayoutSpace => {
+    const r = t.workspace.getBoundingClientRect();
+    return { width: r.width, height: r.height + face };
+  };
+  const apply = () => {
+    const s = space();
+    const fit = fitLayout(prefs, s);
+    t.root.style.setProperty("--tree-width", `${fit.treeWidth}px`);
+    t.root.style.setProperty("--panels-height", `${fit.panelsHeight}px`);
+    face = fit.panelsHeight;
+    t.panels.setSplit(fit.leftShare, fit.swapped);
+    for (const [el, id] of parts) {
+      const v = separatorValue(prefs, id, s);
+      el.setAttribute("aria-valuenow", String(v.now));
+      el.setAttribute("aria-valuemin", String(v.min));
+      el.setAttribute("aria-valuemax", String(v.max));
+    }
+  };
+  const commit = () => {
+    if (sameLayout(prefs, saved)) return;
+    saved = prefs;
+    t.save(prefs);
+  };
+  /** ポインタの位置を仕切りの offset に直す（tree＝範囲の左から、panels＝面の高さ、split＝下の欄の左から） */
+  const offset = (id: SplitterId, e: PointerEvent): number => {
+    if (id === "tree") return e.clientX - t.workspace.getBoundingClientRect().left;
+    const r = t.panels.area.getBoundingClientRect();
+    if (id === "split") return e.clientX - r.left;
+    // 下の欄の下の端からの距離から、帯と枠線（下の欄の高さ − 面の高さ）を引く
+    return r.bottom - e.clientY - (r.height - face);
+  };
+
+  for (const [el, id] of parts) {
+    el.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault(); // 文字の選択を始めない
+      el.focus();
+      el.setPointerCapture(e.pointerId);
+      el.classList.add("dragging");
+      t.root.style.userSelect = "none";
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (!el.hasPointerCapture(e.pointerId)) return;
+      prefs = dragLayout(prefs, id, offset(id, e), space());
+      apply();
+    });
+    // 離した・捕まえを失った（どちらも操作の終わり）
+    el.addEventListener("lostpointercapture", () => {
+      el.classList.remove("dragging");
+      t.root.style.userSelect = "";
+      commit();
+    });
+    const vertical = id !== "panels";
+    const direction = (key: string): -1 | 1 | 0 =>
+      key === (vertical ? "ArrowLeft" : "ArrowUp") ? -1 : key === (vertical ? "ArrowRight" : "ArrowDown") ? 1 : 0;
+    el.addEventListener("keydown", (e) => {
+      const d = direction(e.key);
+      if (d === 0 || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      e.preventDefault();
+      prefs = nudgeLayout(prefs, id, d, space());
+      apply();
+    });
+    el.addEventListener("keyup", (e) => {
+      if (direction(e.key) !== 0) commit();
+    });
+  }
+  t.panels.onSwap = () => {
+    prefs = swapLayout(prefs);
+    apply();
+    commit();
+  };
+  // 窓の大きさが変わった・開始の画面から部品が出たとき。覚えた値は変えず、書かない（11.8）
+  new ResizeObserver(() => apply()).observe(t.workspace);
+  apply();
 }
