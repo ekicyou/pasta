@@ -100,7 +100,7 @@
   - _Dispatch: standard — 判定と出力の約束は設計にあるが、既存スクリプトの流儀に合わせて書く_
   - _Requirements: 6.3, 5.5_
 
-- [ ] 4.2 起動・run の特定・待ち・公開後の見比べ
+- [x] 4.2 起動・run の特定・待ち・公開後の見比べ
   - `-Ref` の `manual.yml` を REST で起動し、応答の `workflow_run_id` を控える。無い・拒否されたときは、起動前の時刻を控えて `gh run list` から起動後の run を特定する（絞り込みのブランチは固定の `main` でなく `-Ref` の値）。特定できなければ `failed`（reason `dispatch`）にする
   - 20 秒おきに run の状態を読み、完了まで待つ（最大 30 分）。`success` と `cancelled` は見比べへ進み、`failure`・`timed_out`・`startup_failure` は `failed`（reason `build`）、待ち切れなければ `failed`（reason `transient`）にする
   - Release の nar を取り（見比べの正本）、`homeurl` を読んで `verify-live` を呼ぶ（30 秒×30 回）。成功で `published`、失敗で `failed`（reason `verify`）。スクリプトの異常終了は `failed`（reason `publish`）
