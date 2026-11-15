@@ -88,7 +88,7 @@
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 7.7, 7.8_
 
 - [ ] 5. 撮影の準備と配置の承認
-- [ ] 5.1 撮るゴーストの写しを作る
+- [x] 5.1 撮るゴーストの写しを作る
   - `C:\pasta-demo\hello-pasta` が在れば消し、リポジトリの hello-pasta（4.3 で作った pasta.dll と scripts を含む）を `profile/` を除いて写す
   - 写しにだけ、`name` を `hello-pasta-demo` に・`[debug] enabled = true` と話す間隔 3600 秒・`10-save.pasta` の頭のコメントを 1 行にして `＊天気` を足す、の 3 つを入れる
   - 写しが 3 つの変更を持ち、`git status` でリポジトリの hello-pasta に差分が無い
