@@ -1,0 +1,22 @@
+{
+  "feature_name": "recipe-demo-video",
+  "created_at": "2026-11-15T05:40:25Z",
+  "updated_at": "2026-11-15T11:03:58Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

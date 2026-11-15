@@ -4,6 +4,7 @@ pub mod check;
 pub mod commands;
 pub mod dev;
 pub mod files;
+pub mod layout;
 pub mod paths;
 pub mod recent;
 pub mod variables;

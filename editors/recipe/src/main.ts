@@ -3,7 +3,8 @@ import { createEditor } from "./editor.ts";
 import { Documents } from "./documents.ts";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { analyze, checkGhost, initialPath, onGhostChanged, onOpenRequest, openGhost, readText, recentRemove, resolveGhost } from "./ipc.ts";
+import { analyze, checkGhost, initialPath, layoutLoad, layoutSave, onGhostChanged, onOpenRequest, openGhost, readText, recentRemove, resolveGhost } from "./ipc.ts";
+import { DEFAULT_LAYOUT, mountLayout } from "./layout.ts";
 import { scenesToItems } from "./mapping.ts";
 import { Panels } from "./panels.ts";
 import { CoalescingRunner, eachLimit } from "./scheduler.ts";
@@ -34,7 +35,20 @@ const docs = new Documents(editor, document.getElementById("tabs")!, document.ge
     if (tab.rel.toLowerCase().endsWith(".pasta") || tab.rel.toLowerCase() === "pasta.toml") checker.request();
   },
 });
+// 並びは下の欄を作る前に読む（既定の並びが一瞬見えるのを避ける）。読めなければ既定（11.7）
+const layout = await layoutLoad().catch(() => DEFAULT_LAYOUT);
 const panels = new Panels(document.getElementById("panels")!, docs);
+mountLayout(
+  {
+    root: document.documentElement,
+    workspace: document.getElementById("workspace")!,
+    treeSplitter: document.getElementById("tree-splitter")!,
+    panelsSplitter: document.getElementById("panels-splitter")!,
+    panels,
+    save: (prefs) => void layoutSave(prefs).catch(() => {}), // 書けなくても次の操作で書き直す
+  },
+  layout,
+);
 // 開発の操作の糊を 1 つ組み、下の欄の動かす面（表の読み直し・書き換え・削除・追加）・ツリーのメニュー・見出しの上の操作とつなぐ
 const devActions = new DevActions({
   docs,

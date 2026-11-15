@@ -22,11 +22,7 @@
 
 ## デモ：書いて、鳴らして、直す
 
-次の画面録画は、右クリックのメニューから「▶ シーンを実行」で `.pasta` のシーンを動いているゴーストで鳴らし、台詞を書き換えてからもう一度鳴らし、続けて「SHIORI をリロード」「保存変数を表示」を選ぶ流れを実演したものである（音声なし）。VSCode の上に SSP のゴーストが重なっていて、再生したシーンがその場で喋る様子と、下の出力のパネル「Pasta 開発」に出る結果が確認できる。
-
-<video controls width="100%" preload="metadata" src="media/dev-actions-demo.mp4">
-  お使いの環境では動画を再生できません。<a href="media/dev-actions-demo.mp4">dev-actions-demo.mp4</a> を直接開いてご覧ください。
-</video>
+同じ流れを pasta-recipe の画面で撮った動画が、[pasta-recipe の章のデモ](./recipe.md#デモ書いて鳴らして直す) にある。
 
 ## 3 つのコマンドに共通の動き
 

@@ -1,6 +1,7 @@
 // Rust のコマンドの表と事件を 1 対 1 で包む（型は Rust の serde の名前と同じ）
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { LayoutPrefs } from "./layout.ts";
 import type { FileStat, GhostIO, PostOutcome } from "../../shared/ghostIO.ts";
 
 export interface Position {
@@ -132,6 +133,8 @@ export const legend = () => call<Legend>("legend");
 export const checkGhost = () => call<Report>("check_ghost");
 export const recentList = () => call<RecentEntry[]>("recent_list");
 export const recentRemove = (master: string) => call<null>("recent_remove", { master });
+export const layoutLoad = () => call<LayoutPrefs>("layout_load");
+export const layoutSave = (prefs: LayoutPrefs) => call<null>("layout_save", { layout: prefs }).then(() => {});
 export const devBegin = () => call<null>("dev_begin").then(() => {});
 export const devEnd = () => call<null>("dev_end").then(() => {});
 export const variableRows = (text: string) => call<VarRow[]>("variable_rows", { text });
