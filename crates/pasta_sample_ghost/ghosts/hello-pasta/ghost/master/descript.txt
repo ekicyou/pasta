@@ -6,4 +6,4 @@ kero.name,男の子
 craftman,ekicyou
 craftmanw,どっとステーション駅長
 shiori,pasta.dll
-homeurl,https://github.com/ekicyou/pasta
+homeurl,https://ekicyou.github.io/pasta/hello-pasta/

@@ -170,7 +170,7 @@ fn test_ukadoc_files() {
         "ghost descript.txt に craftmanw がありません"
     );
     assert!(
-        ghost_desc.contains("homeurl,https://github.com/ekicyou/pasta"),
+        ghost_desc.contains("homeurl,https://ekicyou.github.io/pasta/hello-pasta/"),
         "ghost descript.txt に homeurl がありません"
     );
 

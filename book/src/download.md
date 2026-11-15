@@ -15,6 +15,8 @@
 
 `hello-pasta.nar` は、`pasta.dll` とシェルを含む完成版のゴースト一式である。SSP のウィンドウへドロップして入れる。自分のゴーストへ写す元にもなる。
 同梱の `pasta.dll` の版は、マニュアルの対象バージョンと同じである。
+hello-pasta は SSP のネットワーク更新に対応している（更新が届くのは、対応した版を入れた後から）。
+更新で変わったファイルは新しい版で上書きされ、hello-pasta の辞書や `pasta.toml` に手で入れた変更は消えることがあるので、自分のゴーストは hello-pasta を書き換えずに別に作る。
 詳しくは[前提環境と準備](getting-started/prerequisites.md)と[hello-pasta から写す](getting-started/setup.md#hello-pasta-から写す)を見る。
 
 ## SHIORI の本体

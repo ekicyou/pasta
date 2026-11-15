@@ -1,10 +1,10 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1・添付の欠けを見る github-release.ps1・公開済みなら飛ばす publish-vsix.ps1・pasta-recipe の 2 つの zip を検査する verify-recipe-zips.ps1）を、一時の git リポジトリで実際に動かして確かめる。
+  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1・添付の欠けを見る github-release.ps1・公開済みなら飛ばす publish-vsix.ps1・pasta-recipe の 2 つの zip を検査する verify-recipe-zips.ps1・最新のタグを判定する publish-ghost-site.ps1）を、一時の git リポジトリで実際に動かして確かめる。
 .DESCRIPTION
   一時のフォルダに git リポジトリを作り、決まった件名のコミットとタグ（v0.0.1・v0.0.2）を積んで、スクリプトを子の pwsh で呼ぶ。
-  ネットワークと gh を使わない。一時のフォルダは終わりに消し、リポジトリの作業ツリーを変えない。
+  ネットワークと gh を使わない（publish-ghost-site.ps1 の起動・待ち・見比べは偽の gh と node の .ps1 で通す）。一時のフォルダは終わりに消し、リポジトリの作業ツリーを変えない。
   項目ごとに ok か NG を 1 行で出す。1 つでも NG なら NG の項目を並べて終了コード 1、すべて ok なら 0。
   項目を足すときは、末尾の Test-Item の並びに 1 つ足す。
 .EXAMPLE
@@ -329,6 +329,174 @@ try {
             if (-not $r.Output.Contains("$n の pasta-recipe.exe が VC++ ランタイムの DLL を読む: VCRUNTIME140.dll")) { "出力に $n の VCRUNTIME140.dll の文が無い: $($r.Output)" }
         }
         if ($r.Output -match 'DLL を読む: (KERNEL32|api-ms-win-crt)') { "OS の部品まで VC++ ランタイムに数える: $($r.Output)" }
+    }
+
+    # --- publish-ghost-site.ps1（-LatestTag で最新タグを渡し、待ちを 0 にする。ネットワークと gh を使わない）---
+    $descript = Join-Path $tmp 'ghost-descript.txt'
+    Write-Utf8 $descript "charset,UTF-8`nhomeurl,https://example.invalid/hello-pasta/`n"
+
+    Test-Item 18 'publish-ghost-site.ps1 が、最新より古いタグ（v0.0.9 < v0.0.10）で、status=skipped・reason=stale-tag・終了コード 0 で終わる' {
+        $r = Invoke-Script publish-ghost-site.ps1 @('-Tag', 'v0.0.9', '-LatestTag', 'v0.0.10', '-DescriptPath', $descript, '-LatestWaitSeconds', '0', '-DryRun')
+        if ($r.Exit -ne 0) { "終了コード $($r.Exit)（0 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('status=skipped')) { "出力に status=skipped が無い: $($r.Output)" }
+        if (-not $r.Output.Contains('reason=stale-tag')) { "出力に reason=stale-tag が無い: $($r.Output)" }
+        if ($r.Output.Contains('dry-run:')) { "古いタグなのに計画まで進んだ: $($r.Output)" }
+    }
+
+    Test-Item 19 'publish-ghost-site.ps1 が、homeurl の無い（無いファイルを指す）古いタグでも、status=skipped・reason=stale-tag で終わる（homeurl を判定の後に読む）' {
+        $r = Invoke-Script publish-ghost-site.ps1 @('-Tag', 'v0.0.1', '-LatestTag', 'v0.0.2', '-DescriptPath', (Join-Path $tmp 'no-such-descript.txt'), '-LatestWaitSeconds', '0', '-DryRun')
+        if ($r.Exit -ne 0) { "終了コード $($r.Exit)（0 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('status=skipped')) { "出力に status=skipped が無い: $($r.Output)" }
+        if (-not $r.Output.Contains('reason=stale-tag')) { "出力に reason=stale-tag が無い: $($r.Output)" }
+    }
+
+    Test-Item 20 'publish-ghost-site.ps1 が、最新より新しすぎるタグ（待ち 0）で、status=failed・reason=transient・終了コード 1 で終わる' {
+        $r = Invoke-Script publish-ghost-site.ps1 @('-Tag', 'v0.1.0', '-LatestTag', 'v0.0.2', '-DescriptPath', $descript, '-LatestWaitSeconds', '0', '-DryRun')
+        if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('status=failed')) { "出力に status=failed が無い: $($r.Output)" }
+        if (-not $r.Output.Contains('reason=transient')) { "出力に reason=transient が無い: $($r.Output)" }
+    }
+
+    Test-Item 21 'publish-ghost-site.ps1 -DryRun が、最新と同じタグで、起動の手前の計画（manual.yml・ref main）を出して終了コード 0 で終わる' {
+        $r = Invoke-Script publish-ghost-site.ps1 @('-Tag', 'v0.0.2', '-LatestTag', 'v0.0.2', '-DescriptPath', $descript, '-LatestWaitSeconds', '0', '-DryRun')
+        if ($r.Exit -ne 0) { "終了コード $($r.Exit)（0 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('dry-run:')) { "出力に計画（dry-run:）が無い: $($r.Output)" }
+        if (-not ($r.Output.Contains('manual.yml') -and $r.Output.Contains('ref=main'))) { "計画に manual.yml・ref=main が無い: $($r.Output)" }
+        if ($r.Output.Contains('status=')) { "計画で status まで書いた（起動の手前で終わるはず）: $($r.Output)" }
+    }
+
+    # --- publish-ghost-site.ps1 の起動・待ち・見比べ（偽の gh と node で。答えは環境変数 FAKE_* で変える）---
+    $ghLog = Join-Path $tmp 'fake-gh.log'
+    $nodeLog = Join-Path $tmp 'fake-node.log'
+    $fakeGh = Join-Path $tmp 'fake-gh.ps1'
+    Write-Utf8 $fakeGh @'
+Add-Content -LiteralPath $env:FAKE_GH_LOG -Value ($args -join ' ')
+$a = @($args)
+if ($a[0] -eq 'release' -and $a[1] -eq 'download') {
+    if ($env:FAKE_GH_DOWNLOAD -eq 'fail') { 'release not found'; exit 1 }
+    $dir = $a[[array]::IndexOf($a, '--dir') + 1]
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Set-Content -LiteralPath (Join-Path $dir 'hello-pasta.nar') -Value 'nar'
+    exit 0
+}
+if ($a[0] -eq 'api' -and $a -contains 'POST') { $env:FAKE_GH_DISPATCH; exit [int]$env:FAKE_GH_DISPATCH_EXIT }
+if ($a[0] -eq 'run' -and $a[1] -eq 'list') { if ($env:FAKE_GH_RUNS) { $env:FAKE_GH_RUNS } else { '[]' }; exit 0 }
+if ($a[0] -eq 'run' -and $a[1] -eq 'view') {
+    "{`"status`":`"$env:FAKE_GH_STATUS`",`"conclusion`":`"$env:FAKE_GH_CONCLUSION`",`"url`":`"https://example.invalid/runs/$($a[2])`"}"
+    exit 0
+}
+"想定外の呼び出し: $args"; exit 1
+'@
+    $fakeNode = Join-Path $tmp 'fake-node.ps1'
+    Write-Utf8 $fakeNode "Add-Content -LiteralPath `$env:FAKE_NODE_LOG -Value (`$args -join ' ')`n`$env:FAKE_NODE_OUT`nexit [int]`$env:FAKE_NODE_EXIT`n"
+    $noHome = Join-Path $tmp 'ghost-descript-nohome.txt'
+    Write-Utf8 $noHome "charset,UTF-8`nname,hello-pasta`n"
+
+    # 起動から見比べまでを偽の gh・node で通す。$Fake は FAKE_* の値（既定は「id を返す起動・success・見比べ 3 回目で一致」）。
+    function Invoke-Ghost([hashtable]$Fake = @{}, [string[]]$Extra = @(), [string]$Descript = $descript) {
+        $vals = @{ DISPATCH = '{"workflow_run_id":4242}'; DISPATCH_EXIT = '0'; RUNS = ''; STATUS = 'completed'; CONCLUSION = 'success'; DOWNLOAD = ''; NODE_OUT = 'OK updates.txt: 3 回目で一致'; NODE_EXIT = '0' }
+        foreach ($k in $Fake.Keys) { $vals[$k] = $Fake[$k] }
+        foreach ($p in $ghLog, $nodeLog) { Set-Content -LiteralPath $p -Value '' }
+        $env:FAKE_GH_LOG = $ghLog; $env:FAKE_NODE_LOG = $nodeLog
+        foreach ($k in 'DISPATCH', 'DISPATCH_EXIT', 'RUNS', 'STATUS', 'CONCLUSION', 'DOWNLOAD') { Set-Item "Env:FAKE_GH_$k" $vals[$k] }
+        $env:FAKE_NODE_OUT = $vals.NODE_OUT; $env:FAKE_NODE_EXIT = $vals.NODE_EXIT
+        $env:GITHUB_REPOSITORY = $Repo
+        $env:RUNNER_TEMP = $tmp  # 取った nar を一時のフォルダに置き、終わりに一緒に消す
+        try {
+            $r = Invoke-Script publish-ghost-site.ps1 (@('-Tag', 'v0.0.2', '-LatestTag', 'v0.0.2', '-DescriptPath', $Descript, '-LatestWaitSeconds', '0',
+                    '-RunPollSeconds', '0', '-VerifyIntervalSeconds', '0', '-GhCommand', $fakeGh, '-NodeCommand', $fakeNode) + $Extra)
+        }
+        finally { Remove-Item Env:FAKE_*, Env:GITHUB_REPOSITORY, Env:RUNNER_TEMP -ErrorAction SilentlyContinue }
+        $r | Add-Member Gh ([IO.File]::ReadAllText($ghLog)) -PassThru | Add-Member Node ([IO.File]::ReadAllText($nodeLog).Trim()) -PassThru
+    }
+
+    # 結果が status・reason・終了コードの組かを見て、違えば理由を返す。
+    function Get-OutcomeFailure($Run, [string]$Status, [string]$Reason, [string]$Case) {
+        $exit = if ($Status -eq 'failed') { 1 } else { 0 }
+        if ($Run.Exit -ne $exit) { "${Case}: 終了コード $($Run.Exit)（$exit のはず）: $($Run.Output)" }
+        if (-not $Run.Output.Contains("status=$Status")) { "${Case}: 出力に status=$Status が無い: $($Run.Output)" }
+        if ($Reason -and -not $Run.Output.Contains("reason=$Reason")) { "${Case}: 出力に reason=$Reason が無い: $($Run.Output)" }
+    }
+
+    Test-Item 22 'publish-ghost-site.ps1 が、起動（ref=main・return_run_details）→ success → 見比べ 3 回目で一致で、status=published で終わり、summary に run の URL と見比べの回数を出す' {
+        $r = Invoke-Ghost
+        Get-OutcomeFailure $r published '' '一致'
+        if ($r.Output.Contains('未実装')) { "未実装の行が残っている: $($r.Output)" }
+        if ($r.Gh -notmatch 'release download v0\.0\.2 .*--pattern hello-pasta\.nar') { "Release の nar を取っていない: $($r.Gh)" }
+        if ($r.Gh -notmatch 'actions/workflows/manual\.yml/dispatches .*ref=main.*return_run_details=true') { "起動の引数が違う: $($r.Gh)" }
+        if ($r.Gh -match 'run list') { "workflow_run_id があるのに run list を呼んだ: $($r.Gh)" }
+        if ($r.Gh -notmatch 'run view 4242') { "応答の run（4242）を待っていない: $($r.Gh)" }
+        if ($r.Node -notmatch 'verify-live --nar .*hello-pasta\.nar --base https://example\.invalid/hello-pasta/ --attempts 30 --interval 0') { "verify-live の引数が違う: $($r.Node)" }
+        if (-not $r.Output.Contains('https://example.invalid/runs/4242')) { "summary に run の URL が無い: $($r.Output)" }
+        if (-not $r.Output.Contains('見比べ 3 回')) { "summary に見比べの回数が無い: $($r.Output)" }
+    }
+
+    Test-Item 23 'publish-ghost-site.ps1 の結論の判定表: success・cancelled → 見比べへ（published）、failure・timed_out・startup_failure・action_required → failed・build（見比べない）' {
+        foreach ($c in 'success', 'cancelled') {
+            $r = Invoke-Ghost @{ CONCLUSION = $c }
+            Get-OutcomeFailure $r published '' $c
+            if (-not $r.Node) { "${c}: 見比べに進んでいない" }
+        }
+        foreach ($c in 'failure', 'timed_out', 'startup_failure', 'action_required') {
+            $r = Invoke-Ghost @{ CONCLUSION = $c }
+            Get-OutcomeFailure $r failed build $c
+            if ($r.Node) { "${c}: 失敗した run なのに見比べた: $($r.Node)" }
+        }
+    }
+
+    Test-Item 24 'publish-ghost-site.ps1 が、run が in_progress のまま待ちの上限（0 分）を過ぎると、failed・transient で終わる' {
+        $r = Invoke-Ghost @{ STATUS = 'in_progress'; CONCLUSION = '' } @('-RunTimeoutMinutes', '0')
+        Get-OutcomeFailure $r failed transient 'in_progress'
+        if ($r.Node) { "完了していない run なのに見比べた: $($r.Node)" }
+    }
+
+    Test-Item 25 'publish-ghost-site.ps1 が、応答に workflow_run_id が無い・起動が拒否されたとき、run list から起動後の最新の run を特定し、無ければ failed・dispatch で終わる' {
+        $now = (Get-Date).ToUniversalTime()
+        $old = @{ databaseId = 11; createdAt = $now.AddHours(-1).ToString('yyyy-MM-ddTHH:mm:ssZ'); url = 'https://example.invalid/runs/11' }
+        $new1 = @{ databaseId = 21; createdAt = $now.AddMinutes(1).ToString('yyyy-MM-ddTHH:mm:ssZ'); url = 'https://example.invalid/runs/21' }
+        $new2 = @{ databaseId = 22; createdAt = $now.AddMinutes(2).ToString('yyyy-MM-ddTHH:mm:ssZ'); url = 'https://example.invalid/runs/22' }
+        $r = Invoke-Ghost @{ DISPATCH = ''; RUNS = (ConvertTo-Json -Compress @($new1, $old, $new2)) }
+        Get-OutcomeFailure $r published '' '応答が空'
+        if ($r.Gh -notmatch 'run list .*--workflow manual\.yml.*--branch main.*--event workflow_dispatch') { "run list の絞り込みが違う: $($r.Gh)" }
+        if ($r.Gh -notmatch 'run view 22') { "起動後の最新の run（22）を待っていない: $($r.Gh)" }
+        $r = Invoke-Ghost @{ DISPATCH = 'HTTP 403'; DISPATCH_EXIT = '1'; RUNS = (ConvertTo-Json -Compress @($old, $new1)) }
+        Get-OutcomeFailure $r published '' '拒否・run は在る'
+        if ($r.Gh -notmatch 'run view 21') { "拒否のあと起動後の run（21）を待っていない: $($r.Gh)" }
+        $r = Invoke-Ghost @{ DISPATCH = ''; RUNS = (ConvertTo-Json -Compress @($old)) }
+        Get-OutcomeFailure $r failed dispatch '起動前の run だけ'
+        if ($r.Gh -match 'run view') { "特定できないのに run を待った: $($r.Gh)" }
+        $r = Invoke-Ghost @{ DISPATCH = 'HTTP 403'; DISPATCH_EXIT = '1' }
+        Get-OutcomeFailure $r failed dispatch '拒否・run も無い'
+    }
+
+    Test-Item 26 'publish-ghost-site.ps1 が、見比べの不一致で failed・verify、homeurl の無い descript.txt で failed・publish、nar の取得の失敗で failed・transient で終わる' {
+        $r = Invoke-Ghost @{ NODE_OUT = 'updates.txt が違う'; NODE_EXIT = '1' }
+        Get-OutcomeFailure $r failed verify '不一致'
+        $r = Invoke-Ghost -Descript $noHome
+        Get-OutcomeFailure $r failed publish 'homeurl 無し'
+        if ($r.Node) { "homeurl が無いのに見比べた: $($r.Node)" }
+        $r = Invoke-Ghost @{ DOWNLOAD = 'fail' }
+        Get-OutcomeFailure $r failed transient 'nar の取得の失敗'
+        if ($r.Gh -match 'dispatches') { "nar を取れないのに起動した: $($r.Gh)" }
+    }
+
+    Test-Item 27 'publish-ghost-site.ps1 -Ref feature（リハーサル）が、ref=feature で起動し run list を --branch feature で絞り、結論の判定までで見比べずに終了コード 0 で終わる' {
+        $now = (Get-Date).ToUniversalTime()
+        $run = @{ databaseId = 31; createdAt = $now.AddMinutes(1).ToString('yyyy-MM-ddTHH:mm:ssZ'); url = 'https://example.invalid/runs/31' }
+        $r = Invoke-Ghost @{ DISPATCH = ''; RUNS = (ConvertTo-Json -Compress @($run)) } @('-Ref', 'feature')
+        if ($r.Exit -ne 0) { "終了コード $($r.Exit)（0 のはず）: $($r.Output)" }
+        if ($r.Gh -notmatch 'dispatches .*ref=feature') { "ref=feature で起動していない: $($r.Gh)" }
+        if ($r.Gh -notmatch 'run list .*--branch feature') { "run list を --branch feature で絞っていない: $($r.Gh)" }
+        if ($r.Node) { "リハーサルなのに見比べた: $($r.Node)" }
+        if (-not $r.Output.Contains('rehearsal:')) { "出力にリハーサルの結果（rehearsal:）が無い: $($r.Output)" }
+        if ($r.Output.Contains('status=published')) { "リハーサルで published と書いた: $($r.Output)" }
+        $r = Invoke-Ghost @{ CONCLUSION = 'failure' } @('-Ref', 'feature')
+        Get-OutcomeFailure $r failed build 'リハーサルの failure'
+    }
+
+    Test-Item 28 'publish-ghost-site.ps1 が、最新の Release のタグが vX.Y.Z の形でないとき、failed・publish で終わる（再実行では直らない）' {
+        $r = Invoke-Script publish-ghost-site.ps1 @('-Tag', 'v0.0.2', '-LatestTag', 'nightly', '-DescriptPath', $descript, '-LatestWaitSeconds', '0', '-DryRun')
+        Get-OutcomeFailure $r failed publish '形の違う最新のタグ'
     }
 }
 finally {

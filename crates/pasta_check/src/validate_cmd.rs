@@ -3,7 +3,8 @@
 //! 読むだけで、ファイルを作らない・書き換えない・消さない（Req 1.6）。
 
 use pasta_check::ghost_files::collect;
-use pasta_check::validate::{Report, validate_ghost};
+use pasta_check::validate::{Report, derived_homeurl_finding, validate_ghost};
+use std::fs;
 use std::path::Path;
 
 /// 検査の結果（フォルダの誤りは `Err` で別に返す）
@@ -56,7 +57,20 @@ pub(crate) fn run_on_master(master: &Path) -> Result<ValidateOutcome, String> {
 
 fn check_master(master: &Path) -> Result<Report, String> {
     let (input, files) = collect(master)?;
-    Ok(validate_ghost(&input, &files))
+    let report = validate_ghost(&input, &files);
+    // 無い・読めない・フォルダの descript.txt は注意を出さず、結果も変えない（Req 8.4）
+    let Some(f) = fs::read(master.join("descript.txt"))
+        .ok()
+        .and_then(|bytes| derived_homeurl_finding(&bytes))
+    else {
+        return Ok(report);
+    };
+    let Report {
+        mut findings,
+        stats,
+    } = report;
+    findings.push(f);
+    Ok(Report::new(findings, stats))
 }
 
 fn outcome_of(report: &Report) -> ValidateOutcome {
@@ -70,7 +84,6 @@ fn outcome_of(report: &Report) -> ValidateOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use tempfile::TempDir;
 
     /// target/ghost/master を作り、(TempDir, target, master) を返す
@@ -141,6 +154,49 @@ mod tests {
         fs::create_dir_all(other.join("ghost")).unwrap();
         fs::write(other.join("ghost/master"), "x").unwrap();
         assert!(run(&other).is_err());
+    }
+
+    const DERIVED: &str = "charset,UTF-8
+name,my-ghost
+homeurl,https://ekicyou.github.io/pasta/hello-pasta/
+";
+
+    /// 派生ゴーストの homeurl が hello-pasta の置き場所を指すと注意だけで終了コード 0（Req 8.3・8.7）
+    #[test]
+    fn test_run_derived_homeurl_warns_exit_0() {
+        let (_t, target, master) = ghost();
+        fs::write(master.join("pasta.toml"), "").unwrap();
+        fs::write(master.join("dic/a.pasta"), OK_SCENE).unwrap();
+        fs::write(master.join("descript.txt"), DERIVED).unwrap();
+        let report = check_master(&master).unwrap();
+        assert!(
+            report.findings.iter().any(|f| f.path == "descript.txt"
+                && f.code == pasta_check::validate::FindingKind::HelloPastaHomeurl),
+            "{:?}",
+            report.findings
+        );
+        assert_eq!(report.stats.warnings, 1);
+        let outcome = run(&target).unwrap();
+        assert_eq!(outcome, ValidateOutcome::WarningsOnly);
+        assert_eq!(outcome.exit_code(), 0);
+    }
+
+    /// hello-pasta 自身・descript.txt が無い・フォルダのときは注意を出さない（Req 8.4）
+    #[test]
+    fn test_run_homeurl_no_warning_cases() {
+        let (_t, target, master) = ghost();
+        fs::write(master.join("pasta.toml"), "").unwrap();
+        fs::write(master.join("dic/a.pasta"), OK_SCENE).unwrap();
+        assert_eq!(run(&target).unwrap(), ValidateOutcome::Clean);
+        fs::create_dir(master.join("descript.txt")).unwrap();
+        assert_eq!(run(&target).unwrap(), ValidateOutcome::Clean);
+        fs::remove_dir(master.join("descript.txt")).unwrap();
+        fs::write(
+            master.join("descript.txt"),
+            DERIVED.replace("name,my-ghost", "name,hello-pasta"),
+        )
+        .unwrap();
+        assert_eq!(run(&target).unwrap(), ValidateOutcome::Clean);
     }
 
     /// 読むだけ: 実行の前後で一覧が変わらない
