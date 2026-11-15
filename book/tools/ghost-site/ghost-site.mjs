@@ -2,11 +2,16 @@
 // （hello-pasta-network-update / design「GhostSite」）。Node 22 の標準モジュールだけを使う。
 //
 // タスク 1.1: readNar（zip の読み出しと名前の安全性）・parseUpdates（updates.txt の解析）。
+// タスク 1.2: checkIntegrity（updates.txt とエントリの照合）・extractNar（出力先への展開）。
 
 import zlib from 'node:zlib';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /** @typedef {{ name: string, data: Buffer }} NarFile */
 /** @typedef {{ path: string, md5: string, size: number }} UpdateRecord */
+/** @typedef {{ ok: boolean, problems: string[] }} CheckResult */
 
 /** nar が zip でない・名前が危険・形式が非対応のときに投げる。 */
 export class NarError extends Error {
@@ -77,7 +82,12 @@ export function readNar(buf) {
     }
     const start = offset + 30 + buf.readUInt16LE(offset + 26) + buf.readUInt16LE(offset + 28);
     const body = buf.subarray(start, start + csize);
-    const data = method === 8 ? zlib.inflateRawSync(body) : Buffer.from(body);
+    let data;
+    try {
+      data = method === 8 ? zlib.inflateRawSync(body) : Buffer.from(body);
+    } catch (e) {
+      throw new NarError(`nar のエントリを展開できない: ${name}（${e.message}）`);
+    }
     if (data.length !== usize) throw new NarError(`nar のエントリの大きさが合わない: ${name}`);
     files.push({ name, data });
   }
@@ -100,4 +110,66 @@ export function parseUpdates(text) {
     records.push({ path: m[1], md5: m[2], size: Number(m[3]) });
   });
   return records;
+}
+
+/**
+ * ルートの updates.txt の各行をエントリと照合する。updates.txt が無い・解釈できない・行が指すファイルが無い・
+ * md5 か大きさが違う、を problems に 1 件 1 行で全部集める。行に載らないエントリ（bal/ 以下・入れ子の updates.txt など）は許す。
+ * @param {NarFile[]} files @returns {CheckResult}
+ */
+export function checkIntegrity(files) {
+  const byName = new Map(files.map((f) => [f.name, f]));
+  const problems = [];
+  const updates = byName.get('updates.txt');
+  if (!updates) {
+    problems.push('NG updates.txt: nar の直下に無い');
+    return { ok: false, problems };
+  }
+  let records;
+  try {
+    records = parseUpdates(updates.data.toString('utf8'));
+  } catch (e) {
+    problems.push(`NG updates.txt: ${e.message}`);
+    return { ok: false, problems };
+  }
+  for (const r of records) {
+    try {
+      checkName(r.path);
+    } catch {
+      problems.push(`NG ${r.path}: updates.txt の行の名前が不正`);
+      continue;
+    }
+    const f = byName.get(r.path);
+    if (!f) {
+      problems.push(`NG ${r.path}: nar に無い`);
+      continue;
+    }
+    const actual = crypto.createHash('md5').update(f.data).digest('hex');
+    if (actual !== r.md5) problems.push(`NG ${r.path}: md5 が違う（updates.txt: ${r.md5}、nar: ${actual}）`);
+    if (f.data.length !== r.size) problems.push(`NG ${r.path}: 大きさが違う（updates.txt: ${r.size}、nar: ${f.data.length}）`);
+  }
+  return { ok: problems.length === 0, problems };
+}
+
+/**
+ * files を除外なしで outDir へ書く。outDir は無いか空でなければならない。
+ * 書き始める前に全部の名前を確かめ、outDir の外を指す名前があれば何も書かずに NarError を投げる。
+ * @param {NarFile[]} files @param {string} outDir @returns {void}
+ */
+export function extractNar(files, outDir) {
+  const root = path.resolve(outDir);
+  if (fs.existsSync(root) && fs.readdirSync(root).length > 0) {
+    throw new Error(`出力先が空でない: ${outDir}`);
+  }
+  const targets = files.map((f) => {
+    checkName(f.name);
+    const dest = path.resolve(root, f.name);
+    if (!dest.startsWith(root + path.sep)) throw new NarError(`出力先の外を指す名前: ${f.name}`);
+    return [dest, f.data];
+  });
+  fs.mkdirSync(root, { recursive: true });
+  for (const [dest, data] of targets) {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, data);
+  }
 }
