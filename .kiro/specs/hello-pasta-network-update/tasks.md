@@ -189,8 +189,8 @@
   - _Dispatch: standard — 既存の判定表への追加で、波及の確認が要る_
   - _Requirements: 9.2_
 
-- [ ] 7. Validation: 全体の確認
-- [ ] 7.1 全体の回帰の確認
+- [x] 7. Validation: 全体の確認
+- [x] 7.1 全体の回帰の確認
   - 次をすべて実行して通す: ツールの自己テスト（マニュアル CI の自己テスト一式）、固定リンクの名前の検査、スキル生成物のドリフト検査、`pasta_check` と hello-pasta のテスト、`release-scripts-test.ps1`。整形と静的検査も緑であること
   - `pasta_check release` の `updates.txt` の作り方と Release の添付の名前・数が変わっていないことを確かめる
   - 完了時は、上記がすべて緑で、対象外の領域（検査の核・LSP・WASM・recipe）に差分がない
