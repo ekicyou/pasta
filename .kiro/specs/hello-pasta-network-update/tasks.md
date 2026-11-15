@@ -43,7 +43,7 @@
   - _Requirements: 1.3, 5.1, 5.3, 5.4, 10.4_
 
 - [ ] 2. Core: 公開側のワークフロー
-- [ ] 2.1 マニュアル CI（`manual.yml`）に最新 Release の nar の取得と置き場所の組み立てを足す
+- [x] 2.1 マニュアル CI（`manual.yml`）に最新 Release の nar の取得と置き場所の組み立てを足す
   - 旧版マニュアルの足しの後・Pages へのアップロードの前に、最新 Release の `hello-pasta.nar` を取る段と、組み立てる段を足す。取得に失敗（Release・nar が無い・取れない）したら失敗にし、PR・ブランチでも警告にとどめない
   - 起動条件・権限・`deploy` ジョブ・environment は変えない。ヘッダのコメントにパイプラインの 1 行を足す
   - 最新の Release の nar（`homeurl` を足す前の版でもそのまま）を置く。マニュアルだけの再公開でも毎回最新 Release から作り直す

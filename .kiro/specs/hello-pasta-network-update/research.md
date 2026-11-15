@@ -236,3 +236,12 @@
 6. **警告の読み取り**: 緩い UTF-8・`charset` 無視・`name` は trim の完全一致（大文字小文字を区別）・キー重複は最初の行・読めなければ黙る。
 7. **適用順**: 3 段（第 1 段 manual 側＋`build` の関門、第 2 段 `homeurl`・警告・文書、第 3 段 `release.yml` の新ジョブ＋`-Ref` リハーサル）を 1 つの PR に入れる。
 8. **自明な修正**: 古いタグの再実行で `skipped` になるよう、`homeurl` はスクリプトが古いタグの判定の後・見比べの直前にだけ読む（`-DescriptPath`）。`-DryRun` に「`homeurl` の無い古いタグ」を足す（検証の指摘 2）。
+
+## 11. 実装の記録
+
+### 11.1 実物の nar での最初の照合（2026-11-15・タスク 2.1）
+
+- 対象: v0.6.1 の Release の添付 `hello-pasta.nar`（`latest` の指す版）。3,670,302 バイト・sha256 `824aed71057213250d1a315126d7ae2b9d0d096b9257065af63c9f4ec0739d19`。
+- コマンド: `node book/tools/ghost-site/ghost-site.mjs build --nar <手元の nar> --out <スクラッチ>/site21 --index book/tools/ghost-site/index.html`（`manual.yml` の「Build hello-pasta update site」と同じ引数）。
+- 結果: 終了コード 0。`updates.txt` の 41 行すべてがエントリと md5・大きさで一致。nar のエントリ 42（ファイル）、出力のファイル 43（＝エントリ＋`index.html`）。
+- `manual.yml` の 2 段（Fetch latest hello-pasta.nar・Build hello-pasta update site）は `actionlint` で検査済み（指摘なし）。CI での実際の取得は PR の実行で確かめる。
