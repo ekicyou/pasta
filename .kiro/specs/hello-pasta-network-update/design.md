@@ -41,7 +41,7 @@
 
 - Pages へ公開する仕組みそのもの（`upload-pages-artifact`・`deploy-pages`・`deploy` ジョブ・`github-pages` の environment）。変えない。
 - `pasta_check release` の `updates.txt` の生成規則（`update_files.rs`）と nar の作り（`nar.rs`）。
-- `release.yml` の既存ジョブ（verify・gate・build・publish-crates・publish-vsce・github-release）の中身と権限。
+- `release.yml` の既存ジョブ（verify・gate・build・publish-crates・publish-vsce・github-release）の中身と権限。ただし `build` ジョブに、作った nar の照合の段を 1 つ足す例外を認める（権限は変えない）。
 - マニュアルの静的性・検索・コンテンツ・リンクの検査（置き場所はその対象外）。
 - `pasta_check` の検査の核（`validate_ghost`・`GhostInput`・`select_dictionary_files`）の入力の契約。LSP・WASM・pasta-recipe の殻。
 - 版の決定、`delete.txt`、`pasta-dll-multiarch`。
@@ -151,7 +151,7 @@ crates/pasta_check/src/validate/
 ### Modified Files
 
 - `.github/workflows/manual.yml` — `classic/` の段の後・`Upload Pages artifact` の前に「Fetch latest hello-pasta.nar」「Build hello-pasta update site」の 2 段を足す。ヘッダのコメントにパイプラインの 1 行を足す。起動条件・権限・`deploy` は変えない。
-- `.github/workflows/release.yml` — `publish-ghost-site` ジョブを `github-release` の後に足す。`report` の `needs` に足し、置き場所の行（専用のラベル）を足す。
+- `.github/workflows/release.yml` — `publish-ghost-site` ジョブを `github-release` の後に足す。`report` の `needs` に足し、置き場所の行（専用のラベル）を足す。あわせて `build` ジョブに、作った `hello-pasta.nar` を `ghost-site.mjs build` で一度展開・照合する段を足す（公開前の関門。Req 3.7）。
 - `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/descript.txt` — `homeurl` を `https://ekicyou.github.io/pasta/hello-pasta/` にする（SSOT）。
 - `crates/pasta_sample_ghost/tests/integration_test.rs`（173 行付近）— `homeurl` の表明を新しい URL にする。
 - `crates/pasta_check/src/validate/report.rs` — `FindingKind::HelloPastaHomeurl`（宣言は末尾）・`severity()` の注意の側・`msg::hello_pasta_homeurl`。
@@ -242,6 +242,7 @@ flowchart TD
 | 2.3 | SSP が取れる形で返す | 置き場所一式・index | updates.txt 照合・実機確認 | 実機確認 |
 | 2.4 | 既存利用者は版が上がるまで効かない | RELEASE.md・マニュアルの注意 | — | — |
 | 3.1 | 展開後に md5・大きさを照合 | GhostSite checkIntegrity | `checkIntegrity` | 組み立て C |
+| 3.7 | Release を公開する前に作った nar を照合する | release.yml `build` の関門（`ghost-site.mjs build`） | `build --nar <作った nar> --out $RUNNER_TEMP/…` | 公開前の関門 |
 | 3.2 | 合わなければ名前を出して失敗 | GhostSite | 問題の一覧と `exit 1` | 組み立て C |
 | 3.3 | `updates.txt` が無い・読めない | GhostSite | `checkIntegrity` | 組み立て C |
 | 3.4 | PR・ブランチは公開せず検査まで | manual.yml（`if main` は upload だけ） | — | 組み立て |
@@ -428,11 +429,11 @@ export async function verifyLive(opts) {}
 ##### Batch / Job Contract
 
 - Trigger: `github-release` の成功。
-- 入力: `-Tag`（`GITHUB_REF_NAME`）、`-DescriptPath`（チェックアウトしたそのタグの `descript.txt`。`homeurl` はスクリプトが、古いタグの判定を終えた後・見比べの直前にだけ読む。無い・読めないときは `failed`・`publish`。step では読まない）、環境変数 `GH_TOKEN`・`GITHUB_REPOSITORY`。テスト用に `-LatestTag`（最新タグの上書き）と `-DryRun`（起動の手前で計画を出して終わる）。値の既定は引数で上書きできる: `-LatestWaitSeconds 60`・`-RunTimeoutMinutes 30`・`-RunPollSeconds 20`・`-VerifyAttempts 30`・`-VerifyIntervalSeconds 30`。
+- 入力: `-Tag`（`GITHUB_REF_NAME`）、`-DescriptPath`（チェックアウトしたそのタグの `descript.txt`。`homeurl` はスクリプトが、古いタグの判定を終えた後・見比べの直前にだけ読む。無い・読めないときは `failed`・`publish`。step では読まない）、環境変数 `GH_TOKEN`・`GITHUB_REPOSITORY`。テスト用に `-LatestTag`（最新タグの上書き）と `-DryRun`（起動の手前で計画を出して終わる）。リハーサル用に `-Ref`（起動する `manual.yml` の ref。既定 `main`。ブランチを渡すと、`deploy` が `main` 限定なので組み立てまでが走る）。値の既定は引数で上書きできる: `-LatestWaitSeconds 60`・`-RunTimeoutMinutes 30`・`-RunPollSeconds 20`・`-VerifyAttempts 30`・`-VerifyIntervalSeconds 30`。
 - 手順:
   1. `gh api repos/$GITHUB_REPOSITORY/releases/latest --jq .tag_name` を取り、`Tag` と数字 3 つで比べる。`Tag < latest` なら `skipped`・reason `stale-tag` で終了（起動しない・何も変えない）。`Tag > latest` なら 10 秒おきに最大 6 回取り直し、それでも新しくならなければ `failed`・reason `transient`。
   2. `gh release download $Tag --pattern hello-pasta.nar --dir <一時>` で Release の nar を取る（見比べの正本）。失敗は `failed`・`transient`。
-  3. `POST dispatches`（`ref=main`・`return_run_details=true`）で起動し、応答の `workflow_run_id` を控える。応答に無い・API が拒否したときは、起動前の時刻を控えたうえで `gh run list --workflow manual.yml --branch main --event workflow_dispatch --json databaseId,createdAt` から、起動後に作られた最新の run を特定する。特定できなければ `failed`・`dispatch`。
+  3. `POST dispatches`（`ref=$Ref`（既定 `main`）・`return_run_details=true`）で起動し、応答の `workflow_run_id` を控える。応答に無い・API が拒否したときは、起動前の時刻を控えたうえで `gh run list --workflow manual.yml --branch main --event workflow_dispatch --json databaseId,createdAt` から、起動後に作られた最新の run を特定する。特定できなければ `failed`・`dispatch`。
   4. 20 秒おきに `gh run view <id> --json status,conclusion` を読み、`completed` まで待つ（最大 30 分）。`success` と `cancelled` は 5 へ。`failure`・`timed_out`・`startup_failure` は `failed`・`build`。待ち切れなければ `failed`・`transient`。
   5. `-DescriptPath` の `homeurl` を `SiteBase` として読み（ここで初めて要求する）、`node book/tools/ghost-site/ghost-site.mjs verify-live --nar <nar> --base $SiteBase --attempts 30 --interval 30`。成功で `published`、失敗で `failed`・`verify`。
 - 出力: job outputs と summary の `status`（`published`・`skipped`・`failed`）と `reason`（`stale-tag`・`dispatch`・`build`・`verify`・`transient`・`publish`）。`skipped` のときも `reason` を消さない（既存ジョブと違い、理由を表に出すため）。スクリプトが `status` を書かずに終わったら、集約の step が `failed`・`publish`（既存ジョブと同じ流儀）。
@@ -445,8 +446,8 @@ export async function verifyLive(opts) {}
 
 **Implementation Notes**
 - Integration: `report` の `needs` に `publish-ghost-site` を足し、行を専用のラベルで出す（下の「report の置き場所の行」）。`gateFailed` の判定には含めない（関門の段ではない）。
-- Validation: `release-scripts-test.ps1` に `-DryRun` の項目を足す（古いタグ・`homeurl` の無い古いタグ・新しすぎるタグ・同じタグの 4 つ）。実際の起動と待ちは、ネットワークと権限が要るため自動テストに入れない（最初の実リリースと、`gh workflow run manual.yml --ref <branch>` による組み立ての確認で補う）。
-- Risks: `GITHUB_TOKEN` での起動（文書上は可）と `return_run_details`（2026-02 の追加で、REST 文書には未掲載）は、実リリースで初めて通る。失敗しても他の公開先は無傷で、回復は再実行か `manual.yml` の手動実行（Req 6.1）。`release.yml` はタグのコミットの版で動くので、リリースの実行中は `release.yml` を `main` へ入れない（Req 6.4）。
+- Validation: `release-scripts-test.ps1` に `-DryRun` の項目を足す（古いタグ・`homeurl` の無い古いタグ・新しすぎるタグ・同じタグの 4 つ）。実際の起動と待ちは、ネットワークと権限が要るため自動テストに入れない。代わりに、実装の中で `-Ref <ブランチ>` を渡したリハーサル（起動・run の特定・待ち・`conclusion` の判定まで。見比べは行わない）を手で実行し、`return_run_details` の応答の形（`workflow_run_id` があるか）とあわせて `research.md` に記録する。あわせて `gh workflow run manual.yml --ref <branch>` による組み立ての確認も行う。
+- Risks: `GITHUB_TOKEN` での起動（文書上は可）と `return_run_details`（2026-02 の追加で、REST 文書には未掲載）は、`-Ref` によるブランチでのリハーサルで先に確かめて `research.md` に記録する（`deploy` は `main` 限定なので、ブランチでは組み立てまでの確認）。実リリース（本番）での初回の結果は、この仕様の完了後の確認事項とする。失敗しても他の公開先は無傷で、回復は再実行か `manual.yml` の手動実行（Req 6.1）。`release.yml` はタグのコミットの版で動くので、リリースの実行中は `release.yml` を `main` へ入れない（Req 6.4）。
 
 #### report の置き場所の行
 
@@ -457,6 +458,18 @@ export async function verifyLive(opts) {}
 
 - `Row` 関数に、任意の `[hashtable]$Label = $label` を足す。置き場所の行は `published`＝「今回更新した」、`skipped`＝「最新ではないタグのため飛ばした」、`failed`＝「失敗した」、`not-run`＝「前の段の失敗で行わなかった」のラベルで出す。他の行は既定のラベルのままで、変えない。
 - 行の見出しは `GitHub Pages hello-pasta`。最後の「次の手は各 job の summary を参照」の行は変えない。
+
+#### release.yml `build` ジョブの nar の関門
+
+| Field | Detail |
+|-------|--------|
+| Intent | 壊れた nar を Release として公開させない（公開済みの Release は差し替えられないため） |
+| Requirements | 3.7, 6.5 |
+
+- 位置: `build` ジョブの、nar の必須エントリを確かめる既存の段（`actions/setup-node` と同じ Node 22）の直後。`build` が通らなければ `github-release` へ進まない。
+- 中身: `node book/tools/ghost-site/ghost-site.mjs build --nar release/hello-pasta.nar --out "$RUNNER_TEMP/ghost-site-check" --index book/tools/ghost-site/index.html`。`manual.yml` と同じ照合（`readNar`・`checkIntegrity`・`index.html` の衝突・一覧の一致）が、Release の公開前に働く。出力先は捨てる。
+- 例外の明記: `release.yml` の既存ジョブには触れない方針（Out of Boundary）への 1 段の例外。権限・outputs・`status`/`reason` の契約は変えず、`release/<名前>` だけの行を書かない（Req 11.1。引数の中の `release/hello-pasta.nar` は行頭に単独では書かない）。
+- 回復: `latest` が壊れた nar になってしまったとき（この関門をすり抜けた場合）は、新しい版を切って直す。この手順を `RELEASE.md` に書く（Req 6.5）。
 
 ### Rust
 
@@ -485,7 +498,7 @@ pub fn derived_homeurl_finding(descript: &[u8]) -> Option<Finding>;
 ```
 
 - 読み方: 先頭の BOM を除き、`String::from_utf8_lossy` で読む（`charset` が UTF-8 でなくても、キーと URL は ASCII なので読める。読めないことを理由に誤りにしない）。各行を最初の `,` で割り、キーを trim・小文字化、値を trim。キーごとに最初の行を採る。
-- `name`: 値が（trim して）`hello-pasta` と等しければ `None`。`name` が無いときは `hello-pasta` でないものとして続ける（Req 8.4）。
+- `name`: 値が（trim して）`hello-pasta` と完全一致（大文字小文字を区別する）すれば `None`。`name` が無いときは `hello-pasta` でないものとして続ける（Req 8.4）。
 - `homeurl` の正規化: 小文字化し、`http://`・`https://` を除き、末尾の `/` を除く。`ekicyou.github.io/pasta/hello-pasta` と等しいか、それに `/` を足したものから始まれば「指している」（配下のパスを含む。`hello-pasta-foo` のような別名は指さない）。
 - `Finding`: `code = HelloPastaHomeurl`（宣言は末尾、`severity()` は注意）、`path = "descript.txt"`、`line = homeurl の行番号`、`column = None`。文言は「homeurl が hello-pasta の更新の置き場所を指しています。ネットワーク更新のたびに、このゴーストの辞書が hello-pasta のもので上書きされます。homeurl の行を消すか、自分の更新の置き場所に直してください」。
 - 殻: `check_master` が `validate_ghost` の `Report` を受け、`master/descript.txt` を読めて `Some(f)` なら、`findings` に足して `Report::new(findings, stats)` で並べ直す（誤り・注意の数は `Report::new` が数え直す）。`ValidateOutcome` は既存のまま、注意だけなら終了コード 0（Req 8.7）。
@@ -495,7 +508,7 @@ pub fn derived_homeurl_finding(descript: &[u8]) -> Option<Finding>;
 
 - `book/src/download.md` のサンプルゴーストの節: 「hello-pasta はネットワーク更新に対応している。更新確認で、手元で書き換えた辞書・`pasta.toml` が上書きされることがある（実機確認 10.3 の結果に合わせて確定）」を 1〜2 文。
 - `book/src/getting-started/setup.md` の「hello-pasta から写す」: 「`descript.txt` ごと写したときは `homeurl` を消すか自分の置き場所に直す。残すと更新確認で自分の辞書が上書きされうる」と、`pasta_check validate` が注意を出すことを短く。
-- `RELEASE.md`: ジョブ表に `publish-ghost-site`、`report` の置き場所の行の読み方（`published`／`skipped`＋`stale-tag`／`failed`＋reason ごとの次の手）、回復（失敗した job の再実行、または Actions の `Manual` を `main` で手動実行）、「リリースの実行中は `release.yml` を `main` へ入れない」、「ファイルを消す・改名する版を出すときは、SSP の更新が古いファイルを消さないので別途検討する」の 1 行。`homeurl` を足した版の nar を入れた利用者から更新が効く旨（Req 2.4）。
+- `RELEASE.md`: ジョブ表に `publish-ghost-site`、`report` の置き場所の行の読み方（`published`／`skipped`＋`stale-tag`／`failed`＋reason ごとの次の手）、回復（失敗した job の再実行、または Actions の `Manual` を `main` で手動実行）、「リリースの実行中は `release.yml` を `main` へ入れない」、「ファイルを消す・改名する版を出すときは、SSP の更新が古いファイルを消さないので別途検討する」の 1 行。`latest` の nar が壊れていたときの手順（新しい版を切る）、置き場所の行が `failed`・`dispatch` になったとき（初回の実リリースを含む）の手順、リリース前の確認（マージ直後の実 URL の確認 10.4 が通っていること）。`homeurl` を足した版の nar を入れた利用者から更新が効く旨（Req 2.4）。
 - `.github/release-ci-setup.md`: 4 節の表に `github-pages` の行（`main` だけに公開を許す・変更なし・確認のみ）と、`publish-ghost-site` の権限（ジョブ側の `actions: write`・`contents: read`。Settings の変更は要らない）。
 - `release` スキル: `ci-result.ps1` の対象 job に `publish-ghost-site` を足し、`procedure.md` の結果表に置き場所の行（8 行目）を足し、最終報告に含める。完了の判定は「結果表の 8 つがすべて `published` か `skipped`」＋「定型コマンド A の公開済み 7/7」（A の 7 つは変えない。置き場所の状態の照会は A に足さず、CI の見比べを正とする）。
 
@@ -576,7 +589,7 @@ https://ekicyou.github.io/pasta/hello-pasta/
   - `buildSite`: 出力が nar のエントリ＋`index.html` と一致する／nar に `index.html` があれば失敗／照合に失敗したとき `outDir` に何も書かない／空でない `outDir` を拒否する。
   - `verifyLive`（`node:http` のローカルサーバー）: 初回で一致／最初の 2 回は古い内容で後から一致（取り直しで通る）／上限まで違い続けて失敗しメッセージに状態が出る／404／`--full` で 1 ファイルだけ改変すると検出する。
 - Rust（`homeurl.rs`・`validate_cmd.rs`・`validate_report_test.rs`）:
-  - `derived_homeurl_finding` の表: `name` が `hello-pasta`／`name` 無し／`homeurl` 無し／別の URL／`http`・`HTTPS`・大文字小文字・末尾 `/` の有無・配下のパス／`hello-pasta-foo` は指さない／BOM・CRLF・UTF-8 でない bytes／キーの重複（最初を採る）。
+  - `derived_homeurl_finding` の表: `name` が `hello-pasta`／`Hello-Pasta`（大文字小文字違いは別名として警告の対象）／`name` 無し／`homeurl` 無し／別の URL／`http`・`HTTPS`・大文字小文字・末尾 `/` の有無・配下のパス／`hello-pasta-foo` は指さない／BOM・CRLF・UTF-8 でない bytes／キーの重複（最初を採る）。
   - 固定の分類（注意）の表明。`hello-pasta` の `descript.txt` の `homeurl` と `HELLO_PASTA_UPDATE_URL` の一致（`include_str!`）。
   - `validate_cmd::run`: 派生ゴーストで `WarningsOnly`・終了コード 0／`descript.txt` が無い・フォルダである（読めない）ときは `Clean` のまま。
 - `integration_test.rs`: `descript.txt` の `homeurl` が新しい URL。
@@ -595,8 +608,8 @@ https://ekicyou.github.io/pasta/hello-pasta/
   3. 更新確認の前に、インストール済みの辞書と `pasta.toml` を手で書き換えておく（10.3）。ゴーストを動かしたまま（`pasta.dll` を読み込んだまま）更新確認を行う（10.2）。
   4. 確認: 一式（`pasta.dll` を含む）が新しい nar の中身に差し替わったか（md5）、書き換えた辞書・`pasta.toml` が上書きされたか（10.3 の結果）、更新後にゴーストが再起動して応答するか、`OnUpdate*` の流れで pasta が壊れないか。
   - 差し替わった後の `homeurl` は新しい nar のもの（Pages の URL）に戻る。これは、`homeurl` を持つ版を入れた利用者の通常の動きと同じなので確認の対象外。
-- 初回の `main` 公開の直後（第 1 段のマージの後）に、実 URL で `verify-live --full` を 1 回実行し、`.dll`・`.pasta`・`.png` などが変換されずに返ることを確かめて記録する（10.4）。
-- 通らないとき（10.2・10.4 など）は、この仕様を完了としない（10.5）。
+- 実 URL の確認（10.4）は、Pages が `main` からしか公開できないため PR のマージ直後にしか行えない。マージ直後の最初の公開は前の版（`homeurl` の無い版）の nar の展開で、新しい `homeurl` を持つ利用者がいないので無害。この公開の直後に `verify-live --full` を 1 回実行し、`.dll`・`.pasta`・`.png` などが変換されずに返ることを確かめて `research.md` に記録する。
+- 通らないとき: 10.1〜10.3（マージ前のローカルの実機確認）が通らなければ、この仕様を完了としない（10.5）。マージ直後の 10.4 が通らなければ、次のリリースを出さず、直す PR を先に入れる（10.6）。`RELEASE.md` のリリース前の確認にもこの順を書く。
 
 ### Performance / Load
 
@@ -615,8 +628,8 @@ https://ekicyou.github.io/pasta/hello-pasta/
 
 ```mermaid
 flowchart LR
-    S1[第1段 manual 側 ツール・2段・index・自己テスト] --> S2[第2段 homeurl・警告・マニュアル・手順書]
-    S2 --> S3[第3段 release.yml の新ジョブと report の行]
+    S1[第1段 manual 側 ツール・2段・index・自己テスト・release.yml build の関門] --> S2[第2段 homeurl・警告・マニュアル・手順書]
+    S2 --> S3[第3段 release.yml の新ジョブと report の行・-Ref のリハーサル]
     S3 --> S4[次のリリースで初の実行]
 ```
 

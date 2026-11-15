@@ -78,6 +78,7 @@
 4. While PR またはブランチで実行されている, the マニュアル公開 CI shall 公開を行わずに、置き場所の中身の作成と整合の検査までを実行する。
 5. The マニュアル公開 CI shall 置き場所の中身を、マニュアルの静的性・検索・コンテンツの検査の対象に入れず、それらの検査の後で公開物に足す。
 6. If マニュアルの検査または置き場所の整合の検査が失敗する, then the マニュアル公開 CI shall サイトを公開しない。
+7. When リリース CI が `hello-pasta.nar` を作る, the リリース CI shall Release を公開する前に、作った nar を置き場所の組み立てと同じ照合に通し、合わなければ Release を公開しない。（公開済みの Release は差し替えられず、壊れた nar が最新になるとマニュアルの公開まで止まるため。）
 
 ### Requirement 4: 公開の経路と自動化
 
@@ -117,6 +118,7 @@
 2. When 置き場所の更新を再実行する, the 置き場所の更新 shall すでに公開済みの Release を変えず、最新の Release の `hello-pasta.nar` から置き場所を作り直して公開する。
 3. If 最新ではない Release のタグでリリース CI が再実行される, then the リリース CI shall マニュアル公開 CI を起動せず置き場所を更新せず、報告の表の置き場所の行に `skipped`（理由: 最新ではないタグ）を出す。最新かどうかの判定は起動の前に行い、ほかの run に影響させない。
 4. The リリース手順書 shall 置き場所の更新の失敗時の読み方と、リリースの実行中は `release.yml` を `main` へ入れないという注意を載せる。
+5. The リリース手順書 shall 最新の Release の nar が壊れていたときの手順（新しい版を切る）と、置き場所の行が `failed`（reason `dispatch`）のとき（初回の実リリースを含む）の手順を載せる。
 
 ### Requirement 7: 置き場所の入口
 
@@ -165,8 +167,9 @@
 1. When ローカルの HTTP サーバーに更新の置き場所を作り、別ポートの別の SSP インスタンスで更新確認を行う, the hello-pasta shall `pasta.dll` を含む一式を、置き場所の版に差し替える。
 2. While SSP が `pasta.dll` を読み込んでいる, the SSP shall 更新確認で `pasta.dll` を差し替えられる。*（pasta では未確認。この実機確認で確かめる。）*
 3. When 手元で書き換えた辞書または `pasta.toml` がある状態で更新確認を行う, the 実機確認 shall 上書きされるかどうかの結果を記録し、Requirement 8.2 の注意の根拠にする。
-4. The 実機確認 shall 公開サイト（GitHub Pages）の実際の URL で `.dll`・`.pasta`・`.png` が変換されずに返ることも確かめる。
-5. If 実機確認で更新が通らない, then the 完了の判定 shall この仕様を完了としない。*（部分的な出荷はせず、原因を直すかリジェクトする。）*
+4. The 実機確認 shall 公開サイト（GitHub Pages）の実際の URL で `.dll`・`.pasta`・`.png` が変換されずに返ることも確かめる。公開は `main` からしかできないので、この確認は PR のマージ直後に行って記録する。
+5. If 実機確認（10.1〜10.3）で更新が通らない, then the 完了の判定 shall この仕様を完了としない。*（部分的な出荷はせず、原因を直すかリジェクトする。）*
+6. If マージ直後の実 URL の確認（10.4）が通らない, then the リリース手順 shall 次のリリースを出さず、直す PR を先に入れる。（マージ直後の公開は前の版の nar の展開で、新しい `homeurl` を持つ利用者がいないため、利用者には影響しない。リリース手順書のリリース前の確認にもこの順を書く。）
 
 ### Requirement 11: 既存の保証の維持
 
@@ -198,3 +201,8 @@
 ## 設計フェーズへ回す事項（`research.md` の「設計判断の項目」と同じ。`/kiro-design` で解決する）
 
 展開・検査のロジックの置き場所と言語（公開前と公開後で共有するか）／起動と待ちの方式と run の特定／起動した run が `cancelled` になったときの扱い／新ジョブの構成と `report` への組み込み／見比べの取り直しの値／`release` スキルの完了判定（7 → 8 つか別枠か）／`index.html` の元ファイルの置き場所／照合の細部（`ghost/master/updates.txt`・`date=`・パスの安全性）／警告の実装（`descript.txt` を読む入口・`FindingKind`・URL 定数の持ち方・`validate.md` とスキル生成物）／`integration_test.rs:173` の直し／`manual.yml` の起動条件／`homeurl` の方式（`descript.txt` のみ）。
+
+## 設計ディスカッションでの追加決定（2026-11-15）
+
+- Release 公開前に、作った nar を置き場所と同じ照合に通す関門を `release.yml` の `build` ジョブに足す（Requirement 3.7・6.5）。
+- 実 URL の確認 10.4 は `main` へのマージ直後に行う。通らなければ次のリリースを出さず修正 PR を先に入れる（Requirement 10.4・10.6）。実機確認 10.1〜10.3 はマージ前（Requirement 10.5）。
