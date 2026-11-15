@@ -2,6 +2,7 @@
 
 - 調べた日: 2026-11-15（worktree `claude/kiro-start-recipe-demo-video-daa207`、main `cd2ea431` の上。v0.6.1 から `editors/`・`crates/`・`Cargo.*` の変更は 0 件）
 - 調べ方: 読み取りだけ（Grep・Glob・Read・git）。アプリは動かしていない。Openscreen は道具の定義（スキーマ）だけを読んだ。
+- **読むときの注意（2026-11-15 追記）**: 1〜7 節は、要件ディスカッションの前のギャップ分析である。その後、pasta-recipe の並びを変えられる直し（要件 11）がこの spec に入り、撮る範囲と配置は `direction.md` 13 節の実測に替わった。「コードの変更は要らない」「印刷用のページ」「写しの置き場所」などの 1〜7 節の論点は、いまの `requirements.md` が正である。設計フェーズの調査と決定は 8 節に書く。
 
 ## 1. 要約
 
@@ -181,3 +182,181 @@
 - 値を入れて実行の名前に全角の `ｒ０` を入れたとき、`＄ｒ０` に届くか（案 V-c を採るときだけ）。
 - 試験用の SSP（readonly）が MCP の `raise_event` で鳴らしたとき、送り主の表示が出るか（`SCREENSHOTS.md` の確かめの項目）。
 - 60〜90 秒の H.264 を 5 MB 以下にする高さ・fps・画質の組。
+
+## 8. 設計フェーズの調査と決定（2026-11-15）
+
+### 8.1 Summary
+
+- **Feature**: `recipe-demo-video`
+- **Discovery Scope**: Extension（軽い調査）。流れ A（要件 11）は今ある pasta-recipe への拡張、流れ B（要件 1〜10）は製品のコードではない手順である。新しい依存・外のサービスは無いので、全面の調査には上げなかった。
+- **調べ方**: 読み取りだけ（`editors/recipe/` のソース・`book/` の章と道具・`.github/workflows/`・Openscreen の道具の定義・UKADOC のさくらスクリプト）。アプリは動かしていない。録画もしていない。
+- **Key Findings**:
+  - 並びを覚える型は、もうアプリの中に在る。`src-tauri/src/recent.rs` が「ファイルが正本・毎回読み・変えたら書く・壊れていれば既定・記録の失敗で止めない」を `app_data_dir` の TOML でやっている。並びの記録は同じ作りの `layout.toml` で足りる（新しい crate は要らない）。
+  - 画面は、大きさを決めている所が 3 か所（`#tree` の `width: 260px`・`.panels-face` の `height: 180px`・`.panel` の `flex: 1`）だけで、Monaco は `automaticLayout: true` である。仕切りは CSS の値を変えるだけで効き、エディタの側に手を入れなくてよい。
+  - `direction.md` 13 節の実測（切り抜き 1280×800）で文字の大きさを計算し直すと、13 px の文字（出力の欄・保存変数の表）を本文の幅で 10 px にするには 1.32 倍以上の寄りが要る。13 節の見込み（1.25〜1.3 倍）では足りない。1.35 倍の画（948×593）には、押す ▶ から表の行までの高さ（下の欄が 180 px のとき約 580〜620 px）が入りきらないので、撮影の並びで下の欄を上げる（仕切りの使いどころが 2 つになった）。
+  - 撮影の並びは、仕切りを CDP で引きずらなくても、`layout.toml` に書いてから起動すれば決まる。流れ B が流れ A に触れる所はここだけになる。
+  - 要件 2.8 は「要件 1 の 2〜6 と 9 の各操作」に名前の見出しを求める。`direction.md` 7.1 節の見出しは 5 つ（5 つ目が締めの ▶ を含む）なので、6 つに直した。
+
+### 8.2 Research Log
+
+#### pasta-recipe の画面の作りと、足す所
+
+- **Context**: 仕切り 3 本と入れ替えを、どのファイルに・どの大きさで足すか。
+- **Sources Consulted**: `editors/recipe/index.html`・`src/style.css`・`src/panels.ts`・`src/main.ts`・`src/devPanels.ts`・`src/editor.ts`・`src/devActions.ts`
+- **Findings**:
+  - `#tree` と `#editor-area` は `#workspace`（横の flex）の子、`#panels` は `body`（縦の flex）の子で、`index.html` に静的に書いてある。動かす面の 2 つの `.panel` は `Panels` が作る。だから仕切りは、2 本を `index.html` に、1 本を `panels.ts` に置くのが今の作りに合う。
+  - 開始の画面の間は、CSS が `body` の直下を隠す（`body:has(#start:not([hidden])) > :not(...)`）。`body` の直下に足す仕切りも、同じ決まりで隠れる。
+  - 出力の欄は `section.scrollTop` を一番下へ送る。DOM を並べ替えるとスクロールの位置が頭に戻るので、入れ替えのときは位置を保つ手当てが要る。
+  - `panels.show("run")` は開発の操作のたびに呼ばれる。入れ替えのボタンの出し隠しは `show` に入れればよい。
+  - `Panels` の `output`・`variables`（`devPanels.ts` が中身を満たす口）は、順を変えても参照が切れない。
+- **Implications**: 変えるファイルは `index.html`・`style.css`・`panels.ts`・`main.ts`・`ipc.ts` と、新しい `layout.ts`。`devPanels.ts`・`devActions.ts`・`editors/shared/` は触らない。
+
+#### 記録の型（`recent.toml`）
+
+- **Context**: 並びをどこに覚えるか（管理役の指示: 先に `recent.toml` の書き方を見る）。
+- **Sources Consulted**: `src-tauri/src/recent.rs`・`commands.rs`（`open_ghost`・`recent_list`・`recent_remove`）・`capabilities/default.json`・`Cargo.toml`・`book/src/debug/recipe.md` の節「入手と置き方」
+- **Findings**:
+  - 置き場所は `app.path().app_data_dir()`（`%APPDATA%\io.github.ekicyou.pasta-recipe\`）。ファイルの型（`RecentFile`）と画面への型（`RecentEntry`）を分けている。試験は同じファイルの `#[cfg(test)]` で、`tempfile` を使う。
+  - アプリのコマンドは `commands::handler()` の表に足すだけで呼べる（許可のファイルには、アプリのコマンドは書かれていない）。
+  - `recipe.md` は、アプリが書く場所を「最近開いたゴーストの記録」と「WebView2 の作業用のデータ」の 2 つと書いている。並びの記録を足すなら、この文も直す。
+- **Implications**: `layout.rs` を `recent.rs` と同じ作りで足す。章の文に 1 か所足す。
+
+#### 試験と CI
+
+- **Sources Consulted**: `editors/recipe/package.json`・`src/*.test.ts`・`.kiro/steering/tech.md`（job `recipe`）・`.github/workflows/build.yml`
+- **Findings**: `npm test` は `node --test "src/**/*.test.ts"`。DOM を持つ試験は無く、DOM を使うファイル（`devPanels.ts`）は純粋な関数を書き出して試している。CI は `tsc --noEmit`・`npm test`・`npm run build`・`cargo test --locked`・clippy（`-D warnings`）と、zip の検査・arm64 の煙試験を回す。
+- **Implications**: 並びの決まりを純粋な関数にして `layout.test.ts` で試す。DOM の糊は、手元のビルドを CDP で確かめる（メモ「pasta-recipe の画面は CDP で確かめる」）。依存を足さないので `--locked` はそのまま通る。
+
+#### Openscreen の道具の定義
+
+- **Sources Consulted**: `startRecording`・`stopRecording`・`setClipRange`・`setPointerTrack`・`addZoom`・`addAnnotation`・`setEditorSettings`・`exportVideo`・`getFrames`・`addSpeed`・`addTrim`・`setAspectRatio` の定義（スキーマ）
+- **Findings**:
+  - 時刻の基準が 2 つある。クリップの出入りと切り（`addTrim`）は元の時刻、寄り・速さ・見出しは定規の秒。切りは定規に穴を空けるだけで詰めないので、クリップが 1 本で頭から始まるかぎり、定規の秒は元の時刻と同じである。クリップの入りの点を動かすと、定規がずれる。
+  - `addZoom` は `customScale`（1〜5）で好きな倍率を取れる。録画がぼける手前より深い倍率は断られる。1.5 秒以内に続く寄りは、引かずに滑る。寄りの出入りには 0.7〜0.8 秒かかり、その最中に切ると画が飛ぶ。
+  - `addAnnotation` の文字は、書き出しの枠に付く（寄っても動かない）。箱は文の長さに合わせて作られ、枠の中に収められる。濃い板が既定。
+  - `setEditorSettings` で、余白・枠・角丸・影・動きのぼかし・背景の色・ポインタの大きさと弾みを決められる。
+  - `exportVideo` は MP4（H.264）で、高さ 720・1080・元のまま、fps 24・30・60。形は `setAspectRatio`（16:10 がある）。
+  - `setPointerTrack` の位置は、録った画面に対する割合である。
+- **Implications**: 頭と尻は、クリップの出入りの点でなく `addTrim` で切る。台本は、操作ごとに `Date.now()` と場面の目印を記録し、編集の秒をそこから出す。
+
+#### さくらスクリプト（位置の合わせ方）
+
+- **Sources Consulted**: UKADOC の `\![move]`・`\![set,balloonoffset,x,y]`（伺かの技術文書の検索）・`book/SCREENSHOTS.md`
+- **Findings**: `\![move]` は `--X`・`--Y`・`--base`・`--base-offset`・`--move-offset` で、画面を基準に動かせる。`\![set,balloonoffset,x,y]` は吹き出しのオフセットを置き換え、利用者のドラッグの分がそこへ足される。吹き出しの左は「立ち絵の左 − 吹き出しの幅 ＋ オフセットの x」、上は「立ち絵の上 ＋ オフセットの y」と読める（`direction.md` 4.2 節の逆算と合う）。
+- **Implications**: 13 節の矩形から出したオフセットの見込みは、女の子 244・-102、男の子 97・142。読み込み直しの後も残るかは分からないので、送った後に矩形を読んで合わせ、駄目なら開発者のドラッグに頼む。
+
+#### 13 節の配置と文字の大きさ
+
+- **Sources Consulted**: `direction.md` 13 節・`style.css`・`devPanels.ts`
+- **Findings**（切り抜いた画 1280×800 の上の px。見込み）:
+  - 窓の内側は x 36〜1276・y 76〜798。エディタの左は 297、行は 147 から 19 px ごと。`＊会話` の上の ▶ は y 約 185、`＊天気` の上は約 298。
+  - 立ち絵の体は、男の子が x 952〜1077、女の子が 1076〜1234。吹き出しは、女の子が (898,198)-(1233,367)、男の子が (610,442)-(945,538)。
+  - 下の欄が 180 px のとき、保存変数の表の行は y 約 740〜766 に来る。▶（185）から表の行（766）までは約 581 px で、1.35 倍の画（高さ 593 px）には見出しの分の余りが残らない。240 px に上げると、行は約 680〜706 に上がる。
+  - 出力と保存変数の境が既定の 0.5 だと、表（幅 約 276 px）の右の端は約 940 で、男の子の腕（約 950）まで 10 px しか無い。0.42 にすると約 841 になる。
+  - 本文の幅 750 px での文字の高さは `高さ × 750 ÷ (1280 ÷ 倍率)`。1.35 倍で 13 px → 10.3 px、14 px → 11.1 px、12 px → 9.5 px。
+- **Implications**: 撮影の並びを `panels_height = 240`・`output_share = 0.42`、寄りを 1.35 倍とした。どれも仮で、配置を見せるコマ（要件 7.13）で決め直す。
+
+#### 参照したスキルと指針
+
+- `kiro-spec-design` の `rules/`（design-principles・design-discovery-light・design-synthesis・design-review-gate）と、`.kiro/settings/templates/specs/` の雛形。
+- ponytail（最小の変更の段取り）: 今あるコードの型を先に使う（`recent.rs`）・標準の機能で足りるものに包みを足さない・頼まれていない選べる設定を足さない。
+- 仕切りの読み上げとキーは、WAI-ARIA の「Window Splitter」の型（`role="separator"`・焦点を当てられる・`aria-valuenow`・矢印のキー）に合わせた。新しい部品は入れていない。
+- プロジェクトのメモ: 書式は TOML を既定にする方針・pasta-recipe の画面は CDP で確かめる・試験用の SSP は readonly で立てて `\-` で閉じる・LuaJIT のビルドの前に `NoDefaultCurrentDirectoryInExePath` を外す・worktree に `book/node_modules` が無いことがある。
+
+### 8.3 Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+| -- | -- | -- | -- | -- |
+| 並び: `layout.toml`（Rust 経由） | `recent.rs` と同じ作りで `app_data_dir` に書く | アプリの今の型。操作の終わりに確かに書ける。撮影の前後で写して戻せる。Rust の試験が書ける | コマンド 2 つと Rust のファイル 1 つが増える | **採る** |
+| 並び: WebView の `localStorage` | 画面だけで覚える | Rust の変更が無い | WebView2 の書き込みは遅れて行われ、閉じ際の値が残るかを確かめにくい。保存先は `EBWebView` の中の入れ物で、撮影の前後で写して戻すのが重い。アプリのほかの記録（TOML）と型が割れる | 採らない |
+| 並び: Tauri の窓の状態のプラグイン | 窓の位置と大きさを覚える包み | 出来合い | 欄の並びは覚えない。新しい依存になる（禁止） | 採らない |
+| 仕切り: 自前（Pointer Events） | 境の線に重なる帯を置き、CSS の値を変える | 依存なし。既定の見た目が変わらない | キーと読み上げを自分で付ける | **採る** |
+| 仕切り: 分割の包み（Split.js など） | 出来合いの分割の部品 | 手数が少ない | 新しい依存（禁止）。第三者の表示・CSP・着色の面とのすり合わせが増える | 採らない |
+| 仕切り: CSS の `resize` | ブラウザのつまみ | 1 行 | 角のつまみだけで、境の線を引けない。キーで動かせない（11.5） | 採らない |
+| 入れ替え: DOM の順を変える | 欄の要素を並べ直す | Tab と読み上げの順が見た目と同じ | スクロールの位置を保つ手当てが要る | **採る** |
+| 入れ替え: `flex-direction: row-reverse` | 見た目だけ逆にする | 1 行 | Tab の順が見た目と逆になる | 採らない |
+
+### 8.4 Design Decisions
+
+#### Decision: 並びは `layout.toml` に覚える
+
+- **Context**: 要件 11.7（閉じて開き直しても残る）。管理役の指示（`recent.toml` の書き方を見てから決める）。
+- **Alternatives Considered**: 上の表の 3 つ。
+- **Selected Approach**: `%APPDATA%\io.github.ekicyou.pasta-recipe\layout.toml`。キーは `tree_width`・`panels_height`・`output_share`・`swapped`。操作の終わり（`pointerup`・矢印のキーの `keyup`・入れ替え）に 1 回書く。
+- **Rationale**: アプリの今の型と同じ。タイマーもまとめ書きも要らない。撮影の舞台の配置が、ファイルを書くだけで決まる。
+- **Trade-offs**: 要件 7.7・7.8 が挙げる記録（`recent.toml`）のほかに、撮影が写して戻すファイルが 1 つ増える。
+- **Follow-up**: 要件 7.7・7.8 の文に `layout.toml` を足すかを、設計ディスカッションで決める。
+
+#### Decision: 覚えた値と当てる値を分け、窓の最小を足す
+
+- **Context**: 要件 11.6（最小）・11.8（窓の大きさを変えても、覚えた並びを窓に収まる範囲で保つ）。
+- **Selected Approach**: 覚えた値は作者の操作でだけ変わる。窓が狭いときは `fitLayout` が最小を守って収めた値を当てるだけで、覚えた値は書き換えない。窓には `minWidth` 400・`minHeight` 320 を足し、最小が必ず守れるようにする。
+- **Rationale**: 窓を一度縮めただけで覚えた並びが潰れるのを防ぐ。「収まる範囲で保つ」の読みに合う。
+- **Trade-offs**: 窓の最小の大きさは、今は無い振る舞いである（今はいくらでも縮められる）。
+- **Follow-up**: 最小の数は机の上の数。実物で確かめて直す。
+
+#### Decision: 既定の見た目を変えない
+
+- **Selected Approach**: 仕切りは、今の 1 px の境の線に重なる 5 px の透明な帯にし、場所を取らせない。既定の値（260・180・半分ずつ）は CSS に残す。
+- **Rationale**: `layout.toml` の無い人の画面が 1 px も動かない。13 節の実測の数字がそのまま使える。
+
+#### Decision: 仕切りは出力｜保存変数だけ（書く面は半分ずつのまま）
+
+- **Context**: 要件 11.3 は出力と保存変数の境だけを挙げる。
+- **Selected Approach**: 書く面（診断｜検査）には仕切りを置かない。下の欄の高さは 2 つの面で共通にする（面を切り替えても高さが変わらない）。
+- **Trade-offs**: 作者が書く面でも境を動かしたくなるかもしれない。頼まれていないので足さない。
+
+#### Decision: 撮影の並びは `layout.toml` に書いてから起動する
+
+- **Selected Approach**: 記録の写しを取った後、撮影の並びを書いて pasta-recipe を起動する。仕切りは引きずらない。
+- **Rationale**: 立て直しのたびに同じ並びになる。撮り直しの記録に 4 つの数を書くだけで再現できる。
+
+#### Decision: 寄りは 1.35 倍・画は 4 つ・見出しは 6 つを右上に
+
+- **Context**: 要件 2.6（文字の大きさ）・2.8（操作ごとの見出し）・2.10（結果を同じ画か続いた画に）。`direction.md` 5 節・7 節は、13 節の前の配置（窓 1000×680）で書かれている。
+- **Selected Approach**: 13 節の配置で画を計算し直した（8.2 節）。寄りは 1.35 倍。画は、引き・主の画・左下の画・左上の画。見出しは操作ごとに 6 つで、画の右上に置く（主の画の右上は、タブの列の右の空きに当たる）。
+- **Rationale**: 1.25〜1.3 倍では 13 px の文字が 10 px に届かない。左上に置くと、主の画でタブの名前とコメントの行に乗る。
+- **Trade-offs**: 左下の画では、見出しがエディタの行の終わりに少し乗る。`direction.md` の推奨（左上）と違う。
+- **Follow-up**: 試し撮りのコマを見て、開発者と決め直す（要件 7.13）。
+
+#### Decision: 作業ファイルは `C:\pasta-demo\` に集め、台本のスクリプトはリポジトリに置かない
+
+- **Selected Approach**: 写し・記録の写し・台本・書き出しを `C:\pasta-demo\` の下に置く。`book/SCREENSHOTS.md` には台本の表と数字だけを残す。
+- **Rationale**: 後片付けが 1 回の削除で済む（要件 7.8）。スクラッチパッドは再起動で消えうるので、戻すための写しを置けない。今の `SCREENSHOTS.md` の決まり（撮影のスクリプトも置かない）に合う。
+- **Trade-offs**: 次に撮り直すときは、台本を表から書き起こすことになる。
+
+#### Decision: 2 つの流れを 1 つの spec で進める
+
+- **Context**: 設計の関門は「別々に動かせる責任の境が 2 つ以上あれば分ける」を求める。この spec には、製品のコード（要件 11）と撮影の手順（要件 1〜10）がある。
+- **Selected Approach**: 分けない。順を固定する（流れ A → 流れ B）。
+- **Rationale**: 開発者が 2026-11-15 に、要件 11 をこの spec に入れると決めた（`requirements.md` の前提 A1・Boundary Context）。撮影は要件 11 を入れたビルドに依るので、別々には進められない。
+- **Trade-offs**: `design.md` が長い（約 970 行）。要件が 72 項あり、対応の表だけで 70 行を超える。
+
+#### 統合（Synthesis）の結果
+
+- **まとめたもの**: 3 本の仕切りは「どの値を・どの向きに・どこまで」の違いだけなので、決まりを 1 組の関数（`SplitterId` で分ける）にし、取り付けも 1 つの関数にした。仕切りごとの部品は作らない。
+- **作るか・使うか**: 記録は今ある型（`recent.rs`）、仕切りは標準の機能（Pointer Events・`role="separator"`）、撮影は今ある道具（Openscreen・CDP・SSP の MCP）を使う。新しく作るのは、並びの決まりと糊だけである。
+- **削ったもの**: 書く面の仕切り・窓の位置と大きさを覚えること・ダブルクリックでの初期化・保存のまとめ書き（タイマー）・リポジトリに置く撮影のスクリプト・白の窓（背景）・ゴーストを手前にする細工。
+
+### 8.5 Risks & Mitigations
+
+- **最小の数と窓の最小が実物に合わない** — 数は `LAYOUT_MIN` と `tauri.conf.json` の 1 か所ずつ。手元のビルドを CDP で確かめて直す。
+- **入れ替えで出力の欄のスクロールが頭に戻る** — 並べ替えの前後で位置を保つ。画面の確かめの項目に入れる。
+- **CDP の文字の入力が、前面でない窓の Monaco に入らない** — 焦点のまね（CDP）で補う。試し撮りの前の通し稽古で確かめる。入らなければ開発者に示す（窓を前面にするのは、開発者の作業の焦点を奪う）。
+- **`\![set,balloonoffset]` が読み込み直しで戻る** — 送った後と ▶ の後に矩形を読む。戻るなら開発者のドラッグに頼む。
+- **普段の SSP が動いているときの送り口が未確認** — 送る前の確かめ（`get_active_ghost_list` が `hello-pasta-demo` だけ）を必ず通し、通らなければ送らない。
+- **読み取り専用の SSP で、書き換えた保存変数が読み込み直しの後に残らない（「100 回目」にならない）** — 通し稽古で確かめる。残らなければ、流れの締めを開発者に諮る。
+- **寄りの中心・見出しの位置が、切り抜いた画に対する割合でない** — 試し撮りで 1 つ置いてコマで見る。違えば式を直す。
+- **書き出しが 5 MB を超える・無音のトラックが付く・字がにじむ** — 要件 7.12 の ffmpeg（詰め直し・除去）と、書き出しの高さの切り替え。
+- **録画の間にタスクバーや通知が出る** — 開発者への頼みごと（要件 7.15）と、コマの確かめ（要件 3.3）。出たら撮り直す。
+- **開発者の pasta-recipe が動いていて、撮影用の起動がそちらへ渡る** — 前の確かめで見つけて止まる。
+
+### 8.6 References
+
+- `editors/recipe/src-tauri/src/recent.rs` — 記録の型の手本
+- `editors/recipe/src/panels.ts`・`src/style.css`・`index.html` — 仕切りを足す所
+- `.kiro/specs/recipe-demo-video/direction.md` 13 節 — 配置の基準（実測）
+- `book/SCREENSHOTS.md` — 撮影の記録の型と決まり
+- `.github/workflows/manual.yml` — マニュアルの検査の順
+- [UKADOC さくらスクリプトリスト `\![move]`](https://ukatech.shillest.net/ukadoc-spec/list_sakura_script.html#bang-move)・[`\![set,balloonoffset,x,y]`](https://ukatech.shillest.net/ukadoc-spec/list_sakura_script.html#bang-set-balloonoffset-x-y) — 位置の合わせ方
+- WAI-ARIA Authoring Practices「Window Splitter」— 仕切りのキーと読み上げの型
