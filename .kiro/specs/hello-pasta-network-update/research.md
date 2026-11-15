@@ -161,3 +161,67 @@
 - 優先して確かめる順: (1) `workflow_dispatch` の起動・待ちの小さな試験、(2) v0.6.1 の nar を展開して検査スクリプトの試作、(3) 実機の SSP の dll 差し替え。(3) は完了条件なので、設計の早い段で見通しを立てる。
 - 案 X（node＋自己テスト、`workflow_dispatch`、警告は殻だけ）が、要件・既存の流儀・変更量の釣り合いが取れる見込み。ただし 4.2 の A の「起動した run の特定」と、`concurrency` の取り消しの扱いは設計で決める必要がある。
 - 触れるファイルの見込み: `.github/workflows/manual.yml`・`release.yml`、新規スクリプトと入口、`crates/pasta_check/src/validate/report.rs`・`validate_cmd.rs`（＋テスト）、`crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/descript.txt`・`tests/integration_test.rs`・`RELEASE.md`、`.claude/skills/release/procedure.md`・`scripts/ci-result.ps1`、`.github/release-ci-setup.md`、`book/src/download.md`・`getting-started/setup.md`・`debug/validate.md`（スキル生成物の再生成を伴う）、`.claude/skills/pasta-check/`（種類の一覧があれば）。
+
+## 9. 設計フェーズの判断（2026-11-15・`/kiro-design`）
+
+> 入力は `requirements.md`（決定事項 10 件を含む）・本書 1〜8・steering・現行の `manual.yml`/`release.yml`/`pasta_check`。探索の種類は **Light（拡張）**。外部の事実は 2 件だけ読み取り専用で確かめた（9.1）。決定は `design.md` が正本で、ここは理由と退けた案の記録。
+
+### 9.1 追加の調査（外部の事実）
+
+| 調べたこと | 結果 | 出典 | 設計への含意 |
+|------------|------|------|--------------|
+| `workflow_dispatch` の REST が run の ID を返すか | `return_run_details=true` を付けると 200 で返す（付けなければ従来の 204）。`gh` は 2.87.0 以降が `gh workflow run` で run の URL を出す。REST の文書のレスポンス欄には `workflow_run_id`・`run_url`・`html_url` | GitHub changelog 2026-02-19・REST「Create a workflow dispatch event」 | 起動は `gh` の版に依らない REST（`gh api`）を主にし、応答に ID が無いときだけ `gh run list` で起動後の最新 run を探す。文書にパラメーター名が載っていない点は、最初の実リリースで確かめる（Research Needed） |
+| ジョブの権限の包含 | `actions: write` は `actions: read` を含む。ジョブの `permissions` に書いた権限以外は `none` になる | GitHub Actions の権限の規則（既知） | 新ジョブは `actions: write` と `contents: read` の 2 つだけで足りる |
+| 既存コードの確認 | nar は Rust の `zip` クレートが作り（ファイルのエントリだけ・deflate・`/` 区切り）、`updates.txt` は CRLF・`0x01` 区切り。`validate_cmd::check_master` は `Report` を受けた位置で足せる。`FindingKind` の追加で触るのは `report.rs`・テスト・`validate.md` だけ（`recommend-menu-talk` の足し方を確認）。`validate` の種類名は WASM・LSP の型に列挙されていない | 本リポジトリ | 読み出し側は最小の zip 解釈で足りる。警告は核の入力を触らず殻だけに足せる |
+
+### 9.2 合成（Design Synthesis）
+
+- **一般化**: 公開前の照合（nar のエントリ）と公開後の見比べ（URL）と実機確認の全ファイル確認（10.4）は、すべて「`updates.txt` の行を、ある一覧（nar のエントリ・URL）と照らす」問題の変種。`checkIntegrity`・`verifyLive`（`--full`）を同じ `parseUpdates` の上に作り、実装は 1 ファイルにした。実装の範囲は要件の分だけ（`bal/updates.txt` の照合は足さない）。
+- **作るか・採るか**: zip の読み出しは、npm の zip ライブラリ（`yauzl`・`fflate` など）を足さず、約 60 行の自前実装にした。理由: 読む対象は自前の CI が作る deflate の nar だけ、ライブラリを足すと `release.yml` の job で `npm ci` が要る、`unzip` コマンドは手元の Windows の Git Bash に無く自己テストが手元で動かない。md5・inflate・fetch は Node の標準で足りる。Pages への公開・Release の取得・workflow の起動は GitHub の機能をそのまま使う（作らない）。
+- **単純化**: (a) `workflow_call` での再利用（案 B）は、`github-pages` の environment の許可が呼び出し元（タグ）の ref で判定される見込みで採らない。(b) `manual.yml` に `expected_tag` の入力を足す案は、手動実行の経路を増やすだけなので採らない（古いタグの判定は release 側で起動の前に行い、見比べが最終の判定者になる）。(c) 警告のために核の入力の契約（`GhostInput`・`FileText`）を広げる案は、4 つの殻に波及するので採らない（純関数＋CLI の殻）。(d) 起動した run の特定のための専用の仕組みは作らない（REST の応答の ID を使い、無ければ 1 度だけ一覧から探す）。
+
+### 9.3 設計判断（`requirements.md` の「設計フェーズへ回す事項」と本書 7 の対応）
+
+| # | 項目 | 決定（推奨） | 退けた案・理由 |
+|---|------|--------------|----------------|
+| 1 | 展開・検査のロジックの置き場所と言語（7-1） | Node の 1 ファイル `book/tools/ghost-site/ghost-site.mjs`（ライブラリ＋CLI）と自己テスト。公開前と公開後で同じ `parseUpdates` を共有 | bash 直書き（自己テストが書けない・公開後と別実装）、pwsh（`manual.yml` の `build` は bash 既定で pwsh の使用箇所が無く、`release-scripts-test.ps1` は manual の PR で走らない）。node は `book/tools` の自己テストの自動実行に乗る |
+| 2 | 起動と待ちの方式・run の特定（7-2） | 新ジョブが REST の `workflow_dispatch`（`ref=main`・`return_run_details=true`）で起動し、`gh run view` を 20 秒おきに最大 30 分。応答に ID が無いときだけ `gh run list` で起動後の最新 run を探す | `workflow_call`（環境の許可が弾く見込み）、PAT・GitHub App（認証情報を足す。方針に反する） |
+| 3 | 起動した run が `cancelled` のとき（7-3） | 失敗にせず、実 URL の見比べへ進む（`manual.yml` の `concurrency` が古い待ちを取り消すのは、後続の run が同じ最新 Release から作るため）。見比べが上限まで合わなければ `failed`・`verify`。`failure`・`timed_out` は `failed`・`build` | `cancelled` を即失敗（実際は正しく公開されるのに赤くなる）、再起動（取り消した run との二重起動で連鎖する） |
+| 4 | 古いタグの判定の位置・status の語（7-4） | release 側の新ジョブの頭で、`releases/latest` のタグと数字 3 つで比べる（古い→`skipped`・`stale-tag`。新しい→10 秒×6 回まで取り直して `failed`・`transient`）。`skipped` を流用し、理由を消さず、`Row` に専用のラベルを渡して表に出す | `manual.yml` に期待するタグを渡して照合（手動実行の経路が増える・他の run に影響する） |
+| 5 | 公開後の見比べの範囲と値（7-5） | `updates.txt` 1 本のバイト一致。30 秒間隔・最大 30 回（15 分）。一意のクエリ付きで取る。全ファイルは `--full` で実機確認 10.4 の 1 回だけ | 全ファイルを毎回（dll 3 MB 超の取得）。待ちは `max-age=600`（10 分）より長く取り、クエリが効かなくても足りるようにした |
+| 6 | 新ジョブの構成（7-6） | 1 ジョブ `publish-ghost-site`（起動・待ち・見比べ）。`timeout-minutes: 60`。`report` の `needs` に足すが `gateFailed` には含めない。outputs は `status`・`reason` | 2 ジョブ（起動と見比べ。`needs` と outputs の受け渡しが増えるだけで、再実行の単位としても 1 つで足りる） |
+| 7 | `release` スキルの完了の判定（7-7） | 結果表を 8 行にし、条件 1 を「8 つがすべて `published` か `skipped`」にする。定型コマンド A の 7/7 は変えず、置き場所の状態の照会は A に足さない（CI の見比べを正とする）。`ci-result.ps1` の対象 job に足す | 8/8 に増やして A に置き場所の 404/200 を足す（A の変更が増える）、別枠にして失敗でも完了とする（置き場所の失敗が見逃される）。**OPEN QUESTION 1** |
+| 8 | `index.html` の元ファイルと内容（7-8） | `book/tools/ghost-site/index.html`（git に入れる静的ファイル）。`buildSite` が出力へ複写。内容は短い案内文とダウンロードのページへのリンク（絶対 URL）だけ。nar に `index.html` があれば失敗 | `book/src/` に置く（mdBook が章にする）、`manual.yml` 内で生成（検査できない） |
+| 9 | 照合の細部（7-9） | ルートの `updates.txt` の行だけを照合。`date=` は見ない。載らないエントリは許す（`bal/`・各階層の `updates.txt`・`updates2.dau`・`developer_options.txt`）。パスは `\`・先頭 `/`・`..`・`:`・空の区切り・NUL・重複を拒否。zip のフォルダのエントリは捨てる。zip は暗号化・zip64・方式が 0・8 以外を拒否 | `ghost/master/updates.txt`（複製）の一致確認とバルーンの `updates.txt` の照合は足さない（SSP が使わない・バルーンの持ち主の範囲）。CRC32 は見ない（md5 の照合が上位にある） |
+| 10 | 警告の実装（7-10） | 判定は `crates/pasta_check/src/validate/homeurl.rs` の純関数、読むのは `validate_cmd::check_master`（殻）。`FindingKind::HelloPastaHomeurl`（宣言の末尾・注意）。`descript.txt` は先頭の BOM を除いて `from_utf8_lossy` で読み、読めなくても黙る。URL の定数は Rust 1 つ＋`descript.txt`（SSOT）で、`include_str!` の一致テストで守る。release 側の job は `descript.txt` の `homeurl` を読む。`validate.md` に 1 行足しスキル生成物を再生成 | 核に入れる案（4 つの殻に波及）、`balloon.rs` の `read_utf8_kv` の流用（UTF-8 を要求してエラーにするので、派生ゴーストを誤りにしない趣旨と合わない） |
+| 11 | `integration_test.rs:173` の直し | `homeurl,https://ekicyou.github.io/pasta/hello-pasta/` に表明を変える | — |
+| 12 | `manual.yml` の起動条件 | 変えない。`descript.txt` は足さない（置き場所の中身は Release 由来）。`release.yml`・`book/**`（`book/tools/ghost-site/**` を含む）の変更では動く | `descript.txt` を足す（`homeurl` の変更で組み立てが走るが、中身が変わらず無駄） |
+| 13 | `homeurl` の方式 | `descript.txt` のみ（SHIORI の Resource `homeurl` は使わない） | Resource 方式（要件は `descript.txt` 前提で、SSP の更新確認は `descript.txt` の値で足りる） |
+| 14 | PR で最新 nar が取れないとき（7-13） | どの実行でも失敗（要件 4.4）。`curl --retry 3 --retry-all-errors` で一時的な障害を吸収 | PR のときだけ警告（要件が失敗を指定） |
+| 15 | 版（7-15） | 要件に書かず、ロードマップで決める。`pasta-dll-multiarch` と同じウェーブに置かない | — |
+
+### 9.4 リスクと緩和
+
+| リスク | 緩和 |
+|--------|------|
+| `GITHUB_TOKEN`（`actions: write`）での起動と `return_run_details` は実リリースで初めて通る | 失敗しても他の公開先は無傷（5.5）。回復は再実行か `manual.yml` の手動実行（6.1）。起動は REST を主・一覧探索を副にして特定の失敗を減らす。組み立て側は PR の `manual.yml` と `gh workflow run --ref <branch>` で事前に確かめる |
+| Pages の配信が遅れる・クエリが効かない | 取り直しの上限を 15 分（`max-age=600` より長い）にする |
+| `release.yml` の変更が `release/<名前>` だけの行を生み、固定リンクの名前の検査を壊す | 新ジョブにその形の行を書かない。`manual.yml` の `link-check` が PR で検出する |
+| 手元の書き換えが上書きされる（利用者の事故） | 実機確認 10.3 の結果でマニュアルの文言を確定する（8.2）。派生ゴーストは警告で守る |
+| `.claude/skills/release/` の編集は分類器が拒否することがある | 実装タスクの手順に「入った分と残りを示し、ユーザーに許可を求めて止まる」を織り込む |
+
+### 9.5 追加の Research Needed（実装の早い段で確かめる）
+
+1. `return_run_details=true` の応答に `workflow_run_id` が入ること（REST 文書のパラメーター欄に載っていない）。入らなければ一覧探索の副の経路が主になる。
+2. `GITHUB_TOKEN`（ジョブの `permissions: actions: write`）で `manual.yml` を `ref=main` で起動できること（最初の実リリースで確認。それまでは `gh workflow run` の手元実行で組み立て側を確認）。
+3. 実機確認 10.1〜10.3（SSP の dll の差し替え・書き換えの上書き・ローカルの `updates.txt` 方式で通ること。`updates2.dau` が無いサーバーで `updates.txt` に落ちること）。
+4. 実機確認 10.4（初回の `main` 公開の直後の実 URL で `.dll`・`.pasta`・`.png` が無変換）。
+5. v0.6.1 の nar が `updates.txt` の全行と整合すること（PR の `manual.yml` の最初の実行で確認）。
+
+### 9.6 設計ディスカッションへ持ち越す論点（OPEN QUESTIONS）
+
+1. **`release` スキルの完了の判定**（9.3 の 7）: 結果表を 8 行にして条件 1 に含める推奨案でよいか。置き場所の失敗でリリース全体を「未完了」と扱い、再実行の流れに乗せる前提。
+2. **実機確認 10.4 の時点**: 公開サイトは `main` からしか公開できないので、実 URL の確認は第 1 段のマージの後になる。推奨案は「マージ直後に `verify-live --full` で確認し、通らなければこの仕様を再び開いて直す（初回の公開は `homeurl` の無い版の nar で、どの利用者にも使われないので無害）」。要件 10.5（通らなければ完了にしない）との整合を、完了の判定（`/kiro-complete` の DoD）に 10.4 の確認を含める形にするか。
+3. **`cancelled` の扱い**（9.3 の 3）: 失敗にせず実 URL の見比べに進める推奨案でよいか。
+4. **取り直しの値**（9.3 の 5）: 30 秒 × 30 回（15 分）・run の待ち 30 分・最新タグの取り直し 10 秒 × 6 回・ジョブ 60 分でよいか。
+5. **警告の読み方**（9.3 の 10）: `descript.txt` を `from_utf8_lossy` で読み、`charset` を見ない・`name` は trim した完全一致（大文字小文字を区別）・キーが重複したら最初の行を採る、でよいか。

@@ -1,16 +1,16 @@
 {
   "feature_name": "hello-pasta-network-update",
   "created_at": "2026-11-15T04:30:08Z",
-  "updated_at": "2026-11-15T04:30:08Z",
+  "updated_at": "2026-11-15T04:59:47Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {
