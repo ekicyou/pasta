@@ -428,13 +428,13 @@ export async function verifyLive(opts) {}
 ##### Batch / Job Contract
 
 - Trigger: `github-release` の成功。
-- 入力: `-Tag`（`GITHUB_REF_NAME`）、`-SiteBase`（そのタグの `descript.txt` の `homeurl` を job の step が読んで渡す。無ければ failed・`publish`）、環境変数 `GH_TOKEN`・`GITHUB_REPOSITORY`。テスト用に `-LatestTag`（最新タグの上書き）と `-DryRun`（起動の手前で計画を出して終わる）。値の既定は引数で上書きできる: `-LatestWaitSeconds 60`・`-RunTimeoutMinutes 30`・`-RunPollSeconds 20`・`-VerifyAttempts 30`・`-VerifyIntervalSeconds 30`。
+- 入力: `-Tag`（`GITHUB_REF_NAME`）、`-DescriptPath`（チェックアウトしたそのタグの `descript.txt`。`homeurl` はスクリプトが、古いタグの判定を終えた後・見比べの直前にだけ読む。無い・読めないときは `failed`・`publish`。step では読まない）、環境変数 `GH_TOKEN`・`GITHUB_REPOSITORY`。テスト用に `-LatestTag`（最新タグの上書き）と `-DryRun`（起動の手前で計画を出して終わる）。値の既定は引数で上書きできる: `-LatestWaitSeconds 60`・`-RunTimeoutMinutes 30`・`-RunPollSeconds 20`・`-VerifyAttempts 30`・`-VerifyIntervalSeconds 30`。
 - 手順:
   1. `gh api repos/$GITHUB_REPOSITORY/releases/latest --jq .tag_name` を取り、`Tag` と数字 3 つで比べる。`Tag < latest` なら `skipped`・reason `stale-tag` で終了（起動しない・何も変えない）。`Tag > latest` なら 10 秒おきに最大 6 回取り直し、それでも新しくならなければ `failed`・reason `transient`。
   2. `gh release download $Tag --pattern hello-pasta.nar --dir <一時>` で Release の nar を取る（見比べの正本）。失敗は `failed`・`transient`。
   3. `POST dispatches`（`ref=main`・`return_run_details=true`）で起動し、応答の `workflow_run_id` を控える。応答に無い・API が拒否したときは、起動前の時刻を控えたうえで `gh run list --workflow manual.yml --branch main --event workflow_dispatch --json databaseId,createdAt` から、起動後に作られた最新の run を特定する。特定できなければ `failed`・`dispatch`。
   4. 20 秒おきに `gh run view <id> --json status,conclusion` を読み、`completed` まで待つ（最大 30 分）。`success` と `cancelled` は 5 へ。`failure`・`timed_out`・`startup_failure` は `failed`・`build`。待ち切れなければ `failed`・`transient`。
-  5. `node book/tools/ghost-site/ghost-site.mjs verify-live --nar <nar> --base $SiteBase --attempts 30 --interval 30`。成功で `published`、失敗で `failed`・`verify`。
+  5. `-DescriptPath` の `homeurl` を `SiteBase` として読み（ここで初めて要求する）、`node book/tools/ghost-site/ghost-site.mjs verify-live --nar <nar> --base $SiteBase --attempts 30 --interval 30`。成功で `published`、失敗で `failed`・`verify`。
 - 出力: job outputs と summary の `status`（`published`・`skipped`・`failed`）と `reason`（`stale-tag`・`dispatch`・`build`・`verify`・`transient`・`publish`）。`skipped` のときも `reason` を消さない（既存ジョブと違い、理由を表に出すため）。スクリプトが `status` を書かずに終わったら、集約の step が `failed`・`publish`（既存ジョブと同じ流儀）。
 - 冪等性と回復: 再実行は同じ手順を最初からやり直し、公開済みの Release には触れない（読むだけ）。manual 側は毎回「その時点の最新 Release」から作り直すので、何度走っても結果は同じ。
 
@@ -445,7 +445,7 @@ export async function verifyLive(opts) {}
 
 **Implementation Notes**
 - Integration: `report` の `needs` に `publish-ghost-site` を足し、行を専用のラベルで出す（下の「report の置き場所の行」）。`gateFailed` の判定には含めない（関門の段ではない）。
-- Validation: `release-scripts-test.ps1` に `-DryRun` の項目を足す（古いタグ・新しすぎるタグ・同じタグの 3 つ）。実際の起動と待ちは、ネットワークと権限が要るため自動テストに入れない（最初の実リリースと、`gh workflow run manual.yml --ref <branch>` による組み立ての確認で補う）。
+- Validation: `release-scripts-test.ps1` に `-DryRun` の項目を足す（古いタグ・`homeurl` の無い古いタグ・新しすぎるタグ・同じタグの 4 つ）。実際の起動と待ちは、ネットワークと権限が要るため自動テストに入れない（最初の実リリースと、`gh workflow run manual.yml --ref <branch>` による組み立ての確認で補う）。
 - Risks: `GITHUB_TOKEN` での起動（文書上は可）と `return_run_details`（2026-02 の追加で、REST 文書には未掲載）は、実リリースで初めて通る。失敗しても他の公開先は無傷で、回復は再実行か `manual.yml` の手動実行（Req 6.1）。`release.yml` はタグのコミットの版で動くので、リリースの実行中は `release.yml` を `main` へ入れない（Req 6.4）。
 
 #### report の置き場所の行
@@ -583,7 +583,7 @@ https://ekicyou.github.io/pasta/hello-pasta/
 
 ### Integration Tests
 
-- `release-scripts-test.ps1`: `publish-ghost-site.ps1 -DryRun` で、古いタグ→`skipped`・`stale-tag`／新しすぎるタグ（待ちを 0 にして）→`failed`・`transient`／同じタグ→計画を出して終了コード 0。
+- `release-scripts-test.ps1`: `publish-ghost-site.ps1 -DryRun` で、古いタグ→`skipped`・`stale-tag`／`homeurl` の無い古いタグ→同じく `skipped`・`stale-tag`（`homeurl` を読む前に判定を終えること）／新しすぎるタグ（待ちを 0 にして）→`failed`・`transient`／同じタグ→計画を出して終了コード 0。
 - `manual.yml` の PR の実行: 最新 Release の nar を実際に取り、`build` が通る（`ghost-site.mjs build` の実データでの検査。v0.6.1 の nar が `updates.txt` の全行と整合することの最初の確認を兼ねる）。`gh workflow run manual.yml --ref <branch>` でも同じ。
 - `pasta_check release` の統合テスト: 派生ゴーストの `descript.txt` で、注意が出ても nar が作られる（`validate` の注意は止めない）。
 
