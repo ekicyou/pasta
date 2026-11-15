@@ -207,3 +207,5 @@
 
 - 5.1: `--option readonly` の SSP は手動のネットワーク更新もしない。更新の実機確認は SSP 本体を Temp の外へ複製し `--option bootunlock,standalone` で立てる（research.md 11.2）。SSP は手元とサーバーの `updates.txt` を比べ、変わった行のファイルだけを取る。手で書き換えたファイルは新しい版でそのファイルが変わらなければ残る。
 - 6.1: RELEASE.md の「リリース前の確認」（10.4 の実 URL の確認が通っていること）は、置き場所を足した後の初回のリリースだけに当てはまる。初回が済んだら畳む（完了後の作業）。
+- 完了時にその場で解決: `verifyLive` を `attempts` 0 で呼ぶと落ちる（CLI は弾いていた）→ 関数の入口で 1 以上の整数を確かめて投げる（テスト付き）。
+- 完了時にその場で解決: design.md の publish-ghost-site の手順 4 に、`-Ref` が `main` でないリハーサルの終わり方（見比べず `status` を書かずに 0 で終える）を書き足した（実装と Implementation Notes には既にあった）。
