@@ -91,7 +91,7 @@ az identity federated-credential create \
 
 リポジトリ `ekicyou/pasta` の Settings で、environment を 2 つと、リポジトリ variables を 3 つ登録する。
 
-### environment を 2 つ作る
+### environment を 2 つ作る（github-pages は確認だけ）
 
 Settings →「Environments」→「New environment」で作り、「Deployment branches and tags」を「Selected branches and tags」にして、実行できる ref を限る。
 
@@ -99,10 +99,17 @@ Settings →「Environments」→「New environment」で作り、「Deployment 
 |-------------|--------------|----------|
 | `release` | タグ `v*`（「Add deployment branch or tag rule」で Ref type を Tag にする） | `release.yml` の publish-crates・publish-vsce |
 | `release-setup-check` | ブランチ `main` | `release-setup-check.yml` |
+| `github-pages`（既存・変更なし） | ブランチ `main` のみ（確認するだけ） | `manual.yml` の deploy job（マニュアルの公開）。`release.yml` の publish-ghost-site が起動する先でもある |
 
 - `release` をタグからの実行に限ることで、crates.io のトークンを得られるのはリリースタグの push で動く実行だけになる。Marketplace のアクセストークンは、同じマネージド ID の資格情報を持つ確認ワークフロー（main からの実行に限る）でも得られる。そのため、main を PR 経由でしか変えられないこと（ブランチ保護）が前提になる。
 - environment の保護規則は、GitHub Free では public リポジトリでだけ使える。
 - environment の secrets と variables は使わない（ID は次のリポジトリ variables に 1 組だけ置く）。
+
+### publish-ghost-site の権限（設定の変更は要らない）
+
+- `release.yml` の publish-ghost-site は、job の `permissions` に `actions: write` と `contents: read` だけを与えている。ワークフローを起動する（`workflow_dispatch`）ために `actions: write` を使い、リポジトリの読み取りに `contents: read` を使う。
+- 認証は自動で渡される `GITHUB_TOKEN` だけで足りる。Settings の変更・新しい secrets・variables・environment は要らない。
+- 起動される側の `manual.yml` の deploy job は environment `github-pages` を使う。この environment は main のブランチだけに公開を許す設定で、すでに入っている（上の表。変更なし）。
 
 ### リポジトリ variables を 3 つ登録する
 

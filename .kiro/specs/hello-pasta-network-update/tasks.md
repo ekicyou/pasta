@@ -155,7 +155,7 @@
   - _Dispatch: mechanical — 書く内容が設計にそのまま与えられている_
   - _Requirements: 2.4, 6.1, 6.4, 6.5, 9.1, 9.6, 10.6_
 
-- [ ] 6.2 (P) セットアップ手順の更新
+- [x] 6.2 (P) セットアップ手順の更新
   - `release-ci-setup.md` に、置き場所の更新に必要な権限（ジョブ側の `actions: write`・`contents: read`。Settings の変更は要らない）と、`github-pages` の environment が `main` だけに公開を許すこと（変更なし・確認のみ）を書く
   - 完了時は、環境の表に `github-pages` の行があり、権限の節が足されている
   - _Boundary: release-ci-setup.md_
