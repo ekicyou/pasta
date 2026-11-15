@@ -151,7 +151,7 @@ Before writing `tasks.md`, review the draft task plan and repair local issues un
 
 - Run the review gate on the draft task plan before writing `tasks.md`.
 - If issues are task-plan-local, repair the draft and re-run the review gate.
-- Keep the loop bounded: no more than 2 review-and-repair passes before escalating a real spec gap.
+- Keep repairing until the review gate passes; failing twice (or more) is not a reason to stop. Escalate only a real spec gap.
 - Write `tasks.md` only after the review gate passes.
 
 ### Optional Test Coverage Tasks
