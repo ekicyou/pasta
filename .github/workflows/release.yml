@@ -199,6 +199,10 @@ jobs:
           if ($errors.Count -gt 0 -or $recipeExit -ne 0) { exit 1 }
           Write-Output "配布物の検査: 成功（版 $env:VERSION）"
 
+      # Release 公開前の関門: nar の updates.txt（ハッシュ）と中身の照合・入口ページの組み立てが通ることを確かめる。ここで落ちれば公開されない。
+      - name: Check hello-pasta.nar with ghost-site build
+        run: node book/tools/ghost-site/ghost-site.mjs build --nar release/hello-pasta.nar --out "$env:RUNNER_TEMP/ghost-site-check" --index book/tools/ghost-site/index.html
+
       # release.ps1・wasm-pack・tauri build は --locked を付けないため、lock が書き換わっていないことをここで確かめる。
       - name: Check Cargo.lock is unchanged
         run: git diff --exit-code -- Cargo.lock editors/recipe/src-tauri/Cargo.lock
