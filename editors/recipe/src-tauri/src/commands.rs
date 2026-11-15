@@ -2,7 +2,7 @@
 //! 相対パスを取るコマンドは、状態の master と paths::resolve_rel（files の各関数の中）を必ず通す（11.2）。
 
 use crate::files::{self, EntryKind, TextFile, TreeListing};
-use crate::{check, paths, recent, variables, watch};
+use crate::{check, layout, paths, recent, variables, watch};
 use pasta_check::validate::Report;
 use pasta_lsp::analysis::{AnalysisEngine, AnalysisResult, TOKEN_MODIFIERS, TOKEN_TYPES};
 use serde::Serialize;
@@ -75,6 +75,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static 
         check_ghost,
         recent_list,
         recent_remove,
+        layout_load,
+        layout_save,
         crate::dev::dev_post,
         crate::dev::dev_begin,
         crate::dev::dev_end,
@@ -321,6 +323,23 @@ pub async fn recent_list(app: AppHandle) -> Vec<recent::RecentEntry> {
 pub async fn recent_remove(app: AppHandle, master: String) {
     if let Ok(dir) = app.path().app_data_dir() {
         let _ = recent::save(&dir, &recent::remove(recent::load(&dir), &master));
+    }
+}
+
+/// 窓の並びを読む。データのフォルダが取れなければ既定
+#[tauri::command]
+pub async fn layout_load(app: AppHandle) -> layout::Layout {
+    app.path()
+        .app_data_dir()
+        .map(|dir| layout::load(&dir))
+        .unwrap_or_default()
+}
+
+/// 窓の並びを書く。書けなくても誤りは返さない
+#[tauri::command]
+pub async fn layout_save(app: AppHandle, layout: layout::Layout) {
+    if let Ok(dir) = app.path().app_data_dir() {
+        let _ = layout::save(&dir, &layout);
     }
 }
 
