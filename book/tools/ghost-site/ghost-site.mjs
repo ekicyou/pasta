@@ -231,6 +231,7 @@ const stateOf = (r) => (r.error ? `取得できない（${r.error}）` : `HTTP $
  * @returns {Promise<CheckResult & { attempts: number }>}
  */
 export async function verifyLive({ files, base, attempts, intervalMs, full, fetchFn = fetch }) {
+  if (!(Number.isInteger(attempts) && attempts >= 1)) throw new Error(`attempts は 1 以上の整数: ${attempts}`);
   const local = files.find((f) => f.name === 'updates.txt');
   if (!local) return { ok: false, problems: ['NG updates.txt: nar の直下に無い'], attempts: 0 };
   const root = base.endsWith('/') ? base : `${base}/`;

@@ -616,6 +616,22 @@ await atest('verifyLive --full: 1 ファイルだけ改変されていれば検�
   }
 });
 
+await atest('verifyLive: attempts が 1 未満なら取らずに投げる', async () => {
+  let calls = 0;
+  await assert.rejects(
+    verifyLive({
+      files: liveFiles(),
+      base: 'http://127.0.0.1:9/',
+      attempts: 0,
+      intervalMs: 10,
+      full: false,
+      fetchFn: async () => (calls++, new Response('')),
+    }),
+    /attempts/,
+  );
+  assert.equal(calls, 0);
+});
+
 await atest('verifyLive: nar に updates.txt が無ければ取らずに失敗する', async () => {
   let calls = 0;
   const r = await verifyLive({
