@@ -82,7 +82,7 @@
 VS Code を使わずに `.pasta` を書く Windows（x64・arm64）のアプリ（arch ごとに exe 1 つ・インストール不要・署名なし）。ルートのワークスペースの外の、別の Cargo ワークスペース（`src-tauri/` が自前の `Cargo.lock` を持つ。ルートの `cargo test --workspace` の対象外）。
 - **Tauri 2（~2.12）**: Rust の殻。plugin は `single-instance`（2 つ目の起動を今の窓へ）と `dialog`（フォルダを選ぶ）だけ。画面に fs の許可を与えず、読み書きは Rust のコマンドが開いている `ghost/master` の中だけに限る。外へつながない CSP（開発の操作も Rust の側から送り、画面からは送らない）。WebView2 が無いときはメッセージ箱を出して終了コード 1
 - **pasta_lsp / pasta_check（`default-features = false`・feature `fs`）**: パス依存で直接呼ぶ（WASM を通さない）。色・診断・シーンの並び・ゴースト全体の検査は拡張と同じ核から出る。アプリの lock の版はルートの lock と一致させる（`src-tauri/tests` の一致のテスト）
-- **notify 8 / toml 1 / windows-sys 0.61**: 見張り（200 ms で束ねる）・最近開いたもの（`%APPDATA%\io.github.ekicyou.pasta-recipe\recent.toml`）・メッセージ箱
+- **notify 8 / toml 1 / windows-sys 0.61**: 見張り（200 ms で束ねる）・最近開いたもの（`%APPDATA%\io.github.ekicyou.pasta-recipe\recent.toml`）・窓の中の並び（同じ置き場の `layout.toml`。仕切りの位置と出力・保存変数の左右。既定は保存変数が左）・メッセージ箱
 - **画面: Vite＋TypeScript（strict）＋Monaco Editor 0.57＋shiki 4**: 拡張の TextMate 文法（読むだけ）で下地を塗り、セマンティックトークンを重ねる。純粋な判断のモジュールは `node --test` で試す
 - 版は `tauri.conf.json` から拡張の `package.json` を指す（pasta の版と同じ）。`+crt-static` はルートの `.cargo/config.toml` を受け継ぐ
 - **開発の操作**（`pasta-recipe-dev-actions`）: ▶ シーンを実行・値を入れて実行・SHIORI をリロード・保存変数の表示と書き換え。流れは拡張と同じ `editors/shared/`（入出力の面 `GhostIO` を Tauri のコマンドへ写す）。外へ送るのは Rust の `dev_post` だけで、宛先は 127.0.0.1 の候補のポート（9801〜9810・9821〜9830）に固定（代理なし・接続の使い回しなし・送り直しなし・転送に従わない・`Origin` なし）。読むのは進んでいる操作の `ghost/master` の下の決まったファイルだけ。**reqwest 0.13（`default-features = false`）** と `pasta_dsl`（名前の決まり）をパスで使う

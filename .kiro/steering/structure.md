@@ -220,8 +220,8 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 ├── editors/                  # エディタ拡張
 │   ├── shared/              # 拡張とアプリの共有の実行の流れ（vscode・Node・Tauri を読み込まない・"type": "module"）。ghostIO（入出力の面の型）・mcpClient・ghostFiles・reloadShiori・runSceneAtCursor・dumpVariables・devSession（相手の覚えと選び・重なりの止め・見出し・保存の手順）と、偽の入出力 fakeGhostIO による *.test.ts（アプリの npm test が拾う）
 │   ├── recipe/              # pasta-recipe（VS Code を使わずに書く Windows（x64・arm64）のアプリ・Tauri 2 ＋ Vite ＋ Monaco。別の Cargo ワークスペース）
-│   │   ├── src/             # 画面（TypeScript）。純粋な判断（mapping・sync・tabs・scheduler・theme）は *.test.ts を node --test で
-│   │   ├── src-tauri/       # Rust の殻（自前の Cargo.lock・deny.toml・about.toml）。paths（ghost/master の探し方と範囲の門・開発の読み取りの門 dev_path）・files・recent・check・watch・commands・dev（127.0.0.1 の候補のポートへだけ送る POST と、進んでいる操作の master の下だけを読む門）・variables（保存変数の表の行・ローカル変数のインライン表）
+│   │   ├── src/             # 画面（TypeScript）。純粋な判断（mapping・sync・tabs・scheduler・theme・layout（仕切りと左右の並び））は *.test.ts を node --test で
+│   │   ├── src-tauri/       # Rust の殻（自前の Cargo.lock・deny.toml・about.toml）。paths（ghost/master の探し方と範囲の門・開発の読み取りの門 dev_path）・files・recent・check・watch・commands・dev（127.0.0.1 の候補のポートへだけ送る POST と、進んでいる操作の master の下だけを読む門）・variables（保存変数の表の行・ローカル変数のインライン表）・layout（窓の中の並びの layout.toml）
 │   │   │   └── tests/       # repo_parity_test.rs（lock の版・凡例・版の置き場がルートや拡張と一致）
 │   │   ├── scripts/         # package.ps1（`-Arch x64,arm64`。release/pasta-recipe.x64.zip・release/pasta-recipe.arm64.zip を作る。引数なしで両方）・js-licenses.mjs（画面の部品の第三者の表示）
 │   │   └── tauri.conf.json  # 版は ../vscode/package.json を指す・CSP・窓
