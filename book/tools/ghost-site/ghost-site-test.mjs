@@ -1,4 +1,4 @@
-// ghost-site-test.mjs — ghost-site の自己テスト（hello-pasta-network-update タスク 1.1・1.2 / 要件 1.2, 1.5, 3.1–3.3, 4.4, 11.4）。
+// ghost-site-test.mjs — ghost-site の自己テスト（hello-pasta-network-update タスク 1.1–1.3 / 要件 1.1, 1.2, 1.5, 3.1–3.3, 4.4, 7.1–7.3, 11.4）。
 //
 // 観測する完了条件（design「GhostSite」Invariants・Testing Strategy）:
 //   - readNar がテスト内で組んだ zip（保存・deflate）を読み、ディレクトリのエントリを捨てる。
@@ -13,7 +13,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readNar, parseUpdates, checkIntegrity, extractNar, NarError } from './ghost-site.mjs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { readNar, parseUpdates, checkIntegrity, extractNar, buildSite, NarError } from './ghost-site.mjs';
 
 // --- 最小 assert ハーネス（依存ゼロ） ---
 let passed = 0;
@@ -298,6 +300,127 @@ test('照合 → 展開: 照合に失敗したとき出力先に何も書かな�
     assert.equal(r.ok, false);
     assert.ok(!fs.existsSync(out));
   });
+});
+
+// --- buildSite と CLI `build`（タスク 1.3 / 要件 1.1, 1.2, 7.1–7.3） ---
+const SCRIPT = fileURLToPath(new URL('./ghost-site.mjs', import.meta.url));
+const INDEX = fileURLToPath(new URL('./index.html', import.meta.url));
+const narOf = (files) => makeZip(files.map((f) => ({ name: f.name, data: f.data })));
+function writeNar(tmp, files) {
+  const p = path.join(tmp, 'x.nar');
+  fs.writeFileSync(p, narOf(files));
+  return p;
+}
+
+test('buildSite: 出力の一覧が nar のエントリ＋index.html と一致し、入口はそのまま複写される', () => {
+  withTmp((tmp) => {
+    const out = path.join(tmp, 'out');
+    const files = goodFiles();
+    buildSite({ narPath: writeNar(tmp, files), outDir: out, indexPath: INDEX });
+    assert.deepEqual(listAll(out), [...files.map((f) => f.name), 'index.html'].sort());
+    assert.deepEqual(fs.readFileSync(path.join(out, 'index.html')), fs.readFileSync(INDEX));
+  });
+});
+
+test('buildSite: nar に index.html があれば失敗し、何も書かない', () => {
+  withTmp((tmp) => {
+    const out = path.join(tmp, 'out');
+    const narPath = writeNar(tmp, [...goodFiles(), file('index.html', '<p>evil</p>')]);
+    assert.throws(() => buildSite({ narPath, outDir: out, indexPath: INDEX }), /NG index\.html: nar にも index\.html があり、入口と衝突する/);
+    assert.ok(!fs.existsSync(out));
+  });
+});
+
+test('buildSite: 照合に失敗したとき何も書かない', () => {
+  withTmp((tmp) => {
+    const out = path.join(tmp, 'out');
+    const narPath = writeNar(tmp, goodFiles().filter((f) => f.name !== 'install.txt'));
+    assert.throws(() => buildSite({ narPath, outDir: out, indexPath: INDEX }), /NG install\.txt: nar に無い/);
+    assert.ok(!fs.existsSync(out));
+  });
+});
+
+test('buildSite: 空でない出力先を拒否する', () => {
+  withTmp((tmp) => {
+    const out = path.join(tmp, 'out');
+    fs.mkdirSync(out);
+    fs.writeFileSync(path.join(out, 'keep.txt'), 'old');
+    assert.throws(() => buildSite({ narPath: writeNar(tmp, goodFiles()), outDir: out, indexPath: INDEX }), /空でない/);
+    assert.deepEqual(listAll(out), ['keep.txt']);
+  });
+});
+
+test('index.html: 版や nar に依らない静的な案内で、ダウンロードのページへリンクする', () => {
+  const html = fs.readFileSync(INDEX, 'utf8');
+  assert.match(html, /<html lang="ja">/);
+  assert.match(html, /<meta charset="utf-8">/);
+  assert.match(html, /<meta name="viewport"/);
+  assert.match(html, /<title>[^<]+<\/title>/);
+  assert.match(html, /href="https:\/\/ekicyou\.github\.io\/pasta\/download\.html[^"]*"/);
+  assert.doesNotMatch(html, /<script|http-equiv="refresh"|\d+\.\d+\.\d+/i);
+});
+
+const cli = (args, env = {}) =>
+  spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8', env: { ...process.env, GITHUB_ACTIONS: '', ...env } });
+
+test('CLI build: 成功は終了コード 0', () => {
+  withTmp((tmp) => {
+    const out = path.join(tmp, 'out');
+    const r = cli(['build', '--nar', writeNar(tmp, goodFiles()), '--out', out, '--index', INDEX]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.ok(fs.existsSync(path.join(out, 'index.html')));
+  });
+});
+
+test('CLI build: 照合の失敗は終了コード 1、問題を 1 行 1 件で標準出力に出す（Actions では ::error:: も）', () => {
+  withTmp((tmp) => {
+    const narPath = writeNar(
+      tmp,
+      goodFiles()
+        .filter((f) => f.name !== 'install.txt')
+        .map((f) => (f.name === 'ghost/master/pasta.dll' ? file(f.name, 'dll!') : f)),
+    );
+    const args = ['build', '--nar', narPath, '--out', path.join(tmp, 'out'), '--index', INDEX];
+    const r = cli(args);
+    assert.equal(r.status, 1);
+    const lines = r.stdout.trim().split(/\r?\n/);
+    assert.equal(lines.length, 3);
+    assert.equal(lines[0], 'NG install.txt: nar に無い');
+    const a = cli(args, { GITHUB_ACTIONS: 'true' });
+    assert.equal(a.status, 1);
+    assert.ok(a.stdout.includes('::error::NG install.txt: nar に無い'));
+  });
+});
+
+test('CLI build: nar の衝突・zip でない・空でない出力先は終了コード 1 と 1 行の理由', () => {
+  withTmp((tmp) => {
+    const collide = writeNar(tmp, [...goodFiles(), file('index.html', 'x')]);
+    let r = cli(['build', '--nar', collide, '--out', path.join(tmp, 'o1'), '--index', INDEX]);
+    assert.equal(r.status, 1);
+    assert.equal(r.stdout.trim(), 'NG index.html: nar にも index.html があり、入口と衝突する');
+
+    const junk = path.join(tmp, 'junk.nar');
+    fs.writeFileSync(junk, 'not a zip at all, definitely not');
+    r = cli(['build', '--nar', junk, '--out', path.join(tmp, 'o2'), '--index', INDEX]);
+    assert.equal(r.status, 1);
+    assert.equal(r.stdout.trim().split(/\r?\n/).length, 1);
+    assert.match(r.stdout, /zip/);
+
+    const full = path.join(tmp, 'o3');
+    fs.mkdirSync(full);
+    fs.writeFileSync(path.join(full, 'keep.txt'), 'old');
+    r = cli(['build', '--nar', writeNar(tmp, goodFiles()), '--out', full, '--index', INDEX]);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /空でない/);
+  });
+});
+
+test('CLI: 引数の不足・不明なサブコマンドは使い方を出して終了コード 1', () => {
+  for (const args of [[], ['build'], ['build', '--nar', 'x.nar'], ['nope']]) {
+    const r = cli(args);
+    assert.equal(r.status, 1, JSON.stringify(args));
+    assert.match(r.stderr, /使い方/);
+  }
 });
 
 console.log(`\n結果: ${passed} passed, ${failed} failed`);

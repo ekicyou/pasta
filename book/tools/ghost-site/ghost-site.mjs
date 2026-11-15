@@ -3,11 +3,14 @@
 //
 // タスク 1.1: readNar（zip の読み出しと名前の安全性）・parseUpdates（updates.txt の解析）。
 // タスク 1.2: checkIntegrity（updates.txt とエントリの照合）・extractNar（出力先への展開）。
+// タスク 1.3: buildSite（置き場所の組み立て）と CLI `build`。
 
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseArgs } from 'node:util';
+import { pathToFileURL } from 'node:url';
 
 /** @typedef {{ name: string, data: Buffer }} NarFile */
 /** @typedef {{ path: string, md5: string, size: number }} UpdateRecord */
@@ -172,4 +175,70 @@ export function extractNar(files, outDir) {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, data);
   }
+}
+
+/**
+ * 読み出し → 照合 → index.html の衝突の確認 → 展開 → index.html の複写 → 出力の一覧が nar のエントリ＋index.html と一致することの確認。
+ * 照合・衝突の失敗は書き出しの前に Error（message は問題を 1 件 1 行）を投げ、outDir に何も書かない。
+ * @param {{ narPath: string, outDir: string, indexPath: string }} opts @returns {void}
+ */
+export function buildSite({ narPath, outDir, indexPath }) {
+  const files = readNar(fs.readFileSync(narPath));
+  const r = checkIntegrity(files);
+  if (!r.ok) throw new Error(r.problems.join('\n'));
+  if (files.some((f) => f.name === 'index.html')) {
+    throw new Error('NG index.html: nar にも index.html があり、入口と衝突する');
+  }
+  const index = fs.readFileSync(indexPath);
+  extractNar(files, outDir);
+  fs.writeFileSync(path.join(outDir, 'index.html'), index);
+
+  const expected = new Set([...files.map((f) => f.name), 'index.html']);
+  const actual = new Set(
+    fs
+      .readdirSync(outDir, { recursive: true, withFileTypes: true })
+      .filter((d) => d.isFile())
+      .map((d) => path.relative(outDir, path.join(d.parentPath, d.name)).split(path.sep).join('/')),
+  );
+  const diff = [
+    ...[...expected].filter((n) => !actual.has(n)).map((n) => `NG ${n}: 出力に無い`),
+    ...[...actual].filter((n) => !expected.has(n)).map((n) => `NG ${n}: nar に無いファイルが出力にある`),
+  ];
+  if (diff.length > 0) throw new Error(diff.join('\n'));
+}
+
+const USAGE = `使い方:
+  node ghost-site.mjs build --nar <file> --out <dir> --index <html>`;
+
+// 終了コード 0＝成功、1＝失敗（引数の誤りも 1）。問題は 1 行 1 件で標準出力、GitHub Actions では ::error:: 注釈も出す。
+function main(argv) {
+  const [cmd, ...rest] = argv;
+  let values;
+  try {
+    ({ values } = parseArgs({
+      args: rest,
+      options: { nar: { type: 'string' }, out: { type: 'string' }, index: { type: 'string' } },
+    }));
+  } catch (e) {
+    console.error(`${e.message}\n${USAGE}`);
+    return 1;
+  }
+  if (cmd !== 'build' || !values.nar || !values.out || !values.index) {
+    console.error(USAGE);
+    return 1;
+  }
+  try {
+    buildSite({ narPath: values.nar, outDir: values.out, indexPath: values.index });
+    return 0;
+  } catch (e) {
+    for (const line of e.message.split('\n')) {
+      console.log(line);
+      if (process.env.GITHUB_ACTIONS === 'true') console.log(`::error::${line}`);
+    }
+    return 1;
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exitCode = main(process.argv.slice(2));
 }
