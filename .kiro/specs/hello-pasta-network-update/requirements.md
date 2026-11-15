@@ -31,6 +31,9 @@
   - `pasta.dll` の arch ごとの配布（`pasta-dll-multiarch`）。
   - マニュアルの章立て・見た目の変更（触れるのは、ダウンロードのページへの案内と、派生ゴーストの注意の 1 節だけ）。
   - `pasta_check release` の `updates.txt` の作り方、Release の添付の名前・数。
+  - nar から消えたファイルを利用者の手元から消す仕組み（`delete.txt`）。手順書に注意を 1 行書くだけにとどめる。
+  - VS Code 拡張・LSP・pasta-recipe での派生ゴースト警告。
+  - この仕様を入れる版の決定（ロードマップ側で決める。`pasta-dll-multiarch` と同じウェーブに置かない）。
 - **Adjacent expectations**:
   - `release-workflow`・`release-ci`（完了）: リリースタグの push で Release が公開される流れとジョブ構成。この仕様はその結果（公開された `hello-pasta.nar`）を使う側で、公開の流れ自体は変えない。
   - `manual-download-page`（完了）: ダウンロードのページと、最新版の固定リンクの名前を Release の添付の名前と照らす検査。この仕様の変更がその検査を壊さない。
@@ -50,7 +53,7 @@
 2. The 更新の置き場所の中身 shall 最新の GitHub Release の `hello-pasta.nar` を展開したものと、ファイルの一覧・内容とも同じである。
 3. The 更新の置き場所 shall `.dll`・`.pasta`・`.png`・`.txt`・`.toml`・`.csv` など nar に含まれる種類のファイルを、変換せずそのままの内容で返す。
 4. When 新しいリリースが公開される, the 更新の置き場所 shall 公開後に、その版の `hello-pasta.nar` の中身へ入れ替わる。
-5. Where nar に `bal/`（同梱バルーン）が含まれる, the 更新の置き場所 shall `bal/` を含めて nar 全体を展開したものにする。*（仮定。OPEN QUESTION 1。現在の hello-pasta は `bal/` を含まない。）*
+5. Where nar に `bal/`（同梱バルーン）が含まれる, the 更新の置き場所 shall `bal/` を含めて nar 全体を展開したものにし、除外の規則を持たない。（現在の hello-pasta は `bal/` を含まない。）
 
 ### Requirement 2: ゴースト側の設定（`homeurl`）
 
@@ -85,10 +88,11 @@
 1. When リリース CI が GitHub Release を公開する, the リリース CI shall マニュアル公開 CI を `main` で起動し、その完了を待つ。
 2. The 公開サイトへの公開 shall マニュアル公開 CI の 1 か所だけで行い、リリース CI は公開サイトへ直接公開しない。
 3. When 置き場所の更新と無関係なマニュアルの変更が `main` へ入り、マニュアルが再公開される, the マニュアル公開 CI shall その時点の最新 Release の `hello-pasta.nar` から置き場所の中身も作り直して公開し、置き場所をサイトから消さない。
-4. If 最新の Release が無い、または最新の Release に `hello-pasta.nar` が無い、または取得できない, then the マニュアル公開 CI shall 失敗し、置き場所を欠いたサイトを公開しない。*（仮定: 欠いたままの公開は、すでに配られた利用者の更新確認を壊すので止める。最初のリリースより前は、前の版の nar を置く。OPEN QUESTION 2。）*
+4. If 最新の Release が無い、または最新の Release に `hello-pasta.nar` が無い、または取得できない、または取得した nar に `updates.txt` が無い, then the マニュアル公開 CI shall 失敗し、置き場所を欠いたサイトを公開しない。PR・ブランチでの実行でも同じく失敗にし、警告にとどめない。（欠いたままの公開は、すでに配られた利用者の更新確認を壊すので止める。再実行で直せる。）
 5. The リリース CI shall 置き場所を最新にするための追加の権限を、その処理を行うジョブにだけ最小限で与え、既存のジョブの権限を広げない。
 6. The マニュアル公開 CI shall 公開サイトの公開に必要な権限を、既存どおり公開を行うジョブにだけ与える。
 7. If マニュアル公開 CI の起動または完了の待ち合わせが失敗する, then the リリース CI shall 失敗を報告の表に出し、公開済みの Release の状態を変えない。
+8. While `homeurl` を足した版がまだ公開されていない, the マニュアル公開 CI shall 最新の Release の（前の版の）`hello-pasta.nar` を置き場所に置く。
 
 ### Requirement 5: 公開後の検証と報告
 
@@ -99,7 +103,7 @@
 1. When マニュアル公開 CI の公開が完了する, the リリース CI shall 実際の URL（`https://ekicyou.github.io/pasta/hello-pasta/updates.txt`）を取り、その Release の `hello-pasta.nar` が含む `updates.txt` と内容が同じであることを確かめる。
 2. The リリース CI shall 結果を、公開先ごとの結果を並べる報告の表に 1 行（置き場所）として加え、status と、失敗のときは reason を出す。
 3. If 実際の URL の `updates.txt` が Release 版と違う、または取れない, then the リリース CI shall 結果を `failed` として報告の表に出す。
-4. While 公開の反映が遅れている（公開サイトの配信に時間がかかる）, the リリース CI shall 一定の回数・時間の範囲で取り直してから結果を決める。*（回数と間隔は OPEN QUESTION 5。）*
+4. While 公開の反映が遅れている（公開サイトの配信に時間がかかる）, the リリース CI shall 一定の回数・時間の範囲で取り直してから結果を決める。回数・間隔・上限は設計で決める。見比べるのは `updates.txt` 1 本とし、全ファイルの md5 の取り直しは行わない（公開前に全ファイルを照合済みで、無変換配信の確認は実機確認 Requirement 10.4 で行う）。
 5. If 置き場所の更新が失敗する, then the リリース CI shall 他の公開先（crates.io・Marketplace・GitHub Release）の status を、その失敗で変えない。
 6. The 報告の表の置き場所の行 shall 他の公開先の行と同じ書式（公開先・status・reason）で並ぶ。
 
@@ -111,7 +115,7 @@
 
 1. When 置き場所の更新が失敗する, the リリース手順書 shall リリース CI の失敗したジョブの再実行、またはマニュアル公開 CI の手動実行（`main`）で復旧できることを示す。
 2. When 置き場所の更新を再実行する, the 置き場所の更新 shall すでに公開済みの Release を変えず、最新の Release の `hello-pasta.nar` から置き場所を作り直して公開する。
-3. If 最新ではない Release のタグでリリース CI が再実行される, then the リリース CI shall 最新ではない Release の中身を置き場所へ置かない。*（仮定: 最新でなければ置き場所の更新を行わず、報告の表にその旨を出す。OPEN QUESTION 6。）*
+3. If 最新ではない Release のタグでリリース CI が再実行される, then the リリース CI shall マニュアル公開 CI を起動せず置き場所を更新せず、報告の表の置き場所の行に `skipped`（理由: 最新ではないタグ）を出す。最新かどうかの判定は起動の前に行い、ほかの run に影響させない。
 4. The リリース手順書 shall 置き場所の更新の失敗時の読み方と、リリースの実行中は `release.yml` を `main` へ入れないという注意を載せる。
 
 ### Requirement 7: 置き場所の入口
@@ -120,7 +124,7 @@
 
 #### Acceptance Criteria
 
-1. When ブラウザが `https://ekicyou.github.io/pasta/hello-pasta/` を開く, the 更新の置き場所 shall 404 でなく、ダウンロードのページ（`https://ekicyou.github.io/pasta/download.html`）へ案内するページを返す。*（形は OPEN QUESTION 8。）*
+1. When ブラウザが `https://ekicyou.github.io/pasta/hello-pasta/` を開く, the 更新の置き場所 shall 404 でなく、ダウンロードのページ（`https://ekicyou.github.io/pasta/download.html`）へ案内するページを返す。ページは短い案内文とダウンロードのページへのリンクだけの静的なものとし、自動では移さない。
 2. The 入口のページ shall `updates.txt` に載るファイル（SSP の更新の対象）に含まれず、`updates.txt` との整合の検査（Requirement 3）の結果に影響しない。
 3. The 入口のページ shall リリースの版や nar の中身の構成に依らず、同じ内容で置ける。
 
@@ -131,12 +135,13 @@
 #### Acceptance Criteria
 
 1. The マニュアル shall hello-pasta をコピーして自分のゴーストを作るときは `descript.txt` の `homeurl` を消すか自分の更新の置き場所に直すことを、hello-pasta から写す手順に近い場所に書く。
-2. The マニュアル shall hello-pasta のネットワーク更新で、手元で書き換えた辞書・`pasta.toml` が上書きされうることを、実機確認（Requirement 10.3）の結果に合わせて書く。*（書く場所は OPEN QUESTION 4。）*
+2. The マニュアル shall hello-pasta のネットワーク更新で、手元で書き換えた辞書・`pasta.toml` が上書きされうることを、実機確認（Requirement 10.3）の結果に合わせて、ダウンロードのページのサンプルゴーストの節と、hello-pasta から写す手順（`getting-started/setup.md`）の 2 か所に短く書く。
 3. When `pasta_check validate` が、`name` が `hello-pasta` でないゴーストの `descript.txt` の `homeurl` を調べ、それが hello-pasta の更新の置き場所を指していることを見つける, the `pasta_check validate` shall 警告（注意）を出す。
-4. If `descript.txt` の `name` が `hello-pasta` である、または `homeurl` が無い、または `homeurl` が hello-pasta の更新の置き場所を指さない, then the `pasta_check validate` shall この警告を出さない。
+4. If `descript.txt` の `name` が `hello-pasta` である、または `homeurl` が無い、または `homeurl` が hello-pasta の更新の置き場所を指さない、または `descript.txt` が無い・読めない, then the `pasta_check validate` shall この警告を出さず、読めないことを誤りにしない。`name` が無いゴーストは `hello-pasta` でないものとして扱う。
 5. The `pasta_check validate` shall この警告を、検査の結果の分類の 1 つとして固定の重さ（注意）で出し、オプションや状況で変えない。
-6. The `pasta_check validate` shall `homeurl` が hello-pasta の置き場所を指すかの判定で、末尾の `/` の有無・大文字小文字・`http` と `https` の違いを同じとして扱う。*（仮定。OPEN QUESTION 7。）*
+6. The `pasta_check validate` shall `homeurl` が hello-pasta の置き場所を指すかの判定で、末尾の `/` の有無・大文字小文字・`http` と `https` の違いを同じとして扱い、置き場所の配下のパスも指しているものとみなす。
 7. If この警告だけが出る, then the `pasta_check validate` shall 終了コードを、既存の警告（注意）だけのときと同じにする。
+8. The この警告 shall `pasta_check validate`（および内部で `validate` を行う `pasta_check release`）で出し、VS Code 拡張・LSP・pasta-recipe では出さない。
 
 ### Requirement 9: 手順書とマニュアルの更新
 
@@ -149,6 +154,7 @@
 3. The `.github/release-ci-setup.md` shall 置き場所の更新に必要な権限と、`github-pages` の environment が `main` だけに公開を許すことを書く。
 4. The マニュアルのダウンロードのページ shall サンプルゴーストの節に、hello-pasta がネットワーク更新に対応していることを書く。
 5. The マニュアル shall 章立て・見た目を変えず、触れる範囲をダウンロードのページへの案内と、派生ゴーストの注意の 1 節に限る。
+6. The `crates/pasta_sample_ghost/RELEASE.md` shall ファイルを消す・改名する版を出すときは（SSP の更新が古いファイルを消さないため）別途検討することを 1 行で書く。
 
 ### Requirement 10: 実機（SSP）での確認
 
@@ -157,7 +163,7 @@
 #### Acceptance Criteria
 
 1. When ローカルの HTTP サーバーに更新の置き場所を作り、別ポートの別の SSP インスタンスで更新確認を行う, the hello-pasta shall `pasta.dll` を含む一式を、置き場所の版に差し替える。
-2. While SSP が `pasta.dll` を読み込んでいる, the SSP shall 更新確認で `pasta.dll` を差し替えられる。*（pasta では未確認。OPEN QUESTION 3。）*
+2. While SSP が `pasta.dll` を読み込んでいる, the SSP shall 更新確認で `pasta.dll` を差し替えられる。*（pasta では未確認。この実機確認で確かめる。）*
 3. When 手元で書き換えた辞書または `pasta.toml` がある状態で更新確認を行う, the 実機確認 shall 上書きされるかどうかの結果を記録し、Requirement 8.2 の注意の根拠にする。
 4. The 実機確認 shall 公開サイト（GitHub Pages）の実際の URL で `.dll`・`.pasta`・`.png` が変換されずに返ることも確かめる。
 5. If 実機確認で更新が通らない, then the 完了の判定 shall この仕様を完了としない。*（部分的な出荷はせず、原因を直すかリジェクトする。）*
@@ -176,25 +182,19 @@
 
 ---
 
-## OPEN QUESTIONS（要件ディスカッションで決める）
+## 決定事項（要件ディスカッション 2026-11-15・全議題を推奨案で確定）
 
-1. **展開の範囲**: nar 全体を展開するか、`bal/`（同梱バルーン）を除くか。
-   - 仮定: nar 全体を展開する（置き場所の中身を nar と同じにでき、整合の検査が単純）。現在の hello-pasta は `bal/` を含まず、現状ではどちらでも結果は同じ。
-2. **リリース・nar が無いときの扱い**: 最新の Release が無い／nar が無い／取得失敗のとき、マニュアル公開を止めるか、置き場所を欠いたまま公開を続けるか。最初のリリースより前（この仕様の PR がマージされた後、`homeurl` を足した版が出るまで）は、前の版の nar を置くことになる。古い nar が `updates.txt` を持たないときの扱いも含む。
-   - 仮定: 取得できなければ失敗して公開を止める（置き場所を欠いたサイトを出すと、すでに配られた更新確認が壊れるため）。最初のリリースより前は前の版の nar を置く。
-3. **SSP が `pasta.dll` を更新で差し替えられるか**: 実行中の dll を SSP がどう扱うか、pasta では未確認。
-   - 仮定: SSP は dll ゴーストの更新では dll を解放してから差し替える（通常の挙動）。実機確認（Requirement 10）で確かめ、通らなければこの仕様は完了にしない。
-4. **手元で書き換えたファイルの上書き**: 更新で辞書・`pasta.toml` が上書きされるとき、利用者向けの注意をどこに書くか。
-   - 仮定: ダウンロードのページのサンプルゴーストの節と、hello-pasta から写す手順（`getting-started/setup.md`）の 2 か所に短く書く。実機確認の結果で書き方を直す。
-5. **公開後の見比べの待ち**: 公開サイトの配信の反映待ちで取り直す回数・間隔・全体の上限。見比べが失敗したとき、リリース CI 全体を失敗にするか、報告の表の行だけを failed にするか。
-   - 仮定: 一定の回数・時間の範囲で取り直し、見比べの失敗は報告の表の 1 行を failed にするだけで他の公開先の結果は変えない（Release はすでに公開済みのため）。具体の値は設計で決める。
-6. **古いタグの再実行**: 最新ではないタグのリリース CI が再実行されたとき、置き場所の更新をどうするか（最新を置く／行わない）。
-   - 仮定: 最新の Release でなければ置き場所の更新を行わず、報告の表にその旨を出す。
-7. **派生ゴースト警告の判定条件**: hello-pasta の置き場所を指す `homeurl` の判定の厳密さ（末尾の `/`・大文字小文字・`http`/`https` の違い・配下のパス）と、`name` が無いときの扱い。
-   - 仮定: `https://ekicyou.github.io/pasta/hello-pasta/` に一致または配下で、末尾の `/`・大文字小文字・`http`/`https` の違いは同じとみなす。`name` が無いゴーストは「hello-pasta でない」とみなして警告する。
-8. **入口のページの形**: ダウンロードのページへ案内するページを、案内文＋リンクにするか、自動で移すか。
-   - 仮定: 短い案内文とダウンロードのページへのリンクの静的なページ（自動で移さない）。
-9. **版**: この仕様を入れる版は未定（開発者の判断待ち）。`homeurl` は、その版の nar を入れた利用者から効く。
-   - 仮定: 要件には版を書かず、ロードマップ側で決める。
-10. **権限と起動の方法**: `GITHUB_TOKEN` で別のワークフローを起動し完了を待つのに要る権限（`actions: write`・`actions: read` の想定）が、`github-release` ジョブの `contents: write` と分けて足せるか。
-    - 仮定: 新しいジョブにだけ最小で足す（Requirement 4.5）。足せないときは設計で別の方法を検討し、公開サイトの公開を 1 か所に保つ制約は譲らない。
+1. **展開の範囲**: nar 全体を展開する。`bal/` の除外規則は持たない（Requirement 1.5）。
+2. **Release・nar が取れないとき**: 失敗して公開を止める。PR・ブランチでも同じく失敗にする。`updates.txt` の無い nar も失敗。`homeurl` を足した版が出る前は、前の版の nar を置く（Requirement 4.4・4.8）。
+3. **上書き注意の置き場所**: ダウンロードのページのサンプルゴースト節と `setup.md` の 2 か所。文言は実機確認の結果に合わせる（Requirement 8.2）。
+4. **公開後の見比べ**: `updates.txt` 1 本の一致。失敗は報告の表の 1 行を `failed` にするだけで、他の公開先は変えない。取り直しの値は設計（Requirement 5）。
+5. **古いタグの再実行**: 起動の前に判定し、更新せず `skipped`（理由: 最新ではないタグ）を表に出す（Requirement 6.3）。
+6. **派生ゴースト警告**: `pasta_check validate`（と `release`）だけ。エディタ系は対象外。`name` 無しは警告・`descript.txt` が読めなければ黙る・正規化は末尾の `/`・大文字小文字・http/https・配下のパス（Requirement 8）。
+7. **入口ページ**: 短い案内とリンクだけの静的なページ。自動では移さず、`updates.txt` に載せない（Requirement 7）。
+8. **`delete.txt`**: 対象外。手順書に別途検討の 1 行（Requirement 9.6）。
+9. **版**: 要件に書かず、ロードマップで決める。`pasta-dll-multiarch` と同じウェーブに置かない。
+10. **確認事項のまま進めるもの**: SSP が動作中の `pasta.dll` を差し替えられるか（Requirement 10.2 の実機で確かめる。通らなければ未完了）。`actions` 権限を新ジョブだけに足せるか（設計で確かめる。足せないときも公開を 1 か所に保つ制約は譲らない）。
+
+## 設計フェーズへ回す事項（`research.md` の「設計判断の項目」と同じ。`/kiro-design` で解決する）
+
+展開・検査のロジックの置き場所と言語（公開前と公開後で共有するか）／起動と待ちの方式と run の特定／起動した run が `cancelled` になったときの扱い／新ジョブの構成と `report` への組み込み／見比べの取り直しの値／`release` スキルの完了判定（7 → 8 つか別枠か）／`index.html` の元ファイルの置き場所／照合の細部（`ghost/master/updates.txt`・`date=`・パスの安全性）／警告の実装（`descript.txt` を読む入口・`FindingKind`・URL 定数の持ち方・`validate.md` とスキル生成物）／`integration_test.rs:173` の直し／`manual.yml` の起動条件／`homeurl` の方式（`descript.txt` のみ）。
