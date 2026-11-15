@@ -360,3 +360,11 @@
 - `.github/workflows/manual.yml` — マニュアルの検査の順
 - [UKADOC さくらスクリプトリスト `\![move]`](https://ukatech.shillest.net/ukadoc-spec/list_sakura_script.html#bang-move)・[`\![set,balloonoffset,x,y]`](https://ukatech.shillest.net/ukadoc-spec/list_sakura_script.html#bang-set-balloonoffset-x-y) — 位置の合わせ方
 - WAI-ARIA Authoring Practices「Window Splitter」— 仕切りのキーと読み上げの型
+
+## 9. 設計ディスカッションの決定（2026-11-15）
+
+開発者が 6 つの議題を推奨案で承認した。一覧と根拠は `design.md` の「設計ディスカッションの決定」にある。この文書の前の節と食い違う所は、次のとおり読み替える。
+
+- 3 節・4.2 節の「試験用の SSP を `--sstp-listen 9802` で立てる」: 採らない。撮影の間は普段の SSP を開発者に閉じてもらい、ポートを指定せずに立てる（決定 4）。
+- 8 節の `output_share`（出力が占める割合・入れ替えると欄に付いていく）: `left_share`（左の欄の割合・2 つの面で共通・入れ替えても動かない）に替えた（決定 1）。
+- 録画と編集の道具は一度も試していない。実装の最初の仕事（ToolSmokeTrial）で確かめ、結果をこの文書に書き足す（決定 5）。

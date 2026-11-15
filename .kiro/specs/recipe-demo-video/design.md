@@ -17,7 +17,7 @@
 
 ### Goals
 
-- 仕切り 3 本（ツリー｜エディタ・エディタ｜下の欄・出力｜保存変数）をドラッグと矢印のキーで動かせ、出力と保存変数の左右を入れ替えられ、閉じて開き直しても並びが残る（11.1〜11.8）。
+- 仕切り 3 本（ツリー｜エディタ・エディタ｜下の欄・下の欄の左右。左右の境は「診断｜検査」と「出力｜保存変数」の 2 つの面で共通）をドラッグと矢印のキーで動かせ、出力と保存変数の左右を入れ替えられ、閉じて開き直しても並びが残る（11.1〜11.8）。
 - 新しい依存を足さない。Rust は今ある `toml`・`serde`、画面は今ある部品だけで作る。
 - 60〜90 秒・5 MB 以下・音声なしの mp4 を `book/src/debug/media/recipe-dev-actions-demo.mp4` に置き、`recipe.md` に載せ、`dev-actions.md` の古い動画を外す（要件 1〜6）。
 - 撮影は Openscreen と CDP で行い、開発者のマウスとキーボードを使わず、終わったら環境を元に戻す（要件 7）。
@@ -25,7 +25,7 @@
 
 ### Non-Goals
 
-- 欄を別の場所へ移すこと（窓の上下左右への付け替え・別の窓）。書く面（診断｜検査）の境を動かすこと。窓の位置と大きさを覚えること。仕切りのダブルクリックでの初期化。
+- 欄を別の場所へ移すこと（窓の上下左右への付け替え・別の窓）。窓の位置と大きさを覚えること。仕切りのダブルクリックでの初期化。
 - 動画への音声・ナレーション・文で流す字幕・矢印・題名。
 - 撮影の自動化（CI で撮る・撮影のスクリプトをリポジトリに置く）。
 - リポジトリの hello-pasta・VSCode 拡張・pasta.dll の変更。公開のサイトの旧版（`classic/`）に残る古い動画の扱い。
@@ -79,7 +79,7 @@ graph TB
         Markup[SplitterMarkup 仕切りの要素と見た目]
         Rules[LayoutRules 並びの決まり]
         Mount[LayoutMount 取り付け]
-        RunFace[PanelsRunFace 動かす面]
+        PanelsSplit[PanelsSplit 下の欄の左右]
         Ipc[ipc.ts]
         Cmd[commands.rs]
         Store[LayoutStore layout.rs]
@@ -90,7 +90,7 @@ graph TB
         Exe[LocalBuild 手元のビルド]
     end
     Mount --> Rules
-    Mount --> RunFace
+    Mount --> PanelsSplit
     Mount --> Markup
     Mount --> Ipc
     Ipc --> Cmd
@@ -106,7 +106,7 @@ graph TB
 **Architecture Integration**:
 
 - 選んだ型: 流れ A は今の層（Rust の記録 → コマンド → `ipc.ts` → 純粋な決まり → DOM の糊）にそのまま足す。流れ B は関門つきの手順である。
-- 境: 並びの数の決まり（最小・窓への収め方・入れ替え）は `LayoutRules` だけが持つ。DOM に当てるのは `LayoutMount`、ファイルは `LayoutStore`。動かす面の 2 つの欄の順と割合は、面を作っている `Panels` が当てる。
+- 境: 並びの数の決まり（最小・窓への収め方・入れ替え）は `LayoutRules` だけが持つ。DOM に当てるのは `LayoutMount`、ファイルは `LayoutStore`。下の欄の左右の割合（2 つの面で共通）と、動かす面の 2 つの欄の順は、面を作っている `Panels` が当てる。
 - 守る型: 記録は `recent.rs` と同じ作り。純粋な判断と DOM を分ける。既定の見た目を変えない。
 - 依存の向き（流れ A）: `layout.rs` → `commands.rs` → `ipc.ts` → `main.ts`。`layout.ts` は何も読み込まない（`ipc.ts` が `LayoutPrefs` の型だけを借りる）。`layout.ts`・`panels.ts`・`ipc.ts` を結ぶのは `main.ts` だけである。
 - 流れ B が流れ A に触れる所は 1 つだけ: 撮影の並びを `layout.toml` に書いてから pasta-recipe を起動する（仕切りを CDP で引きずらない）。
@@ -133,7 +133,7 @@ editors/recipe/
 ├── src/
 │   ├── layout.ts                  # 新規。並びの決まり（純粋）と、仕切りの取り付け（DOM）
 │   ├── layout.test.ts             # 新規。並びの決まりの試験（node --test）
-│   ├── panels.ts                  # 動かす面に仕切りと入れ替えのボタンを足す。順と割合を当てる
+│   ├── panels.ts                  # 2 つの面に左右の仕切りを足し、入れ替えのボタンを足す。割合と順を当てる
 │   ├── ipc.ts                     # layoutLoad・layoutSave を足す
 │   ├── main.ts                    # 並びを読み、取り付ける
 │   └── style.css                  # 仕切りの見た目。幅と高さを CSS の変数に替える（既定は今の値）
@@ -180,11 +180,12 @@ Openscreen のプロジェクト（題名 recipe-dev-actions-demo）            
 | -- | -- |
 | LayoutStore | `editors/recipe/src-tauri/src/layout.rs`・`commands.rs`・`lib.rs` |
 | LayoutRules・LayoutMount | `editors/recipe/src/layout.ts`・`layout.test.ts`・`ipc.ts`・`main.ts` |
-| PanelsRunFace | `editors/recipe/src/panels.ts` |
+| PanelsSplit | `editors/recipe/src/panels.ts` |
 | SplitterMarkup | `editors/recipe/index.html`・`src/style.css` |
 | WindowMinimum | `editors/recipe/src-tauri/tauri.conf.json` |
 | RecipeManualNote・ManualVideoEdits | `book/src/debug/recipe.md`・`dev-actions.md`・`media/` |
 | RetakeRecord | `book/SCREENSHOTS.md` |
+| ToolSmokeTrial | `C:\pasta-demo\work\`（試しの書き出し。確かめたら消す）・`research.md`（結果の記録） |
 | LocalBuild | `editors/recipe/src-tauri/target/release/pasta-recipe.exe`・`crates/pasta_sample_ghost/release.ps1` の生成物 |
 | DemoGhostCopy | `C:\pasta-demo\hello-pasta\` |
 | Preflight・StageSetup | `C:\pasta-demo\work\stage.ps1`・`%APPDATA%\io.github.ekicyou.pasta-recipe\layout.toml` |
@@ -213,7 +214,8 @@ Openscreen のプロジェクト（題名 recipe-dev-actions-demo）            
 
 ```mermaid
 flowchart TD
-    Build[要件 11 を入れてビルド] --> Pre[前の確かめ]
+    Smoke[道具の試し撮り] --> Build[要件 11 を入れてビルド]
+    Build --> Pre[前の確かめ]
     Pre -->|確かめが 1 つでも外れた| Stop[止まって開発者に頼む]
     Pre --> Backup[記録の写しを取る]
     Backup --> Stage[舞台を作る]
@@ -301,6 +303,7 @@ flowchart TD
 | 7.13 | 配置を見せて尋ねる | StageSetup | 試し撮りのコマ | 撮影 |
 | 7.14 | よいと言われるまで撮らない | StageSetup | 承認の関門 | 撮影 |
 | 7.15 | 撮る画面と頼みごとを知らせる | StageSetup | 知らせの文 | 撮影 |
+| 7.16 | 普段の SSP が動いていたら止まる | Preflight | `ssp.exe` のプロセスの確かめ | 撮影 |
 | 8.1 | 不具合を避けて撮らない | ShootScript | 不具合の扱い | 撮影 |
 | 8.2 | 小さな直しはこの spec で | ShootScript | 不具合の扱い | 撮影 |
 | 8.3 | 大きな直しは開発者に諮る | ShootScript | 不具合の扱い | 撮影 |
@@ -310,8 +313,8 @@ flowchart TD
 | 10.2 | 見出しと番号を同じ形で | RetakeRecord | 見出しの表 | — |
 | 11.1 | ツリー｜エディタの仕切り | SplitterMarkup・LayoutMount・LayoutRules | `dragLayout("tree")` | 仕切り |
 | 11.2 | エディタ｜下の欄の仕切り | SplitterMarkup・LayoutMount・LayoutRules | `dragLayout("panels")` | 仕切り |
-| 11.3 | 出力｜保存変数の仕切り | PanelsRunFace・LayoutMount・LayoutRules | `dragLayout("run")`・`setRunLayout` | 仕切り |
-| 11.4 | 左右の入れ替え | PanelsRunFace・LayoutRules | `swapLayout`・`onSwap` | 仕切り |
+| 11.3 | 下の欄の左右の仕切り（2 つの面で共通） | PanelsSplit・LayoutMount・LayoutRules | `dragLayout("split")`・`setSplit` | 仕切り |
+| 11.4 | 左右の入れ替え | PanelsSplit・LayoutRules | `swapLayout`・`onSwap` | 仕切り |
 | 11.5 | キーボード | LayoutMount・LayoutRules | `nudgeLayout`・`role="separator"` | 仕切り |
 | 11.6 | 最小の幅と高さ | LayoutRules・WindowMinimum | `LAYOUT_MIN`・`minWidth`・`minHeight` | 仕切り |
 | 11.7 | 開き直しても残る | LayoutStore・LayoutMount | `layout_load`・`layout_save`・`layout.toml` | 仕切り |
@@ -325,14 +328,15 @@ flowchart TD
 | -- | -- | -- | -- | -- | -- |
 | LayoutStore | A・Rust | `layout.toml` を読み書きする | 11.7 | toml・serde（P0） | Service・State |
 | LayoutRules | A・画面（純粋） | 並びの数を決める（最小・収め方・入れ替え） | 11.1〜11.6・11.8 | なし | Service |
-| LayoutMount | A・画面（DOM） | 仕切りの操作を受け、当てて、覚えさせる | 11.1〜11.5・11.7・11.8 | LayoutRules（P0）・PanelsRunFace（P0）・ipc（P1） | Service |
-| PanelsRunFace | A・画面（DOM） | 動かす面の仕切りと入れ替えのボタンを持ち、順と割合を当てる | 11.3・11.4 | 今の `Panels`（P0） | Service |
+| LayoutMount | A・画面（DOM） | 仕切りの操作を受け、当てて、覚えさせる | 11.1〜11.5・11.7・11.8 | LayoutRules（P0）・PanelsSplit（P0）・ipc（P1） | Service |
+| PanelsSplit | A・画面（DOM） | 2 つの面の左右の仕切りと入れ替えのボタンを持ち、割合と順を当てる | 11.3・11.4 | 今の `Panels`（P0） | Service |
 | SplitterMarkup | A・画面（HTML・CSS） | 仕切り 2 本の要素と、3 本に共通の見た目 | 11.1・11.2・11.5 | なし | — |
 | WindowMinimum | A・設定 | 窓をこれより小さくさせない | 11.6・11.8 | tauri（P0） | — |
 | RecipeManualNote | A・文書 | 並びを変えられることを章に書く | 11.9 | なし | — |
+| ToolSmokeTrial | B・準備 | 録画と編集の道具がこの舞台で通ることを、最初に確かめる | 1.1・2.1・2.2・2.8・3.1・7.1・7.2・7.5 | Openscreen の MCP・CDP（P0） | Batch |
 | LocalBuild | B・準備 | 撮る exe と pasta.dll を手元で作る | 前提 A1 | 流れ A（P0） | Batch |
 | DemoGhostCopy | B・準備 | 写しのゴーストを作る | 1.4・1.10・3.2・7.6 | LocalBuild（P0） | Batch |
-| Preflight | B・準備 | 撮れる状態かを確かめる | 7.2・7.3 | Openscreen・SSP の MCP（P0） | Batch |
+| Preflight | B・準備 | 撮れる状態かを確かめる | 7.2・7.3・7.16 | Openscreen・SSP の MCP（P0） | Batch |
 | StageSetup | B・撮影 | 舞台を作り、開発者の承認を取る | 1.1・1.10・2.12・2.13・3.1・3.2・7.3・7.4・7.11・7.13〜7.15 | DemoGhostCopy・LayoutStore の形（P0） | Batch・State |
 | ShootScript | B・撮影 | CDP で流れを操作し、記録と確かめを残す | 1.2〜1.9・2.1・2.5・2.13・7.5・8.1〜8.3 | StageSetup（P0） | Batch |
 | TakeEdit | B・編集 | 録画・切り抜き・ポインタ・寄り・見出し・書き出し | 1.1・2.1〜2.11・3.1・4.2・7.1 | Openscreen の MCP（P0） | Batch |
@@ -355,7 +359,7 @@ flowchart TD
 
 - `recent.rs` と同じ作りにする: `parse`・`render`・`load(dir)`・`save(dir, …)`。置き場所は `app_data_dir`（`recent.toml` の隣）。
 - 読めない・壊れている・無いときは既定の並びを返す（誤りにしない）。書けないときは理由を返すが、コマンドは握りつぶす（記録の失敗で操作を止めない）。
-- ファイルは人が書き換えうるので、値を確かめる: キーが欠けていればそのキーだけ既定。TOML として読めない・型が合わないときは全部既定。`output_share` が 0〜1 の外か有限でないときは、そのキーだけ既定。
+- ファイルは人が書き換えうるので、値を確かめる: キーが欠けていればそのキーだけ既定。TOML として読めない・型が合わないときは全部既定。`left_share` が 0〜1 の外か有限でないときは、そのキーだけ既定。
 - 窓の大きさに合わせた丸め（最小・最大）はここでは行わない（`LayoutRules` の持ち分）。
 
 **Contracts**: Service [x] / State [x]
@@ -363,11 +367,11 @@ flowchart TD
 ##### Service Interface
 
 ```rust
-/// 画面との受け渡し（serde は camelCase: treeWidth・panelsHeight・outputShare・swapped）
+/// 画面との受け渡し（serde は camelCase: treeWidth・panelsHeight・leftShare・swapped）
 pub struct Layout {
     pub tree_width: u32,     // ツリーの幅（CSS px）
     pub panels_height: u32,  // 下の欄の面の高さ（帯を除く。CSS px）
-    pub output_share: f64,   // 動かす面の幅のうち出力が占める割合（0.0〜1.0）
+    pub left_share: f64,     // 下の欄の左の欄の幅の割合（0.0〜1.0。2 つの面で共通）
     pub swapped: bool,       // true で保存変数が左・出力が右
 }
 impl Default for Layout { /* 260・180・0.5・false（今の見た目） */ }
@@ -384,7 +388,7 @@ pub fn save(dir: &Path, layout: &Layout) -> Result<(), String>;
 
 - Preconditions: なし（`app_data_dir` が取れなければ `layout_load` は既定を返し、`layout_save` は何もしない）。
 - Postconditions: `save` の後の `load` は同じ値を返す。`render` の出力は頭にコメントの 1 行を持つ。
-- Invariants: 返す `output_share` はいつも 0.0〜1.0 の有限の数。
+- Invariants: 返す `left_share` はいつも 0.0〜1.0 の有限の数。
 
 ##### State Management
 
@@ -420,8 +424,8 @@ export interface LayoutPrefs {
   treeWidth: number;
   /** 下の欄の面の高さ（帯を除く。CSS px・整数） */
   panelsHeight: number;
-  /** 動かす面の幅のうち出力の欄が占める割合（0〜1） */
-  outputShare: number;
+  /** 下の欄の左の欄の幅の割合（0〜1）。書く面（診断｜検査）と動かす面（出力｜保存変数）で共通 */
+  leftShare: number;
   /** true で保存変数が左・出力が右 */
   swapped: boolean;
 }
@@ -434,7 +438,7 @@ export interface LayoutSpace {
   height: number;
 }
 
-export type SplitterId = "tree" | "panels" | "run";
+export type SplitterId = "tree" | "panels" | "split";
 
 export const DEFAULT_LAYOUT: LayoutPrefs; // 260・180・0.5・false
 export const LAYOUT_MIN: {
@@ -442,31 +446,31 @@ export const LAYOUT_MIN: {
   readonly editorWidth: 240;
   readonly editorHeight: 120; // タブの列を含むエディタの側の高さ
   readonly panels: 60;
-  readonly panel: 160; // 出力・保存変数のそれぞれの幅
+  readonly panel: 160; // 下の欄の左右の欄のそれぞれの幅
 };
 export const KEY_STEP = 16; // 矢印のキー 1 回の px
 
 /** 窓に収めた並び（最小を守る）。prefs は書き換えない。数でない値は既定に替える */
 export function fitLayout(prefs: LayoutPrefs, space: LayoutSpace): LayoutPrefs;
-/** ドラッグ: 仕切りを offset へ動かした並び。tree＝範囲の左の端から、panels＝範囲の下の端から、run＝動かす面の左の端からの px */
+/** ドラッグ: 仕切りを offset へ動かした並び。tree＝範囲の左の端から、panels＝範囲の下の端から、split＝下の欄の左の端からの px */
 export function dragLayout(prefs: LayoutPrefs, id: SplitterId, offset: number, space: LayoutSpace): LayoutPrefs;
 /** 矢印: 見た目の向きへ KEY_STEP だけ動かした並び。-1＝左か上、1＝右か下 */
 export function nudgeLayout(prefs: LayoutPrefs, id: SplitterId, direction: -1 | 1, space: LayoutSpace): LayoutPrefs;
-/** 左右を入れ替える。出力の割合は欄に付いていく */
+/** 動かす面の左右を入れ替える（swapped だけを替える）。境は動かない */
 export function swapLayout(prefs: LayoutPrefs): LayoutPrefs;
-/** 読み上げに渡す今の値と範囲（tree・panels は px、run は左の欄の %） */
+/** 読み上げに渡す今の値と範囲（tree・panels は px、split は左の欄の %） */
 export function separatorValue(prefs: LayoutPrefs, id: SplitterId, space: LayoutSpace): { now: number; min: number; max: number };
 ```
 
 - Preconditions: `space` の数は 0 以上（部品が隠れていて 0 のときも落ちない）。
-- Postconditions（`space` が窓の最小の大きさ以上のとき）: `tree ≤ treeWidth ≤ width − editorWidth`、`panels ≤ panelsHeight ≤ height − editorHeight`、出力と保存変数の幅はどちらも `panel` 以上。
+- Postconditions（`space` が窓の最小の大きさ以上のとき）: `tree ≤ treeWidth ≤ width − editorWidth`、`panels ≤ panelsHeight ≤ height − editorHeight`、下の欄の左右の欄の幅はどちらも `panel` 以上。
 - 窓の最小より小さい `space`（起こらない見込み）では、ツリー・下の欄・2 つの欄の最小を先に守り、エディタが残りを取る。
-- `dragLayout`・`nudgeLayout` は、今の窓に収めた値（`fitLayout` の結果）から動かす。返す並びは、**動かした仕切りのキーだけ**を新しい値にし、触っていないキーは受け取った `prefs`（覚えた値）のまま返す。狭い窓で 1 本を動かしても、ほかの 2 本の覚えた値は収めた値に書き換わらない（11.8）。入れ替えているときの `run` は、左の欄が保存変数なので `outputShare = 1 − 左の欄の割合` になる。
+- `dragLayout`・`nudgeLayout` は、今の窓に収めた値（`fitLayout` の結果）から動かす。返す並びは、**動かした仕切りのキーだけ**を新しい値にし、触っていないキーは受け取った `prefs`（覚えた値）のまま返す。狭い窓で 1 本を動かしても、ほかの 2 本の覚えた値は収めた値に書き換わらない（11.8）。`split` の値は入れ替えに依らない（左の欄の割合をそのまま持つ）。
 
 **Implementation Notes**
 
 - Validation: `layout.test.ts`（Testing Strategy）。
-- Risks: 最小の数は机の上で決めた。実物で狭すぎる・広すぎると分かったら、この表の数だけを変える（未決の論点 5）。
+- Risks: 最小の数は机の上で決めた。実物で狭すぎる・広すぎると分かったら、この表の数だけを変える（設計ディスカッションの決定 3）。
 
 #### LayoutMount（`src/layout.ts` の `mountLayout`）
 
@@ -478,16 +482,16 @@ export function separatorValue(prefs: LayoutPrefs, id: SplitterId, space: Layout
 **Responsibilities & Constraints**
 
 - 今の並び（`LayoutPrefs`）を 1 つ持つ。動かすたびに `LayoutRules` で決め直し、当てる。
-- 当て方: ツリーの幅と下の欄の高さは、`root` の CSS の変数 `--tree-width`・`--panels-height`。出力と保存変数は `RunFace.setRunLayout`。
+- 当て方: ツリーの幅と下の欄の高さは、`root` の CSS の変数 `--tree-width`・`--panels-height`。下の欄の左右は `PanelsSplit.setSplit`。
 - ドラッグは Pointer Events とポインタの捕まえ（`setPointerCapture`）で受ける。動かしている間は文字の選択を止める。
-- キーボード: 仕切りに焦点があるとき、縦の仕切り（ツリー・出力｜保存変数）は ←・→、横の仕切り（下の欄）は ↑・↓ で `KEY_STEP` ずつ動かす。ほかのキーは触らない。
+- キーボード: 仕切りに焦点があるとき、縦の仕切り（ツリー・下の欄の左右）は ←・→、横の仕切り（下の欄）は ↑・↓ で `KEY_STEP` ずつ動かす。ほかのキーは触らない。
 - 読み上げ: 動かすたびに `aria-valuenow`・`aria-valuemin`・`aria-valuemax` を `separatorValue` で更新する。
 - 覚えさせるのは操作の終わりだけ（`pointerup`・矢印のキーの `keyup`・入れ替え）。値が変わっていなければ書かない。書くのは覚えた並び（`LayoutRules` が返したもの）で、窓に収めて当てた値ではない。
 - `#workspace` を `ResizeObserver` で見張り、大きさが変わったら `fitLayout` で当て直す（覚えた値は変えない・書かない）。
 
 **Dependencies**
 
-- Outbound: LayoutRules（P0）・RunFace（P0）・`save`（`ipc.layoutSave`。失敗は握りつぶす。P1）
+- Outbound: LayoutRules（P0）・PanelsSplit（P0）・`save`（`ipc.layoutSave`。失敗は握りつぶす。P1）
 
 **Contracts**: Service [x]
 
@@ -495,13 +499,13 @@ export function separatorValue(prefs: LayoutPrefs, id: SplitterId, space: Layout
 
 ```typescript
 /** Panels のうち並びが使う所（panels.ts を読み込まず、形で受ける） */
-export interface RunFace {
-  /** 出力と保存変数の間の仕切り（role="separator"） */
-  readonly runSplitter: HTMLElement;
-  /** 動かす面（幅と左の端を測る） */
-  readonly runFace: HTMLElement;
-  /** 2 つの欄の順と幅の割合を当てる */
-  setRunLayout(outputShare: number, swapped: boolean): void;
+export interface PanelsSplit {
+  /** 2 つの面それぞれの、左右の欄の間の仕切り（role="separator"。出ている面のものだけが見える） */
+  readonly splitters: readonly HTMLElement[];
+  /** 下の欄（#panels。幅と左の端を測る） */
+  readonly area: HTMLElement;
+  /** 左の欄の幅の割合を 2 つの面に当て、動かす面の 2 つの欄の順を当てる */
+  setSplit(leftShare: number, swapped: boolean): void;
   /** 入れ替えのボタンが押されたときに呼ばれる */
   onSwap: () => void;
 }
@@ -513,7 +517,7 @@ export interface LayoutTargets {
   workspace: HTMLElement;
   treeSplitter: HTMLElement;
   panelsSplitter: HTMLElement;
-  run: RunFace;
+  panels: PanelsSplit;
   /** 操作の終わりに呼ぶ。失敗しても投げない */
   save(prefs: LayoutPrefs): void;
 }
@@ -530,20 +534,19 @@ export function mountLayout(targets: LayoutTargets, initial: LayoutPrefs): void;
 - Validation: DOM の試験は置かない（このアプリの型）。手元のビルドで CDP から確かめる（Testing Strategy）。
 - Risks: 開始の画面の間は部品が隠れていて大きさが 0 になる。`ResizeObserver` が、ゴーストを開いて部品が出たときに当て直す。
 
-#### PanelsRunFace（`src/panels.ts` の `Panels` の拡張）
+#### PanelsSplit（`src/panels.ts` の `Panels` の拡張）
 
 | Field | Detail |
 | -- | -- |
-| Intent | 動かす面に仕切りと入れ替えのボタンを持ち、2 つの欄の順と割合を当てる |
+| Intent | 2 つの面に左右の仕切りを持ち、入れ替えのボタンを持ち、割合と順を当てる |
 | Requirements | 11.3, 11.4 |
 
 **Responsibilities & Constraints**
 
-- 動かす面の中の並びを「左の欄・仕切り・右の欄」にする。`setRunLayout(outputShare, swapped)` は、**DOM の順を見た目の順に合わせる**（Tab の順と読み上げの順が見た目と同じになる）。順が変わらないときは DOM を触らない。並べ替えの前後で、2 つの欄のスクロールの位置を保つ。
-- 幅の割合は 2 つの欄の `flex-grow` で当てる（出力＝`outputShare`、保存変数＝`1 − outputShare`）。
-- 入れ替えのボタンは帯（`.panels-bar`）の右の端に置く。文は「左右を入れ替える」、読み上げの名前は「出力と保存変数の左右を入れ替える」。動かす面を出している間だけ出す（`show` が切り替える）。押した後、焦点はボタンに残る。
-- 書く面（診断｜検査）は今のまま（半分ずつ・仕切りなし）。
-- `RunFace` の形（上の Service Interface）を満たす。`output`・`variables`（`devPanels.ts` が中身を満たす口）は変えない。
+- 2 つの面（書く面＝診断｜検査、動かす面＝出力｜保存変数）のどちらも、中の並びを「左の欄・仕切り・右の欄」にする。仕切りの要素は面ごとに 1 つで、出ている面のものだけが見える。`setSplit(leftShare, swapped)` は、左の欄の幅の割合を **2 つの面に同じ値で**当て、動かす面では `swapped` に合わせて **DOM の順を見た目の順に合わせる**（Tab の順と読み上げの順が見た目と同じになる）。順が変わらないときは DOM を触らない。並べ替えの前後で、2 つの欄のスクロールの位置を保つ。
+- 幅の割合は 2 つの欄の `flex-grow` で当てる（左の欄＝`leftShare`、右の欄＝`1 − leftShare`）。入れ替えても境は動かず、中身だけが入れ替わる。面を切り替えても境の位置は同じである。
+- 入れ替えのボタンは帯（`.panels-bar`）の、面を切り替える 2 つのタブのすぐ右に置く（左寄せ。帯の右の端は、画面の右下に立つゴーストに隠れる所なので使わない）。文は「左右を入れ替える」、読み上げの名前は「出力と保存変数の左右を入れ替える」。動かす面を出している間だけ出す（`show` が切り替える）。押した後、焦点はボタンに残る。
+- `PanelsSplit` の形（上の Service Interface）を満たす。`output`・`variables`（`devPanels.ts` が中身を満たす口）は変えない。
 
 **Implementation Notes**
 
@@ -552,7 +555,7 @@ export function mountLayout(targets: LayoutTargets, initial: LayoutPrefs): void;
 
 #### SplitterMarkup（`index.html`・`src/style.css`）
 
-- 仕切りの要素: `role="separator"`・`tabindex="0"`・`aria-orientation`（ツリーと出力｜保存変数は `vertical`、下の欄は `horizontal`）・`aria-label`（「ツリーとエディタの境」「エディタと下の欄の境」「出力と保存変数の境」）。
+- 仕切りの要素: `role="separator"`・`tabindex="0"`・`aria-orientation`（ツリーと下の欄の左右は `vertical`、エディタと下の欄の境は `horizontal`）・`aria-label`（「ツリーとエディタの境」「エディタと下の欄の境」「出力と保存変数の境」「診断と検査の境」）。
 - 見た目: **今の 1 px の境の線のまま**。仕切りは境の線に重なる幅（高さ）5 px の透明な帯で、場所を取らない。ポインタを乗せたとき・焦点が当たったとき・動かしている間だけ強調色（`--accent`）になる。カーソルは `col-resize`・`row-resize`。`touch-action: none`。
 - 既定の値（`260px`・`180px`・半分ずつ）は CSS の側に残す。`layout.toml` が無い人の見た目は今と変わらない。
 - 開始の画面の間は、今の CSS の決まり（`body` の直下を隠す）で仕切りも隠れる。
@@ -563,10 +566,35 @@ export function mountLayout(targets: LayoutTargets, initial: LayoutPrefs): void;
 
 #### RecipeManualNote（`book/src/debug/recipe.md`）
 
-- 節「画面と操作」の頭の段落の後に、短い段落を 1 つ足す: 3 つの境（ツリーとエディタ・エディタと下の欄・出力と保存変数）をドラッグで動かせること。境に焦点を当てて矢印のキーでも動かせること。下の欄の頭の「左右を入れ替える」で出力と保存変数を入れ替えられること。並びは次に開いたときも残ること。欄には最小の幅と高さがあること。
+- 節「画面と操作」の頭の段落の後に、短い段落を 1 つ足す: 3 つの境（ツリーとエディタ・エディタと下の欄・下の欄の左右）をドラッグで動かせること。下の欄の左右の境は「診断・検査」と「出力・保存変数」で共通であること。境に焦点を当てて矢印のキーでも動かせること。下の欄の頭の「左右を入れ替える」で出力と保存変数を入れ替えられること。並びは次に開いたときも残ること。欄には最小の幅と高さがあること。
 - 節「入手と置き方」の、書く場所を挙げている文に、並びの記録（`layout.toml`。`recent.toml` と同じフォルダ）を足す。
 
 ### 流れ B: 撮影とマニュアル
+
+#### ToolSmokeTrial（実装の最初の仕事）
+
+| Field | Detail |
+| -- | -- |
+| Intent | 一度も試していない録画と編集の道具が、この舞台で通ることを、流れ A を作る前に確かめる |
+| Requirements | 1.1, 2.1, 2.2, 2.8, 3.1, 7.1, 7.2, 7.5 |
+
+録画の道具は Openscreen に限る（7.2）。根本でつまずくなら、仕切りを作る前に分かったほうがよい。使うのは、要件 11 の前の今のビルドと、`C:\pasta-demo\hello-pasta` の写しである（無ければ LocalBuild・DemoGhostCopy の手順で作る）。
+
+##### Batch / Job Contract
+
+- Trigger: 実装の最初。Preflight を通し、Cleanup の 1〜4 で挟む（記録の写し → 起動 → 閉じる → 戻す）。録る前に 7.15 の知らせをする。
+- 手順: 舞台を `direction.md` 13 節の矩形に置く → 3 秒ほど録る（その間に CDP で ▶ を 1 回押し、エディタに 1 文字打つ）→ `cropRegion` → 寄り 1 つ（1.35 倍）→ `setPointerTrack`（1 点）→ 見出し 1 つ → 高さ 720 で書き出す → `getFrames` でコマを見る。
+- Output: 下の表の結果を `research.md` に書き足す。設計の仮の数字（画の表・割合の式・見出しの位置）が違っていたら直す。直しが設計の決まり（道具・順・要件の満たし方）を変えるときは、開発者に示す。
+
+| 確かめること | 外れたときの手 |
+| -- | -- |
+| ゴーストの窓（透明・常に手前）が画面の録画に映る（1.1） | 録画の指定（画面の番号・ポインタの取り方）を変えて試す。それでも映らなければ止まり、開発者に示す（道具は替えない。7.2） |
+| 録画のバーとカウントダウンが、切り抜く範囲に入らない（3.1） | 頭だけなら `addTrim` で切る。録る間ずっと範囲に残るなら、切り抜く範囲と舞台を、バーにかからない側へずらす |
+| `setPointerTrack` の割合が、画面の録画で「撮った画面に対する割合」として効く（2.1） | ずれを 2 点で測り、式を合わせ直す |
+| 切り抜いた後の寄りの中心と見出しの位置が、切り抜いた画に対する割合である（2.2・2.8） | 録った画面に対する割合なら、画の表と見出しの位置を換算して書き直す |
+| 前面でない窓のエディタに、CDP で文字が入る（7.5） | `Input.insertText` に替える。カーソルが見えないのは受け入れる。それでも入らなければ開発者に示す |
+| Win32 の窓の位置の指定が、目標の矩形に効く | 効かなければ、配置の承認（7.13）の前に開発者のドラッグを頼む |
+| 書き出しが 16:10・高さ 720 で、寄りの字が読め、音声のトラックが無い | 形は `setAspectRatio`、にじむなら高さ 1080、音声は ffmpeg で除く（7.12） |
 
 #### LocalBuild・DemoGhostCopy
 
@@ -595,7 +623,7 @@ export function mountLayout(targets: LayoutTargets, initial: LayoutPrefs): void;
 | Field | Detail |
 | -- | -- |
 | Intent | 撮り始めてよい状態かを確かめる |
-| Requirements | 7.2, 7.3 |
+| Requirements | 7.2, 7.3, 7.16 |
 
 確かめること（1 つでも外れたら、舞台を作らずに止まる）:
 
@@ -603,6 +631,7 @@ export function mountLayout(targets: LayoutTargets, initial: LayoutPrefs): void;
 | -- | -- |
 | Openscreen の `listSources` が返る（画面が 2 枚） | 止まって、開発者に Openscreen の起動か `/mcp` の再接続を頼む。ほかの録画の道具に替えない（7.2） |
 | areka が動いていない（送る相手が 2 つになり、選ぶ窓が映る） | 止まって開発者に知らせる |
+| 開発者の普段の SSP が動いていない（`ssp.exe` のプロセスが無い。動いていると、SSP の MCP の道具が普段の SSP に届き、試験用のゴーストを動かすことも閉じることもできない） | 止まって、開発者に閉じてもらう。撮影の作業は閉じない（7.16・7.3） |
 | 開発者の pasta-recipe が動いていない（単一起動なので、撮影用の起動がそちらへ渡って終わる） | 止まって開発者に知らせる（閉じるのは開発者） |
 | 正時の前後 5 分でない（時報。1.10）。舞台を作る前だけでなく、`startRecording` を呼ぶ直前（試し撮り・本番）にも毎回確かめる | 待つ |
 
@@ -629,11 +658,11 @@ export function mountLayout(targets: LayoutTargets, initial: LayoutPrefs): void;
 ```toml
 tree_width = 260
 panels_height = 240
-output_share = 0.42
+left_share = 0.42
 swapped = false
 ```
 
-- `output_share = 0.42`: 出力と保存変数の境が切り抜きの x 約 557 に来る。保存変数の表（幅 約 276 px）は 約 565〜841 に収まり、男の子の腕（x 約 950）にかからない（2.13）。既定の 0.5 では余りが 10 px しか無い。
+- `left_share = 0.42`: 出力と保存変数の境が切り抜きの x 約 557 に来る。保存変数の表（幅 約 276 px）は 約 565〜841 に収まり、男の子の腕（x 約 950）にかからない（2.13）。既定の 0.5 では余りが 10 px しか無い。
 - `panels_height = 240`: 表の行が上がり、押す ▶・吹き出し・表が 1 つの寄りの画（高さ 593 px）に入る（締めの場面で `99` の表と「100 回目だよ！」が並ぶ）。13 節の実測は 180 のときなので、男の子の吹き出しと帯の間が詰まる。コマで見て、開発者と決め直す。
 - 入れ替えは使わない（出力を右にすると、結果の行がゴーストに隠れる）。
 
@@ -641,11 +670,11 @@ swapped = false
 
 1. 記録の写しを取る（Cleanup の 1）。その後で、撮影の並びを `layout.toml` に書く。
 2. 試験用の SSP を立てる: `ssp.exe --option readonly --ghost "C:\pasta-demo\hello-pasta"`（7.4）。起動の台詞（`OnFirstBoot`）が終わって吹き出しが消えるのを待つ（1.10）。
-3. **送る前の確かめ**: SSP へ何かを送る前に、毎回、その送り口の `get_active_ghost_list` が `hello-pasta-demo` だけを返すことを確かめる。違えば送らない（7.3）。普段の SSP が動いていないときは、`mcp__ssp__*` の道具が試験用の SSP に届く（2026-11-15 に確かめた）。動いているときの送り口は、未決の論点 8 の仮定による。
+3. **送る前の確かめ**: SSP へ何かを送る前に、毎回、その送り口の `get_active_ghost_list` が `hello-pasta-demo` だけを返すことを確かめる。違えば送らない（7.3）。Preflight が「普段の SSP が動いていない」を確かめているので、`mcp__ssp__*` の道具は試験用の SSP に届く（2026-11-15 に確かめた）。
 4. ゴーストと吹き出しを目標へ動かす。送った後、`get_property` で `currentghost.scope(0).rect`・`scope(1).rect` を読み、目標と ±2 px で合うまで直す。吹き出しは、▶ で 1 回鳴らして出ている間に `currentghost.balloon.scope(n).rect` を読んで合わせる。合わせきれないときは、開発者にドラッグを頼む。
 5. pasta-recipe を起動する: 環境変数 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333` をその起動だけに付け、引数に `C:\pasta-demo\hello-pasta\ghost\master\dic\10-save.pasta` を渡す（開始の画面と「最近開いたもの」を映さない。3.2）。窓を目標の矩形へ動かす。前面にはしない（開発者の作業の焦点を奪わない。7.5）。
 6. `＊会話` を 1 回鳴らし、「保存変数を表示」を押して、吹き出しと表を出す。
-7. 試し撮りも画面を録るので、先に 10 と同じ知らせを開発者に伝える（7.15）。Openscreen で 2〜3 秒の試し撮りをし、切り抜きと 4 つの画（TakeEdit の表）を置いて、`getFrames` でコマを取る。ダイアログを開いたコマも 1 枚取る。**コマと数字（上の 2 つの表）と、見出しの 6 つの文（ShootScript の表。2 は押すボタンの名前に「書き換えて」を足した文である）を開発者に見せ、この配置でよいかを尋ねる（7.13）**。
+7. 試し撮りも画面を録るので、先に 10 と同じ知らせを開発者に伝える（7.15）。Openscreen で 2〜3 秒の試し撮りをし、切り抜きと 4 つの画（TakeEdit の表）を置いて、`getFrames` でコマを取る。ダイアログを開いたコマも 1 枚取る。**コマと数字（上の 2 つの表）と、見出しの 6 つの文（ShootScript の表。2 と 6 は、押すボタンの名前に「書き換えて」「もう一度」を足した文である）を開発者に見せ、この配置でよいかを尋ねる（7.13）**。
 8. 直すよう言われたら、直して 6〜7 をやり直す。**よいと言われるまで本番を撮らない（7.14）**。
 9. よいと言われたら、録画なしで台本を 1 回通す（通し稽古。待ちの秒を測り、読み取り専用の SSP でも書き換えた保存変数が読み込み直しの後に残って「100 回目」になることを確かめる）。その後、最初の状態に立て直す: pasta-recipe と試験用の SSP を閉じ、写しの `profile/` を消し、写しの `10-save.pasta` を撮る前の中身に戻し、2〜5 をやり直す。位置は、承認された数字と合うことを 4 の読み取りで確かめる（readonly の SSP は位置を覚えない）。
 10. **撮る画面（ノート PC の画面）と、撮影の間（約 3 分）その画面に窓とマウスを入れず、どこも押さないでほしいことを、開発者に知らせる（7.15）**。
@@ -669,7 +698,7 @@ swapped = false
 | 3 | 3　値を入れて実行… | 1.4 | `＊天気` の見出しの上の「値を入れて実行…」→「組を足す」→ 名前 `天気`・型「文字列」・値 `雨` →「鳴らす」 | 「今日の天気は雨だって。」 |
 | 4 | 4　SHIORI をリロード | 1.5 | ツールバーの「SHIORI をリロード」 | 出力の欄に読み込み直しの要約 |
 | 5 | 5　保存変数を表示・書き換え… | 1.6 | 「保存変数を表示」→ `回数` の行の「書き換え…」→ `99` →「書き換える」 | 表の値が `2` → `99` |
-| 6 | 6　▶ シーンを実行 | 1.9 | `＊会話` の「▶ シーンを実行」 | 「この話をするのは 100 回目だよ！」 |
+| 6 | 6　もう一度 ▶ シーンを実行 | 1.9 | `＊会話` の「▶ シーンを実行」 | 「この話をするのは 100 回目だよ！」 |
 
 **Responsibilities & Constraints**
 
@@ -740,7 +769,7 @@ swapped = false
 | 5 | `addTrim` | 頭（録画のバーとカウントダウン）と尻、`wait-start`〜`wait-end`（読み込み直しの待ち・吹き出しが閉じる待ち）。寄りの出入りの最中は切らない（2.4） |
 | 6 | `addSpeed` | `typing-start`〜`typing-end` を 1.5〜2 倍。**台詞が出ている間（`press` の後〜`hold-end`）には掛けない**（2.11・2.5） |
 | 7 | `addZoom`（`customScale` 1.35・`focus`） | 画の表のとおり。続く寄りは 1.5 秒以内に置いて滑らせる。最初の寄りは 3 秒より後に始める（最初のコマは引き） |
-| 8 | `addAnnotation`（text） | 見出しの表の 6 つ。操作を映している間だけ出す。場所は画の右上の 1 か所。濃い板に白い字・現れ方は fade。引きの間は出さない（2.8・2.9） |
+| 8 | `addAnnotation`（text） | 見出しの表の 6 つ。操作を映している間だけ出す。場所は画の左上の 1 か所（右上は女の子の吹き出しが出る所なので使わない）。濃い板に白い字・現れ方は fade。引きの間は出さない（2.8・2.9） |
 | 9 | `exportVideo` | `C:\pasta-demo\work\recipe-dev-actions-demo.mp4`。H.264・高さ 720（16:10 で 1152×720 の見込み）・30 fps（4.2） |
 
 - 時刻の扱い: クリップは 1 本で頭から始まるので、定規の秒は「`at` − `recordingStartedAt`」である。切り（`addTrim`）は元の時刻、寄り・速さ・見出しは定規の秒で指定する。
@@ -860,8 +889,8 @@ swapped = false
 | 3 | 試験用の SSP を閉じる（送る前の確かめの後で `\-\e`）。これも控えたプロセスの番号のものだけ。普段の SSP には触れない | 7.8・7.3 |
 | 4 | `recent.toml`・`layout.toml` を写しから戻す。「無かった」ものは消す。戻した後の中身が写しと同じことを確かめる | 7.8 |
 | 5 | `C:\pasta-demo` ごと消す（写し・記録の写し・作業ファイル） | 7.8 |
-| 6 | 残ったものを確かめる: 控えた番号の pasta-recipe と試験用の SSP が残っていない・`C:\pasta-demo` が無い・普段の SSP が動いていたなら動いたまま。戻せないものがあれば、物と場所を開発者に知らせる | 7.9 |
-| 7 | 開発者が自分で変えた設定を 1 つずつ挙げ、元に戻したかを尋ねる: タスクバーの自動で隠す・デスクトップのアイコン・通知・拡大率（100% → 元は 200%）と、撮影の途中で開発者が足したもの。撮影の作業は自分では戻さない | 7.10・7.11 |
+| 6 | 残ったものを確かめる: 控えた番号の pasta-recipe と試験用の SSP が残っていない・`C:\pasta-demo` が無い。撮影の途中で開発者が普段の SSP を立てていたときは、それに触れていない。戻せないものがあれば、物と場所を開発者に知らせる | 7.9 |
+| 7 | 開発者が自分で変えた設定を 1 つずつ挙げ、元に戻したかを尋ねる: タスクバーの自動で隠す・デスクトップのアイコン・通知・拡大率（100% → 元は 200%）・普段の SSP（撮影のために閉じてもらったとき。起動し直したか）と、撮影の途中で開発者が足したもの。撮影の作業は自分では戻さない | 7.10・7.11 |
 
 - 途中で止めたときも 2〜7 を通る。写しを取る前に止まったときは 4 を飛ばす。何も起動していないとき（Preflight で止まったとき）は、2・3 で閉じる物が無い。
 - 流れ A の画面の確かめ（Testing Strategy の E2E）も、手元のビルドでゴーストを開き、仕切りを動かすので、`recent.toml` と `layout.toml` を書き換える。この確かめも 1・2・4 で挟む（写しを取ってから起動し、閉じたら戻す）。
@@ -877,7 +906,7 @@ swapped = false
 # pasta-recipe の窓の中の並び（仕切りの位置と、出力と保存変数の左右）
 tree_width = 260
 panels_height = 180
-output_share = 0.5
+left_share = 0.5
 swapped = false
 ```
 
@@ -885,11 +914,11 @@ swapped = false
 | -- | -- | -- | -- | -- |
 | `tree_width` | 整数（0 以上） | 260 | ツリーの幅（CSS px） | 欠けていれば既定 |
 | `panels_height` | 整数（0 以上） | 180 | 下の欄の面の高さ（帯を除く。CSS px） | 欠けていれば既定 |
-| `output_share` | 小数（0.0〜1.0） | 0.5 | 動かす面の幅のうち出力が占める割合 | 欠けている・範囲の外・有限でないなら既定 |
+| `left_share` | 小数（0.0〜1.0） | 0.5 | 下の欄の左の欄の幅の割合（2 つの面で共通） | 欠けている・範囲の外・有限でないなら既定 |
 | `swapped` | 真偽 | false | true で保存変数が左・出力が右 | 欠けていれば既定 |
 
 - 知らないキーは読み飛ばす。型が合わない・TOML として読めないときは全部既定。
-- 入れ替えても `output_share` は変えない（割合は欄に付いていく）。
+- 入れ替えても `left_share` は変えない（境は動かず、中身だけが入れ替わる）。
 - 画面との受け渡しは同じ 4 つを camelCase で渡す（`LayoutPrefs`）。画面は px を整数に丸めてから渡す。
 
 ### `actions.json`（流れ B）
@@ -924,13 +953,13 @@ ShootScript の `ShootAction` の並び。`setPointerTrack` へは `at`・`x`・
 - `src/layout.test.ts`（`node --test`）:
   - `fitLayout` が、狭い窓でツリー・下の欄・2 つの欄の最小を守る。覚えた値は書き換えず、広い窓では覚えた値をそのまま返す（11.6・11.8）。
   - `dragLayout` が 3 本それぞれで、最小より狭く・最大より広くならない（11.1〜11.3・11.6）。
-  - 入れ替えているときの `dragLayout("run")` が、左の欄＝保存変数として `outputShare` を出す（11.3・11.4）。
+  - `dragLayout("split")` が、入れ替えていてもいなくても同じ `leftShare` を出す（境は入れ替えに依らない。11.3・11.4）。
   - `nudgeLayout` が見た目の向きへ `KEY_STEP` だけ動かす（下の欄は −1 で高くなる）（11.5）。
   - `swapLayout` が `swapped` だけを替え、割合を保つ。2 回で元に戻る（11.4）。
   - 数でない値（`NaN`・負の数）と、大きさ 0 の範囲で落ちずに既定か最小を返す。
 - `src-tauri/src/layout.rs`（`cargo test`）:
   - ファイルが無い・壊れた TOML・型の合わない値で既定を返す（11.7）。
-  - キーが欠けたファイルで、欠けたキーだけ既定になる。`output_share` が範囲の外なら既定になる。
+  - キーが欠けたファイルで、欠けたキーだけ既定になる。`left_share` が範囲の外なら既定になる。
   - `render` → `parse` が元に戻る。頭にコメントの 1 行がある。
   - `save` がフォルダを作り、`load` が同じ値を返す。
 
@@ -940,9 +969,9 @@ ShootScript の `ShootAction` の並び。`setPointerTrack` へは `at`・`x`・
 
 ### E2E/UI Tests（流れ A。手元のビルドを CDP で確かめる）
 
-- 3 本の仕切りをドラッグして、ツリーの幅・下の欄の高さ・出力と保存変数の割合が変わる。最小で止まる（11.1〜11.3・11.6）。
+- 3 本の仕切りをドラッグして、ツリーの幅・下の欄の高さ・下の欄の左右の割合が変わる。最小で止まる。書く面（診断｜検査）でも左右の境が動き、面を切り替えても境の位置が同じである（11.1〜11.3・11.6）。
 - 仕切りに焦点を当てて矢印のキーで動く。`aria-valuenow` が変わる（11.5）。
-- 「左右を入れ替える」で左右が替わり、Tab の順が見た目の順になる（11.4）。
+- 「左右を入れ替える」で左右が替わり、Tab の順が見た目の順になる。境の位置は変わらない。ボタンはタブのすぐ右にあり、右下に立つゴーストに隠れない（11.4）。
 - 閉じて開き直すと、4 つとも閉じる前のまま出る。`layout.toml` に同じ値がある（11.7）。
 - 窓を縮めると最小を守って収まり、広げ直すと覚えた並びに戻る。窓は最小の大きさより小さくならない（11.8）。
 - `layout.toml` が無い状態で開くと、今の見た目（260・180・半分ずつ）と同じである。
@@ -961,25 +990,24 @@ ShootScript の `ShootAction` の並び。`setPointerTrack` へは `at`・`x`・
 
 ## Migration Strategy
 
-- 実行の順: (1) 流れ A の実装と試験 → (2) `recipe.md` の並びの説明（11.9）→ (3) 手元のビルド → (4) 流れ A の画面の確かめ（CDP。記録の写しと戻しで挟む）→ (5) 撮影（Preflight → StageSetup → ShootScript → TakeEdit → ExportCheck）→ (6) マニュアルの直しと検査 → (7) `SCREENSHOTS.md` → (8) 後片付け。
+- 実行の順: (0) 道具の試し撮り（ToolSmokeTrial。今のビルドで）→ (1) 流れ A の実装と試験 → (2) `recipe.md` の並びの説明（11.9）→ (3) 手元のビルド → (4) 流れ A の画面の確かめ（CDP。記録の写しと戻しで挟む）→ (5) 撮影（Preflight → StageSetup → ShootScript → TakeEdit → ExportCheck）→ (6) マニュアルの直しと検査 → (7) `SCREENSHOTS.md` → (8) 後片付け。
 - 並びの記録は新しいファイルなので、移行は無い。`layout.toml` が無い人は今の見た目のまま開く。
 - 動画は main から公開される。仕切りと入れ替えは次のリリースで届くので、動画が先に公開される（前提 A1 で認めている）。
 
-## 未決の論点（設計ディスカッションへ）
+## 設計ディスカッションの決定（2026-11-15）
 
-入力から決めきれないものを、仮定を置いて設計した。番号は報告の OPEN QUESTIONS と同じである。
+下書きの時点で仮定を置いた 12 の論点と、設計の検証の指摘 3 つを、次のとおり決めた。開発者が推奨案で承認したもの（決定 1〜6）と、原則から決まるので議題にしなかったもの（7 以降）がある。
 
-| # | 論点 | この設計の仮定 |
+| # | 決めたこと | 根拠 |
 | -- | -- | -- |
-| 1 | 並びの保存先 | `recent.toml` の隣の `layout.toml`（Rust 経由）。WebView の `localStorage` は採らない（閉じ際の書き込みが確かでない・撮影の前後で写して戻しにくい） |
-| 2 | 要件 7.7・7.8 は `recent.toml` だけを挙げる | `layout.toml` も写して戻す（撮影が並びを書き換えるため）。要件の文に足すかは要相談 |
-| 3 | 入れ替えの操作の置き場所と名前 | 下の欄の帯の右の端のボタン「左右を入れ替える」。動かす面のときだけ出す。割合は欄に付いていく |
-| 4 | 書く面（診断｜検査）の境 | 動かせないまま（11.3 は出力と保存変数だけ）。下の欄の高さは 2 つの面で共通 |
-| 5 | 最小の数と窓の最小の大きさ | ツリー 120・エディタ 240×120・下の欄 60・欄 160。窓は `minWidth` 400・`minHeight` 320 を足す（窓の振る舞いが変わる） |
-| 6 | 見出しの数 | 6 つ（2.8 が 2〜6 と 9 の各操作に名前を求める）。`direction.md` 7.1 節は 5 つ（5 が締めを含む） |
-| 7 | 見出しの場所・寄りの倍率・撮影の並び | 右上・1.35 倍・`output_share` 0.42・`panels_height` 240。どれも試し撮りのコマを見て 7.13 で決め直す。`direction.md` の推奨は左上、13 節の見込みは 1.25〜1.3 倍・高さ 180 |
-| 8 | 普段の SSP が動いているときの送り口 | 試験用の SSP を別の候補のポートで立て、その MCP へ直接送る（未確認）。確かめられるまでは、ゴーストの位置合わせを開発者のドラッグに頼む |
-| 9 | 台本のスクリプトをリポジトリに置くか | 置かない。`SCREENSHOTS.md` に台本の表と数字だけを残す |
-| 10 | 書き出しの大きさ | 1152×720・30 fps。字がにじめば 1080 に上げる |
-| 11 | 前面でない窓の見え方 | pasta-recipe を前面にしない。題名の帯の薄い色は受け入れ、カーソルは CDP の焦点のまねで出す（試し撮りで確かめる） |
-| 12 | 吹き出しの位置の合わせ方 | `\![set,balloonoffset]` を試し、読み込み直しの後も残るかを舞台で確かめる。残らなければ開発者のドラッグ |
+| 1 | 下の欄の左右の境は 1 つの値（`left_share`）で持ち、書く面（診断｜検査）と動かす面（出力｜保存変数）で共有する。入れ替えても境は動かず、中身だけが入れ替わる | 右下に立つゴーストは、書く面でも右の欄を隠す。面を切り替えても境が跳ばない。決まりが単純になる（要件 11.3・11.4 を直した） |
+| 2 | 入れ替えのボタンは、帯の 2 つのタブのすぐ右に置く。文は「左右を入れ替える」。動かす面のときだけ出す | 帯の右の端は、ゴーストに隠れる所である |
+| 3 | 最小はツリー 120・エディタ 240×120・下の欄 60・左右の欄 各 160。窓に `minWidth` 400・`minHeight` 320 を足す。数字は実物で確かめて直す | 窓がそれより小さいと、欄の最小を守りきれない |
+| 4 | 撮影の間、開発者の普段の SSP は閉じてもらう。動いていたら Preflight で止まる。最後に、起動し直したかを尋ねる | 普段の SSP が動いていると、試験用のゴーストを動かすことも閉じることもできない。外から閉じて普段の SSP まで閉じた前例がある（要件 7.16 を足した） |
+| 5 | 道具の試し撮り（ToolSmokeTrial）を、実装の最初の仕事にする | 録画は一度も試していない。道具は Openscreen に限るので、つまずきは早く知る |
+| 6 | 見出しは 6 つ。場所は画の左上。6 は「6　もう一度 ▶ シーンを実行」。最後は配置の承認（7.13）のコマで見てもらう | 右上は女の子の吹き出しが出る。1 と 6 が同じ文だと紛らわしい |
+| 7 | 並びの記録は `recent.toml` の隣の `layout.toml`（Rust 経由）。撮影の前後で `recent.toml` と一緒に写して戻す | 今ある記録と同じ作り。写して戻しやすい（要件 7.7・7.8 に足した） |
+| 8 | 撮影のスクリプトはリポジトリに置かない。`SCREENSHOTS.md` に台本の表と数字だけを残す | `SCREENSHOTS.md` の今の決まり |
+| 9 | pasta-recipe を前面にしない。題名の帯の薄い色は受け入れる | 開発者の作業の焦点を奪わない（7.5） |
+| 10 | 寄りの倍率 1.35・撮影の並び（`left_share` 0.42・`panels_height` 240）・書き出し 1152×720・30 fps・吹き出しの位置（`\![set,balloonoffset]`、だめなら開発者のドラッグ）は仮の数字とし、試し撮りと配置の承認（7.13）のコマで決める | 実物を撮らないと決まらない |
+| 11 | 記録の写しは手元のビルドの最初の起動の前に取り、在る写しは上書きしない。閉じるのは、起動のときに番号を控えたものだけ | 検証の指摘 2 |
