@@ -172,7 +172,7 @@
   - _Dispatch: mechanical — 節の中身の表を設計が与える_
   - _Requirements: 10.1, 10.2_
 
-- [ ] 8. 後片付けと設定の確かめ
+- [x] 8. 後片付けと設定の確かめ
   - 控えた番号の pasta-recipe を閉じ、送る前の確かめの後で試験用の SSP を閉じる。普段の SSP と開発者が自分で開いた pasta-recipe には触れない
   - `recent.toml`・`layout.toml` を写しから戻し（「無かった」ものは消す）、中身が写しと同じことを確かめてから、`C:\pasta-demo` ごと消す。Openscreen のプロジェクトは消さない
   - 控えた番号のものが残っていない・`C:\pasta-demo` が無い・`git status` でリポジトリの hello-pasta に差分が無いことを確かめ、戻せないものがあれば物と場所を開発者に知らせる
