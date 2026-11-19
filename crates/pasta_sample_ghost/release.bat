@@ -1,6 +1,6 @@
 @echo off
 REM release.bat - hello-pasta Build & Release Script
-REM Double-click this file to build ghost distribution and create hello-pasta.nar, pasta.dll.zip, pasta_check.zip and pasta-skills.zip
+REM Double-click this file to build ghost distribution and create hello-pasta.nar, pasta-starter.nar, pasta.dll.zip, pasta_check.zip and pasta-skills.zip
 REM Outputs in release/ are for local checks only (not committed). Publishing is done by
 REM the release CI (.github/workflows/release.yml) when a vX.Y.Z tag is pushed.
 REM

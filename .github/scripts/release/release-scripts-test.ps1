@@ -246,19 +246,19 @@ try {
         Write-Utf8 $hlPath $Highlights
     }
 
-    Test-Item 10 'github-release.ps1 が、添付 8 つのうち pasta_check.zip だけが無いとき、終了コード 1 で、出力にその名前を示す' {
+    Test-Item 10 'github-release.ps1 が、添付 9 つのうち pasta_check.zip だけが無いとき、終了コード 1 で、出力にその名前を示す' {
         # 添付の有無は gh の呼び出しより前に検査されるので、ネットワークと gh を使わない
         $dir = Join-Path $tmp 'assets'
-        foreach ($n in 'pasta.dll.zip', 'hello-pasta.nar', 'pasta-vscode-0.0.2.vsix', 'pasta-skills.zip', 'pasta-recipe.x64.zip', 'pasta-recipe.arm64.zip', 'release-notes-v0.0.2.md') { Write-Utf8 (Join-Path $dir $n) '' }
+        foreach ($n in 'pasta.dll.zip', 'hello-pasta.nar', 'pasta-starter.nar', 'pasta-vscode-0.0.2.vsix', 'pasta-skills.zip', 'pasta-recipe.x64.zip', 'pasta-recipe.arm64.zip', 'release-notes-v0.0.2.md') { Write-Utf8 (Join-Path $dir $n) '' }
         $r = Invoke-Script github-release.ps1 @('-Tag', 'v0.0.2', '-NotesFile', $notesPath, '-AssetDir', $dir)
         if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
         if (-not $r.Output.Contains('pasta_check.zip')) { "出力に pasta_check.zip が無い: $($r.Output)" }
         if ($r.Output.Contains('pasta-skills.zip')) { "出力に pasta-skills.zip が出る（無いのは pasta_check.zip だけのはず）: $($r.Output)" }
     }
 
-    Test-Item 11 'github-release.ps1 が、添付 8 つのうち pasta-skills.zip だけが無いとき、終了コード 1 で、出力にその名前を示す' {
+    Test-Item 11 'github-release.ps1 が、添付 9 つのうち pasta-skills.zip だけが無いとき、終了コード 1 で、出力にその名前を示す' {
         $dir = Join-Path $tmp 'assets-skills'
-        foreach ($n in 'pasta.dll.zip', 'hello-pasta.nar', 'pasta-vscode-0.0.2.vsix', 'pasta_check.zip', 'pasta-recipe.x64.zip', 'pasta-recipe.arm64.zip', 'release-notes-v0.0.2.md') { Write-Utf8 (Join-Path $dir $n) '' }
+        foreach ($n in 'pasta.dll.zip', 'hello-pasta.nar', 'pasta-starter.nar', 'pasta-vscode-0.0.2.vsix', 'pasta_check.zip', 'pasta-recipe.x64.zip', 'pasta-recipe.arm64.zip', 'release-notes-v0.0.2.md') { Write-Utf8 (Join-Path $dir $n) '' }
         $r = Invoke-Script github-release.ps1 @('-Tag', 'v0.0.2', '-NotesFile', $notesPath, '-AssetDir', $dir)
         if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
         if (-not $r.Output.Contains('pasta-skills.zip')) { "出力に pasta-skills.zip が無い: $($r.Output)" }
@@ -275,18 +275,18 @@ try {
         if (-not $r.Output.Contains('status=skipped')) { "出力に status=skipped が無い: $($r.Output)" }
     }
 
-    Test-Item 13 'github-release.ps1 が、添付 8 つのうち pasta-recipe.x64.zip だけが無いとき、終了コード 1 で、出力にその名前を示す' {
+    Test-Item 13 'github-release.ps1 が、添付 9 つのうち pasta-recipe.x64.zip だけが無いとき、終了コード 1 で、出力にその名前を示す' {
         $dir = Join-Path $tmp 'assets-recipe-x64'
-        foreach ($n in 'pasta.dll.zip', 'hello-pasta.nar', 'pasta-vscode-0.0.2.vsix', 'pasta_check.zip', 'pasta-skills.zip', 'pasta-recipe.arm64.zip', 'release-notes-v0.0.2.md') { Write-Utf8 (Join-Path $dir $n) '' }
+        foreach ($n in 'pasta.dll.zip', 'hello-pasta.nar', 'pasta-starter.nar', 'pasta-vscode-0.0.2.vsix', 'pasta_check.zip', 'pasta-skills.zip', 'pasta-recipe.arm64.zip', 'release-notes-v0.0.2.md') { Write-Utf8 (Join-Path $dir $n) '' }
         $r = Invoke-Script github-release.ps1 @('-Tag', 'v0.0.2', '-NotesFile', $notesPath, '-AssetDir', $dir)
         if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
         if (-not $r.Output.Contains('pasta-recipe.x64.zip')) { "出力に pasta-recipe.x64.zip が無い: $($r.Output)" }
         if ($r.Output.Contains('pasta-recipe.arm64.zip')) { "出力に pasta-recipe.arm64.zip が出る（無いのは pasta-recipe.x64.zip だけのはず）: $($r.Output)" }
     }
 
-    Test-Item 14 'github-release.ps1 が、添付 8 つのうち pasta-recipe.arm64.zip だけが無いとき、終了コード 1 で、出力にその名前を示す' {
+    Test-Item 14 'github-release.ps1 が、添付 9 つのうち pasta-recipe.arm64.zip だけが無いとき、終了コード 1 で、出力にその名前を示す' {
         $dir = Join-Path $tmp 'assets-recipe-arm64'
-        foreach ($n in 'pasta.dll.zip', 'hello-pasta.nar', 'pasta-vscode-0.0.2.vsix', 'pasta_check.zip', 'pasta-skills.zip', 'pasta-recipe.x64.zip', 'release-notes-v0.0.2.md') { Write-Utf8 (Join-Path $dir $n) '' }
+        foreach ($n in 'pasta.dll.zip', 'hello-pasta.nar', 'pasta-starter.nar', 'pasta-vscode-0.0.2.vsix', 'pasta_check.zip', 'pasta-skills.zip', 'pasta-recipe.x64.zip', 'release-notes-v0.0.2.md') { Write-Utf8 (Join-Path $dir $n) '' }
         $r = Invoke-Script github-release.ps1 @('-Tag', 'v0.0.2', '-NotesFile', $notesPath, '-AssetDir', $dir)
         if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
         if (-not $r.Output.Contains('pasta-recipe.arm64.zip')) { "出力に pasta-recipe.arm64.zip が無い: $($r.Output)" }
@@ -497,6 +497,15 @@ if ($a[0] -eq 'run' -and $a[1] -eq 'view') {
     Test-Item 28 'publish-ghost-site.ps1 が、最新の Release のタグが vX.Y.Z の形でないとき、failed・publish で終わる（再実行では直らない）' {
         $r = Invoke-Script publish-ghost-site.ps1 @('-Tag', 'v0.0.2', '-LatestTag', 'nightly', '-DescriptPath', $descript, '-LatestWaitSeconds', '0', '-DryRun')
         Get-OutcomeFailure $r failed publish '形の違う最新のタグ'
+    }
+
+    Test-Item 29 'github-release.ps1 が、添付 9 つのうち pasta-starter.nar だけが無いとき、終了コード 1 で、出力にその名前を示す' {
+        $dir = Join-Path $tmp 'assets-starter'
+        foreach ($n in 'pasta.dll.zip', 'hello-pasta.nar', 'pasta-vscode-0.0.2.vsix', 'pasta_check.zip', 'pasta-skills.zip', 'pasta-recipe.x64.zip', 'pasta-recipe.arm64.zip', 'release-notes-v0.0.2.md') { Write-Utf8 (Join-Path $dir $n) '' }
+        $r = Invoke-Script github-release.ps1 @('-Tag', 'v0.0.2', '-NotesFile', $notesPath, '-AssetDir', $dir)
+        if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('pasta-starter.nar')) { "出力に pasta-starter.nar が無い: $($r.Output)" }
+        if ($r.Output.Contains('hello-pasta.nar')) { "出力に hello-pasta.nar が出る（無いのは pasta-starter.nar だけのはず）: $($r.Output)" }
     }
 }
 finally {

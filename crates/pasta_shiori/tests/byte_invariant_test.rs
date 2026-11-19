@@ -84,13 +84,13 @@ fn assert_golden_bytes(label: &str, actual: &str, expected: &str) {
 
 /// OnBoot（hello-pasta 単一 OnBoot シーン）の完全応答。
 ///
-/// 出どころは `dic/01-boot.pasta` の 1 行（`女の子：やっほー、今日もよろしくね。`・表情なし）。
-/// 表情指定が無いので `\s[n]` は出ず、`[talk]` 設定の句読点ウェイト `\_w[n]` が入る。
+/// 出どころは `dic/01-boot.pasta` の 1 行（`女の子：いらっしゃいませ！　本日のおすすめは、わたしです。`・表情なし）。
+/// 表情指定が無いので `\s[n]` は出ず、`[talk]` 設定の句読点ウェイト `\_w[n]` が入る（全角空白 `\u{3000}` はウェイトの後ろにそのまま残る）。
 const GOLDEN_ONBOOT: &str = "SHIORI/3.0 200 OK\r\n\
 Charset: UTF-8\r\n\
 Sender: Pasta\r\n\
 SecurityLevel: local\r\n\
-Value: \\p[0]やっほー、\\_w[450]今日もよろしくね。\\_w[950]\\e\r\n\
+Value: \\p[0]いらっしゃいませ！\\_w[450]\u{3000}本日のおすすめは、\\_w[450]わたしです。\\_w[950]\\e\r\n\
 \r\n";
 
 /// GET property コルーチン継続 Round1: get_property が get タグを yield。

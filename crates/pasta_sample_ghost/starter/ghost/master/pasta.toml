@@ -1,0 +1,9 @@
+[actor."女の子"]
+spot = 0
+
+[actor."男の子"]
+spot = 1
+
+[debug]
+# エディター（pasta-recipe・VS Code）の ▶ でシーンを鳴らせるようにする。自分のゴーストを配布する前に false にする
+enabled = true

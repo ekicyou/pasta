@@ -1,0 +1,8 @@
+charset,UTF-8
+type,ghost
+name,my-ghost
+sakura.name,女の子
+kero.name,男の子
+craftman,your-name
+craftmanw,あなたの名前
+shiori,pasta.dll
