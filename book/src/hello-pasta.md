@@ -15,7 +15,7 @@
 
 [hello-pasta をダウンロード（.nar）](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)
 
-落とした `hello-pasta.nar` を、SSP に出ているゴーストの上へドロップすると入る。ネットワーク更新に対応している。
+ダウンロードするか、リンクを SSP へ直接ドロップする。ネットワーク更新に対応している。
 
 </section>
 
@@ -34,9 +34,8 @@ hello-pasta は、pasta で動く見本のゴーストである。パスタ屋�
 ## 入れる
 
 1. SSP を用意する（[SSP の配布サイト](https://ssp.shillest.net/)）。
-2. このページの上のボタンから、`hello-pasta.nar` を落とす。
-3. 落とした `hello-pasta.nar` を、SSP に出ているゴーストの上へドロップする。
-4. ゴーストを右クリックし、メニューの「ゴースト切り替え」から hello-pasta を選ぶ。
+2. このページの上のボタンを、SSP に出ているゴーストの上へドロップする。ダウンロードした `hello-pasta.nar` をドロップしてもよい。
+3. ゴーストを右クリックし、メニューの「ゴースト切り替え」から hello-pasta を選ぶ。
 
 - 成功の目印: 2 人が出てきて、吹き出しであいさつする。
 - 過去の版は、[ダウンロード](download.md#過去の版) のページから辿れる。
