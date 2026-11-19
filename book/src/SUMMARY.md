@@ -28,13 +28,13 @@
 - [文法リファレンス概要](grammar/index.md)
   - [キーワード・マーカー](grammar/markers.md)
   - [行とブロック構造](grammar/block-structure.md)
-  - [Call / Jump](grammar/call-jump.md)
-  - [リテラル型](grammar/literals.md)
   - [アクション行](grammar/action-line.md)
-  - [さくらスクリプト](grammar/sakura-script.md)
-  - [変数・スコープ](grammar/variables.md)
-  - [単語定義](grammar/words.md)
   - [アクター辞書](grammar/actor-dictionary.md)
+  - [さくらスクリプト](grammar/sakura-script.md)
+  - [単語定義](grammar/words.md)
+  - [変数・スコープ](grammar/variables.md)
+  - [リテラル型](grammar/literals.md)
+  - [Call（シーンの呼び出し）](grammar/call-jump.md)
 
 # Lua API / コーディング
 
@@ -53,13 +53,13 @@
   - [scripts/ の記述パターン](lua/patterns.md)
   - [DSL と Lua の使い分け](lua/dsl-vs-lua.md)
 
-# デバッグ
+# 書いて試す
 
-- [デバッグ概要](debug/index.md)
-  - [VSCode 接続と拡張導入](debug/vscode-setup.md)
-  - [VS Code を使わずに書く（pasta-recipe）](debug/recipe.md)
-  - [開発支援アクション（シーン再生・SHIORI をリロード・保存変数を表示）](debug/dev-actions.md)
-  - [うまく動かないとき（トラブルシューティング）](debug/troubleshooting.md)
+- [書いて、その場で鳴らす](debug/index.md)
+  - [pasta-recipe で書く](debug/recipe.md)
+  - [VS Code で書く](debug/vscode-setup.md)
+  - [▶・リロード・保存変数](debug/dev-actions.md)
+  - [うまく動かないとき](debug/troubleshooting.md)
   - [辞書を検査する（pasta_check validate）](debug/validate.md)
 
 # リファレンス

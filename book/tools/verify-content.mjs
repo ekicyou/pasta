@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { runTutorialCheck, listGuideChapters, findProseParagraphs } from './tutorial-check.mjs';
 import { GENERATION_MAP, findVoice, extractBody, chapterRegions } from './gen-skill-refs.mjs';
 import { maskFences, listMarkdownFiles, summaryChapters } from './link-check.mjs';
-import { SPEAKERS, FACE_DIR, MAX_FACE_BYTES, NO_TALK_CHAPTERS, scanTalk, checkRegion } from './talk/talk.mjs';
+import { SPEAKERS, faceDir, castOf, MAX_FACE_BYTES, NO_TALK_CHAPTERS, scanTalk, checkRegion } from './talk/talk.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '../..');
@@ -460,8 +460,9 @@ for (const ch of DEBUG_CHAPTERS) {
     `デバッグ章 ${ch}.md が本文不足/プレースホルダ`,
   );
   // G-voice: 散文部（コードフェンス除去後）に導入/締めのキャラ口調がある（R7.1）。
+  // 口調マーカーは Claudia のものなので、配役が claudia の章だけを見る（emo2 の 2 人が案内する章は対象外）。
   const prose = stripCodeFences(md);
-  assert(
+  if (castOf(`debug/${ch}.md`) === 'claudia') assert(
     `G-voice:${ch}`,
     hasVoice(prose),
     `デバッグ章 ${ch}.md の散文部にキャラ口調（導入/締め）がある`,
@@ -601,7 +602,8 @@ for (const ch of INTERNALS_CHAPTERS) {
   for (const rel of listChapters([...VOICE_DIRS, 'debug'])) {
     const ch = rel.slice(SRC.length + 1);
     const md = read(rel);
-    const { blocks, errors } = scanTalk(md);
+    const cast = castOf(ch);
+    const { blocks, errors } = scanTalk(md, cast);
     // T-syntax: 記法の不正を全件（章パス・行番号・種類・詳細）。
     report(`T-syntax:${ch}`, rel, errors, `${rel} の台詞部品の記法に不正なし`);
     // T-notalk: 台詞を置かない章は導入・締めの代わりに台詞が 1 つも無いことを求める。
@@ -620,16 +622,17 @@ for (const ch of INTERNALS_CHAPTERS) {
       continue;
     }
     const cover = ch === 'introduction.md';
-    report(`T-intro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.intro, { cover }),
+    report(`T-intro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.intro, { cover, cast }),
       `${rel} の導入が二人の台詞だけでできている`);
-    report(`T-outro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.outro, { cover }),
+    report(`T-outro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.outro, { cover, cast }),
       `${rel} の締めが二人の台詞だけでできている`);
   }
 
-  // T-assets: 顔画像フォルダが登録簿の画像＋LICENSE.txt と完全一致（立ち絵の混入なし）し、各画像が上限以下。
-  {
-    const dir = `${SRC}/${FACE_DIR}`;
-    const want = new Set([...SPEAKERS.flatMap((sp) => Object.values(sp.faces).map((f) => `${f}.png`)), 'LICENSE.txt']);
+  // T-assets: 配役ごとの顔画像フォルダが登録簿の画像＋LICENSE.txt と完全一致（立ち絵の混入なし）し、各画像が上限以下。
+  for (const cast of [...new Set(SPEAKERS.map((sp) => sp.cast))]) {
+    const dir = `${SRC}/${faceDir(cast)}`;
+    const want = new Set([...SPEAKERS.filter((sp) => sp.cast === cast)
+      .flatMap((sp) => Object.values(sp.faces).map((f) => `${f}.png`)), 'LICENSE.txt']);
     const have = exists(dir) ? fs.readdirSync(abs(dir)) : [];
     const problems = [
       ...[...want].filter((f) => !have.includes(f)).map((f) => `欠落 ${f}`),
@@ -640,7 +643,7 @@ for (const ch of INTERNALS_CHAPTERS) {
         .map(([f, size]) => `容量超過 ${f} ${size} バイト（上限 ${MAX_FACE_BYTES}）`),
     ];
     assert(
-      'T-assets',
+      `T-assets:${cast}`,
       problems.length === 0,
       `${dir} が登録簿の画像 ${want.size - 1} 枚と LICENSE.txt に一致し、各画像が ${MAX_FACE_BYTES} バイト以下`,
       `${dir} の不備: ${problems.join(', ')}`,

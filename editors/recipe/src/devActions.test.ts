@@ -262,7 +262,7 @@ test("▶ は保存の後の中身を解析し直し、道から今の行を引�
   assert.deepEqual(s.analyzed, ["NEW"]);
   assert.deepEqual(s.raises(), [{ event: "OnPastaSceneAt", references: [`${info.master}\\dic\\a.pasta`, "9"], ghost_name: info.root }]);
   assert.match(s.lines[0], /▶ シーンを実行 — ゴースト/);
-  assert.ok(s.lines.includes("台本:") && s.lines.includes(SCRIPT));
+  assert.ok(s.lines.includes("スクリプト:") && s.lines.includes(SCRIPT));
   assert.deepEqual(s.notices, []);
   assert.equal(s.count("dev_end"), 1);
 });

@@ -358,7 +358,7 @@ act:call(global_scene_name, key, attrs, ...) -> any
 - `key` が `call_key` の返した「呼ばない」印のときは、検索も警告もせずに `nil` を返す（警告と失敗表記は `call_key` が出している）。
 - 呼び出しはコルーチンを新しく作らず、実行中のシーンのコルーチンの中で行う。呼んだ先で `yield` すると、呼び出し元のシーンごと中断する。
 - 実行中のシーンは戻さない。呼んだ先のシーン関数が `init_scene` を呼ぶと、戻った後も実行中のシーンは呼んだ先のシーンのままになる。戻った後に呼ぶ前のシーンへ戻す呼び出しは [call_restore](#call_restoreglobal_scene_name-key-attrs-) である。
-- DSL の Call 行は、ローカルシーンの最後の行なら `return act:call(SCENE.__global_name__, "名前", {}, 引数…)`、それ以外の行なら `act:call_restore(SCENE.__global_name__, "名前", {}, 引数…)` になる。動的ターゲット（`＞＄名前` など）では、`"名前"` の代わりに `act:call_key(…)` が入る（[Call / Jump](../grammar/call-jump.md)）。
+- DSL の Call 行は、ローカルシーンの最後の行なら `return act:call(SCENE.__global_name__, "名前", {}, 引数…)`、それ以外の行なら `act:call_restore(SCENE.__global_name__, "名前", {}, 引数…)` になる。動的ターゲット（`＞＄名前` など）では、`"名前"` の代わりに `act:call_key(…)` が入る（[Call](../grammar/call-jump.md)）。
 
 ```lua
 act:call(nil, "挨拶", nil)           -- 「挨拶」で前方一致するシーンを探して呼ぶ

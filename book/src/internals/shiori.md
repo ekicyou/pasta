@@ -111,7 +111,7 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 | ---------- | ---- |
 | `pasta.shiori.entry` | グローバルの `SHIORI` 表（`load`・`request`・`unload`）。`GLOBAL.close_ghost`（`GLOBAL["ゴースト終了"]`）・`GLOBAL.pause_auto_talk`（`GLOBAL["自動トーク停止"]`）・`GLOBAL.resume_auto_talk`（`GLOBAL["自動トーク再開"]`）も登録する |
 | `pasta.shiori.event` | `EVENT.fire`（振り分けとコルーチンの再開）と、ハンドラが無いときの `EVENT.no_entry` |
-| `pasta.shiori.event.register` | `REG`。依存を持たない表で、生のキーには代入したハンドラ（鎖の底）だけを置く。鎖はモジュールのローカル変数 `chains` に持ち、読み出しの `REG.register` はメタテーブルの `__index` から登録の口（`REG:register(id, fn)`）を返す。`EVENT.fire` が鎖の写しを取る内部の口は、`__index` でなくメタテーブルの `handlers` 欄（`getmetatable(REG).handlers(id)`）に置き、`REG.handlers` からは見えない。`REG.register` に代入すると、生のキーが先に引かれて登録の口が隠れる（代入を今と同じに働かせるため止めない） |
+| `pasta.shiori.event.register` | `REG`。依存を持たない表で、生のキーには代入したハンドラ（鎖の底）だけを置く。鎖はモジュールのローカル変数 `chains` に持ち、登録の口 `REG:register(id, fn)` はメタテーブルの `__index` から、`EVENT.fire` が鎖の写しを取る口は `getmetatable(REG).handlers(id)` から引く（`REG.handlers` からは見えない）。`REG.register` に代入すると、生のキーが先に引かれて登録の口が隠れる |
 | `pasta.shiori.event.boot`・`pasta.shiori.event.choice_select`・`pasta.shiori.event.second_change`・`pasta.shiori.event.mouse` | 既定ハンドラ（OnBoot・OnChoiceSelectEx・OnSecondChange・OnMouseDoubleClick・OnMouseMove）を `REG` に登録する。`pasta.shiori.event.mouse` は、つつき・撫でのショートカットの候補の名前・アクター名の解決・撫での判定も持つ |
 | `pasta.shiori.event.virtual_dispatcher` | 仮想イベント（OnHour・OnTalk）の判定と発行 |
 | `pasta.shiori.clock` | SSP の仮想時刻と OS の時計のずれ・時刻の飛びを持つ時計。合図の判定・仮想時刻の読み取り・ずれを足した時刻と日付・飛びを差し引いた時計 |
@@ -261,7 +261,7 @@ marshal_request
 
 ### アクタースレッドのメッセージループ
 
-アクタースレッドは、同期の `rx.recv()` だけで待つ単一のループを回す。別のスレッドの `try_send`・`send` が `recv()` を起こす。非同期の実行器・OS のウィンドウ・メッセージの仕組みは使わない。
+アクタースレッドは、同期の `rx.recv()` だけで待つ単一のループを回す。
 
 ```text
 while let Ok(msg) = rx.recv()
@@ -292,6 +292,29 @@ while let Ok(msg) = rx.recv()
 - `Charset`・`ID`・`BaseID`・`Status`・`SecurityLevel`・`Sender` は対応するフィールドに、`ReferenceN` は `reference[N]` に入れる。どのヘッダも `dic[ヘッダ名]` に入る。
 - 1 行目が `GET` か `NOTIFY` かで `method` を `"get"`・`"notify"` にする。SHIORI/3.0 は `version = 30`、SHIORI/2.x は 1 行目のイベント名を `id` に、版を `20`〜`29` にする。
 - 解析結果の列は再帰ではなく反復で処理する。ヘッダの数はホストが決めるため、再帰ではスタックを使い果たしてホストのプロセスごと落ちうる。
+
+次のリクエストは、その下の表になる。
+
+```text
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnMouseDoubleClick
+Reference3: 0
+Reference4: head
+```
+
+```lua
+{
+  method = "get", version = 30,
+  charset = "UTF-8", sender = "SSP", security_level = "local", id = "OnMouseDoubleClick",
+  reference = { [3] = "0", [4] = "head" },
+  dic = { Charset = "UTF-8", Sender = "SSP", SecurityLevel = "local", ID = "OnMouseDoubleClick",
+          Reference3 = "0", Reference4 = "head" },
+  date = { … },  -- 受け取った時刻
+}
+```
 
 ### unload・DllMain と teardown
 
@@ -350,39 +373,7 @@ teardown_via_sender(tx, timeout)
 
 ### FFI 入口と終了処理のログ
 
-ログの振り分けの規則は [ロギングとエンコーディング](logging-encoding.md#振り分けの規則) が書く。この節は、SHIORI の各入口と終了処理のログがその規則でどうなるかを書く。旧来の入口だけを使うホスト（SSP）では、登録簿のロガーは 0 個か 1 個である。版 3 のインスタンスが並ぶと 2 個以上になり、文脈の無いログは捨てる。
-
-| 入口・処理 | スレッドの文脈 | 扱い |
-| ---------- | -------------- | ---- |
-| アクタースレッド（メッセージループの観測ログ、`PastaShiori` の各メソッドのログ） | スレッドの入口で設置パスの `LoadDirGuard` を張り、片付けと ack を終えて約束を待つ前に外す | 自分のロガーへ届く |
-| `ActorInstance` の起動と後始末（占有を断った warn・引き継いだ warn・起動の失敗の error・スレッドを手放した warn） | 出す間だけ設置パスの `LoadDirGuard` を張る | そのディレクトリのロガーへ届く。起動の失敗は、その場で既定のロガーを登録してから出す |
-| 旧来の `loadu`・`load`（`load_entry`） | 無し。`load_impl` は入口名と成否の 1 行を出す間だけ張り直す | 最初のロード前の引数の誤りや設置パスを読めないときのログは、登録が無いので捨てる。`loadu` 済みで無視した `load` の warn は、登録されたロガーがちょうど 1 つなら届く |
-| 旧来の `request` | 無し。解けない要求の warn（`request.unreadable`）だけはインスタンスの設置パスで張って出す | 解けない要求の warn はそのインスタンスのロガーへ届く。不正な引数や UTF-8 として読めない要求の warn、境界での panic の error、観測用の debug・trace は、登録されたロガーがちょうど 1 つなら届く。`load` の前・`unload` の後は捨てる |
-| 旧来の `unload` | 無し | teardown の異常の warn は後述 |
-| `DllMain`（どの通知でも） | — | 何もしないので、ログも出ない。プロセスの終了では `SHIORI.unload` と永続化データの保存も走らない |
-| 版 3 の `load`・`request`・`notify` | 入口の 1 行・弾いた要求の debug・解けない要求の warn・開始行を読めない warn を出す間だけ、インスタンスの設置パスで張る | そのインスタンスのロガーへ届く。絶対パスでない・ディレクトリが無いときは置き場が無いのでログを出さない |
-
-終了処理（`unload`）のログは、出る時点で次のように分かれる。
-
-```text
-FFI 入口のスレッド: send(Stop{done})
-  debug「Stop enqueued」                  … アクターの登録解除より前なら届く
-アクタースレッド: Stop を受けてループを抜け、drop(shiori)（PastaShiori の Drop）
-  SHIORI.unload・永続化データの保存のログ … 届く
-  info「Unregistering logger」            … 届く
-  ロガーの登録を外す（ファイルを閉じる）
-アクタースレッド: drop(rx) → done.send(())
-  debug「actor.done」                     … 捨てる
-FFI 入口のスレッド: recv_timeout(5 秒)
-  届いた       → debug「done ack received」 … 捨てる。続けて join
-  Timeout      → warn                       … 届く（ロガーはまだ登録されている）
-                 warn「actor thread abandoned」… 届く（設置パスの文脈を張って出す）
-  Disconnected → warn                       … 登録解除の後なら捨てる
-```
-
-- 完了の通知（done ack）の後のログは、そのディレクトリのロガーがもう登録されていないので捨てる。done ack を送る位置は変えないため、通知を受け取った時点で VM・ログファイルの解放が済んでいる、という不変条件は保たれる。
-- Timeout のとき、アクターは終了処理の途中で、ロガーは登録されたままである。FFI 入口のスレッドの文脈の無い warn は、ロガーがちょうど 1 つなら届く。Disconnected は巻き戻すプロファイルでの panic でしか起きず、そのときロガーが既に登録を外されていれば warn は捨てる。
-- ログを残すために、`unload` の戻り値（常に 1）・待ち時間の上限（5 秒）・応答の内容は変えない。
+SHIORI の各入口と終了処理のログがどのロガーへ届くかは、[ロギングとエンコーディング](logging-encoding.md#残るログと捨てるログ) が書く。この章の側の決まりは、終了処理でロガーの登録を外すのを最後にすることだけである。`SHIORI.unload` の結果・永続化データの保存の失敗・登録解除の通知を、ファイルを閉じる前に書くためである。ログを残すために、`unload` の戻り値（常に 1）・待ち時間の上限（5 秒）・応答の内容は変えない。
 
 ### ディレクトリの占有
 
@@ -413,12 +404,7 @@ FFI 入口のスレッド: recv_timeout(5 秒)
 
 ### ログの量の判定
 
-購読者は `registry().with(fmt::layer().with_writer(GlobalLoggerRegistry).with_filter(RegistryFilter))` の 1 つで、プロセスに 1 つの量の設定は持たない。量の設定（`EnvFilter`）は `REGISTRY` の項目ごとに持ち、`update_tracing_filter(load_dir, config)` がその項目の量の設定を作り直す（[ロギングとエンコーディング](logging-encoding.md#ログフィルタ)）。
-
-- `RegistryFilter::enabled` は、書き込み先を選ぶのと同じ決まりで項目を選び、その項目の量の設定で判定する。スレッドの文脈があればその項目、無ければロガーを持つ項目がちょうど 1 つのときだけその項目である。選べなければ出さない。ほかのゴーストの設定へ逃げない。
-- 判定はスレッドの文脈で変わるので、`callsite_enabled` は `Interest::sometimes()` を返し、コールサイトごとに覚えさせない。`max_level_hint` は全部の項目の量の最大（項目が無ければ OFF）で、それより細かいイベントは購読者に届く前に止まる。表を変えたら、ロックを外してから `rebuild_interest_cache()` で作り直す（ロックを持ったまま呼ぶと、`max_level_hint` が同じロックを取って止まる）。
-- 1 つの `EnvFilter` を項目ごとに `Filter::enabled` で呼ぶだけなので、スパンの中身で絞る指定（`[span{field=…}]` のような動的な指定）は効かない。ターゲットと量の指定（`warn,pasta_lua=debug` など）は効く。
-- 同じ理由で、`tracing::enabled!` はディレクトリごとの断りを映さない。答えは全部の項目の量の最大だけで決まる。実際の書き出しは、選んだ項目の量の設定に従う。
+購読者はプロセスに 1 つで、量の設定（`EnvFilter`）は `REGISTRY` の項目ごとに持つ。`update_tracing_filter(load_dir, config)` がその項目の量の設定を作り直す。判定の決まりは [ログフィルタ](logging-encoding.md#ログフィルタ) が書く。
 
 ### Lua 側の SHIORI エントリとイベント配送
 
@@ -466,10 +452,29 @@ pasta.shiori.entry
 | ハンドラ | 動作 |
 | -------- | ---- |
 | `REG.OnBoot` | `SCENE.co_exec(act, act.req.id)`。シーン関数フォールバックと同じ |
-| `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ探索範囲の親を決める。`act.req.reference[2]`（`\q` の 3 番目の引数。選択肢を出したグローバルシーンの登録名）が文字列で `SCENE.get_global_table` で引けるグローバルシーンならそれを、そうでなければ `STORE.last_global_scene` を親にする。`act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, 親, act)` で探し、無ければ `SCENE.search(選択 ID, nil, act)` でグローバルシーンを探し、見つかった関数をコルーチンに包んで返す。どちらも見つからず、どちらかが `"unmet"` なら `FAILURE.raise` で `SCENE_UNMET`（対象 `OnChoiceSelectEx ＞選択 ID`）を投げ、名前が無いだけなら `nil`（204）を返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
+| `REG.OnChoiceSelectEx` | イベント名のシーン → 選択 ID のローカルシーン → グローバルシーンの順に探す（表の下の手順） |
 | `REG.OnMouseDoubleClick` | `act.req.reference[3]`（スコープ番号）からアクター名を、`act.req.reference[4]`（部位）を部位として、ショートカットの 1〜8 段の名前を上から `SCENE.co_exec_exact` で探し、最初に見つかったコルーチンを返す。無ければ `SCENE.co_exec(act, "OnMouseDoubleClick")`。抑止は見ない |
-| `REG.OnMouseMove` | 撫での判定（`check_stroke`）を毎回回す。判定には部位・スコープ番号・なめらかな時計の時刻（`CLOCK.steady(act.req)` に `act.req.date.ns` を足した小数の秒）と、`virtual_dispatcher.is_blocked(act.req.status)` を渡す。撫でたと決めた回だけ、アクター名を引いて 1〜8 段を `SCENE.co_exec_exact` で探し、見つかればそのコルーチンを返す。それ以外は `SCENE.co_exec(act, "OnMouseMove")`。判定の状態はモジュールのローカル変数 1 つで、保存しない |
-| `REG.OnSecondChange` | `CALLBACK.sweep(CLOCK.steady(act.req) or os.time(), act.req)` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` がコルーチンを返せばそれを返す。何も出さない回は、Status がブロック対象なら `nil`、そうでなければ `CLOCK.take_probe(act.req)`（予約された仮想時刻の読み取りのスクリプトか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、止まるエラーの表記の 200、または表記を出さない設定での理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
+| `REG.OnMouseMove` | 撫での判定（`check_stroke`）を毎回回す。撫でたと決めた回だけ、アクター名を引いて 1〜8 段を `SCENE.co_exec_exact` で探し、見つかればそのコルーチンを返す。それ以外は `SCENE.co_exec(act, "OnMouseMove")` |
+| `REG.OnSecondChange` | `CALLBACK.sweep` → `virtual_dispatcher.dispatch` → `CLOCK.take_probe` の順に試す（手順は [仮想時刻の時計](#仮想時刻の時計pastashioriclock)） |
+
+```text
+REG.OnChoiceSelectEx
+ 1. SCENE.co_exec(act, "OnChoiceSelectEx") があればそれ
+ 2. 探索範囲の親を決める
+      act.req.reference[2]（\q の 3 番目の引数。選択肢を出したグローバルシーンの登録名）が
+      文字列で、SCENE.get_global_table で引ける → それ
+      そうでなければ                               → STORE.last_global_scene
+ 3. 選択 ID（act.req.reference[1]）を SCENE.search(選択 ID, 親, act) で探す
+    無ければ SCENE.search(選択 ID, nil, act) でグローバルシーンを探す
+    見つかった関数をコルーチンに包んで返す
+ 4. どちらも見つからない
+      どちらかが "unmet" → FAILURE.raise で SCENE_UNMET（対象 OnChoiceSelectEx ＞選択 ID）
+      名前が無いだけ     → nil（204）
+```
+
+- `OnChoiceSelectEx` が検索を直接呼ぶのは、`SCENE.co_exec` が親のグローバルシーンを渡せないためである。
+- 撫での判定には、部位・スコープ番号・なめらかな時計の時刻（`CLOCK.steady(act.req)` に `act.req.date.ns` を足した小数の秒）と、`virtual_dispatcher.is_blocked(act.req.status)` を渡す。判定の状態はモジュールのローカル変数 1 つで、保存しない。
+- `OnSecondChange` の `CALLBACK.sweep(CLOCK.steady(act.req) or os.time(), act.req)` の応答は、期限切れの待機を再開した結果（出力の 200、止まるエラーの表記の 200、または表記を出さない設定での理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す。
 
 ### 非同期トーク
 
@@ -501,7 +506,7 @@ Lua のエラーでシーンやハンドラが止まったとき（止まるエ�
 - `EVENT.fire` は、ハンドラ（鎖のハンドラ・`REG` の関数・`EVENT.no_entry`）を 1 つ呼ぶ直前ごとに、渡す act を `STOP.hold_handler(act)` で控え直す。シーンの外（ハンドラの中）で止まったときは、止まったハンドラの act に積んだ台詞の後に表記が出る。見送った鎖のハンドラの act は控えが上書きされるので、その台詞は表記に混ざらない。
 - `SHIORI.request` は、要求の始めに `STOP.clear()` で両方の控えを空にする。エラーを受けたら `STOP.take()`・`STOP.take_handler()` で控えを取り出し、理由の行（エラー文の最初の行）・要求の ID・ID が `On` で始まるかと一緒に `STOP.response` に渡す。
 - エラーの値が `FAILURE.raise` の記録（`FAILURE.is_raised`）なら、`STOP.response` は記録の種類と対象をそのまま表記の種類と対象にし、止まった場所の名前を説明にする（`【条件に合うシーンが無い：＞秘密（＊OnMouseDoubleClick）】`）。理由の行は記録の `tostring`（`条件に合うシーンが無い：＞秘密`）になる。
-- `STOP.response` は、控えた act（シーンの失敗の act、無ければハンドラの act）から止まった場所の名前を作り、エラー文の場所を直し、ログに警告を 1 行出す（`FAILURE.notation`）。表記を出す設定で、ID が `On` で始まる要求なら、act の末尾に表記を `raw_script` として積んで組み立てた値を `Value` に、受けた理由を `X-Error-Reason` にした `RES.ok`（`200 OK`）の全文を返す。表記を出さない設定・ID が `On` で始まらない・組み立てに失敗したときは `nil` を返し、`SHIORI.request` はこれまでどおり `RES.err` の 500 を返す。
+- `STOP.response` は、控えた act（シーンの失敗の act、無ければハンドラの act）から止まった場所の名前を作り、エラー文の場所を直し、ログに警告を 1 行出す（`FAILURE.notation`）。表記を出す設定で、ID が `On` で始まる要求なら、act の末尾に表記を `raw_script` として積んで組み立てた値を `Value` に、受けた理由を `X-Error-Reason` にした `RES.ok`（`200 OK`）の全文を返す。表記を出さない設定・ID が `On` で始まらない・組み立てに失敗したときは `nil` を返し、`SHIORI.request` は `RES.err` の 500 を返す。
 - 期限切れの掃引（`CALLBACK.sweep`）は、待機ごとの `time_out` で `EVENT.drive` の直後に、成否にかかわらず `STOP.take()` で控えを取り出す（同じ要求の後の止まるエラーに古い控えを混ぜない）。理由付きの待機がエラーで終わると、`timeout_message` を理由と表記の対象にして `STOP.response` に渡し（`【時間切れ：…】`）、`nil` なら `RES.err(理由)` の 500 を候補にする（警告は再開の前に出した 1 行だけで、`STOP.response` は警告を出さない）。理由の無い待機がエラーで終わると、イベント名を前に付けた警告を出し、スクリプトのエラーの表記の応答を候補にする（表記を出さない設定では候補を作らない）。
 
 表記の形・止まった場所の示し方・出る応答と設定ごとの違いは、[止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記) が正である。
@@ -521,18 +526,54 @@ dispatch(act)
 
 利用者から見た判定の順・ブロック対象のキーワードと照合の仕方・OnHour のシーン候補の順・トーク間隔の決まり方・テスト用の関数は、[仮想ディスパッチャ](../lua/shiori-events.md#仮想ディスパッチャ)（[ブロック対象 Status キーワード](../lua/shiori-events.md#ブロック対象-status-キーワード)・[OnHour](../lua/shiori-events.md#onhour)・[pasta.toml 設定](../lua/shiori-events.md#pastatoml-設定)・[テスト用関数](../lua/shiori-events.md#テスト用関数)）が正である。ここではそれを実現する仕組みだけを書く。
 
-- `check_hour` の現在時刻は `CLOCK.now(act.req)`（仮想時刻。下の「仮想時刻の時計」）である。`next_hour_unix` が 0 なら次の正時（`unix - unix % 3600 + 3600`）を記録するだけで終わる。`CLOCK.epoch()` が `seen_epoch` と違えば（時刻の飛びがあれば）、`seen_epoch` を更新し、現在時刻の 70 秒前（ローカル定数 `REBASE_GRACE`）から同じ式で次の正時を決め直す。現在時刻がそれに達していれば、同じ式で次の正時を記録し直し、`act:transfer_date_to_var()` で日時変数を転記してからシーンを探す。シーン名の `{HH}` は `CLOCK.date(act.req).hour` から作る。時報のシーンが見つかってコルーチンを返すときは、`next_talk_time` を `CLOCK.steady(act.req)` から決め直し（時報の直後にトークが続かないようにする）、`talk_suspend_count` に `CLOCK.suspend_count()` を記録する。`check_talk` も、コルーチンを返すとき（チェイントークの続きを含む）に同じ記録をする。
-- `check_talk` は、`next_talk_time` が 0 なら次のトーク時刻を決めるだけで終わる。トーク時刻は `CLOCK.steady(act.req)`（飛びを差し引いた時計）で数え、仮想時刻の設定し直しに左右されない。正時までの残りを `hour_margin` と比べる判定は、`check_hour` が記録した `next_hour_unix` と `CLOCK.now(act.req)` の差を使う（仮想時刻で数える）。この判定で発行を見送るときは `next_talk_time` を変えないため、次の秒にまた判定する。発行するときは、シーンを探す前に `next_talk_time` を決め直す。
-- 次のトーク時刻は「現在時刻 + `math.random(最小間隔, 最大間隔)`」で決める。間隔は、決めるたびにローカル関数 `get_config` が `pasta.save` と `@pasta_config` を読み直して求める（キャッシュしない）。`hour_margin` は `[ghost].hour_margin` が有限の数ならその値を、切り捨てや下限の補正をせずにそのまま使う。無いとき、数でないとき、NaN・無限大のときは 30 を使う（ローカル関数 `finite_or`）。`[ghost]` の既定値の補完は [設定読込](loader.md#設定読込) で扱う。
-- ブロック中（2 で終わる間）は `check_hour`・`check_talk` を呼ばないため、`next_hour_unix`・`next_talk_time` は進まない。そのため、ブロックが解けた最初の判定で、過ぎていた正時やトーク時刻の条件が成り立つ。
-- 3 の `STORE.auto_talk_paused` は、`GLOBAL.pause_auto_talk`／`resume_auto_talk`（`pasta/shiori/entry.lua`）が書く（[自動トークを止めている間](../lua/shiori-events.md#自動トークを止めている間)）。止めている間もブロック中と同じく時計は進まないが、再開の関数が公開の関数 `restart_timers(act)` を 1 回呼び、時計を決め直す。`next_talk_time` を 0 に戻し、`CLOCK.now(act.req)` が取れれば次の正時を求めて、今の `next_hour_unix` より後のとき、または `CLOCK.epoch()` が `seen_epoch` と違うときだけ置き換えて `seen_epoch` を記録する（取れなければ `next_hour_unix` を 0 にする）。そのため、ブロックと違い、止めている間に過ぎた正時は再開の後にも発行されない。`set_co_scene` を通らないので、中断中の継続は捨てずに残る。`talk_suspend_count` は `restart_timers` では戻さない。
-- 公開の関数 `wake_talk(act)` は、スリープ明けのおしゃべりを予約する。`next_talk_time` を `CLOCK.steady(act.req)` に置くだけで、発行はしない（次の OnSecondChange からの `check_talk` が、ブロックと止める門を通ったうえで出す）。次のどれかなら何もしない。`act.req` か `act.req.date` が無い（`CLOCK.steady(act.req)` が nil）、`next_talk_time` が 0（初回の時刻決めの前）、`CLOCK.suspend_count()` が 0（`OnSysSuspend` を見ていない）、`talk_suspend_count` が `CLOCK.suspend_count()` と同じ（最後のスリープの後に自動トークを出し済み）。予約は `next_talk_time` を今にするだけなので、`restart_timers` が `next_talk_time` を 0 に戻せば消える。
-- 返したコルーチンは `EVENT.fire` が `EVENT.drive` で再開し、続きの決まりに従って `STORE.co_scene` を更新する。継続を再開するのは OnTalk だけである（`check_talk` が `STORE.co_scene` を返し、種類は "resume"）。OnHour のシーンは `SCENE.co_exec` で探した印の無いコルーチンなので、中断中の継続があればふつうの割り込み（"interrupt"）になり、台詞を出せば継続を捨て、出さなければ残す（[継続トークと co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新)）。
+```text
+check_hour(act)                    今 = CLOCK.now(act.req)（仮想時刻。下の「仮想時刻の時計」）
+ 1. next_hour_unix が 0 → 次の正時（今 - 今 % 3600 + 3600）と seen_epoch を記録して nil
+ 2. CLOCK.epoch() が seen_epoch と違う（時刻が飛んだ）
+      → seen_epoch を更新し、今の 70 秒前（REBASE_GRACE）から同じ式で次の正時を決め直す
+ 3. 今 < next_hour_unix → nil
+ 4. 同じ式で次の正時を記録し直し、act:transfer_date_to_var() で日時変数を転記する
+ 5. 時報のシーンを候補の順に探す（{HH} は CLOCK.date(act.req).hour から作る）
+      見つかった → next_talk_time を CLOCK.steady(act.req) から決め直し（時報の直後にトークを続けない）、
+                   talk_suspend_count に CLOCK.suspend_count() を記録して、コルーチンを返す
+      どれも無い → nil
+
+check_talk(act)                    今 = CLOCK.steady(act.req)（飛びを差し引いた時計）
+ 1. next_talk_time が 0 → 次のトーク時刻を決めて nil
+ 2. 今 < next_talk_time → nil
+ 3. 正時までの残り（next_hour_unix - CLOCK.now(act.req)）が 0 より大きく hour_margin 未満 → nil
+      next_talk_time は変えないので、次の秒にまた判定する
+ 4. シーンを探す前に next_talk_time を決め直す
+ 5. STORE.co_scene があればそれ、無ければ OnTalk のシーンを探して返す
+      コルーチンを返すときは talk_suspend_count に CLOCK.suspend_count() を記録する
+
+restart_timers(act)                自動トークの再開の関数が 1 回呼ぶ
+ 1. next_talk_time を 0 に戻す
+ 2. CLOCK.now(act.req) が取れない → next_hour_unix を 0 にして終わる
+ 3. 次の正時が今の next_hour_unix より後か、CLOCK.epoch() が seen_epoch と違う
+      → next_hour_unix を置き換え、seen_epoch を記録する
+    talk_suspend_count は戻さない
+
+wake_talk(act)                     スリープ明けのおしゃべりの予約。発行はしない
+ 次のどれかなら何もしない
+   act.req か act.req.date が無い（CLOCK.steady(act.req) が nil）
+   next_talk_time が 0（初回の時刻決めの前）
+   CLOCK.suspend_count() が 0（OnSysSuspend を見ていない）
+   talk_suspend_count が CLOCK.suspend_count() と同じ（最後のスリープの後に自動トークを出し済み）
+ それ以外 → next_talk_time を CLOCK.steady(act.req) に置く
+```
+
+- トーク時刻は飛びを差し引いた時計で数えるので、仮想時刻の設定し直しに左右されない。正時までの残りは仮想時刻で数える。
+- 次のトーク時刻は「現在時刻 + `math.random(最小間隔, 最大間隔)`」で決める。間隔は、決めるたびにローカル関数 `get_config` が `pasta.save` と `@pasta_config` を読み直して求める（キャッシュしない）。`hour_margin` は `[ghost].hour_margin` が有限の数ならその値をそのまま使い、無いとき・数でないとき・NaN・無限大のときは 30 を使う（ローカル関数 `finite_or`）。`[ghost]` の既定値の補完は [設定読込](loader.md#設定読込) で扱う。
+- ブロック中（`dispatch` の 2 で終わる間）は `check_hour`・`check_talk` を呼ばないため、`next_hour_unix`・`next_talk_time` は進まない。そのため、ブロックが解けた最初の判定で、過ぎていた正時やトーク時刻の条件が成り立つ。
+- `dispatch` の 3 の `STORE.auto_talk_paused` は、`GLOBAL.pause_auto_talk`／`resume_auto_talk`（`pasta/shiori/entry.lua`）が書く（[自動トークを止めている間](../lua/shiori-events.md#自動トークを止めている間)）。止めている間もブロック中と同じく時計は進まないが、再開の関数が `restart_timers(act)` で時計を決め直す。そのため、ブロックと違い、止めている間に過ぎた正時は再開の後にも発行されない。`set_co_scene` を通らないので、中断中の継続は捨てずに残る。
+- `wake_talk` の予約は、次の OnSecondChange からの `check_talk` が、ブロックと止める門を通ったうえで出す。`restart_timers` が `next_talk_time` を 0 に戻せば消える。
+- 返したコルーチンは `EVENT.fire` が `EVENT.drive` で再開する。継続を再開するのは OnTalk だけで、OnHour のシーンは割り込みになる（[継続トークと co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新)）。
 - 仮想イベントは `REG` を通らない。OnHour・OnTalk で発行するシーンはどれも `SCENE.co_exec` で探す（テスト用の差し替え `scene_executor` が設定されていればそれを使う）。
 
 #### 仮想時刻の時計（pasta.shiori.clock）
 
-SSP の仮想時刻は SHIORI のリクエストのヘッダに載らない。SSP によっては（2.9.18 の `20261017-5` ビルドで確認）SSP のプロセスの中の OS の時計そのものが仮想時刻になり、`act.req.date` も仮想時刻になるが、そうでない SSP のために `pasta.shiori.clock`（以下 `CLOCK`）が OS の時計とのずれを持つ。どちらの SSP でも Apply・Reset は「今」の飛びになるため、`CLOCK` は飛びも数える。利用者から見た読み取りの手順・返事の扱い・ずれの使われ方は [OnPastaClock](../lua/shiori-events.md#onpastaclock仮想時刻の読み取り) が正である。`CLOCK` は `pasta.shiori.event`・`pasta.shiori.act`・`pasta.shiori.event.second_change`・`pasta.shiori.event.virtual_dispatcher`・`pasta.shiori.event.mouse` から読まれるため、循環参照を避けて `pasta.shiori.event.*`・`pasta.shiori.act`・`pasta.store` を `require` しない。
+SSP の仮想時刻は SHIORI のリクエストのヘッダに載らない。SSP によっては（2.9.18）SSP のプロセスの中の OS の時計そのものが仮想時刻になり、`act.req.date` も仮想時刻になるが、そうでない SSP のために `pasta.shiori.clock`（以下 `CLOCK`）が OS の時計とのずれを持つ。どちらの SSP でも Apply・Reset は「今」の飛びになるため、`CLOCK` は飛びも数える。利用者から見た読み取りの手順・返事の扱い・ずれの使われ方は [OnPastaClock](../lua/shiori-events.md#onpastaclock仮想時刻の読み取り) が正である。`CLOCK` は `pasta.shiori.event`・`pasta.shiori.act`・`pasta.shiori.event.second_change`・`pasta.shiori.event.virtual_dispatcher`・`pasta.shiori.event.mouse` から読まれるため、循環参照を避けて `pasta.shiori.event.*`・`pasta.shiori.act`・`pasta.store` を `require` しない。
 
 状態はモジュールのローカル変数 8 つだけである。
 
@@ -549,13 +590,9 @@ SSP の仮想時刻は SHIORI のリクエストのヘッダに載らない。SS
 
 状態は保存しない。VM と同じ寿命（`load` から `unload` まで）で、次の `load` で初期値から始まる。
 
-```text
-EVENT.fire(req)
- 1. CALLBACK.try_route(req)          待っているコールバックの返事ならその応答
- 2. CLOCK.observe(req)               true（OnPastaClock の返事を受け取った）なら 204
- 3. 鎖（REG:register）を新しい順に   真の値を返したものの応答
- 4. 全部見送れば REG[req.id] を呼ぶ  rawget。OnSecondChange では既定ハンドラ（下）
+`CLOCK.observe(req)` は、`EVENT.fire` が `REG` より前に、すべてのリクエストで呼ぶ（[Lua 側の SHIORI エントリとイベント配送](#lua-側の-shiori-エントリとイベント配送)）。読み取りの予約を返すのは、OnSecondChange の既定ハンドラである。
 
+```text
 REG.OnSecondChange（既定。鎖の底）
  1. CALLBACK.sweep                   タイムアウトの応答があればそれ
  2. dispatcher.dispatch(act)         シーンがあればそれ
@@ -563,12 +600,40 @@ REG.OnSecondChange（既定。鎖の底）
  4. CLOCK.take_probe(act.req)        予約があれば読み取りのスクリプト
 ```
 
-- 合図の判定（`observe`）: 現在時刻 `CLOCK.now(req)` で、`OnMinuteChange` は `now % 60` が 2 秒を超え 58 秒未満なら、`OnHourTimeSignal` は `now % 3600` が 60 秒を超え 3595 秒未満なら、見込みの時機から外れたとして `_probe_armed` を立てる。毎時の合図は遅れを 60 秒、早まりを 5 秒まで許す（トークできるまで待つ遅れを許すため）。幅はローカル定数 `MINUTE_TOLERANCE`・`HOUR_LATE_TOLERANCE`・`HOUR_EARLY_TOLERANCE` である。
-- 読み取り（`take_probe`）: 予約があれば消して `\![get,property,OnPastaClock,system.year,system.month,system.day,system.hour,system.minute,system.second]\e` を返す。呼ぶのは OnSecondChange の既定ハンドラだけで、何も発行せず Status がブロック対象でない回に限る。予約が無い回は何も返さないため、毎秒のバルーンには影響しない。
-- 返事の受け取り: `id` が `OnPastaClock` で `SecurityLevel` が `external` でなければ、`observe` が返事として消費して true を返す（`REG` へ進まない）。Reference0〜5 を `tonumber` で整数に読み、`os.time`（地方時）で Unix 時刻にし、`act.req.date.unix` との差をずれにする。差の絶対値が 2 秒以下（ローカル定数 `OFFSET_DEADBAND`）なら 0 にする。値が読めなければずれを 0 に戻し、警告ログを出す。ずれが変わったときはデバッグログを出す。
-- `X-Pasta-Time`: ヘッダのあるリクエストでは、合図を判定せず、返事を受け取っても無視し、読み取りも返さない。`now` は `req.date.unix` を、`date` は `req.date` をそのまま返す。
-- 読み出し: `now(req)` は `req.date.unix + _offset`、`date(req)` はずれを足した時刻から `os.date("*t")` で作った新しい日付の表（`act.req.date` と同じ形）を返す。ずれが 0 なら `req.date` をそのまま返し、`act.req.date` は書き換えない。日時変数の転記（`pasta.shiori.act` の `transfer_date_to_var`）は `CLOCK.date` を読む。`offset()` は `_offset` を返す。
-- 時刻の飛び: `observe` は OnSecondChange のたびに `d = now − _prev_now` を求め、`d` が −2 秒より小さいか 90 秒より大きければ（ローカル定数 `JUMP_BACK`・`JUMP_FORWARD`）飛びとして `_epoch` を 1 増やし、`_jump_total` に `d − 1` を足す。`_resumed` か `_suspended` が立っていれば数えずに `_suspended` を下ろす。飛ばない差で `_resumed` が立っていれば `_suspended` も下ろす（スリープせずに戻った場合に印を残さない）。どの場合も最後に `_resumed` を下ろして `_prev_now` を `now` にする。`OnSysSuspend` を見ると `_suspended` を立て、`_suspend_count` を 1 増やす（回数は判定に使わず、ディスパッチャが `suspend_count()` で読む）。`OnSysResume` を見ると `_resumed` を立てる（スリープ明けは飛びにしない）。SSP 2.9.18 では、`OnSysSuspend` は復帰してから最初の OnSecondChange より前に届き、`OnSysResume` は最初の OnSecondChange より数秒遅れて届く（2026-10-18 実機）ので、両方を見る。`X-Pasta-Time` 付きのリクエストは飛びを見ず、`_prev_now` も変えない。ずれが変わったとき（読み取りの返事）も、次の OnSecondChange で `now` が飛ぶので同じ判定に入る。
+```text
+observe(req)
+ OnPastaClock（読み取りの返事）
+   SecurityLevel が external → false（受け取らない）
+   それ以外 → 返事を受け取って true（呼び元は 204 を返し、REG へ進まない）
+     Reference0〜5 を tonumber で整数に読み、os.time（地方時）で Unix 時刻にする
+     act.req.date.unix との差をずれ（_offset）にする
+       差の絶対値が 2 秒以下（OFFSET_DEADBAND） → 0
+       値が読めない                            → 0 に戻して警告ログ
+       ずれが変わった                          → デバッグログ
+ OnSysResume  → _resumed を立てる
+ OnSysSuspend → _suspended を立て、_suspend_count を 1 増やす
+ X-Pasta-Time のあるリクエスト → ここで false（合図も飛びも見ず、返事も無視する）
+ OnSecondChange   → watch_jump(now)
+ OnMinuteChange   → now % 60 が 2 秒を超え 58 秒未満     → _probe_armed を立てる
+ OnHourTimeSignal → now % 3600 が 60 秒を超え 3595 秒未満 → _probe_armed を立てる
+
+watch_jump(now)                    d = now − _prev_now
+ d が −2 秒より小さいか 90 秒より大きい（JUMP_BACK・JUMP_FORWARD）
+   _resumed か _suspended が立っている → 数えずに _suspended を下ろす（スリープ明けは飛びにしない）
+   それ以外 → _epoch を 1 増やし、_jump_total に d − 1 を足す
+ 飛ばない差で _resumed が立っている → _suspended を下ろす（スリープせずに戻った場合に印を残さない）
+ どの場合も最後に _resumed を下ろし、_prev_now を now にする
+
+take_probe(req)
+ 予約（_probe_armed）が無い・X-Pasta-Time がある → nil
+ 予約がある → 予約を消して、仮想時刻の読み取りのスクリプトを返す
+```
+
+- 合図の許容幅: 毎分の合図は ±2 秒、毎時の合図は遅れを 60 秒・早まりを 5 秒まで許す（トークできるまで待つ遅れを許すため）。幅はローカル定数 `MINUTE_TOLERANCE`・`HOUR_LATE_TOLERANCE`・`HOUR_EARLY_TOLERANCE` である。外れた合図で読み取りを予約する。
+- 読み取りのスクリプトは `\![get,property,OnPastaClock,system.year,system.month,system.day,system.hour,system.minute,system.second]\e` である。`take_probe` を呼ぶのは OnSecondChange の既定ハンドラだけで、何も発行せず Status がブロック対象でない回に限る。予約が無い回は何も返さないため、毎秒のバルーンには影響しない。
+- 読み出し: `now(req)` は `req.date.unix + _offset`、`date(req)` はずれを足した時刻から `os.date("*t")` で作った新しい日付の表（`act.req.date` と同じ形）を返す。ずれが 0 なら `req.date` をそのまま返し、`act.req.date` は書き換えない。日時変数の転記（`pasta.shiori.act` の `transfer_date_to_var`）は `CLOCK.date` を読む。`offset()` は `_offset` を返す。`X-Pasta-Time` のあるリクエストでは、`now` は `req.date.unix` を、`date` は `req.date` をそのまま返す。
+- スリープの合図: SSP 2.9.18 では、`OnSysSuspend` は復帰してから最初の OnSecondChange より前に届き、`OnSysResume` は最初の OnSecondChange より数秒遅れて届くので、両方を見る。`_suspend_count` は判定に使わず、ディスパッチャが `suspend_count()` で読む。
+- ずれが変わったとき（読み取りの返事）も、次の OnSecondChange で `now` が飛ぶので `watch_jump` の同じ判定に入る。
 - なめらかな時計: `steady(req)` は `now(req) − _jump_total`（`X-Pasta-Time` があれば `req.date.unix`）を返す。おしゃべりの間隔（`check_talk`）、`act:get_property` の期限（シーンを最後に再開した要求 `act._resume_req`、無ければ `act.req` の時刻から数える）と `CALLBACK.sweep` に渡す今（`req.date` が無ければ `os.time()`）、撫での判定の時刻（`pasta.shiori.event.mouse`）はこれで数える。`epoch()` は `_epoch` を返し、ディスパッチャが `seen_epoch` と比べる。飛んでから次の OnSecondChange までの 1 秒足らずの間に始まった期限や撫では、補正前の時計で数える。
 - 仮想時刻を使わずに OS の時計を手で 90 秒より進めたか 2 秒より戻したときも、飛びになる（10 時 30 分から 9 時 30 分へ戻すと 10 時に時報が出る。10 時 30 分から 12 時 10 分へ進めると 13 時まで時報が出ず、おしゃべりは残りの間隔を待つ）。
 - 見落とし: ずれの変化の秒の端数が毎分の許容幅（±2 秒）に入ると、毎分の合図では気づかない。そのときは仮想の正時の `OnHourTimeSignal` で気づき、決め直しの猶予（70 秒）で時報が数秒遅れて 1 回出る。仮想時刻を戻した（Reset）のを見落とすと、古いずれが最大 1 時間残り、実際の正時の `OnHourTimeSignal` で直る。ずれの変化が 1 時間の倍数に近いと気づけない。
@@ -584,7 +649,15 @@ REG.OnSecondChange（既定。鎖の底）
 | `MyError::to_shiori_response`（Rust） | 500 | `Charset`・`X-ERROR-REASON` | ロードの失敗（設置パスが無いときの `load directory not found` を含む）・未ロード・`SHIORI.request` の呼び出しの失敗 |
 | `MyError::to_shiori_400_response`（Rust） | 400 | `Charset`・`X-ERROR-REASON` | リクエストの解析の失敗（`X-Pasta-Time` の誤りを含む） |
 
-- `default_204` は Rust で作る唯一の 204 で、バイト列は `RES.no_content()` が既定の `RES.env` で作る応答と同じである。
+- `default_204` は Rust で作る唯一の 204 で、バイト列は `RES.no_content()` が既定の `RES.env` で作る応答と同じである。行の終わりは CRLF で、空行で終わる。
+
+  ```text
+  SHIORI/3.0 204 No Content
+  Charset: UTF-8
+  Sender: Pasta
+  SecurityLevel: local
+  ```
+
 - Rust の 500・400 の理由は `single_line` で 1 行にする。`stack traceback:` の行から後を捨て、残りの行を前後の空白を除いて半角スペースでつなぐ。改行を含まない理由はそのまま使う。
 
 ### `@pasta_sakura_script` の登録
@@ -604,13 +677,7 @@ VM の構築の途中で、`register_sakura_script_module`（`crates/pasta_lua/s
 
 リリースビルドの設定はルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml) の `[profile.release]` にあり、ワークスペースの全クレートに効く。pasta.dll の大きさを小さくするための設定である。
 
-| キー | 値 | 効果 |
-| ---- | -- | ---- |
-| `opt-level` | `"z"` | 大きさを優先して最適化する |
-| `lto` | `true` | クレートをまたいでリンク時に最適化する |
-| `codegen-units` | `1` | コード生成を分割せず、最適化の範囲を広げる |
-| `panic` | `"abort"` | panic で巻き戻さず中止する。巻き戻しの表を持たない |
-| `strip` | `true` | シンボルを取り除く |
+設定は `opt-level = "z"`・`lto = true`・`codegen-units = 1`・`panic = "abort"`・`strip = true` である。
 
 `panic = "abort"` のため、リリースビルドでは panic がホストのプロセスごと中止させる。旧来の入口の `catch_unwind` と、版 3 の入口がパニックを `SHIORI_E_PANIC` で返す `shiori4_abi` の捕捉が効くのは、巻き戻すプロファイル（dev・test）だけである。リリースでは、どちらの入口でもパニックでプロセスが終わる。この扱いは変えない。
 
@@ -648,7 +715,7 @@ VM の構築の途中で、`register_sakura_script_module`（`crates/pasta_lua/s
 - アクタースレッドは走っている間 pasta.dll の参照を 1 つ持つ。そのため `FreeLibrary` で pasta.dll が外れるのは、参照を持つアクタースレッドが 1 つも無いときだけである。参照を返すのは、join した親か、手放されたスレッド自身のどちらか一方だけである。
 - 終了処理は何度呼んでも安全である（`unload` の二重呼び出し、置き場の後始末と最後の参照の Drop の重なり）。ack が届けばスレッドを join し、届かなければ手放す。完了の通知は VM の破棄と mailbox の受信側の破棄が済んでから送る。
 - ロガーの登録を外すのは、ランタイムを手放す処理（`release_runtime`）の最後である。完了の通知の後に出たログは捨てる。
-- `default_204` のバイト列は `RES.no_content()` と同じであり、FFI 入口の応答のバイト列はテスト `crates/pasta_shiori/tests/byte_invariant_test.rs` が固定している。版 3 の GET が旧来の入口と同じバイト列を返すことは `crates/pasta_shiori/tests/shiori4_v3_entry_test.rs` が、2 つのインスタンスが混ざらないことは `crates/pasta_shiori/tests/multi_instance_test.rs` が、後始末の決まり（join・手放し）は `crates/pasta_shiori/tests/actor_instance_test.rs` が、`unload` を呼ばずに `FreeLibrary` で外してもホストが落ちず止まらないことは `crates/pasta_shiori/tests/free_library_test.rs` が確かめる。再読み込みを繰り返しても OS のハンドルが増えないことは `crates/pasta_shiori/tests/actor_reload_leak_test.rs` が確かめる。
+- FFI 入口の応答のバイト列は変えない。テストが固定している（[ソースの所在](#ソースの所在)）。
 - 仮想イベントディスパッチャの状態は保存されず、再読み込みのたびに初めからになる。
 - 静的 CRT の設定は、ワークスペースのルートから実行したビルドにだけ効く（ルートの `.cargo/config.toml`）。
 
@@ -660,7 +727,7 @@ VM の構築の途中で、`register_sakura_script_module`（`crates/pasta_lua/s
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/`
 - `.cargo/config.toml`
 
-リリースプロファイルはルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml) にある。テストは `crates/pasta_shiori/tests/`・`crates/pasta_shiori/src/windows_tests.rs`・`crates/pasta_shiori/src/shiori_lifecycle_tests.rs`・`crates/pasta_shiori/src/shiori_request_tests.rs` にある。
+リリースプロファイルはルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml) にある。テストは `crates/pasta_shiori/tests/`・`crates/pasta_shiori/src/windows_tests.rs`・`crates/pasta_shiori/src/shiori_lifecycle_tests.rs`・`crates/pasta_shiori/src/shiori_request_tests.rs` にある。FFI 入口の応答のバイト列は `crates/pasta_shiori/tests/byte_invariant_test.rs` が固定する。版 3 の GET が旧来の入口と同じバイト列を返すことは `crates/pasta_shiori/tests/shiori4_v3_entry_test.rs` が、2 つのインスタンスが混ざらないことは `crates/pasta_shiori/tests/multi_instance_test.rs` が、後始末の決まり（join・手放し）は `crates/pasta_shiori/tests/actor_instance_test.rs` が、`unload` を呼ばずに `FreeLibrary` で外してもホストが落ちず止まらないことは `crates/pasta_shiori/tests/free_library_test.rs` が、再読み込みを繰り返しても OS のハンドルが増えないことは `crates/pasta_shiori/tests/actor_reload_leak_test.rs` が確かめる。
 
 本文で参照した主なファイルは次のとおりである。旧来の入口は `crates/pasta_shiori/src/windows.rs`、版 3 の入口は `crates/pasta_shiori/src/v3.rs`、芯の型は `crates/pasta_shiori/src/actor/instance.rs`、アクターランタイムは `crates/pasta_shiori/src/actor/`、ディレクトリの占有とログの量の判定は `crates/pasta_lua/src/logging/registry.rs`・`crates/pasta_lua/src/logging/tracing_init.rs`、リクエストの解析は `crates/pasta_shiori/src/lua_request.rs` と `crates/pasta_shiori/src/util/parsers/req_parser.pest`、Lua 側の振り分けは `crates/pasta_lua/pasta_scripts/pasta/shiori/entry.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`、仮想イベントは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua` にある。`@pasta_sakura_script` の登録を呼ぶ側は `crates/pasta_lua/src/runtime/module_registry.rs`・`crates/pasta_lua/src/runtime/factory.rs` である。
 
@@ -678,9 +745,8 @@ VM の構築の途中で、`register_sakura_script_module`（`crates/pasta_lua/s
 - [choice-definition-dsl](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/choice-definition-dsl) — OnChoiceSelectEx の既定ハンドラ
 - [shiori-async-talk](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/shiori-async-talk) — 非同期トーク（`get_property` のコールバック）
 - [audit-pasta-shiori](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/audit-pasta-shiori) — FFI 境界の安全性の点検（HGLOBAL の解放・確保の失敗・反復の解析）
-- [pasta-actor-feasibility](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-actor-feasibility)・[pasta-actor-runtime](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-actor-runtime) — アクターランタイム、presentation マーカーとレンダラ注入
+- [pasta-actor-feasibility](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-actor-feasibility)・[pasta-actor-runtime](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-actor-runtime) — アクターランタイム
 - [lua-require-robustness](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-require-robustness) — `loadu`、処理のエラーを 500 応答で返す契約
-- [pasta-scene-kick](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-scene-kick) — デバッグ通信からのシーンの再生（[debug-mcp-runtime](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/debug-mcp-runtime) で撤去）
 - [pasta-toml-logging-consistency](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-toml-logging-consistency) — ランタイムの解放を `release_runtime` にまとめ、ロガーの登録解除を最後にする
 - [touch-poke-shortcuts](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/touch-poke-shortcuts) — OnMouseDoubleClick・OnMouseMove の既定ハンドラと、既定ハンドラを上書きしない登録（`REG.X = REG.X or …`）
 

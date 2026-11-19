@@ -8,44 +8,55 @@
 
 ---
 
-このページでは、pasta.dll がゴーストを起動するまでに何をどの順で読み込むのか、どこまでが仕様上の保証でどこからが制限なのか、そして起動に失敗したときにどう切り分けるのかを示す。
+このページでは、pasta.dll がゴーストを起動するときに何をどの順で読み込むかと、起動に失敗したときにどこを読めば原因が分かるかを示す。
 
-以下では、ベースウェアが SHIORI に渡すゴーストの**設置ディレクトリ**（`ghost/master/`。`pasta.dll` が置かれている場所）を基準ディレクトリと呼ぶ。本ページのすべての相対パスはこのディレクトリからの相対である。
+相対パスはすべて、`pasta.dll` を置いた `ghost/master/`（以下、基準ディレクトリ）からの相対である。
 
 ## 1. モジュール検索パス
 
-Lua の `require` が解決するモジュールは、次の 5 つのディレクトリを**この優先順位**で探索する。先に見つかったものが勝つ。同名のモジュールを上位のディレクトリに置けば、下位のものを上書きできる。
+Lua の `require` は、次の 5 つのディレクトリを**この順**で探す。先に見つかったものが勝つ。同じ名前のモジュールを上のディレクトリに置けば、下のものを上書きできる。
 
 | 順 | ディレクトリ | 役割 |
 | -- | ------------ | ---- |
 | 1 | `profile/pasta/save/lua` | 保存領域に置かれた Lua |
-| 2 | `scripts` | ゴースト作者が書く利用者スクリプト |
-| 3 | `profile/pasta/pasta_scripts` | pasta.dll が起動時に自己展開する内蔵スクリプト |
-| 4 | `profile/pasta/cache/lua` | `.pasta` をトランスパイルしたシーンモジュールのキャッシュ |
+| 2 | `scripts` | ゴースト作者が書くスクリプト |
+| 3 | `profile/pasta/pasta_scripts` | pasta.dll が起動時に展開する内蔵スクリプト |
+| 4 | `profile/pasta/cache/lua` | `.pasta` を変換したシーンのモジュール |
 | 5 | `scriptlibs` | スクリプトライブラリ |
 
-探索するディレクトリは `pasta.toml` の `[loader] lua_search_paths` で変更できる。上表は既定値である。
+上の表は既定値で、`pasta.toml` の `[loader] lua_search_paths` で変えられる。
 
-各ディレクトリでは、次の 2 つのファイル名パターンを**この順**で試す。
+各ディレクトリでは、次の 2 つのファイル名を**この順**で試す。`?` にはモジュール名が入り、モジュール名の `.` はフォルダの区切りになる。
 
 | 順 | パターン | `require "pasta.shiori.entry"` の例（`scripts` の場合） |
 | -- | -------- | ------------------------------------------------------- |
 | 1 | `?.lua` | `scripts/pasta/shiori/entry.lua` |
 | 2 | `?/init.lua` | `scripts/pasta/shiori/entry/init.lua` |
 
-`?` にはモジュール名が入る。モジュール名の `.` はディレクトリの区切りへ置き換えられる。
+モジュールが見つからないときのエラーには、探した候補が `no file '…'` の行として探索順に並ぶ。次は `require "mylib.util"` が見つからなかったときの例である。
 
-なお Windows では、`?` に代入される部分の区切りは `\` になる一方、検索パス側の区切りは `/` に正規化されている。このため実際のエラーメッセージに出る候補パスは `…/scripts/pasta\shiori\entry.lua` のように **`/` と `\` が混在した表記**になる。表記の違いであって別の場所を探しているわけではないので、`no file '…'` の行を読むときに食い違いと誤解しないこと。
+```text
+module 'mylib.util' not found:
+	…
+	no file 'C:/SSP/ghost/my-ghost/ghost/master/profile/pasta/save/lua/mylib\util.lua'
+	no file 'C:/SSP/ghost/my-ghost/ghost/master/profile/pasta/save/lua/mylib\util/init.lua'
+	no file 'C:/SSP/ghost/my-ghost/ghost/master/scripts/mylib\util.lua'
+	no file 'C:/SSP/ghost/my-ghost/ghost/master/scripts/mylib\util/init.lua'
+	…
+```
+
+- `…` の所には、残りのディレクトリの行と、Lua 標準のほかの探索の行が並ぶ。pasta が探した場所は、`.lua` で終わる行である。
+- 候補のパスは、ディレクトリの部分の区切りが `/`、モジュール名の部分の区切りが `\` になる。表記が混ざるだけで、探している場所は 1 つである。
+- 置いたつもりのファイルがどの行とも一致しなければ、置き場所かモジュール名のどちらかが違う。
 
 ### 設置パスの長さ・文字種に依存しない
 
-モジュールの解決は、ゴーストの設置場所がどれほど深くても、パスにどのような文字が含まれていても（`;` と `?` を除く）同じ結果になる。
+`require` は、ゴーストをどこに置いても同じように解決する。
 
-- 絶対パスが 260 文字を超える場所に設置しても `require` は成功する。ランタイムは独自のパス長上限を持たない。
-- システムの ANSI コードページで表現できない文字（利用者名やフォルダ名に含まれる各国語の文字など）がパスに含まれても `require` は成功する。
-- モジュールが見つからなかった場合のエラーメッセージには、探索した候補パスが `no file '…'` の行として**探索順に**並ぶ。非 ASCII の文字も欠落・置換されずにそのまま表記される。どこを探したかがそのまま読み取れる。
+- 絶対パスが 260 文字を超える場所に置いても成功する。
+- システムの ANSI コードページで表せない文字（各国語の利用者名・フォルダ名など）がパスにあっても成功する。`no file '…'` の行にも、その文字がそのまま出る。
 
-例外は `;` と `?` である。Lua の検索パス（`package.path`）は `;` を区切り、`?` をモジュール名を入れる場所として使うため、これらの文字を含むパスは検索パスに入れられない。ゴーストのフォルダ（`ghost/master`）の絶対パスか、`pasta.toml` の `[loader] lua_search_paths` の項目に `;` か `?` が含まれると、辞書の読み込みより前に読み込みエラーになる。エラーの理由には、問題の文字と、そのパスまたは項目が入る。
+例外は `;` と `?` である。Lua の検索パス（`package.path`）が `;` を区切り、`?` をモジュール名の場所として使うためである。基準ディレクトリの絶対パスか `lua_search_paths` の項目にこの 2 つの文字があると、辞書の読み込みより前に読み込みエラーになる。
 
 ```text
 Ghost folder path contains ';', which Lua package.path cannot hold: 'C:\SSP\ghost\a;b\ghost\master'
@@ -54,159 +65,164 @@ Ghost folder path contains ';', which Lua package.path cannot hold: 'C:\SSP\ghos
 
 ゴーストのフォルダ名か `lua_search_paths` の項目から、その文字を外す。
 
-ただし、これはランタイムが解決するモジュール（`require`）についての保証である。ゴースト作者のコードが直接呼ぶ Lua 標準のファイル入出力は対象外である（第 3 節を参照）。
+`package.path` は UTF-8 の文字列として解釈される。スクリプトから `package.path` に足すときは、UTF-8 の文字列を足す。
 
-実測（SSP 2.8.98）でも確認している。解決先が 260 文字を超えるモジュールを含むゴースト、ANSI コードページに存在しない文字（ハングル・絵文字）を含む設置パスのゴースト、および**その両方を同時に満たす**ゴースト（設置パスが全段非 ANSI で、`require` の解決先が 263 文字）が、いずれも起動して応答した。なおホストが短縮名を渡してくる場合があり、その条件は第 3 節に記す。
-
-### 挙動変更: `package.path` を UTF-8 として解釈する
-
-検索パスの設定値（`package.path`）は **UTF-8 の文字列として解釈される**。これは従来からの挙動変更である。
-
-ゴースト作者のコードが `package.path` へ独自のエントリを追記している場合、その文字列が UTF-8 でなければ（たとえば ANSI のバイト列を連結している場合）、そのエントリは解決に使えず、未検出時の `no file '…'` 行に載るだけになる。`package.path` へ追記する場合は UTF-8 の文字列を使うこと。
+ここまでは `require` についての保証である。スクリプトが直接呼ぶ Lua 標準のファイル入出力は対象外である（第 3 節）。
 
 ## 2. 起動シーケンス
 
-SHIORI の `load`（あるいは `loadu`）を受け取ったあと、ランタイムは次の順にモジュールを読み込む。**上から順に実行され、致命に分類されたモジュールのロードに失敗した時点で起動は中止される。**
+SHIORI の `load`（か `loadu`）を受けると、ランタイムは次の順にモジュールを読み込む。どれか 1 つでもロードに失敗すると、起動はそこで止まる。
 
 | 順 | 読み込むもの | 失敗時の扱い | 備考 |
 | -- | ------------ | ------------ | ---- |
-| 1 | `main`（利用者初期化スクリプト） | 致命 | 既定の `main.lua` が内蔵スクリプトとして起動時に自己展開されるため、不在は正常な状態ではない |
-| 2 | `pasta.shiori.entry`（SHIORI 応答関数） | 致命 | `SHIORI.load` / `SHIORI.request` / `SHIORI.unload` を定義する唯一の場所 |
-| 3 | `pasta.scene_dic`（シーン辞書） | 致命 | トランスパイル済みシーンモジュールの読み込みと確定を行う |
-| 4 | シーン identity 索引の突合 | 継続 | モジュールのロードではない。デバッグ有効時のみ実行される best-effort 処理で、失敗しても起動は続く |
+| 1 | `main`（作者の初期化スクリプト） | 致命 | `scripts/main.lua` を置かなければ、内蔵の `main.lua` が読まれる |
+| 2 | `pasta.shiori.entry`（SHIORI 応答関数） | 致命 | `SHIORI.load` / `SHIORI.request` / `SHIORI.unload` を定義する |
+| 3 | `pasta.scene_dic`（シーン辞書） | 致命 | `.pasta` を変換したシーンのモジュールを読み込む |
 
-致命に分類されたロードが失敗した場合、ランタイムは次の 3 経路で原因を示す。
+`.pasta` の変換は、この 3 つより前に行われる。文法エラーのある `.pasta` が 1 つでもあれば、`main` を読む前に起動が止まる。
 
-1. ホストへ返す `load` の戻り値が失敗になる。
-2. 以降の応答を要するリクエスト（GET）に対し、500 応答と `X-ERROR-REASON` ヘッダで原因を返す。黙って既定の空応答を返すことはない。
-3. ログファイルに、失敗したモジュール名と根本原因を記録する。
+起動が止まると、pasta は次の 3 つで原因を示す。読み方は第 4 節にある。
 
-このうち **経路 3 だけがホストの実装に依存しない**。経路 2 は「ホストが `load` の失敗後もリクエストを送ってくる」ことが前提であり、送ってこないホストでは発動しない。実測では SSP 2.8.98 は `load` が失敗を返した時点でゴーストの起動を打ち切り、リクエストを一切送らなかった。したがって SSP 環境で原因を読む場所は、実質ログファイルだけになる（第 4 節）。
-
-### 挙動変更: `main` のロード失敗は致命になった
-
-`main` のロード失敗は、従来は警告を残して起動を続行していたが、**致命として起動を中止するよう変更された**。
-
-壊れた `scripts/main.lua` を抱えたまま動いていたゴーストは、この変更後はロードに失敗する。ただし黙って壊れるのではなく、上記 3 経路で原因が示される。辞書登録やイベントハンドラが欠けたまま無言で動き続けるよりも、原因を出して止まるほうが復旧が早いという判断による。
+1. `load` の戻り値が失敗になる。
+2. その後の GET のリクエストに、500 応答と `X-ERROR-REASON` ヘッダで原因を返す。
+3. ログファイルに、原因の全文を残す。起動モジュールのロード失敗は `fatal=true` の行になる。
 
 ## 3. 既知の制限
 
 ### `loadu` を呼ばないホストでは非 ANSI の設置パスを扱えない
 
-SHIORI の DLL には、設置パスを UTF-8 で受け取る初期化入口 `loadu` がある（SSP 2.6.92 以降が対応する）。pasta.dll はこれを実装しており、`loadu` で初期化されたあとに従来の `load` が呼ばれた場合は無視して初期化済みの状態を保つ。
-
-`loadu` を呼ばないホストでは、設置パスはシステムの ANSI コードページでランタイムへ渡される。このため **ANSI コードページで表現できない文字を含む設置パスは、その時点で欠落しており、ランタイム側では回復できない**。ホスト側の制約であり、pasta.dll をどれだけ堅牢にしても解消できない。該当する場合は、ホストを `loadu` 対応版へ更新するか、設置パスを ANSI で表現できる文字に限る必要がある。
+`loadu` は、設置パスを UTF-8 で受け取る初期化の入口である（SSP は 2.6.92 以降が対応する）。`loadu` を呼ばないホストは設置パスを ANSI コードページで渡すので、ANSI で表せない文字は pasta.dll に届く前に欠ける。そのホストでは、ANSI で表せる文字だけのパスにゴーストを置く。どちらの入口で呼ばれたかは、ログの `entry` で分かる（第 4 節の手順 1）。
 
 ### 設置パスが 260 文字を超えると、ホストが短縮名を渡すことがある
 
-ランタイム側に長さの上限は無い（第 1 節）。しかしその手前で、**ホストがゴーストを登録する時点で設置パスが 8.3 短縮名に置き換わる**ことがある。Windows のフォルダ選択は `MAX_PATH`（260 文字・終端を含む）のバッファを前提とする経路があり、そこに収まらないパスは短縮名で返される。ホストはそれをそのまま保存し、以後 `loadu` にもその短縮名を渡す。
-
-この場合、長いパスはランタイムに届かないため、長パス対応は発動しない（そして発動する必要も無い）。実測では、285 文字のフォルダへ設置したゴーストは 104 文字の短縮名としてランタイムへ渡された。191 文字のフォルダでは短縮されず、そのまま渡された。
-
-短縮名は**ボリューム上に 8.3 名が存在して初めて成立する**点に注意する。次の条件では短縮名が作られず、本来の長いパスがそのままランタイムへ渡る。
-
-- 8.3 名の生成を無効化したボリューム（システムボリューム以外は既定で無効なことがある）
-- exFAT / ReFS など 8.3 名を持たないファイルシステム
-- ネットワーク共有（UNC）
-
-つまり、同じゴーストを同じ深さに置いても、**ボリュームの設定次第でランタイムへ渡るパスが変わる**。ランタイムはどちらでも動作するが、ホストやゴースト作者のコードが 260 文字を前提にしている場合は、後者の条件で初めて問題が表面化しうる。
+ホストが、設置パスを 8.3 短縮名（`MYGHOS~1` の形）に置き換えて渡すことがある。ランタイムは、どちらのパスでも同じように動く。
 
 ### Lua 標準のファイル入出力は長パス・非 ANSI パスに対応しない
 
-ゴースト作者のコードが直接呼ぶ次の関数は、OS の narrow API を使うため、**絶対パスが 260 文字を超えるファイル、および ANSI コードページ外の文字を含むパスのファイルを扱えない**。
+スクリプトが直接呼ぶ次の関数は、絶対パスが 260 文字を超えるファイルと、ANSI コードページに無い文字を含むパスのファイルを扱えない。
 
 - `io.open`
 - `loadfile`
 - `dofile`
 - `package.searchpath`
 
-これらは本ランタイムの改善対象外であり、制限として残る。実測でも、絶対パスが 260 文字を超える場所へ設置したゴーストでは、ゴースト側の `SHIORI.unload` 内で呼ばれた `io.open` が失敗することが確認されている。
-
-データの永続化にこれらを使ってはならない。永続化は `@pasta_persistence` モジュールを用いること（[@pasta_persistence](../lua/modules/pasta-persistence.md) を参照）。同モジュールはランタイム側でファイルを扱うため、設置パスの長さ・文字種の影響を受けない。
+データの保存には、これらではなく [@pasta_persistence](../lua/modules/pasta-persistence.md) を使う。設置パスの長さ・文字種の影響を受けない。
 
 ### `ffi.load` で読む DLL の制限
 
 `ffi.load`（第 5 節）が保証するのは、DLL を見つけて読み込み、`ffi.load` の値として返すところまでである。次のことは保証しない。
 
 - **DLL のファイル名は ANSI コードページで表せる文字に限る。** フォルダの部分は深くても ANSI に無い文字を含んでもよいが、ファイル名（最後の部分）は LuaJIT の `ffi.load` へそのまま渡るため、ANSI で表せなければならない。似た文字への置き換えでしか表せない名前も表せないものとして扱う。この場合は `cannot load module '…': the file name '…' cannot be represented in the ANSI code page` で失敗する。
-- **同じファイル名の別の DLL がプロセスに読み込み済みなら失敗する。** 同じ SSP で動く別のゴーストが同名の DLL を読んでいる場合などである。黙ってそちらの DLL に結びつくことはなく、`cannot load module '…': a different DLL named '…' is already loaded in this process` で失敗する。同じファイルを読み直すのは失敗ではない。先に読んだ側が解放されれば読めるようになる。ほかと重ならないファイル名にすれば起きない。
+- **同じファイル名の別の DLL がプロセスに読み込み済みなら失敗する。** 同じ SSP で動く別のゴーストが同名の DLL を読んでいる場合などである。黙ってそちらの DLL に結びつくことはなく、`cannot load module '…': a different DLL named '…' is already loaded in this process` で失敗する。同じファイルを読み直すのは失敗ではない。ほかと重ならないファイル名にすれば起きない。
 - **依存 DLL の同名の取り違えは防がない。** 確かめるのは `ffi.load` に渡した DLL 自身だけである。依存 DLL と同じ名前の DLL がプロセスに読み込み済みなら、Windows はそちらを使う。
 - **名前だけの指定で OS の探索に任せた DLL は、Windows の規則のまま読まれる。** 検索パスのどこにも無かった名前（第 5 節）は、探す場所も依存 DLL を探す場所も Windows の既定の探索に従う。この節のほかの保証（深いパス・ANSI に無い文字・依存 DLL の探し方）は及ばない。
 - **DLL の中で ANSI 版の API を使うと失敗しうる。** DLL が自分の置き場所などのパスを ANSI 版の API（`…A` の関数）で扱うと、設置パスが深い場合や ANSI に無い文字を含む場合に、DLL の中で失敗する。読み込みまでは成功しているので、`ffi.load` は失敗を報告しない。
 - **`PATH` にある依存 DLL は見つからない。** カレントディレクトリも探さない。依存 DLL を探す場所は第 5 節のとおりである。
-- **別のスレッドとの競合は防がない。** 同名の DLL の確かめと実際の読み込みの間に、同じプロセスの別のスレッド（同じ SSP で動く別のゴーストなど）が同名の別の DLL を読み込むと、そちらに結びつくことがある。同じ瞬間に同名の DLL を読んだ場合に限られる。
 
 ## 4. ゴーストが起動しない・喋らないとき
 
-ゴーストがまったく反応しない場合、起動シーケンスのどこかで失敗している可能性が高い。次の順で切り分ける。
+ゴーストがまったく反応しないときは、起動のどこかで失敗している。次の順で調べる。
 
-この節の手順は、起動・読み込みの失敗を扱う。読み込みに失敗したときの 500 応答は、設定にかかわらずバルーンに何も出ない。一方、起動した後にイベントの処理中に Lua のエラーで止まったとき（止まるエラー）は、既定ではバルーンに `【スクリプトのエラー：…】`・`【時間切れ：…】` の表記が出る。読み方は [止まるエラーの表記](runtime-failures.md#止まるエラーの表記) を参照する。表記を出さない設定（`balloon_warning = false`）では表記は出ず、これまでどおり 500 応答の `X-Error-Reason` とログの警告で理由を見る。
+この節が扱うのは、起動・読み込みの失敗である。このとき、バルーンには何も出ない。起動した後にイベントの処理中に止まったとき（止まるエラー）は、既定ではバルーンに `【スクリプトのエラー：…】`・`【時間切れ：…】` が出る。そちらの読み方は [止まるエラーの表記](runtime-failures.md#止まるエラーの表記) にある。
 
 ### 手順 1: ログファイルの `fatal=true` の行を読む
 
-**まずログファイルを読む。** 起動失敗を示す 3 経路のうち、ホストの実装に依存しないのはログだけである（第 2 節）。ホストによっては `load` の失敗後にリクエストを送らず、500 応答そのものが発生しない。実測では SSP 2.8.98 がこれに該当し、ゴーストは起動されず、ホスト側にはファイルとして何も残らなかった。
-
-ログファイルは既定で次の場所にある。
+ログファイルは次の場所にある。新しい行は末尾に足される。
 
 ```text
 profile/pasta/logs/pasta.log
 ```
 
-`pasta.toml` の `[logging] file_path` で変更できるが、指定できるのは**基準ディレクトリからの相対パスで、かつ `profile/` ディレクトリの下**に限られる。`..` を含むパスや絶対パスも受け付けない。この条件を満たさない値（例: `logs/pasta.log`）を設定すると、ログは既定のログファイル `profile/pasta/logs/pasta.log` へ書かれ、その値を受け付けなかったことを示す warn が残る。
-
-起動モジュールのロードに失敗すると、`module`（モジュール名）と `fatal`（致命なら `true`）のフィールドを持つ error レベルの行が記録される。まず `fatal=true` を含む行を探す。その行には根本原因の全文が、**複数行のメッセージとスタックトレースを含めて欠落なく**記録されている。`X-ERROR-REASON` で足りないときは、ここを読む。
-
-起動モジュールのロード失敗は必ず `fatal=true` で記録される。一方、継続扱いの処理（シーン identity 索引の突合）の失敗は、`module` / `fatal` のフィールドを持たない warn 行（`scene identity index join failed` を含む）として記録される。したがって `fatal` フィールドの有無で両者を区別できる。`.pasta` ファイルの文法エラーは起動モジュールのロードより前に検出されるため、`fatal=true` の行にはならない（手順 3 の「パースエラー」を参照）。
-
-あわせて、ロードの締めくくりに次の 1 行が記録される。
+場所は `pasta.toml` の `[logging] file_path` で変えられる。書けるのは、基準ディレクトリからの相対パスで、`profile/` の下だけである。それ以外の値（例: `logs/pasta.log`）を書くと、ログは上の既定の場所に書かれ、次の警告が残る。
 
 ```text
-INFO pasta::windows: SHIORI load entry completed entry="loadu" loaded=false
+2026-10-18T00:35:49.801358Z  WARN pasta_lua::loader: Cannot use [logging] file_path; logging to the default log file instead file_path=logs/pasta.log fallback=profile/pasta/logs/pasta.log error=Log path must be within profile/ directory: "…\\logs/pasta.log"
 ```
 
-`entry` はホストが呼んだ初期化入口（`loadu` または `load`）、`loaded` はロードの成否である。ログにこの行が**まったく無い**場合は、ランタイムがロード処理に入る前の段階（DLL の読み込み、設置パスのデコード）で止まっている。`entry` の値は、非 ANSI の設置パスを扱えているかの判断にも使える（第 3 節）。
+ログを開いたら、`fatal=true` を含む行を探す。起動モジュール（第 2 節の表の 3 つ）のロードに失敗すると、必ずこの行が残る。次は、辞書 `dic/talk.pasta` を変換したシーンのモジュールが、Lua の構文エラーで読めなかったときの例である。
+
+```text
+2026-10-18T00:35:49.901358Z ERROR pasta_lua::runtime::factory: Failed to load startup module module="pasta.scene_dic" fatal=true error=runtime error: error loading module 'pasta.scene.talk' from file 'C:/SSP/ghost/my-ghost/ghost/master/profile/pasta/cache/lua/pasta\scene\talk.lua':
+	...host/master/profile/pasta/cache/lua/pasta\scene\talk.lua:25: invalid escape sequence near '"'
+stack traceback:
+	[C]: in ?
+	[C]: in function 'error'
+	pasta_searcher:6: in function <pasta_searcher:3>
+	[C]: in function 'require'
+	...ghost/master/profile/pasta/cache/lua/pasta\scene_dic.lua:17: in main chunk
+	[C]: in function 'require'
+2026-10-18T00:35:49.966478Z ERROR pasta::shiori: PastaShiori load failed load_dir=C:\SSP\ghost\my-ghost\ghost\master\ error=Failed to initialize Lua runtime: failed to load startup module 'pasta.scene_dic'
+runtime error: error loading module 'pasta.scene.talk' from file 'C:/SSP/ghost/my-ghost/ghost/master/profile/pasta/cache/lua/pasta\scene\talk.lua':
+	…
+2026-10-18T00:35:49.966478Z  INFO pasta::load_entry: SHIORI load entry completed entry="loadu" loaded=false
+```
+
+| 読む所 | 分かること |
+| ------ | ---------- |
+| `module="pasta.scene_dic"` | 失敗した起動モジュール |
+| `fatal=true` | 起動を止めた失敗である |
+| `error=` から次の時刻の行まで | 原因の全文。この例では、読めなかったファイルと、その 25 行目の構文エラーである。`stack traceback:` から下は、そこへ至った呼び出しの経路である |
+| `PastaShiori load failed` の行 | ロード全体が失敗したこと。`load_dir` は基準ディレクトリである。同じ原因がもう一度続く（例では `…` で省いた） |
+| `SHIORI load entry completed` の行 | ロードの締めくくり。`entry` はホストが呼んだ入口（`loadu` か `load`）、`loaded` はロードの成否である |
+
+- `fatal=true` の行が無く `loaded=false` なら、`.pasta` の文法エラーなど、起動モジュールを読む前の失敗である。`ERROR` の行を探す（手順 3）。
+- `SHIORI load entry completed` の行がまったく無ければ、ロードの処理に入る前（DLL の読み込み・設置パスの受け取り）で止まっている。
 
 ### 手順 2: ホストの SHIORI 通信ログで 500 応答を読む
 
-**この手順はホストが `load` の失敗後もリクエストを送ってくる場合にのみ成立する。** 送ってこないホスト（実測: SSP 2.8.98）では応答自体が発生しないので、手順 1 と手順 3 だけで切り分ける。
+ロードに失敗した後も、pasta は GET のリクエストに 500 応答を返し、`X-ERROR-REASON` ヘッダに原因を入れる。ホストの SHIORI 通信ログで、この応答を読める。ホストがリクエストを送らなければ応答は出ないので、そのときは手順 1 のログだけで調べる。
 
-ホストの SHIORI 通信ログを開き、pasta.dll が返している応答を確認する。起動に失敗している場合、応答は次の形になる。
+手順 1 の例と同じ失敗では、応答は次の形になる。
 
 ```text
 SHIORI/3.0 500 Internal Server Error
 Charset: UTF-8
-X-ERROR-REASON: Load error: ... failed to load startup module 'pasta.shiori.entry' ...
+X-ERROR-REASON: Load error: Failed to initialize Lua runtime: failed to load startup module 'pasta.scene_dic' runtime error: error loading module 'pasta.scene.talk' from file 'C:/SSP/ghost/my-ghost/ghost/master/profile/pasta/cache/lua/pasta\scene\talk.lua': ...host/master/profile/pasta/cache/lua/pasta\scene\talk.lua:25: invalid escape sequence near '"'
 ```
 
-`X-ERROR-REASON` の値は**必ず単一行**であり、改行を含まない。値には、失敗した起動モジュールの名前と根本原因が先頭から読める順で入る。スタックトレースはヘッダには含まれない（全文はログファイルに残る）。
+`X-ERROR-REASON` の値は必ず 1 行である。ログの原因から改行を除き、スタックトレースを落としたものが入る。全文はログファイルで読む。
 
 ### 手順 3: 典型的な原因を読み分ける
 
-| メッセージに現れるもの | 典型的な原因 | 対処 |
-| ---------------------- | ------------ | ---- |
-| `failed to load startup module 'main'` ＋ 構文エラー | `scripts/main.lua` の構文エラー | 示された行番号を修正する。エラーにはファイル名と行番号が付く |
-| `failed to load startup module 'pasta.shiori.entry'` ＋ 実行時エラー | `scripts/pasta/shiori/entry.lua` で内蔵の `entry.lua` を上書きしており、その内容に誤りがある | 上書きの必要が無ければ、そのファイルを削除して内蔵版に戻す |
-| `module 'X' not found:` ＋ `no file '…'` の並び | モジュール未検出 | `no file` の行が**実際に探したパスの全リスト**である。意図した置き場所が並んでいるか、ファイル名・モジュール名の綴りが一致しているかを照合する |
-| `error loading module 'X' from file '…'` | ファイルは見つかったが、構文エラーまたは読み込みに失敗した | 示されたファイルを確認する |
-| `Partial transpilation failure: …` ＋ ログに `Parse error: ファイル:行:列: 内容` | `.pasta` ファイルの文法エラー（パースエラー） | 示されたファイルの行・列を修正する（下記「パースエラー」） |
+| メッセージに現れるもの | 原因 | 対処 |
+| ---------------------- | ---- | ---- |
+| `failed to load startup module 'main'` と `error loading module 'main' from file '…'` | `scripts/main.lua` の構文エラー | 続く行に出るファイル名と行番号の所を直す |
+| `failed to load startup module 'pasta.shiori.entry'` | `scripts/pasta/shiori/entry.lua` を置いて内蔵の `entry.lua` を上書きしており、その中身に誤りがある | 上書きが要らなければ、そのファイルを消して内蔵のものに戻す |
+| `module 'X' not found:` と `no file '…'` の並び | モジュールが見つからない | `no file` の行と、置いた場所・ファイル名・モジュール名の綴りを見比べる（第 1 節） |
+| `error loading module 'X' from file '…'` | ファイルは見つかったが、構文エラーがあるか読めなかった | 続く行に出るファイル名と行番号の所を直す |
+| `Partial transpilation failure: …` | `.pasta` の文法エラー | ログの `Process failure` の行で、ファイル・行・列を確かめて直す（下記「パースエラー」） |
 | `Module name collision: …` | 2 つ以上の `.pasta`、または辞書のフォルダの 2 つ以上の `.lua` が、同じモジュール名になる。大文字と小文字だけの違いも同じ名前として扱う | 示されたファイルのどれかの名前を変える（下記「モジュール名の衝突」） |
-| `which Lua package.path cannot hold` | ゴーストのフォルダのパスか `lua_search_paths` の項目に `;` か `?` が含まれる（第 1 節） | フォルダ名か項目から、その文字を外す |
-
-`no file '…'` の並びは、第 1 節の優先順位とファイル名パターンの組み合わせがそのまま出力されたものである。置いたつもりのファイルがリストのどのパスとも一致しないなら、置き場所かモジュール名のどちらかが間違っている。
+| `which Lua package.path cannot hold` | 基準ディレクトリのパスか `lua_search_paths` の項目に `;` か `?` がある | フォルダ名か項目から、その文字を外す（第 1 節） |
+| `load directory not found: …` | 渡された設置パスのフォルダが無い | 示されたパスの文字が欠けていれば、第 3 節の `loadu` の制限に当たる |
 
 #### パースエラー
 
-`.pasta` ファイルに文法エラーがあると、そのファイルは読み込まれず、ロード全体が失敗する。エラーは失敗したファイルごとに、error レベルの `Process failure` 行としてログファイルに記録される。行の `path` は失敗したファイル、`error` は原因で、`error` には次の形式のメッセージが含まれる。
+`.pasta` に文法エラーがあると、ロード全体が失敗する。失敗したファイルごとに、`Process failure` の行がログに残る。次は、`dic/talk_boy.pasta` の 123 行目に誤りがあったときの例である。
 
 ```text
-Parse error: ファイル:行:列: 内容
+2026-11-08T11:04:20.912891Z ERROR pasta_lua::loader::process: Process failure path=C:\SSP\ghost\my-ghost\ghost\master\dic\talk_boy.pasta error=Parse error: Parse error: C:\SSP\ghost\my-ghost\ghost\master\dic\talk_boy.pasta:123:22: Parse error in C:\SSP\ghost\my-ghost\ghost\master\dic\talk_boy.pasta at 123:22:    --> 123:22
+    |
+123 | 　　　　：＠内緒　先生にはないしょですよ？
+    |                      ^---
+    |
+    = expected var_ref_local, var_ref_global, …, talk, or sakura_script
+2026-11-08T11:04:20.912891Z ERROR pasta::shiori: PastaShiori load failed load_dir=C:\SSP\ghost\my-ghost\ghost\master\ error=Partial transpilation failure: 18 succeeded, 1 failed [C:\SSP\ghost\my-ghost\ghost\master\dic\talk_boy.pasta]
+2026-11-08T11:04:20.912891Z  INFO pasta::load_entry: SHIORI load entry completed entry="loadu" loaded=false
 ```
 
-行と列は 1 から数える。`内容` には、該当する行の抜粋と、その位置で期待される要素の一覧が複数行で続く。`X-ERROR-REASON` とロード失敗の行（`PastaShiori load failed`）には、`Partial transpilation failure: 成功数 succeeded, 失敗数 failed [ファイルのパス]` の形で失敗したファイルの一覧だけが載り、行・列は載らない。行・列はログファイルの `Process failure` 行で確かめる。
+| 読む所 | 分かること |
+| ------ | ---------- |
+| `path=` | 失敗した `.pasta` ファイル |
+| `…talk_boy.pasta:123:22:` | 誤りの行と列（どちらも 1 から数える） |
+| `123 \| …` と `^---` | その行の中身と、誤りの位置 |
+| `= expected …` | その位置に書けるものの一覧（例では `…` で省いた） |
+| `Partial transpilation failure: 18 succeeded, 1 failed […]` | 読めた数・読めなかった数と、読めなかったファイルの一覧 |
+
+`X-ERROR-REASON` に入るのは `Partial transpilation failure: …` の部分で、行と列は入らない。行と列はログの `Process failure` の行で確かめる。
 
 #### モジュール名の衝突
 
-辞書のファイル名からはモジュール名が作られる。違うファイルが同じモジュール名になると、片方の内容が失われるため、辞書の変換と Lua の実行より前に読み込みエラーになる。`Module name collision:` の後には、ぶつかったモジュール名とファイル（ゴーストのフォルダから見たパス）が並ぶ。大文字と小文字だけが違う組は、ファイルごとにモジュール名が付く。組が複数あれば ` / ` でつながる。
+辞書のファイル名からはモジュール名が作られる。違うファイルが同じモジュール名になると、片方の内容が失われるため、辞書の変換と Lua の実行より前に読み込みエラーになる。`Module name collision:` の後には、ぶつかったモジュール名とファイル（基準ディレクトリから見たパス）が並ぶ。大文字と小文字だけが違う組は、ファイルごとにモジュール名が付く。組が複数あれば ` / ` でつながる。
 
 ```text
 Module name collision: pasta.scene.会話_朝: dic\会話-朝.pasta, dic\会話_朝.pasta

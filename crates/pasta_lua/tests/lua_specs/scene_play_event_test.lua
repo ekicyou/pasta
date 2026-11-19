@@ -326,7 +326,7 @@ describe("既定のハンドラ - 見つからない", function()
 end)
 
 describe("既定のハンドラ - 再生", function()
-    test("名前: 空の Reference1 は省略と同じで、大域のコルーチンを返し 1 回目の再開で台本が返る", function()
+    test("名前: 空の Reference1 は省略と同じで、大域のコルーチンを返し 1 回目の再開でスクリプトが返る", function()
         SCENE.register("spe_h_1", "__start__", function() end)
         local search = {
             search_scene_exact = function(_, name)

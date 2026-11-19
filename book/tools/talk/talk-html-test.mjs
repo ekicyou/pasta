@@ -71,15 +71,15 @@ log('\n== (S) 出力 HTML 契約の構造 ==');
   // タグの直後で改行した形（`> 【驚き】\n> 本文`）
   const n = transformHtml('<blockquote>\n<p>【驚き】\n本文です。</p>\n</blockquote>', '');
   check('S-10 タグ直後の改行は落として本文を段落に残す', n.html.includes('</span>\n<p>本文です。</p>\n</div>'), show(n.html));
-  // 全 16 表情が変換できる
+  // 全話し手の全表情が変換できる（顔画像は配役ごとのフォルダ）
   let all = true;
   for (const sp of SPEAKERS) {
     for (const [face, file] of Object.entries(sp.faces)) {
       const t = transformHtml(`<blockquote>\n<p>【${sp.name}：${face}】x</p>\n</blockquote>`, '');
-      if (!t.html.includes(`src="img/claudia/${file}.png" alt="${sp.name}（${face}）"`) || !t.html.includes(`talk-${sp.id} talk-${sp.side}`)) all = false;
+      if (!t.html.includes(`src="img/${sp.cast}/${file}.png" alt="${sp.name}（${face}）"`) || !t.html.includes(`talk-${sp.id} talk-${sp.side}`)) all = false;
     }
   }
-  check('S-11 全 16 表情を変換できる', all);
+  check('S-11 全話し手の全表情を変換できる', all);
 }
 
 // ============================================================
@@ -131,7 +131,7 @@ log('\n== (E) 不正（未知のタグ・入れ子） ==');
 // ============================================================
 log('\n== (X) 属性値のエスケープ ==');
 {
-  const evil = { id: 'x"y', name: 'A<B', latin: 'L&"<>\'', side: 'left', faces: { '"q\'': 'f"0' } };
+  const evil = { id: 'x"y', name: 'A<B', latin: 'L&"<>\'', side: 'left', cast: 'claudia', faces: { '"q\'': 'f"0' } };
   const html = renderTalk({ speaker: evil, face: '"q\'', file: 'f"0' }, '<p>本文</p>\n', '../');
   check('X-1 class の値をエスケープ', html.startsWith('<div class="talk talk-x&quot;y talk-left">'), show(html));
   check('X-2 src・alt の値をエスケープ', html.includes('src="../img/claudia/f&quot;0.png" alt="A&lt;B（&quot;q&#39;）"'), show(html));

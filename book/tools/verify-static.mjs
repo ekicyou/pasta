@@ -30,7 +30,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { transformDir } from './talk/talk-html.mjs';
-import { SPEAKERS, NO_TALK_CHAPTERS } from './talk/talk.mjs';
+import { SPEAKERS, NO_TALK_CHAPTERS, castOf } from './talk/talk.mjs';
 import { summaryChapters as readSummaryChapters } from './link-check.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -342,7 +342,8 @@ function analyzeTheme(root, pages) {
     const refs = assetRefs(html).filter(isLocalRef).map(refPath);
     if (!refs.some((r) => THEME_CSS_RE.test(r))) noCssRef.push(page);
     if (!refs.some((r) => THEME_JS_RE.test(r))) noJsRef.push(page);
-    const speakers = SPEAKERS.map((s) => s.id).filter((id) => !html.includes(`class="talk talk-${id} `));
+    const speakers = SPEAKERS.filter((s) => s.cast === castOf(page)).map((s) => s.id)
+      .filter((id) => !html.includes(`class="talk talk-${id} `));
     if (speakers.length > 0 && !Object.hasOwn(NO_TALK_CHAPTERS, page.replace(/\.html$/, '.md'))) missingTalk.push({ page, speakers });
     const ids = MENU_IDS.filter((id) => !html.includes(`id="${id}"`));
     if (ids.length > 0) missingMenuIds.push({ page, ids });
@@ -477,16 +478,17 @@ function runSelfTest() {
     };
     const talkOf = (r) => r.missingTalk.find((m) => m.page === target);
 
-    // 期待値は登録簿（talk.mjs の SPEAKERS）から組み立てる。
-    const ids = SPEAKERS.map((s) => s.id);
+    // 期待値は登録簿（talk.mjs の SPEAKERS）の、その章の配役から組み立てる。
+    const cast = SPEAKERS.filter((s) => s.cast === castOf(target));
+    const ids = cast.map((s) => s.id);
     const talkDiv = (s) => `<div class="talk talk-${s.id} talk-${s.side}"></div>`;
     let r = withTarget(original);
     check('self-test: 台詞部品の無い章を、全話し手の欠落として報告する',
       JSON.stringify(talkOf(r)?.speakers) === JSON.stringify(ids), JSON.stringify(talkOf(r)));
-    r = withTarget(original.replace('<main>', `<main>${talkDiv(SPEAKERS[0])}`));
+    r = withTarget(original.replace('<main>', `<main>${talkDiv(cast[0])}`));
     check(`self-test: ${ids[0]} だけの章を、残りの話し手の欠落として報告する`,
       JSON.stringify(talkOf(r)?.speakers) === JSON.stringify(ids.slice(1)), JSON.stringify(talkOf(r)));
-    r = withTarget(original.replace('<main>', `<main>${SPEAKERS.map(talkDiv).join('')}`));
+    r = withTarget(original.replace('<main>', `<main>${cast.map(talkDiv).join('')}`));
     check('self-test: 全話し手がいる章は報告しない', talkOf(r) === undefined, JSON.stringify(talkOf(r)));
 
     r = withTarget(original.replace('</head>', '<script src="https://example.com/x.js"></script></head>'));

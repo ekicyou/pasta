@@ -36,7 +36,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 | [入門ガイド](https://ekicyou.github.io/pasta/getting-started/index.html) | 辞書を 1 枚ずつ足しながら、14 段でゴーストを育てて配布するまで |
 | [Pasta DSL 文法](https://ekicyou.github.io/pasta/grammar/index.html) | マーカー・シーン・アクション行・変数・単語・アクター辞書 |
 | [Lua API / コーディング](https://ekicyou.github.io/pasta/lua/index.html) | 公開モジュール・SHIORI イベント・`scripts/` の書き方 |
-| [デバッグ](https://ekicyou.github.io/pasta/debug/index.html) | VSCode から動いているゴーストでシーンを鳴らす・保存変数を見る・SSP を起動せずに辞書を検査する |
+| [書いて試す](https://ekicyou.github.io/pasta/debug/index.html) | pasta-recipe か VS Code で書いて、動いているゴーストでその場で鳴らす・保存変数を見る・SSP を起動せずに辞書を検査する |
 | [pasta.toml リファレンス](https://ekicyou.github.io/pasta/reference/pasta-toml.html) | 設定の全セクション・全キー |
 
 配布物は、マニュアルの[ダウンロード](https://ekicyou.github.io/pasta/download.html)のページから入手できます（過去の版は[リリースページ](https://github.com/ekicyou/pasta/releases)）。

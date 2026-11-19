@@ -201,7 +201,7 @@
 
 ## もっと詳しく
 
-- [Call / Jump（`＞シーン名` でシーンを呼ぶ）](../grammar/call-jump.md)
+- [Call（`＞シーン名` でシーンを呼ぶ）](../grammar/call-jump.md)
 - [前方一致によるターゲット解決（名前の頭が一致するシーンが候補になる）](../grammar/call-jump.md#前方一致によるターゲット解決)
 - [ローカルシーン（`・名前`）](../grammar/block-structure.md#ローカルシーン)
 - [チェイントーク（`＞チェイントーク`）](../grammar/call-jump.md#チェイントーク)

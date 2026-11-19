@@ -1,4 +1,4 @@
-// RunScene - 読み込み直しの後、OnPastaSceneAt を送り、台本を取り出す
+// RunScene - 読み込み直しの後、OnPastaSceneAt を送り、スクリプトを取り出す
 // （vscode-mcp-client の設計の RunScene。要件 4.4〜4.10）
 //
 // vscode に触らない純粋なモジュール。時計を持たず、待ちは ctx.sleep の回数で数える。
@@ -58,7 +58,7 @@ export async function runScene(ctx: FlowContext, fileFsPath: string, line1: numb
     }
   }
 
-  // 応答が無い（4.8）: 送る前の番号より後の台本の記録を上限まで引き直す
+  // 応答が無い（4.8）: 送る前の番号より後のスクリプトの記録を上限まで引き直す
   let last = reply.detail;
   const maxSleeps = Math.ceil(timing.scriptLogWaitMs / timing.pollIntervalMs);
   for (let slept = 0; ; slept++) {
@@ -78,8 +78,8 @@ export async function runScene(ctx: FlowContext, fileFsPath: string, line1: numb
   }
 }
 
-const NO_SCRIPT_GUIDE = 'ゴーストは台本を返しませんでした（204）。pasta.toml に [debug] enabled = true を書いて、SHIORI をリロードしてください。';
-const UNCONFIRMED = '台本を確かめられませんでした';
+const NO_SCRIPT_GUIDE = 'ゴーストはスクリプトを返しませんでした（204）。pasta.toml に [debug] enabled = true を書いて、SHIORI をリロードしてください。';
+const UNCONFIRMED = 'スクリプトを確かめられませんでした';
 
 export function formatScene(outcome: SceneOutcome): { lines: string[]; notice?: string } {
   const reload = formatReload(outcome.reload);
@@ -89,7 +89,7 @@ export function formatScene(outcome: SceneOutcome): { lines: string[]; notice?: 
       lines.push('シーンを再生しませんでした');
       return { lines, notice: reload.notice ?? 'シーンを再生しませんでした' };
     case 'played':
-      lines.push(outcome.viaLog ? '台本（応答が無かったため、再生の記録から）:' : '台本:', outcome.script);
+      lines.push(outcome.viaLog ? 'スクリプト（応答が無かったため、再生の記録から）:' : 'スクリプト:', outcome.script);
       return { lines };
     case 'noScript':
       lines.push(NO_SCRIPT_GUIDE, ...outcome.reasons.map((r) => `  ${r}`));

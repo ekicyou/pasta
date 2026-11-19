@@ -304,7 +304,7 @@ async function main() {
     const { m, o } = onlyOn(a, b);
     await run('pasta.runSceneAtCursor');
     resetServer(a);
-    assert.ok(outputSince(o).includes('台本（応答が無かったため、再生の記録から）:'), outputSince(o).join('\n'));
+    assert.ok(outputSince(o).includes('スクリプト（応答が無かったため、再生の記録から）:'), outputSince(o).join('\n'));
     assert.ok(outputSince(o).includes('\\0played via log\\e'));
     assert.strictEqual(messagesSince(m).length, 0);
   });
@@ -314,8 +314,8 @@ async function main() {
     const { m, o } = onlyOn(a, b);
     await run('pasta.runSceneAtCursor');
     resetServer(a);
-    assert.ok(outputSince(o).some((l) => l.startsWith('台本を確かめられませんでした')), outputSince(o).join('\n'));
-    assert.deepStrictEqual(messagesSince(m).map((x) => [x.kind, x.message]), [['warning', '台本を確かめられませんでした']]);
+    assert.ok(outputSince(o).some((l) => l.startsWith('スクリプトを確かめられませんでした')), outputSince(o).join('\n'));
+    assert.deepStrictEqual(messagesSince(m).map((x) => [x.kind, x.message]), [['warning', 'スクリプトを確かめられませんでした']]);
   });
 
   await test('4.10: 204 → the [debug] enabled guide with the OnPastaSceneAt: reason line', async () => {
