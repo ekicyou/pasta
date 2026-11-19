@@ -14,7 +14,12 @@
 
 hello-pasta の置き場所（GitHub Pages）を足した変更を入れた後の最初のリリースの前に、次を確かめます。
 
-- 置き場所の変更を `main` へ入れた直後の公開について、実 URL での確認（`ghost-site.mjs verify-live --full`）が通っている（`.dll`・`.pasta`・`.png` などが変換されずに返ること）
+- 置き場所の変更を `main` へ入れた直後の公開について、実 URL での確認が通っている。`--full` は `updates.txt` の各行のファイルを取り、`.dll`・`.pasta`・`.png` などが変換されずに返ることを md5・大きさで確かめます。`{VERSION}` と `{WORK}` の用意は、下の「手元で組み立てる」と同じです
+
+  ```bash
+  node book/tools/ghost-site/ghost-site.mjs verify-live --nar {WORK}/hello-pasta.nar --tree v{VERSION}:crates/pasta_sample_ghost/ghosts/hello-pasta --base https://ekicyou.github.io/pasta/hello-pasta/ --full
+  ```
+
 - 通っていないときは、リリースを出さず、直す PR を先に `main` へ入れる
 
 ### 利用者に更新が届く条件
@@ -54,7 +59,7 @@ GitHub の「Actions」→「Release」の実行を開きます。job は次の�
 | publish-crates | crates.io へ 5 クレートを公開 |
 | publish-vsce | VSCode Marketplace へ拡張を公開 |
 | github-release | 詳しいリリースノートを作り、見どころを本文とする GitHub Release `pasta vX.Y.Z` を作成して、配布物 8 つと詳しいリリースノートの 9 つを添付 |
-| publish-ghost-site | 最新のタグのときだけ、Actions の `Manual`（`manual.yml`）を `main` で起動して待ち、公開後の実 URL の `updates.txt` が Release の nar と一致するかを見比べる（`github-release` が成功したときだけ走る） |
+| publish-ghost-site | 最新のタグのときだけ、Actions の `Manual`（`manual.yml`）を `main` で起動して待ち、公開後の実 URL の `updates.txt` を Release の nar の側の行と見比べる（`github-release` が成功したときだけ走る） |
 | report | 公開先ごとの結果と Release の URL を表にまとめる |
 
 report job の Summary の表で、公開先ごとの結果を確かめます。
@@ -71,8 +76,8 @@ report job の Summary の表で、公開先ごとの結果を確かめます。
 | reason | 意味 | 次の手 |
 |--------|------|--------|
 | `dispatch` | `Manual` を起動できない、または起動した run を特定できない | 権限（`actions: write`）と API の応答をログで確かめ、直したら再実行 |
-| `build` | `Manual` の run が失敗した（nar の照合の失敗が多い） | その run のログを読む。直して `Manual` を `main` で手動実行 |
-| `verify` | 実 URL の `updates.txt` が Release の nar と違う、または取れない | 配信の遅れなら失敗した job を再実行。続くなら Pages の公開状況を確かめる |
+| `build` | `Manual` の run が失敗した（置き場所の検査・照合で止まったことが多い） | その run のログを読み、下の「検査で止まったとき」に従って直す |
+| `verify` | 実 URL の `updates.txt` の nar の側の行が Release の nar と違う、または取れない | 配信の遅れなら失敗した job を再実行。続くなら Pages の公開状況を確かめる |
 | `transient` | 最新の判定・nar の取得・run の待ちの時間切れ | 失敗した job を再実行 |
 | `publish` | スクリプトの異常終了（最新の Release のタグが `vX.Y.Z` の形でない、`homeurl` が無い、など） | ログを読む。再実行で直らないことがある |
 
@@ -122,7 +127,7 @@ git push -f origin v{VERSION}
 置き場所は、Release を作った後の最後の段です。ここが `failed` でも、crates.io・Marketplace・GitHub Release の公開は済んでいます。版を上げて出し直す必要はありません。
 
 - 失敗した job（`publish-ghost-site`）を再実行します。最新ではないタグなら `skipped` で飛ばされます。
-- 再実行で直らないときは、Actions の `Manual` を `main` で手動実行します。`Manual` は最新の Release の nar を取って公開するので、何度実行しても同じ結果になります。
+- 再実行で直らないときは、Actions の `Manual` を `main` で手動実行します。`Manual` はその時点の `main` と最新の Release の nar から置き場所を作り直して公開します。
 - 初回の実リリースで `dispatch` になったときは、権限（`actions: write`）と、`manual.yml` が `main` にあることを確かめます。
 - リリースの実行中は、`release.yml` を `main` へ入れません。起動した `Manual` が `main` の定義で動くためです。
 
@@ -130,9 +135,55 @@ git push -f origin v{VERSION}
 
 `build` ジョブは、公開前に nar を一度展開して照合するので、壊れた nar は Release になりません。それでも壊れた nar が `latest` になったときは、置き場所が `Manual` の照合で止まります。公開済みの Release は差し替えられないので、直す PR を `main` へ入れて、新しい版を切り、出し直します。
 
-**ファイルを消す・改名する版を出すとき**
+## hello-pasta の更新の置き場所
 
-SSP の更新は、`updates.txt` が前回と違うファイルだけを取り、古いファイルを消しません。nar からファイルを消す・改名する版は、利用者の手元に古いファイルが残るので、`delete.txt` を使うかを別に検討します。
+### 作り方
+
+置き場所（`https://ekicyou.github.io/pasta/hello-pasta/`）は、`main` のリポジトリの hello-pasta のファイルに、最新の Release の `hello-pasta.nar` にだけ在るファイル（`pasta.dll` など、最新の Release のタグのツリーに無いもの）を重ねて作ります。重ねた一式を最新の Release と同じ版の `pasta_check release` で検査し、`updates.txt` を作り直して照合してから公開します。
+
+置き場所が出るきっかけは 2 つです。
+
+- `main` への push（hello-pasta の配下の変更を含む）。辞書の変更は、リリースを待たずに利用者へ届きます
+- リリース。リリース CI が `Manual` を `main` で起動し、nar の側を新しい Release のものに入れ替えます
+
+リリースの直後の数分の間（Release が最新になってから、リリース CI の起動した `Manual` が公開を終えるまで）は、nar の側が 1 つ前の Release のままです。この間に新しい nar を入れて更新確認をした利用者は古い `pasta.dll` を受け取り、次の更新確認で新しいものに戻ります。
+
+### 検査で止まったとき
+
+`Manual` の「Build hello-pasta update site」の段で止まり、ログに `pasta_check release` の報告（ファイル・行・理由）か、照合の `NG <パス>: …` が出ます。どちらのときも公開しません。
+
+辞書が、まだリリースしていない `pasta.dll` の機能を使っていて止まったときは、次のどちらかで直します。
+
+- リリースを出す。リリース CI の起動する `Manual` が、新しい版の `pasta_check` で通して公開します
+- 急ぐときは、辞書を戻す PR を `main` へ入れる
+
+この検査は Lua を動かしません。読み込める辞書で、実行の結果だけが変わる違い（新しい日時変数の値が空になるなど）は止められません。
+
+### 見比べの読み方
+
+リリース CI の `publish-ghost-site` は、実 URL の `updates.txt` のうち nar の側の行だけを、Release の nar の `updates.txt` の行と md5・大きさで比べます。リポジトリの側の行と日付の欄は比べません。
+
+- 一致: `OK updates.txt: <n> 回目で nar の側の <k> 行が一致`。報告の表は `published`
+- 合わない・取れない: `NG <パス>: md5 が違う（nar: …、実 URL: …）` などが出て、報告の表は `failed`（`reason` は `verify`）
+
+### ファイルを消す・改名するとき
+
+`main` でファイルを消す・改名すると、置き場所からはなくなります。SSP の更新は、`updates.txt` が前回と違うファイルだけを取り、古いファイルを消しません。利用者の手元には古いファイルが残り、pasta が読み続けることがあります。`delete.txt` を使うかは別に検討します。
+
+### 手元で組み立てる
+
+リポジトリのルートで、最新の Release の版 `{VERSION}` と、リポジトリの外の作業フォルダ `{WORK}` を決めて実行します。`{WORK}/site` は無いか空にしておきます。
+
+```bash
+git fetch origin tag v{VERSION}
+gh release download v{VERSION} --pattern hello-pasta.nar --dir {WORK}
+cargo install pasta_check --version {VERSION} --locked --root {WORK}/pasta-check
+PASTA_CHECK={WORK}/pasta-check/bin/pasta_check bash book/tools/ghost-site/assemble-site.sh HEAD v{VERSION} {WORK}/hello-pasta.nar {WORK}/site
+```
+
+- 引数は、組み立てるコミット・最新の Release のタグ・その nar・出力先の順です
+- `pasta_check` が PATH に在れば、`PASTA_CHECK` は要りません
+- 止まったときは、上の「検査で止まったとき」と同じ報告が出ます
 
 ## 手元での release.ps1（動作確認用）
 
