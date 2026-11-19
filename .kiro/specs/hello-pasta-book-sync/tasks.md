@@ -55,7 +55,7 @@
   - _Dispatch: standard — ワークフローの段の組み替えとキャッシュの新しい使い方_
   - _Requirements: 2.6, 2.7, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.3, 4.4, 8.3, 8.5, 8.7_
 
-- [ ] 3.2 古い run の公開を止める見分けの段と、公開の条件を足す
+- [x] 3.2 古い run の公開を止める見分けの段と、公開の条件を足す
   - main の run だけ、組み立ての後・Upload の前に、見分けの段を足す。今の最新 Release の tag が組み立ての tag と違えば公開しない。main の先頭が自分と同じなら公開する。違えば、自分から先頭までに起動の条件のファイル（`yq` で `on.push.paths` を読み、`:(glob)` を付ける）が変わったときだけ公開しない
   - 公開しないときは理由を `::notice::` と summary に出し、成功で終える。`gh api`・`git fetch` の失敗はジョブの失敗にする
   - 見分けの結果を `build` ジョブの出力にし、Upload と `deploy` の条件を「main かつ公開する」にする。`deploy` は 1 か所のまま
@@ -130,3 +130,4 @@
 - SSP の実機確認で SSP を複製するときは、立てる前に複製の `data/profile/app.dat` から `SelfUpdate.Pending.*` の行を消す（残すと複製が普段の SSP の保留中の自己更新を使って自分を更新し、`temp/cache` の zip を消費する。タスク 1 で発生）。
 - 複製の SSP の MCP は普段の SSP が口を持つので届かない。更新の結果はローカルの HTTP サーバーの要求の記録と `pasta.log` の `OnUpdateComplete` の Reference0 で見る。
 - 2.2 の後、`publish-ghost-site.ps1` は `--tree` 無しで `verify-live` を呼ぶので失敗し、回数の正規表現 `回目で一致` も新しい文に合わない。3.3 で `--tree` と正規表現（`(\d+) 回目で`）・偽の node の出力文を直す。
+- main で「Check freshness」が実際に走るのはマージの後だけ。5.3 でその段の出力（publish=true）も見る。
