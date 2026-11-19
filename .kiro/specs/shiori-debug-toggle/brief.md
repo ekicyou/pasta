@@ -93,3 +93,12 @@ discovery の議案（2026-11-19 開発者が推奨案で承認）:
 - デバッグの待ち受けは 127.0.0.1 固定・単一 DLL・opt-in のまま。`OnPastaSetSaveVariable` は前からいつでも効くので、外から有効にできることで開く口は増えない。
 - `cargo test` は環境変数に左右されない（`PASTA_DEBUG` の `#[ctor]` の中和）。`＄＊デバッグ` で決まることのテストも、置いた場所に左右されないように走らせる。
 - マニュアルが権威。挙動と同じ変更でマニュアルとスキルの `references/` を直す。
+
+## 申し送り（2026-11-19 manual-reader-first から）
+
+マニュアルのデバッグの部を書き直した。この spec が直すマニュアルと文言は、次の今の形に合わせる。
+
+- 部の題は「編集ツールとデバッグ」。章は `debug/index.md`「編集ツールとデバッグの概要」・`debug/recipe.md`「pasta-recipe で書く」・`debug/vscode-setup.md`「VS Code で書く」・`debug/dev-actions.md`「▶・リロード・保存変数」。見出し「デバッグの有効化」（`debug/index.md`）は残してあり、優先順位の節は 1 文に畳んだ。案内役は emo2 の 2 人（むらさき・エモ）で、本体にも台詞を置ける。
+- ゴーストが返したさくらスクリプトの呼び名を「台本」から「スクリプト」に改めた。エディタの文言（`editors/shared/runSceneAtCursor.ts` の `NO_SCRIPT_GUIDE` ほか）も「スクリプト」になっている。`DEBUG_HINT` を直すときは同じ語にそろえる。
+- hello-pasta と入門用のスターター（`pasta-starter.nar`・`my-ghost`）は、`pasta.toml` に `[debug] enabled = true` を入れて配る。入門は、配る前に 14 段目で `false` にする手順である。トグルを足すなら、入門の「▶ が効かないとき」（`getting-started/01-boot.md`・`debug/recipe.md` の「3 手で最初の ▶」）と 14 段目の手順も見直す。
+- 実機で分かったこと: 開発者の機械には環境変数 `PASTA_DEBUG=1` が入っているので、`[debug] enabled` だけの効き目は実機で見られなかった。この spec の確かめでは環境変数を外して立てる。
