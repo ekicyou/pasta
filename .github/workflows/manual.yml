@@ -4,8 +4,8 @@
 #   book/**・本ワークフロー・スキル 3 種（pasta-ghost-authoring / pasta-lua-coding / pasta-check）、
 #   クレート README（crates/*/README.md）・ルートの README.md・doc/SOUL.md（公開マニュアル URL の実在検査のため。
 #   pasta-runtime-internals-doc 要件 7.8・manual-link-anchor-check 要件 4）、
-#   hello-pasta の辞書（crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**）と行事の表（同 master/calendar.csv）
-#   （チュートリアルの照合のため）、
+#   hello-pasta の配下全部（crates/pasta_sample_ghost/ghosts/hello-pasta/**。チュートリアルの照合と、
+#   置き場所のリポジトリの側を作り直すため。hello-pasta-book-sync 要件 3.1）、
 #   pasta の TextMate 文法（editors/vscode/syntaxes/**。着色に使うため）、
 #   リリース CI（.github/workflows/release.yml。link-check が最新版の固定リンクの名前を添付の名前と照らすため。
 #   manual-download-page 要件 7.8）。
@@ -24,7 +24,9 @@
 #        自己テストも実行）・コンテンツ検証・ツール自己テスト
 #     -> 旧版の生成（固定コミット CLASSIC_REF の book/ を旧版のツールで book/book/classic へ。印刷用のページは作らない。
 #        新版の検査の後に置き、検査の対象に含めない。失敗で中断。manual-claudia-theme 要件 11）
-#     -> hello-pasta の更新の置き場所（最新 Release の hello-pasta.nar を展開・照合して book/book/hello-pasta へ。失敗で中断。hello-pasta-network-update）
+#     -> hello-pasta の更新の置き場所（最新 Release の tag を特定し、その nar と tag を取り、その版の pasta_check を
+#        キャッシュから取り戻すか入れて、assemble-site.sh で「このコミットの hello-pasta ＋ tag のツリーに無い nar の側のファイル」を
+#        重ね・検査・照合して book/book/hello-pasta へ。失敗で中断。hello-pasta-book-sync）
 #     -> Pages artifact（./book/book）をアップロード -> deploy-pages で公開。
 # すべて build ジョブ内で検証するため、失敗時は deploy（needs: build）が走らず公開されない。
 name: Manual
@@ -42,8 +44,7 @@ on:
       - 'crates/*/README.md'
       - 'README.md'
       - 'doc/SOUL.md'
-      - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
-      - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/calendar.csv'
+      - 'crates/pasta_sample_ghost/ghosts/hello-pasta/**'
       - 'editors/vscode/syntaxes/**'
   pull_request:
     branches: [main]
@@ -57,15 +58,15 @@ on:
       - 'crates/*/README.md'
       - 'README.md'
       - 'doc/SOUL.md'
-      - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
-      - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/calendar.csv'
+      - 'crates/pasta_sample_ghost/ghosts/hello-pasta/**'
       - 'editors/vscode/syntaxes/**'
   workflow_dispatch:  # 手動実行
 
 # Pages の同時デプロイを直列化（実行中のデプロイはキャンセルしない）。
-# PR の検証は PR ごとに別グループとし、公開の直列化に巻き込まない。
+# pages の組は main の run だけにする。組は待ちの run を 1 つしか残さないので、ブランチの手動実行が
+# main の待ちの run を取り消さないよう、ほかは event と ref ごとの別グループにする（hello-pasta-book-sync 要件 5.4）。
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('manual-pr-{0}', github.ref) || 'pages' }}
+  group: ${{ github.ref == 'refs/heads/main' && 'pages' || format('manual-{0}-{1}', github.event_name, github.ref) }}
   cancel-in-progress: false
 
 # 全体は読むだけ。公開の権限は deploy ジョブにだけ与える。
@@ -190,19 +191,71 @@ jobs:
           [ ! -e "$out/print.html" ] || { echo "::error::classic snapshot must not have print.html"; exit 1; }
           compgen -G "$out/searchindex*.js" > /dev/null || { echo "::error::classic snapshot is missing searchindex*.js"; exit 1; }
 
-      # 最新 Release の hello-pasta.nar を取る。Release・nar が無ければここで失敗し、置き場所を欠いたサイトを公開しない
-      # （hello-pasta-network-update 要件 4.4）。PR・ブランチでも取得と組み立てまで走らせ、失敗は警告にしない。
-      - name: Fetch latest hello-pasta.nar
+      # 置き場所の組み立て（hello-pasta-book-sync design「置き場所の組み立て」・ManualWorkflow 段 1〜5）。
+      # 旧版の生成の後・アップロードの前に置き、置き場所はマニュアルの検査の対象に入らない。
+      # PR・ブランチでも組み立て・検査・照合まで全部走らせ、どの段の失敗もジョブの失敗にする（要件 2.6, 2.7, 3.2, 4.4）。
+      # 段の run: の本文には ${{ }} を書かず、値は env: から取る。
+
+      # 段 1: 最新 Release の tag を特定する。Release が無い・tag が vX.Y.Z の形でなければ失敗（要件 2.6）。
+      # 出力 tag は組み立てに、version（v を外したもの）は pasta_check の版とキャッシュの鍵に使う（要件 4.1, 4.3）。
+      - name: Resolve latest Release
+        id: rel
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/hello-pasta.nar" \
-            "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/hello-pasta.nar"
+          tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::latest Release tag is not vX.Y.Z: '$tag'"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
-      # nar を展開して updates.txt と照合し、book/book/hello-pasta/ に置く（検査の後・アップロードの前。
-      # 置き場所はマニュアルの検査の対象に入らない。要件 1.1, 3.5）。照合の失敗は exit 1 で公開を止める。
+      # 段 2: その tag の hello-pasta.nar と、tag のツリー（nar の側の決め方に使う）を取る。
+      # 取れなければ失敗し、置き場所を欠いたサイトを公開しない（要件 2.6）。tag は浅く fetch する。
+      - name: Fetch hello-pasta.nar and tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern hello-pasta.nar --dir "$RUNNER_TEMP/release"
+          git fetch --no-tags --depth=1 origin "refs/tags/$TAG:refs/tags/$TAG"
+
+      # 段 3・4: 最新 Release と同じ版の pasta_check を使う（要件 4.1, 4.3, 8.5。Windows も pasta.dll のビルドも要らない）。
+      # actions/cache の 1 段の形はジョブの成功時にしか残さないので、取り戻しと保存を分け、入れた直後に残す（research.md 11.6）。
+      - name: Restore pasta_check
+        id: pasta-check-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/pasta-check
+          key: pasta-check-${{ runner.os }}-${{ steps.rel.outputs.version }}
+
+      - name: Install pasta_check
+        if: steps.pasta-check-cache.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
+        run: cargo install pasta_check --version "$VERSION" --locked --root "$HOME/pasta-check"
+
+      - name: Save pasta_check
+        if: steps.pasta-check-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/pasta-check
+          key: pasta-check-${{ runner.os }}-${{ steps.rel.outputs.version }}
+
+      - name: Add pasta_check to PATH
+        shell: bash
+        run: echo "$HOME/pasta-check/bin" >> "$GITHUB_PATH"
+
+      # 段 5: このコミットの hello-pasta ＋ tag のツリーに無い nar の側のファイルを重ね、pasta_check release で検査して
+      # updates.txt を作り直し、照合して book/book/hello-pasta に置く（要件 1, 2, 4。手順は assemble-site.sh の冒頭）。
       - name: Build hello-pasta update site
-        run: node book/tools/ghost-site/ghost-site.mjs build --nar "$RUNNER_TEMP/hello-pasta.nar" --out book/book/hello-pasta --index book/tools/ghost-site/index.html
+        shell: bash
+        env:
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: bash book/tools/ghost-site/assemble-site.sh HEAD "$TAG" "$RUNNER_TEMP/release/hello-pasta.nar" book/book/hello-pasta
 
       # 公開は main のときだけ（ブランチの手動実行では検査だけ走らせて緑で終える）。
       # v4 から . で始まるファイルを既定で外すため、mdBook の .nojekyll を入れるよう指定する。
