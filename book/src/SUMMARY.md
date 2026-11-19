@@ -53,9 +53,9 @@
   - [scripts/ の記述パターン](lua/patterns.md)
   - [DSL と Lua の使い分け](lua/dsl-vs-lua.md)
 
-# 書いて試す
+# 編集ツールとデバッグ
 
-- [書いて、その場で鳴らす](debug/index.md)
+- [編集ツールとデバッグの概要](debug/index.md)
   - [pasta-recipe で書く](debug/recipe.md)
   - [VS Code で書く](debug/vscode-setup.md)
   - [▶・リロード・保存変数](debug/dev-actions.md)
