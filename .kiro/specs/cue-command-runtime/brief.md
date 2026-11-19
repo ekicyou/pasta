@@ -18,7 +18,7 @@
 - コード生成は `crates/pasta_lua/src/code_gen/scope_gen.rs` 340〜345 行で、`select` だけを `act:choice_timeout` にし、ほかを捨てる。`scope_gen_tests.rs` 311〜322 行のテストが、この挙動を固定している。
 - 命令の名前と引数には、日本語が書ける（`grammar.pest` 210・218 行）。
 - 台詞の中の知らない `\![…]` は、日本語の引数を含めて、そのままさくらスクリプトに残る。待ちも改行も挟まれず、文字の幅にも数えられない（`sakura_script/tokenizer.rs` 138〜146 行、`wait_inserter.rs` 77〜80 行、`line_breaker.rs` 33〜45 行）。
-- `！` 行は、areka の土台（dola）の要請で入った（`.kiro/specs/completed/pasta-cue-dsl-extension/`）。当時の構想は、dola が pasta の AST を直に読んでキューシート（`CueSheet`）にすることだった。この道は、どちらの側にも実装が無い。
+- `！` 行は、areka の土台（dola）の要請で入った（`.kiro/specs/completed/pasta-cue-dsl-extension/`）。当時の構想は、dola が pasta の AST を直に読んで台本にすることだった。この道は、どちらの側にも実装が無い。
 
 ### 柱（`＆属性` とアクター指定行）
 
