@@ -166,3 +166,9 @@
 - ノベルの骨子は、`novel-areka-contract/final-model-2026-11-19.md` にまとめた（要件定義は、これを正として始める）。台本を書く人の目線のまとめは、同じ場所の `play-script-guide.md`。この brief の上の節と食い違う所は、骨子が正しい。
 - 当たり判定のクリックは、今の条件の属性で書ける（`＊OnMouseClick　＆＄ｒ４＝「ドア」`）。演劇の間は、今のシーンのグローバルシーンのローカルシーン（`・OnMouseClick`）を先に探す動きを、`novel-talk-flow` が足す。アクターと部位の名前で選ぶ近道を足すかは、この spec の要件定義で決める（足さなくても書ける）。
 - 演劇の間、どのシーンも拾わなかった左クリックは「進める」になる（`novel-talk-flow`）。クリックの受け口（`event/init.lua`）を触る順を、`novel-talk-flow` と合わせる。
+
+## 申し送り（2026-11-19 の暫定設計の照らし合わせより。持ち主の整理）
+
+8 本の暫定設計を別々の係が書いたら、同じ仕事を 2〜3 本が別々の形で持っていた。骨子 5 章の持ち分どおりに、持ち主を 1 つにする。くわしくは `novel-areka-contract/provisional-design-issues-2026-11-19.md` の 4 章と、`provisional-cross-check-interfaces.md`。この spec の暫定の設計と検証は、このフォルダの `provisional-design.md`・`provisional-design-validation.md`（正式な設計ではない。要件定義と設計の材料にする）。
+
+- 中身のほとんど（ローカルを先に探す・進める・画面の場面の決め方）が、`novel-talk-flow` と今の条件の属性に吸収された。残すか、`novel-talk-flow` に入れて閉じるかを、開発者に諮っている。

@@ -178,3 +178,11 @@
 ### モデル
 
 - 要件定義は Opus でよい。
+
+## 申し送り（2026-11-19 の暫定設計の照らし合わせより。持ち主の整理）
+
+8 本の暫定設計を別々の係が書いたら、同じ仕事を 2〜3 本が別々の形で持っていた。骨子 5 章の持ち分どおりに、持ち主を 1 つにする。くわしくは `novel-areka-contract/provisional-design-issues-2026-11-19.md` の 4 章と、`provisional-cross-check-interfaces.md`。この spec の暫定の設計と検証は、このフォルダの `provisional-design.md`・`provisional-design-validation.md`（正式な設計ではない。要件定義と設計の材料にする）。
+
+- スロットのファイルの形は、この spec が決める。`novel-checkpoint-rollback` は、欄の名前を合わせる。
+- ロードの道は、`novel-checkpoint-rollback` と合わせて、設計で 1 つに決める。
+- 先に入る spec は、後に入る spec の関数を呼ばない。先に入る spec が知らせの口を置き、後の spec が登録する。
