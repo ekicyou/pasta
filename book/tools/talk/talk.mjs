@@ -44,6 +44,14 @@ export const SPEAKERS = Object.freeze([
     素: 'e0', 笑顔: 'e1', 驚き: 'e2', 不安: 'e3', 落胆: 'e4', 照れ: 'e5', 静観: 'e6',
     怒り: 'e7', 冷笑: 'e8', 照れ怒り: 'e9', ジト: 'e10',
   }),
+  speaker('girl', '女の子', 'Girl', 'left', 'hello', {
+    素: 'g1', 笑顔: 'g0', 照れ: 'g2', 驚き: 'g3', 泣き: 'g4',
+    困惑: 'g5', キラキラ: 'g6', 眠い: 'g7', 怒り: 'g8',
+  }),
+  speaker('boy', '男の子', 'Boy', 'right', 'hello', {
+    素: 'b11', 笑顔: 'b10', 照れ: 'b12', 驚き: 'b13', 泣き: 'b14',
+    困惑: 'b15', キラキラ: 'b16', 眠い: 'b17', 怒り: 'b18',
+  }),
 ]);
 
 export const DEFAULT_SPEAKER_ID = 'claudia';
@@ -51,7 +59,9 @@ export const DEFAULT_FACE = '素';
 // 顔画像の置き場（book/src と出力根から）。配役ごとに分ける。
 export const faceDir = (cast) => `img/${cast}`;
 // 章（book/src か出力根からのパス）が使う配役。
-export const castOf = (chapter) => (chapter.startsWith('debug/') ? 'emo2' : 'claudia');
+// hello-pasta の紹介ページだけは、見本ゴーストの 2 人（女の子・男の子）が案内する。
+export const castOf = (chapter) => (chapter.startsWith('debug/') ? 'emo2'
+  : /^hello-pasta\.(md|html)$/.test(chapter) ? 'hello' : 'claudia');
 const castNames = (cast) => SPEAKERS.filter((s) => s.cast === cast).map((s) => s.name);
 export const MAX_FACE_BYTES = 20480;
 

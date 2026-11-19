@@ -52,15 +52,15 @@ const byId = (id) => SPEAKERS.find((s) => s.id === id);
 // ============================================================
 log('\n== (A) 登録簿の不変条件と初期値 ==');
 {
-  check('A-1 話し手は claudia・anthony（配役 claudia）と murasaki・emo（配役 emo2）の 4 名',
+  check('A-1 話し手は claudia・anthony（配役 claudia）、murasaki・emo（配役 emo2）、girl・boy（配役 hello）の 6 名',
     JSON.stringify(SPEAKERS.map((s) => [s.id, s.cast]))
-      === '[["claudia","claudia"],["anthony","claudia"],["murasaki","emo2"],["emo","emo2"]]');
+      === '[["claudia","claudia"],["anthony","claudia"],["murasaki","emo2"],["emo","emo2"],["girl","hello"],["boy","hello"]]');
   check('A-2 既定の話し手は claudia・既定の表情は素',
     DEFAULT_SPEAKER_ID === 'claudia' && DEFAULT_FACE === '素' && !!byId(DEFAULT_SPEAKER_ID));
   for (const s of SPEAKERS) {
     check(`A-3 ${s.id} は表情「素」を持つ`, Object.hasOwn(s.faces, DEFAULT_FACE));
     check(`A-4 ${s.id} の id は英小文字だけ`, /^[a-z]+$/.test(s.id));
-    check(`A-5 ${s.id} の名前はかなだけ`, /^[ぁ-ゖァ-ヺー]+$/.test(s.name), s.name);
+    check(`A-5 ${s.id} の名前はかなと漢字だけ`, /^[ぁ-ゖァ-ヺー一-鿿]+$/.test(s.name), s.name);
     check(`A-6 ${s.id} の配置は left か right`, s.side === 'left' || s.side === 'right');
     check(`A-7 ${s.id} の画像名は英小文字 1 つ＋数字`, Object.values(s.faces).every((f) => /^[a-z]\d+$/.test(f)));
   }
@@ -85,20 +85,22 @@ log('\n== (A) 登録簿の不変条件と初期値 ==');
     JSON.stringify(c.faces));
   check('A-14 アンソニーの表情 2 種と画像の対応',
     JSON.stringify(a.faces) === JSON.stringify({ 素: 'f10', 刮目: 'f11' }), JSON.stringify(a.faces));
-  check('A-15 表情は Claudia とアンソニーで 16 種・むらさき 12 種・エモ 11 種',
-    files.length === 39 && Object.keys(byId('murasaki').faces).length === 12 && Object.keys(byId('emo').faces).length === 11);
+  check('A-15 表情は Claudia とアンソニーで 16 種・むらさき 12 種・エモ 11 種・女の子と男の子は 9 種ずつ',
+    files.length === 57 && Object.keys(byId('murasaki').faces).length === 12 && Object.keys(byId('emo').faces).length === 11
+      && Object.keys(byId('girl').faces).length === 9 && Object.keys(byId('boy').faces).length === 9);
   const m = byId('murasaki');
   const e = byId('emo');
   check('A-18 むらさき・エモの名前・名札・配置',
     m.name === 'むらさき' && m.latin === 'Murasaki' && m.side === 'left'
       && e.name === 'エモ' && e.latin === 'Emo' && e.side === 'right');
-  check('A-19 配役ごとに左右 1 人ずつ', ['claudia', 'emo2'].every((cast) =>
+  check('A-19 配役ごとに左右 1 人ずつ', ['claudia', 'emo2', 'hello'].every((cast) =>
     JSON.stringify(SPEAKERS.filter((s) => s.cast === cast).map((s) => s.side)) === '["left","right"]'));
   check('A-16 登録簿は凍結されている',
     Object.isFrozen(SPEAKERS) && SPEAKERS.every((s) => Object.isFrozen(s) && Object.isFrozen(s.faces)));
-  check('A-17 faceDir・MAX_FACE_BYTES', faceDir('claudia') === 'img/claudia' && faceDir('emo2') === 'img/emo2' && MAX_FACE_BYTES === 20480);
-  check('A-20 castOf: debug/ の章は emo2・ほかは claudia',
+  check('A-17 faceDir・MAX_FACE_BYTES', faceDir('claudia') === 'img/claudia' && faceDir('emo2') === 'img/emo2' && faceDir('hello') === 'img/hello' && MAX_FACE_BYTES === 20480);
+  check('A-20 castOf: debug/ の章は emo2・hello-pasta の紹介ページは hello・ほかは claudia',
     castOf('debug/index.md') === 'emo2' && castOf('debug/recipe.html') === 'emo2'
+      && castOf('hello-pasta.md') === 'hello' && castOf('hello-pasta.html') === 'hello' && castOf('getting-started/hello.md') === 'claudia'
       && castOf('grammar/index.md') === 'claudia' && castOf('introduction.md') === 'claudia'
       && castOf('internals/debug.md') === 'claudia');
 }

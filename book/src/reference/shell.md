@@ -35,15 +35,15 @@
 
 | 表情名 | 女の子（サーフェス番号） | 男の子（サーフェス番号） |
 | ------ | ------------------------ | ------------------------ |
-| `＠笑顔` | ![女の子の笑顔の顔](../img/shell/face-s0.png) 0 | ![男の子の笑顔の顔](../img/shell/face-s10.png) 10 |
-| `＠通常` | ![女の子の通常の顔](../img/shell/face-s1.png) 1 | ![男の子の通常の顔](../img/shell/face-s11.png) 11 |
-| `＠照れ` | ![女の子の照れの顔](../img/shell/face-s2.png) 2 | ![男の子の照れの顔](../img/shell/face-s12.png) 12 |
-| `＠驚き` | ![女の子の驚きの顔](../img/shell/face-s3.png) 3 | ![男の子の驚きの顔](../img/shell/face-s13.png) 13 |
-| `＠泣き` | ![女の子の泣きの顔](../img/shell/face-s4.png) 4 | ![男の子の泣きの顔](../img/shell/face-s14.png) 14 |
-| `＠困惑` | ![女の子の困惑の顔](../img/shell/face-s5.png) 5 | ![男の子の困惑の顔](../img/shell/face-s15.png) 15 |
-| `＠キラキラ` | ![女の子のキラキラの顔](../img/shell/face-s6.png) 6 | ![男の子のキラキラの顔](../img/shell/face-s16.png) 16 |
-| `＠眠い` | ![女の子の眠いの顔](../img/shell/face-s7.png) 7 | ![男の子の眠いの顔](../img/shell/face-s17.png) 17 |
-| `＠怒り` | ![女の子の怒りの顔](../img/shell/face-s8.png) 8 | ![男の子の怒りの顔](../img/shell/face-s18.png) 18 |
+| `＠笑顔` | ![女の子の笑顔の顔](../img/hello/g0.png) 0 | ![男の子の笑顔の顔](../img/hello/b10.png) 10 |
+| `＠通常` | ![女の子の通常の顔](../img/hello/g1.png) 1 | ![男の子の通常の顔](../img/hello/b11.png) 11 |
+| `＠照れ` | ![女の子の照れの顔](../img/hello/g2.png) 2 | ![男の子の照れの顔](../img/hello/b12.png) 12 |
+| `＠驚き` | ![女の子の驚きの顔](../img/hello/g3.png) 3 | ![男の子の驚きの顔](../img/hello/b13.png) 13 |
+| `＠泣き` | ![女の子の泣きの顔](../img/hello/g4.png) 4 | ![男の子の泣きの顔](../img/hello/b14.png) 14 |
+| `＠困惑` | ![女の子の困惑の顔](../img/hello/g5.png) 5 | ![男の子の困惑の顔](../img/hello/b15.png) 15 |
+| `＠キラキラ` | ![女の子のキラキラの顔](../img/hello/g6.png) 6 | ![男の子のキラキラの顔](../img/hello/b16.png) 16 |
+| `＠眠い` | ![女の子の眠いの顔](../img/hello/g7.png) 7 | ![男の子の眠いの顔](../img/hello/b17.png) 17 |
+| `＠怒り` | ![女の子の怒りの顔](../img/hello/g8.png) 8 | ![男の子の怒りの顔](../img/hello/b18.png) 18 |
 
 - 表の絵は、各サーフェスの画像の顔の所を切り抜いたものである
 - 表情名の付け方の正本は、[3 段目：表情を変えたい](../getting-started/03-face.md#表情に名前を付ける) と [アクター辞書](../grammar/actor-dictionary.md#グローバルアクター辞書定義) である

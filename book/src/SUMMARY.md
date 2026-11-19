@@ -2,6 +2,7 @@
 
 [はじめに](introduction.md)
 [ダウンロード](download.md)
+[サンプルゴースト hello-pasta](hello-pasta.md)
 
 # 入門 / チュートリアル
 

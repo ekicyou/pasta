@@ -83,7 +83,7 @@ log('\n== verify-content.mjs（コンテンツ整合・網羅レビュー検証�
   const toc = summaryChapters();
   // 台詞を置かない章（一覧の章）は T-intro・T-outro の代わりに T-notalk を 1 回ずつ実行する。目次に無い一覧の章は数えない。
   const listed = toc.filter((c) => Object.hasOwn(NO_TALK_CHAPTERS, c)).length;
-  for (const [id, n] of [['T-syntax', toc.length], ['T-intro', toc.length - listed], ['T-outro', toc.length - listed], ['T-notalk', listed], ['T-assets', 2], ['T-authoring', 1]]) {
+  for (const [id, n] of [['T-syntax', toc.length], ['T-intro', toc.length - listed], ['T-outro', toc.length - listed], ['T-notalk', listed], ['T-assets', 3], ['T-authoring', 1]]) {
     check(`${id} を ${n} 件実行`, tcount(id) === n, `${id}=${tcount(id)}`);
   }
   // 検査した章の名前の集合が目次の章と一致する（検査のフォルダの外の章を見落とさない）。

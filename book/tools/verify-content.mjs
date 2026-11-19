@@ -342,7 +342,7 @@ function listChapters(dirs) {
     // D1: 散文部（コードフェンス除去後）にキャラ口調がある = 導入/締めボイスの存在。
     const prose = stripCodeFences(md);
     // 台詞を置かない章は口調を検査しない（記録もしない）。
-    if (!Object.hasOwn(NO_TALK_CHAPTERS, rel.slice(SRC.length + 1))) assert(
+    if (!Object.hasOwn(NO_TALK_CHAPTERS, rel.slice(SRC.length + 1)) && castOf(rel.slice(SRC.length + 1)) === 'claudia') assert(
       `D-voice:${rel}`,
       hasVoice(prose),
       `${rel} の散文部にキャラ口調（導入/締め）がある`,
