@@ -7,7 +7,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 現在の主題は次のとおり。
 
 - **0.6.0: VS Code を使わないエディタ pasta-recipe**（2026-11-12 開発者の決定「次のリリースにする。最優先事項」）。2026-11-12 にウェーブ 1 の 2 本（`vscode-scene-outline-play`・`scene-play-locals`）が入り、2026-11-13 にウェーブ 2 の `pasta-recipe` と、ウェーブ 3 の `pasta-recipe-dev-actions`（アプリのシーンの ▶・リロード・保存変数の表と書き換え・値を入れて実行）が入った。2026-11-14 に `pasta-recipe-multiarch`（x64・arm64 の 2 つの zip）が入った。0.6.0 の spec は揃い、残りはリリース（下の「0.6.0 の範囲」と棚卸）。
-- **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`、2026-11-14 に起票した `manual-download-page`、2026-11-19 に起票した `shiori-debug-toggle`。まとめは下の「版がまだ決まっていないもの」にある。
+- **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`、2026-11-14 に起票した `manual-download-page`、2026-11-19 に起票した `shiori-debug-toggle`・`hello-pasta-book-sync`。まとめは下の「版がまだ決まっていないもの」にある。
 - **Phase 13: areka でノベルゲーム（0.7.0。2026-10-29 に 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性の 2 本（`scene-attribute-store`・`scene-condition-attributes`）は、2026-10-29 に 0.5.0 へ移した。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
@@ -350,6 +350,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 - `pasta-recipe-multiarch`（2026-11-14 起票）: 中身は台帳の行にある。版は 0.6.0（2026-11-14 開発者の決定。リリースの前に入れれば `pasta-recipe.zip` の名前は一度も出ない）。
 - `manual-download-page`（2026-11-14 起票。開発者「ダウンロード関係だけ簡潔に説明したページが欲しい」）: 中身は台帳の行にある。マニュアルだけの spec で、main への push で Pages に出るのでリリースを待たない。
 - `shiori-debug-toggle`（2026-11-19 起票。開発者「グローバル変数「デバッグ」に true を設定する方法も」）: 中身は台帳の行にある。版は開発者が後で決める。
+- `hello-pasta-book-sync`（2026-11-19 起票。開発者「ネットワークアップデートは book に同期。nar はリリースタイミングで作ればよい」）: 中身は台帳の行にある。CI とスクリプトの spec で、main に入れば効くのでリリースを待たない。
 
 ## 依存の更新（2026-10-24 起票）
 
@@ -381,6 +382,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 - [ ] shiori4-v4-lua-api -- 版 4 のホストの機能を Lua と DSL から使う口。ホストのプロパティの読み出し（今の `act:get_property` と `CALLBACK.pending` の上に作る）、シーンからの SEND・NOTIFY、終わりを待って `OnHostComplete` で待っているシーンを再開する書き方（`REG:register` との並び・チェイントークの `STORE.co_preempt` との関係・待っている間の unload）、SHIORI3 だけのときの扱い、`pasta_check` の組み込みの名前、マニュアル（2026-10-23 の棚卸で `shiori4-v4-host` から分けた）。0.7.0（2026-10-29 にノベルゲームとともに 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）。Dependencies: shiori4-v4-host
 - [ ] pasta-dll-multiarch -- x64・arm64 版の pasta.dll をビルドし、32bit 版と同じリリースで出す。見本ゴーストの .nar に areka の探し方に合う名前（`pasta.x64.dll`・`pasta.arm64.dll`）で同梱し、接尾辞の無い `pasta.dll` は SSP 向けの 32bit 版のまま残す。`release.ps1`・`.cargo/config.toml`・配布物とリリース CI の検査・マニュアル。aarch64 の LuaJIT のビルドは要確認（2026-10-23 起票。3 者会談の後の areka の相談から）。版は未定。`vsce-4-upgrade`（`release.yml`）・`shiori4-v4-host`（`build.yml`）と同じウェーブに置かない。Dependencies: none（先に要った `shiori4-v3-portable`・`ponytail-manual-ci`・`ponytail-shiori` は入った）
 - [ ] shiori-debug-toggle -- 保存変数 `＄＊デバッグ`（真偽値。英語名の `＄＊debug` も見て、食い違えば `デバッグ` が勝つ）でデバッグを入れたり切ったりする。優先は `PASTA_DEBUG` ＞ `＄＊デバッグ` ＞ `[debug] enabled` ＞ false で、シーンから見える `＄＊デバッグ` と同じ値で読み込みのときに決める（判断を Lua が起きた後へ移す作りは設計で決める）。VSCode 拡張の「SHIORI デバッグを有効にする／無効にする」と pasta-recipe のトグルのボタンは、`OnPastaSetSaveVariable` で書いてからリロードする（`editors/shared/` の流れを共有）。`DEBUG_HINT` とマニュアルの「デバッグの有効化」も直す（2026-11-19 起票）。版は未定。Dependencies: none
+- [ ] hello-pasta-book-sync -- hello-pasta のネットワーク更新の置き場所を、最新 Release の nar からではなく、book を公開するコミット（main）から作る。`manual.yml` に Windows のジョブを足して配布の中身と `updates.txt` を作り、同じ run で公開する。`hello-pasta.nar` はリリースのときのまま。完了済みの `hello-pasta-network-update` が「book に同期」を「同じデプロイに載せる」と狭く作ったのを直す。dll をどこから取るか（推奨は同じコミットでビルド）・dll の md5 の再現性・関門・リリース CI の見比べの移し替えは、要件ディスカッションの議題（2026-11-19 起票）。リリースを待たない。`pasta-dll-multiarch` と同じウェーブに置かない（`release.ps1`・`release.yml`）。Dependencies: none
 - [x] manual-reader-first -- マニュアルを読む人の側から書き直した。入門ガイドは「まず会ってみる」（hello-pasta を入れて、1 行書き換えて ▶ で鳴らす）から始め、自分のゴーストは入門用のスターター `pasta-starter.nar`（`my-ghost`）で始める。段の章は H2 4 つ（叶えたいこと・辞書を書く・確かめる・もっと詳しく）で、確かめ方はエディタの ▶。hello-pasta の台詞 13 枚を「パスタ屋の見習い 2 人」の掛け合いに書き直し、絵 16 枚を撮り直した。文法の部は「台本である」の全体像（柱・台詞・ト書き・登場人物）から大きい順に並べた。デバッグの部は「編集ツールとデバッグ」に改め、案内役を emo2 の 2 人にした（台詞部品に配役を足した）。リファレンス 3 章と内部設計 10 章は、今の動きだけを書き、実物の例を足した。出力の呼び名を「台本」から「スクリプト」に改めた（エディタの文言も）。雑記に親の章を立てた。hello-pasta の紹介ページ（`book/src/hello-pasta.md`。案内役は女の子と男の子）をマニュアルに足し、hello-pasta の `craftmanurl` をその URL にした。要件 → 設計 → タスクのフェーズは取らず、brief と状況ファイルで進めた（2026-11-19。開発者の指示）。Dependencies: none
 - [x] manual-download-page -- マニュアルに「ダウンロード」のページ（`book/src/download.md`）を足す。目次の「はじめに」の次と扉の案内の先頭に置き、「やりたいこと → 取るファイル」の表と各ファイルの短い説明にする。トップページ（`introduction.md`）は削り込み、「AI にゴーストを書かせるとき」をこのページへ移し、「このマニュアルの歩き方」を消す。ほかの章と README の入手の説明はこのページへのリンクに寄せる（2026-11-14 起票。方針は discovery の推奨案のまま開発者が承認）。版は未定。`pasta-dll-multiarch` と同じウェーブに置くなら、このページの節を持ち場分けする。Dependencies: none
 - [ ] novel-areka-contract -- pasta と areka の取り決め（台本に載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票）。Dependencies: none
