@@ -1,5 +1,18 @@
 # 編集ツールとデバッグの概要
 
+<section class="claudia-hero" aria-label="扉">
+<i class="hero-corner hero-corner-tl" aria-hidden="true"></i><i class="hero-corner hero-corner-tr" aria-hidden="true"></i><i class="hero-corner hero-corner-bl" aria-hidden="true"></i><i class="hero-corner hero-corner-br" aria-hidden="true"></i>
+<p class="hero-latin">Murasaki &amp; Emo — guest hosts</p>
+<div class="hero-faces"><img class="hero-face hero-face-murasaki" src="../img/emo2/m1.png" alt="" width="84" height="84"><img class="hero-face hero-face-emo" src="../img/emo2/e0.png" alt="" width="84" height="84"></div>
+
+> 【むらさき：笑顔】主役交代のお知らせや！ この部は、うちらが案内するで！
+
+> 【エモ】ゴースト「えも？？」のエモだよ。隣のにぎやかなのが、むらさき。二人とも pasta で動いてる、現役のゴーストなんだ。
+
+> 【むらさき：照れ怒り】にぎやかは余計や！ ……ほな Claudia はんには、紅茶でも飲んで休んどいてもらお。道具の話は、鳴らされる側のうちらがいちばん詳しいねん。
+
+</section>
+
 > 【むらさき：笑顔】書いた台詞をその場でしゃべらせてもらえるんやて！ うちら、出番めっちゃ増えるやん！
 
 > 【エモ：静観】▶ を押されるたびに、同じ台詞を言わされるんだけどね。

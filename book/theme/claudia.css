@@ -684,6 +684,14 @@ mark {
     border-color: var(--talk-anthony-ring);
     background-color: var(--talk-anthony-face);
 }
+.hero-faces .hero-face-murasaki {
+    border-color: var(--talk-murasaki-ring);
+    background-color: var(--talk-murasaki-face);
+}
+.hero-faces .hero-face-emo {
+    border-color: var(--talk-emo-ring);
+    background-color: var(--talk-emo-face);
+}
 /* パート案内: Markdown のリストをカードの格子にする。幅が足りなければ自動で列が減る */
 .hero-toc ul {
     display: grid;

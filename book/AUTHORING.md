@@ -488,7 +488,7 @@ Claudia の表情は次の 14 種である。使いどころと例文は目安�
 
 この一覧に章を足さない。足すなら規約を改める。
 
-- 表紙（`introduction.md`）では、扉（`<section class="claudia-hero">`）の中にも置ける。
+- 表紙（`introduction.md`）と、「編集ツールとデバッグ」の扉のページ（`debug/index.md`）では、扉（`<section class="claudia-hero">`）の中にも置ける。`debug/index.md` の扉は、むらさきとエモが案内役を引き継ぐ登場の場面である（顔は `hero-face-murasaki`・`hero-face-emo`）。
 - どの章でも、台詞は行頭の引用ブロックとして置く。字下げした台詞、リストの中・引用の中（入れ子）の台詞は置けない（`nested-talk`）。注記（`> [!NOTE]`）の中にも置けない。
 
 ### 書けない内容

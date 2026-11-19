@@ -621,7 +621,7 @@ for (const ch of INTERNALS_CHAPTERS) {
       fail(`T-outro:${ch}`, `${rel} の章構造不備: ${e.message}`);
       continue;
     }
-    const cover = ch === 'introduction.md';
+    const cover = ch === 'introduction.md' || ch === 'debug/index.md'; // 扉を持つページ
     report(`T-intro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.intro, { cover, cast }),
       `${rel} の導入が二人の台詞だけでできている`);
     report(`T-outro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.outro, { cover, cast }),
