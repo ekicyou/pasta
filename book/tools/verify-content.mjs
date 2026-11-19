@@ -14,7 +14,7 @@
 //   B. Lua 網羅（R5.1, R5.5）   — 公開モジュール名の登場・LuaJIT 2.1 明示
 //   C. チュートリアル（R6.1, R6.2 / getting-started-story-guide 1.2, 1.4, 7.1, 10.1, 10.7, 10.8） — 前提環境/UTF-8 注意・
 //      段の章の本文（C-steps）、目次の並び（C-order）、tutorial-check 逐語一致、
-//      段の章の H2 5 種（C-sections）、台詞以外の段落は指示の一文だけ（C-prose）
+//      段の章の H2 4 種（C-sections）、台詞以外の段落は指示の一文だけ（C-prose）
 //   D. ボイス（R7.1, R7.2, R7.4 / ssot 1.7） — 導入/締めのキャラ口調（判定は findVoice）・コードフェンス内に口調なし
 //   E. 外部参照（R8.2, R8.3）   — milkpot(lua51/lua52)＋luajit.org 絶対 URL・lua55 不採用明記
 //   F. バージョン（R9.1, R9.3, R9.4） — introduction の対象バージョンが Cargo.toml と一致・LuaJIT 2.1・将来変更注記
@@ -216,7 +216,7 @@ const LUA_MODULES = [
 // C. チュートリアル（R6.1 前提環境/手順/UTF-8 / R6.2 起動可能な最小一式に一致）
 // ============================================================
 // 段の章（ファイル名が 2 桁の数字とハイフンで始まる章）が持つ H2。この順で現れること。
-const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞書ファイルを足す', '起動して確かめる', 'もっと詳しく'];
+const GUIDE_SECTIONS = ['叶えたいこと', '辞書を書く', '確かめる', 'もっと詳しく'];
 {
   const gsDir = `${SRC}/getting-started`;
   const gsFiles = listGuideChapters(REPO_ROOT);
@@ -250,9 +250,9 @@ const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞�
       ? `段の章（2 桁の数字とハイフンで始まる .md）が ${gsDir} に 1 枚も無い`
       : `段の章が本文不足/プレースホルダ: ${thin.join(', ')}`,
   );
-  // C-order: 目次の入門の並びが、入口・準備 2 章・段の章（ファイル名の昇順）と一致する（1.2, 1.4）。
+  // C-order: 目次の入門の並びが、入口・まず会ってみる・自分のゴーストを始める・段の章（ファイル名の昇順）・付録と一致する（1.2, 1.4）。
   {
-    const want = ['index.md', 'prerequisites.md', 'setup.md', ...stageFiles];
+    const want = ['index.md', 'hello.md', 'setup.md', ...stageFiles, 'prerequisites.md'];
     const have = [...read(`${SRC}/SUMMARY.md`).matchAll(/\]\((?:\.\/)?getting-started\/([^)\s#]+\.md)(?:#[^)]*)?\)/g)]
       .map((m) => m[1]);
     const missing = want.filter((f) => !have.includes(f));
@@ -261,7 +261,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞�
     assert(
       'C-order',
       have.length === want.length && at < 0,
-      `SUMMARY.md の入門の並びが、入口・準備 2 章・段の章 ${stageFiles.length} 枚の昇順と一致する`,
+      `SUMMARY.md の入門の並びが、入口・導入 2 章・段の章 ${stageFiles.length} 枚の昇順・付録と一致する`,
       missing.length > 0 || extra.length > 0
         ? `SUMMARY.md の入門の章が章立てと違う: ${[
           ...missing.map((f) => `目次に無い章 ${f}`),
@@ -274,7 +274,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞�
   for (const f of gsFiles) {
     const rel = `${gsDir}/${f}`;
     const md = read(rel);
-    // C-sections: 段の章が H2 5 種をこの順で持つ（10.7。I-sections と同じ判定。フェンス内の行は見出しとみなさない）。
+    // C-sections: 段の章が H2 4 種をこの順で持つ（10.7。I-sections と同じ判定。フェンス内の行は見出しとみなさない）。
     if (stageFiles.includes(f)) {
       const h2s = stripCodeFences(md)
         .split(/\r?\n/)
@@ -286,7 +286,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞�
       assert(
         `C-sections:${f}`,
         missing.length === 0 && ordered,
-        `段の章 ${f} が H2 5 種をこの順で持つ`,
+        `段の章 ${f} が H2 4 種をこの順で持つ`,
         missing.length > 0
           ? `段の章 ${f} に H2 が無い: ${missing.join(', ')}`
           : `段の章 ${f} の H2 の順序が違う（期待: ${GUIDE_SECTIONS.join(' → ')}／実際: ${h2s.filter((h) => GUIDE_SECTIONS.includes(h)).join(' → ')}）`,

@@ -7,8 +7,7 @@
 
 - [入門ガイド](getting-started/index.md)
   - [まず会ってみる](getting-started/hello.md)
-  - [前提環境と準備](getting-started/prerequisites.md)
-  - [ゴーストの最小一式を置く](getting-started/setup.md)
+  - [自分のゴーストを始める](getting-started/setup.md)
   - [1 段目：しゃべらせたい](getting-started/01-boot.md)
   - [2 段目：二人で掛け合いさせたい](getting-started/02-talk.md)
   - [3 段目：表情を変えたい](getting-started/03-face.md)
@@ -23,6 +22,7 @@
   - [12 段目：もっと凝ったことをしたい](getting-started/12-lua.md)
   - [13 段目：季節の行事でしゃべらせたい](getting-started/13-calendar.md)
   - [14 段目：配布したい](getting-started/14-nar.md)
+  - [付録：フォルダの中身と文字コード](getting-started/prerequisites.md)
 
 # Pasta DSL 文法
 

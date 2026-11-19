@@ -3,6 +3,7 @@
 | やりたいこと | ファイル |
 | ------------ | -------- |
 | [まずゴーストを動かしてみる](#サンプルゴースト) | [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar) |
+| [自分のゴーストを作り始める](#スターター) | [`pasta-starter.nar`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-starter.nar) |
 | [自分のゴーストの `pasta.dll` を差し替える](#shiori-の本体) | [`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip) |
 | [pasta-recipe で書く](#pasta-recipe) | [`pasta-recipe.x64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.x64.zip)・[`pasta-recipe.arm64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.arm64.zip) |
 | [VS Code で書く](#vs-code-の拡張) | [Marketplace の拡張](https://marketplace.visualstudio.com/items?itemName=ekicyou.pasta-vscode)（VSIX は手動で入れるとき。[最新のリリース](https://github.com/ekicyou/pasta/releases/latest)の Assets にある） |
@@ -13,17 +14,24 @@
 
 ## サンプルゴースト
 
-`hello-pasta.nar` は、`pasta.dll` とシェルを含む完成版のゴースト一式である。SSP のウィンドウへドロップして入れる。自分のゴーストへ写す元にもなる。
+`hello-pasta.nar` は、`pasta.dll` とシェルを含む完成版のゴースト一式である。SSP に出ているゴーストの上へドロップして入れる。
 同梱の `pasta.dll` の版は、マニュアルの対象バージョンと同じである。
 hello-pasta は SSP のネットワーク更新に対応している（更新が届くのは、対応した版を入れた後から）。
-更新で変わったファイルは新しい版で上書きされ、hello-pasta の辞書や `pasta.toml` に手で入れた変更は消えることがあるので、自分のゴーストは hello-pasta を書き換えずに別に作る。
-詳しくは[前提環境と準備](getting-started/prerequisites.md)と[hello-pasta から写す](getting-started/setup.md#hello-pasta-から写す)を見る。
+更新で変わったファイルは新しい版で上書きされ、hello-pasta の辞書や `pasta.toml` に手で入れた変更は消えることがあるので、自分のゴーストは[スターター](#スターター)から作る。
+入れ方は[まず会ってみる](getting-started/hello.md)を見る。
+
+## スターター
+
+`pasta-starter.nar` は、自分のゴーストの出発点 `my-ghost` である。`pasta.dll`・シェル・最初の辞書 1 枚を含み、SSP に出ているゴーストの上へドロップして入れる。
+同梱の `pasta.dll` の版は、マニュアルの対象バージョンと同じである。
+ネットワーク更新はしないので、書いた辞書が元に戻ることは無い。
+入れ方は[自分のゴーストを始める](getting-started/setup.md)を見る。
 
 ## SHIORI の本体
 
 `pasta.dll.zip` は、`pasta.dll` とライセンス表示を含む。自分のゴーストの `ghost/master/` にある `pasta.dll` を、これで差し替える。
 マニュアルの対象バージョンと同じ版を使うこと。
-置き方は[hello-pasta から写す](getting-started/setup.md#hello-pasta-から写す)、対象バージョンは[このマニュアルが対象とするバージョン](introduction.md#このマニュアルが対象とするバージョン)を見る。
+置き場所は[ゴーストのフォルダ構成](getting-started/prerequisites.md#ゴーストのフォルダ構成)、対象バージョンは[このマニュアルが対象とするバージョン](introduction.md#このマニュアルが対象とするバージョン)を見る。
 
 ## pasta-recipe
 
