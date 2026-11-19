@@ -75,7 +75,7 @@
   - _Dispatch: mechanical — 設計が引数と文の形を与えた追記_
   - _Requirements: 6.1, 6.4, 6.5, 8.1_
 
-- [ ] 4. 手順書と記録
+- [x] 4. 手順書と記録
 - [x] 4.1 RELEASE.md を新しい置き場所の作り方に合わせる
   - 置き場所が「main のリポジトリのファイル＋最新 Release の nar にだけ在るファイル」で作られること、出る 2 つのきっかけ（main への push・リリース）を書く
   - リリースの直後の数分の間（nar の側が 1 つ前の Release のままでありうること）を例外として書く
@@ -86,7 +86,7 @@
   - _Dispatch: standard — 設計が項目を与え、文は書き起こす_
   - _Requirements: 4.6, 5.1, 9.1, 9.5_
 
-- [ ] 4.2 (P) release スキル・release-ci-setup.md・前の仕様の記録を合わせる
+- [x] 4.2 (P) release スキル・release-ci-setup.md・前の仕様の記録を合わせる
   - `.claude/skills/release/procedure.md` の結果表の見比べの行を「nar の側の行」に合わせる。編集が拒否されたら、入った分と残りを示して開発者の許可を求める
   - `.github/release-ci-setup.md` の置き場所の作り方の記述を合わせ、設定の変更は要らないことを書く
   - `hello-pasta-network-update` の要件の置き換わる項（1.2・1.4・4.3・4.8・5.1・9.6 など）に、この仕様で置き換わったことを書き足す
