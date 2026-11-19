@@ -45,7 +45,7 @@
   - _Requirements: 1.1, 1.5, 1.7, 1.8, 2.1, 2.2, 2.3, 2.4, 2.5, 3.3, 7.1, 7.2_
 
 - [ ] 3. CI へのつなぎ込み
-- [ ] 3.1 マニュアル公開 CI の置き場所の段を新しい組み立てに替える
+- [x] 3.1 マニュアル公開 CI の置き場所の段を新しい組み立てに替える
   - 起動の条件の hello-pasta の 2 行を、hello-pasta の配下全部の 1 行に替える（push・pull_request の両方）
   - concurrency の `pages` の組を main の run だけにし、ほかは event と ref ごとの組にする
   - 今の「nar を取る」「置き場所を作る」の 2 段を、最新 Release の tag の特定（`vX.Y.Z` の形でなければ失敗）・その tag の nar の取得とタグの浅い fetch・`pasta_check` のキャッシュの取り戻し・外れたときだけの `cargo install --locked` と直後の保存・`PATH` への追加・2.3 の台本の実行、に替える
