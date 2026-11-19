@@ -10,7 +10,7 @@
 
 ## 叶えたいこと
 
-- 叶うこと: ほかのゴーストと切り替わるとき・初めて起動したとき・閉じるときに、2 人が挨拶する。おしゃべりの中で、ベースウェアの名前を話す
+- 叶うこと: ほかのゴーストと切り替わるとき・初めて起動したとき・閉じるときに、2 人が挨拶する。おしゃべりの中で、ベースウェアの名前を話す。ネットワーク更新の始まりと結果を知らせる
 - この章で足すファイル: `ghost/master/dic/07-greeting.pasta`
 
 ## 辞書を書く
@@ -71,6 +71,26 @@
 ＊会話
 　女の子：＠キラキラ　このお店、＄％baseware.name　の上にあるんだって。
 　男の子：＠困惑　……家賃、払ってたっけ。
+
+＃ ネットワーク更新のときも、イベントが来る。始まりは OnUpdateBegin、終わりは OnUpdateComplete、失敗は OnUpdateFailure。
+＃ OnUpdateComplete の ＄ｒ０ には、更新したら changed、新しいものが無かったら none が入る。
+＃ シーン名の後ろに ＆＄ｒ０＝「changed」 と条件を書くと、＄ｒ０ が changed のときだけ、そのシーンが選ばれる。
+＃ 更新したときの OnUpdateComplete は、読み込み直した後の新しい辞書が受け取る。
+＊OnUpdateBegin
+　女の子：＠キラキラ　本店から新しいのが届いてないか、見てくるね。
+　男の子：＠困惑　……つまみ食いは、検品って言わないからね。
+
+＊OnUpdateComplete　＆＄ｒ０＝「changed」
+　女の子：＠笑顔　新装開店です！　いらっしゃいませ！
+　男の子：＠困惑　……ぼく、さっきまでのぼくと同じだよね？
+
+＊OnUpdateComplete　＆＄ｒ０＝「none」
+　女の子：＠通常　新しいのは、なし！　届いてたのは、家賃の請求書だけでした。
+　男の子：＠笑顔　それは、見なかったことにしよう。
+
+＊OnUpdateFailure
+　女の子：＠困惑　あれ？　本店に電話が、つながらない……
+　男の子：＠通常　落ち着いて。それ、電卓だよ。
 ```
 
 | 行 | 意味 |
@@ -79,13 +99,14 @@
 | `＄ｒ０` | イベントの付加情報 `Reference0` が入る変数。`＄ｒ９` まであり、`ｒ` と数字は全角で書く |
 | `　＞ゴースト終了（３００）` | ゴーストを閉じる行。`＊OnClose` で話したら、最後に書く。`（３００）` は閉じるまでに待つミリ秒 |
 | `＄％baseware.name` | ベースウェアのプロパティを読む変数。いま動いているベースウェアの名前が入る |
+| `＊OnUpdateComplete　＆＄ｒ０＝「changed」` | 条件の付いたシーン。`＄ｒ０` が `changed` のときだけ選ばれる |
 
 - 1 段目の `＊OnBoot` も、イベントと同じ名前のシーンである。
 - どんなイベントがあるかは、[UKADOC の SHIORI Event 一覧](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html) で調べる。pasta のマニュアルの [主要イベント](../lua/shiori-events.md#主要イベント) に無い `OnGhostChanging` にも、同じ名前のシーンを書けば応えられる。
 - 本体側の名前は、そのゴーストの `descript.txt` の `sakura.name` である。emo2 なら `むらさき` になる。
 - `＄ｒ０` と `＄％baseware.name` の後ろには空白を置いて、続く台詞と区切る。
 - `＠終了挨拶` は、5 段目で決めた単語である。
-- `Reference0` に何が入るかは、イベントごとに違う。この章の 4 つのイベントは、次の表のとおりである。
+- `Reference0` に何が入るかは、イベントごとに違う。この章の 7 つのイベントは、次の表のとおりである。
 
 | イベント | いつ来るか（UKADOC より） | この段で使う Reference（UKADOC より） |
 | -------- | ------------------------- | ------------------------------------- |
@@ -93,6 +114,9 @@
 | [`OnGhostChanging`](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnGhostChanging) | 「他のゴーストへの切り替え指示があった際に発生。」 | `Reference0` —「切り替わるゴーストの本体側の名前。」 |
 | [`OnFirstBoot`](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnFirstBoot) | 「初回起動した際に発生。」 | —（この段の辞書は使わない） |
 | [`OnClose`](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnClose) | 「終了が指示された際に発生。」 | —（この段の辞書は使わない） |
+| [`OnUpdateBegin`](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnUpdateBegin) | 「ネットワーク更新開始が指示された際に発生。」 | —（この段の辞書は使わない） |
+| [`OnUpdateComplete`](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnUpdateComplete) | 「ネットワーク更新が成功し完了した際に発生。」 | `Reference0` — 成功理由。更新したら `changed`、新しいものが無かったら `none` |
+| [`OnUpdateFailure`](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnUpdateFailure) | 「ネットワーク更新に失敗した際に発生。」 | —（この段の辞書は使わない） |
 
 > 【アンソニー】お嬢様、付加情報を取り出す呪文のようなものは、要らないのでございますか。
 
@@ -162,12 +186,40 @@
 - 開発用パレットを開けないときは、[6 段目の「開発者用機能を有効にする」](06-hour.md#開発者用機能を有効にする) の手順を済ませる。
 - `\![raise,…]` の説明は [UKADOC のさくらスクリプト一覧](https://ssp.shillest.net/ukadoc/manual/list_sakura_script.html) に、開発用パレットの操作の正本は SSP ヘルプの [開発用パレット](https://ssp.shillest.net/ukadoc/ssphelp/dev-palette.html) にある。
 
+### 更新のイベントを起こす
+
+> 【したり顔】仕上げは、ネットワーク更新の知らせですわ。本物の更新が来るまで待つなんて、気の長いことはいたしませんの。こちらも呼びつけてしまいますわよ。
+
+1. 開発用パレットの「スクリプト入力」を押し、下の 1 行目を入力して、Enter キーを押す。
+2. 2〜4 行目も、同じように 1 行ずつ入力する。
+
+```text
+\![raise,OnUpdateBegin]
+\![raise,OnUpdateComplete,none]
+\![raise,OnUpdateComplete,changed]
+\![raise,OnUpdateFailure]
+```
+
+- 成功の目印（1 行目）: 女の子「本店から新しいのが届いてないか、見てくるね。」、男の子「……つまみ食いは、検品って言わないからね。」
+- 成功の目印（2 行目）: 女の子「新しいのは、なし！　届いてたのは、家賃の請求書だけでした。」、男の子「それは、見なかったことにしよう。」
+- 成功の目印（3 行目）: 女の子「新装開店です！　いらっしゃいませ！」、男の子「……ぼく、さっきまでのぼくと同じだよね？」
+- 成功の目印（4 行目）: 女の子「あれ？　本店に電話が、つながらない……」、男の子「落ち着いて。それ、電卓だよ。」
+- `＊OnUpdateComplete` は 2 つあるが、`＆` の条件で、`Reference0` に合う 1 つだけが選ばれる。どちらにも合わない値を入れると、何も話さない。
+- 本物のネットワーク更新では、`OnUpdateBegin` の後に `OnUpdateComplete` が来る。新しいものがあれば、ファイルを入れ替えて読み込み直した後に来るので、`changed` の台詞を話すのは新しい辞書である。
+- 本物の更新は、`descript.txt` に更新の置き場所（`homeurl`）を書いたゴーストで起きる。スターターには書いていない。
+- イベントの順序の正本は、UKADOC の [ネットワーク更新イベントの発生順序](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#caption_updateorder) にある。
+
+> 【アンソニー】お嬢様、家賃の請求書は、本当に届いていたのでございましょうか。
+
+> 【不機嫌】フンッ、台詞ですわ、台詞。……念のため、あとで郵便受けを見ておきなさい。
+
 ## もっと詳しく
 
 - [SHIORI イベントとハンドラ（イベントの一覧と、応答の仕組み）](../lua/shiori-events.md)
 - [シーン関数フォールバック（イベントと同じ名前のシーンを探す仕組み）](../lua/shiori-events.md#シーン関数フォールバック)
 - [リクエスト変数（Reference）（`＄ｒ０`〜`＄ｒ９`）](../grammar/variables.md#リクエスト変数reference)
 - [プロパティ変数（`＄％baseware.name`）](../grammar/variables.md#プロパティ変数)
+- [条件で候補を絞る（`＆＄ｒ０＝「changed」`）](../grammar/block-structure.md#条件で候補を絞る)
 - [UKADOC の OnGhostChanging](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnGhostChanging)
 
 ---
