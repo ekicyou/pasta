@@ -6,6 +6,7 @@
 # 入門 / チュートリアル
 
 - [入門ガイド](getting-started/index.md)
+  - [まず会ってみる](getting-started/hello.md)
   - [前提環境と準備](getting-started/prerequisites.md)
   - [ゴーストの最小一式を置く](getting-started/setup.md)
   - [1 段目：しゃべらせたい](getting-started/01-boot.md)
@@ -85,4 +86,5 @@
 
 # 雑記
 
-- [cc-sdd で回す pasta の開発ワークフロー](notes/cc-sdd.md)
+- [雑記](notes/index.md)
+  - [cc-sdd で回す pasta の開発ワークフロー](notes/cc-sdd.md)

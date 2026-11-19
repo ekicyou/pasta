@@ -20,7 +20,7 @@
 - [編集ツールとデバッグ <small>Tools &amp; Debugging</small>](debug/index.md)
 - [リファレンス <small>Reference</small>](reference/startup.md)
 - [内部設計 <small>Internals</small>](internals/index.md)
-- [雑記 <small>Notes</small>](notes/cc-sdd.md)
+- [雑記 <small>Notes</small>](notes/index.md)
 
 </nav>
 
