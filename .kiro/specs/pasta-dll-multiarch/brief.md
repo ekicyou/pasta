@@ -138,3 +138,7 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 
 - **ダウンロードのページ**: マニュアルに `book/src/download.md` ができた。「やりたいこと → 取るファイル」の表（6 行）と配布物ごとの節（サンプルゴースト・SHIORI の本体・VS Code を使わずに書くアプリ・VS Code の拡張・検査の CLI・AI 向けのスキル・過去の版）で、表の右の列は最新版の固定リンク（`https://github.com/ekicyou/pasta/releases/latest/download/<名前>`）である。`pasta.dll.zip` を arch ごとに分ける・名前を変えるなら、表の行と「SHIORI の本体」の節を同じ変更で直す。ほかの章・README の入手の案内は、このページの節へのリンクに寄せてある（`getting-started/prerequisites.md`・`getting-started/setup.md` が `#shiori-の本体`・`#サンプルゴースト` を指す）。見出しを変えるとアンカーが変わるので、指している章も同じコミットで直す。
 - **固定リンクの名前の検査**: `book/tools/link-check.mjs` の `checkReleaseAssetLinks` が、マニュアルの本文と読者に届く文書（クレートの README・ルートの README・`doc/SOUL.md`・配る 3 スキル）の固定リンクの名前を、`release.yml` の 1 行 1 つの `release/<名前>` の行（`${{` を含む行は除く）と照らす。添付の名前を変えて固定リンクを直し忘れると、マニュアルの CI が `release-asset` で止まる。`manual.yml` の起動条件に `release.yml` が入ったので、`release.yml` だけの変更でも走る。添付の行の形（1 行 1 つの `release/<名前>`）を崩すときは、この読み取りも合わせる（`shortcut:` のコメントがある）。参照先: `.kiro/specs/completed/manual-download-page/design.md` の ReleaseAssetLinkCheck。
+
+## 申し送り（2026-11-19 manual-reader-first から）
+
+入門用のスターター `pasta-starter.nar` を配布物に足した。GitHub Release の添付は 9 つ（配布物 8 つ＋詳しいリリースノート）になった。この brief の「添付の数」と、添付の数を書いた所は、ここから数え直す（`release.yml`・`github-release.ps1`・`release` スキルの `release-state.ps1` と `procedure.md` は 9 つに直してある）。スターターは hello-pasta の nar と同じ `pasta.dll` を同梱するので、arch 別の DLL を足すときは `crates/pasta_sample_ghost/release.ps1` のスターターの組み立てと `release.yml` のスターターの検査（中身の完全一致）も合わせる。

@@ -13,10 +13,10 @@ use pasta_lua::loader::PastaLoader;
 use tempfile::TempDir;
 
 // 各シーンに固有の台詞の一部（08-touch.pasta・09-choice.pasta）。読点の後ろにはウェイトが入るので、読点をまたがない
-const POKE_GIRL_HEAD: &str = "頭をつつかれると";
-const POKE_BOY_OTHER: &str = "つついた？";
+const POKE_GIRL_HEAD: &str = "呼び鈴じゃないよ";
+const POKE_BOY_OTHER: &str = "食材じゃないよ";
 const POKE_FACE: &str = "ほっぺたは";
-const POKE_OTHER: &str = "なにか用事？";
+const POKE_OTHER: &str = "おかわり？";
 const POKE_CHOICE: &str = "\\q[";
 const TOUCH_GIRL_HEAD: &str = "なでなでされちゃった";
 const TOUCH_OTHER: &str = "くすぐったいってば";

@@ -1,5 +1,5 @@
 ﻿# release.ps1 - hello-pasta Build, Setup & Release Script
-# Builds ghost distribution and creates .nar, pasta.dll.zip, pasta_check.zip and pasta-skills.zip release packages
+# Builds ghost distribution and creates hello-pasta.nar, pasta-starter.nar, pasta.dll.zip, pasta_check.zip and pasta-skills.zip release packages
 # (also run by the release CI: .github/workflows/release.yml)
 #
 # Usage (PowerShell 7):
@@ -24,6 +24,10 @@ $WorkspaceRoot = Resolve-Path (Join-Path $ScriptDir "..\..") | Select-Object -Ex
 $GhostDir = Join-Path $ScriptDir "ghosts\hello-pasta"
 $ReleaseDir = Join-Path $WorkspaceRoot "release\hello-pasta"
 $NarFilePath = Join-Path $WorkspaceRoot "release\hello-pasta.nar"
+$StarterSrcDir = Join-Path $ScriptDir "starter"
+$StarterStageDir = Join-Path $WorkspaceRoot "release\pasta-starter-src"
+$StarterReleaseDir = Join-Path $WorkspaceRoot "release\pasta-starter"
+$StarterNarPath = Join-Path $WorkspaceRoot "release\pasta-starter.nar"
 $DllZipPath = Join-Path $WorkspaceRoot "release\pasta.dll.zip"
 $CheckZipPath = Join-Path $WorkspaceRoot "release\pasta_check.zip"
 $SkillsZipPath = Join-Path $WorkspaceRoot "release\pasta-skills.zip"
@@ -37,6 +41,7 @@ Write-Host "Workspace:   $WorkspaceRoot"
 Write-Host "Ghost Dir:   $GhostDir"
 Write-Host "Release Dir: $ReleaseDir"
 Write-Host "NAR File:    $NarFilePath"
+Write-Host "Starter NAR: $StarterNarPath"
 Write-Host "DLL Zip:     $DllZipPath"
 Write-Host "Check Zip:   $CheckZipPath"
 Write-Host "Skills Zip:  $SkillsZipPath"
@@ -244,6 +249,66 @@ finally {
     Pop-Location
 }
 Write-Host "  Release package created" -ForegroundColor Green
+
+# --- Step 4 (cont.): pasta-starter.nar (tutorial starter "my-ghost") ---
+# Starter-only files live in starter/; the boot dictionary, shell, DLL and licences are taken from hello-pasta
+# so there is a single source. The staged tree goes through the same pasta_check release (validation gate + nar).
+Write-Host "  Building pasta-starter.nar..."
+$HelloMaster = Join-Path $GhostDir "ghost\master"
+if (Test-Path $StarterStageDir) {
+    Remove-Item -Path $StarterStageDir -Recurse -Force
+}
+Copy-Item -Path $StarterSrcDir -Destination $StarterStageDir -Recurse
+$StarterMaster = Join-Path $StarterStageDir "ghost\master"
+New-Item -ItemType Directory -Path (Join-Path $StarterMaster "dic") -Force | Out-Null
+Copy-Item -Path (Join-Path $HelloMaster "dic\01-boot.pasta") -Destination (Join-Path $StarterMaster "dic")
+Copy-Item -Path (Join-Path $HelloMaster "pasta.dll"), (Join-Path $HelloMaster "THIRD_PARTY_LICENSES.txt") -Destination $StarterMaster
+Copy-Item -Path (Join-Path $GhostDir "shell") -Destination $StarterStageDir -Recurse
+
+Push-Location $WorkspaceRoot
+try {
+    & $PastaCheckExe release --target $StarterStageDir --release $StarterReleaseDir --nar $StarterNarPath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "ERROR: pasta_check release failed for pasta-starter" -ForegroundColor Red
+        exit 1
+    }
+}
+finally {
+    Pop-Location
+}
+
+# The starter never network-updates (no homeurl), so drop the updates.txt that pasta_check release always writes
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [System.IO.Compression.ZipFile]::Open($StarterNarPath, 'Update')
+try {
+    foreach ($name in 'updates.txt', 'ghost/master/updates.txt') {
+        $entry = $zip.GetEntry($name)
+        if ($null -ne $entry) { $entry.Delete() }
+    }
+}
+finally {
+    $zip.Dispose()
+}
+
+# The nar must hold exactly the staged files (no updates.txt, nothing else)
+$zip = [System.IO.Compression.ZipFile]::OpenRead($StarterNarPath)
+try {
+    $zipEntries = @($zip.Entries | ForEach-Object { $_.FullName } | Sort-Object)
+}
+finally {
+    $zip.Dispose()
+}
+$expectedEntries = @(Get-ChildItem -Path $StarterStageDir -Recurse -File | ForEach-Object { $_.FullName.Substring($StarterStageDir.Length + 1).Replace('\', '/') } | Sort-Object)
+if (($zipEntries -join "|") -cne ($expectedEntries -join "|")) {
+    Write-Host ""
+    Write-Host "ERROR: pasta-starter.nar content mismatch" -ForegroundColor Red
+    Write-Host "  Expected: $($expectedEntries -join ', ')"
+    Write-Host "  Actual:   $($zipEntries -join ', ')"
+    Remove-Item -Path $StarterNarPath -Force
+    exit 1
+}
+Write-Host "  Created pasta-starter.nar ($($zipEntries.Count) files)" -ForegroundColor Green
 Write-Host ""
 
 # --- Step 5: Create pasta.dll.zip (pasta.dll + THIRD_PARTY_LICENSES.txt) ---
@@ -392,6 +457,7 @@ Write-Host "  Release Packages Ready!"
 Write-Host "========================================"
 Write-Host ""
 Write-Host "  NAR:        $NarFilePath ($narSizeMB MB)"
+Write-Host "  Starter:    $StarterNarPath"
 Write-Host "  DLL Zip:    $DllZipPath"
 Write-Host "  Check Zip:  $CheckZipPath"
 Write-Host "  Skills Zip: $SkillsZipPath"

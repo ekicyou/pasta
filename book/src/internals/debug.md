@@ -66,7 +66,7 @@
 
 有効化の判定は `resolve_enabled(config.debug())` の 1 回だけで、ローダが段階 5.5 で呼ぶ。読む環境変数は `PASTA_DEBUG` だけである。値は `parse_env_bool` で読み、`1`・`true`・`yes`・`on` を真、`0`・`false`・`no`・`off`・空を偽とし（大小と前後の空白は問わない）、ほかの値は設定されていないのと同じに扱う。環境変数が読めれば `[debug] enabled` より優先し、どちらも無ければ偽である。
 
-- `DebugFileConfig` の欄は `enabled` だけで、`deny_unknown_fields` を付けない。`[debug]` に残った古いキー（`port`・`present_as`・`source_map_sidecar`）は、`pasta.toml` のほかの節の知らないキーと同じく黙って読み飛ばされる。
+- `DebugFileConfig` の欄は `enabled` だけで、`deny_unknown_fields` を付けない。`[debug]` の知らないキーは、`pasta.toml` のほかの節と同じく黙って読み飛ばす。
 - SHIORI の読み込み（リロードを含む）のたびに、ローダが `pasta.toml` を読み直して判定する。
 - 判定が真のときだけ、ローダはシーンマップを作り、`Some(Arc<SourceMap>)` をランタイムに渡す。ランタイムの `source_map: Option<Arc<SourceMap>>` の有無が「デバッグが有効か」の唯一の値であり、別の真偽値は持たない。`PastaLuaRuntime::debug_enabled()` は `source_map.is_some()` を返し、`@pasta_debug.enabled()` も同じ値を返す。
 - ローダを通らない VM（`PastaLuaRuntime::new`・`with_config`）は、いつも無効である。
@@ -157,7 +157,7 @@ build_source_map
 
 #### シーン identity 索引
 
-`.pasta` の（ファイル, 行）を、実行時のシーンの登録名（`(scene_id, parent)`）に引くには、全ファイルを読み込んだ後でないと決まらない通し番号が要る。グローバルシーンの登録名は、照合用の名前・`_`・通し番号からなり（`メイン_1`。[シーンテーブル](internal-modules.md#シーンテーブル)）、通し番号はシーンモジュールの読み込み時に `create_scene` が全ファイルを通して振る。そこで、変換のときに再現できる照合の鍵を記録し、辞書確定の後に突き合わせる。
+`.pasta` の（ファイル, 行）を、実行時のシーンの登録名（`(scene_id, parent)`）に引くには、全ファイルを読み込んだ後でないと決まらない通し番号が要る。通し番号（`メイン_1` の `1`。[登録名の構成](registry-search.md#登録名の構成)）は、シーンモジュールの読み込み時に `create_scene` が全ファイルを通して振る。そこで、変換のときに再現できる照合の鍵を記録し、辞書確定の後に突き合わせる。
 
 - 生成器は `record_scene` で、グローバルシーンを `G:{サニタイズした名前}#{出現順}`、名前付きローカルシーンを `L:{親のサニタイズした名前}#{親の出現順}:{関数名}` として記録する（関数名は `挨拶_1` の形の登録名か `__start__`）。出現順は、その `.pasta` の中でのサニタイズした名前ごとの順（ファイルごとに 1 から）であり、実行時の通し番号とは一致しない。
 - 鍵の名前は宣言名（pasta.toml の別名表で置き換えた後の名前。[登録と生成](transpiler.md#登録と生成単一走査)）をサニタイズしたものである。既定の別名表のもとで `＊会話` は `G:OnTalk#{出現順}` と記録され、同じファイルの `＊OnTalk` と出現順を共有する。実行時の登録名も宣言名から作るため、突き合わせは別名を意識せずに成り立つ。
@@ -202,18 +202,9 @@ dump_variables(save)
 
 止まるエラーの場所は、デバッグの有無によらず、`@pasta_chunks` の値と、`act` が控えた行の対応（`"<.pasta のファイル>|<lua の行>:<pasta の行>,…"`。生成コードにいつも埋まる）だけで決める。シーンマップは使わず、`pasta.shiori.stop` は `@pasta_debug` を読まない。
 
-`@pasta_chunks` のキーはエラー文の形のチャンク名で、値は searcher が `LoaderContext::pasta_sources` を引いて決める。
+`@pasta_chunks` のキーはエラー文の形のチャンク名で、値は searcher が書く。値は、作者の `.lua` と `dic/` の `.lua` の写しなら文字列（`scripts\天気.lua`）、`.pasta` から変換したキャッシュなら表（`{ pasta = "dic\\天気.pasta" }`）、見分けられないキーなら `false` である（値の表は [require の解決（searcher）](loader.md#require-の解決searcher)）。
 
-| 値 | 意味 |
-| -- | ---- |
-| 文字列（`scripts\天気.lua`） | ゴーストのフォルダーの中の作者の `.lua`。ゴーストのフォルダーから見たパス |
-| 文字列（`dic\道具.lua`） | `dic/` の `.lua` をキャッシュに写したもの。元の `.lua` のパス |
-| 表 `{ pasta = "dic\\天気.pasta" }` | その `.pasta` から変換したキャッシュ |
-| `false` | 2 つのファイルが同じキーになった（見分けられない） |
-| （無い） | 標準ランタイム・ゴーストの外・`pasta_sources` に無いキャッシュ |
-
-- ローダは段階 4 の後に `pasta_sources` を詰める（`.pasta` は `DicSource::Pasta`、`dic/` の `.lua` は `DicSource::Lua`。値は `CacheManager::get_relative_path` の形）。`.pasta` と `.lua` は値の型で見分け、拡張子では見分けない。値のパスの区切りは `\` にそろえる。
-- `dic/` の `.lua` の写しは元とバイトで同じなので、エラー文の行がそのまま元の `.lua` の行になる。
+- ローダは段階 4 の後に、searcher が引く `pasta_sources` を詰める（`.pasta` は `DicSource::Pasta`、`dic/` の `.lua` は `DicSource::Lua`。値は `CacheManager::get_relative_path` の形で、区切りは `\` にそろえる）。
 
 ```text
 STOP.location(chunk, line, chunks, line_map)

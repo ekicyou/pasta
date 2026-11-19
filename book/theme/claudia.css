@@ -16,7 +16,7 @@
  *
  * ------------------------------------------------------------
  * 台詞部品のクラス（design「データモデル / 出力 HTML 契約」。talk-html.mjs がビルド後に出力する）
- *   .talk.talk-{claudia|anthony}.talk-{left|right} > img.talk-face ＋ .talk-bubble > span.talk-name ＋ 本文
+ *   .talk.talk-{claudia|anthony|murasaki|emo}.talk-{left|right} > img.talk-face ＋ .talk-bubble > span.talk-name ＋ 本文
  *
  * 扉とクレジットのクラス契約（タスク 2.4 で決め、タスク 5.1 の book/src/introduction.md が使う）
  *   claudia-hero       扉の紙の枠。<section class="claudia-hero" aria-label="扉"> で開き </section> で閉じる
@@ -86,6 +86,22 @@
     --talk-anthony-face: var(--quote-bg);
     --talk-anthony-ring: var(--links);
     --talk-anthony-name: var(--fg);
+    --talk-murasaki-ink: var(--fg);
+    --talk-murasaki-face: var(--quote-bg);
+    --talk-murasaki-ring: var(--quote-border);
+    --talk-murasaki-name: var(--fg);
+    --talk-emo-ink: var(--fg);
+    --talk-emo-face: var(--quote-bg);
+    --talk-emo-ring: var(--links);
+    --talk-emo-name: var(--fg);
+    --talk-girl-ink: var(--fg);
+    --talk-girl-face: var(--quote-bg);
+    --talk-girl-ring: var(--quote-border);
+    --talk-girl-name: var(--fg);
+    --talk-boy-ink: var(--fg);
+    --talk-boy-face: var(--quote-bg);
+    --talk-boy-ring: var(--links);
+    --talk-boy-name: var(--fg);
 
     /* 影の 2 段（1: コードの枠などの部品、2: 浮かぶもの）。rust・coal・ayu では無彩色の淡い影 */
     --claudia-shadow-1: 0 1px 0 rgba(0, 0, 0, 0.06), 0 3px 10px rgba(0, 0, 0, 0.08);
@@ -176,6 +192,22 @@
     --talk-anthony-face: #EEF2FA;
     --talk-anthony-ring: #8FA3C8;
     --talk-anthony-name: #4A6290;
+    --talk-murasaki-ink: #53287A;
+    --talk-murasaki-face: #F1E7FA;
+    --talk-murasaki-ring: #A98BD0;
+    --talk-murasaki-name: #6B3F9C;
+    --talk-emo-ink: #1F5A5A;
+    --talk-emo-face: #E4F3F1;
+    --talk-emo-ring: #7FB8B4;
+    --talk-emo-name: #2C6B6B;
+    --talk-girl-ink: #7A2A22;
+    --talk-girl-face: #FBE9E4;
+    --talk-girl-ring: #D98A7C;
+    --talk-girl-name: #9C3A2E;
+    --talk-boy-ink: #24477A;
+    --talk-boy-face: #E6EEF9;
+    --talk-boy-ring: #86A6D4;
+    --talk-boy-name: #2F5A9C;
 
     /* 影の 2 段（墨 #3A2419 の淡い影） */
     --claudia-shadow-1: 0 1px 0 rgba(58, 36, 25, 0.06), 0 3px 10px rgba(58, 36, 25, 0.08);
@@ -275,6 +307,22 @@
     --talk-anthony-face: #242F4A;
     --talk-anthony-ring: #6F86B8;
     --talk-anthony-name: #8FA6D8;
+    --talk-murasaki-ink: #D7BDF6;
+    --talk-murasaki-face: #33294A;
+    --talk-murasaki-ring: #8E72C2;
+    --talk-murasaki-name: #BBA0E8;
+    --talk-emo-ink: #A9E4DC;
+    --talk-emo-face: #1F3839;
+    --talk-emo-ring: #5FA39B;
+    --talk-emo-name: #88CFC6;
+    --talk-girl-ink: #F3C2B8;
+    --talk-girl-face: #452A27;
+    --talk-girl-ring: #C27E72;
+    --talk-girl-name: #E8A79B;
+    --talk-boy-ink: #BCD3F5;
+    --talk-boy-face: #26324A;
+    --talk-boy-ring: #6F90C4;
+    --talk-boy-name: #9DB9E8;
 
     /* 影の 2 段（暗い地では墨の代わりに夜の底の色 #080A12 を濃いめに使う。明るい影は光って見えるため） */
     --claudia-shadow-1: 0 1px 0 rgba(8, 10, 18, 0.25), 0 3px 10px rgba(8, 10, 18, 0.30);
@@ -513,6 +561,30 @@ mark {
     --talk-speaker-ring: var(--talk-anthony-ring);
     --talk-speaker-name: var(--talk-anthony-name);
 }
+.talk-murasaki {
+    --talk-speaker-ink: var(--talk-murasaki-ink);
+    --talk-speaker-face: var(--talk-murasaki-face);
+    --talk-speaker-ring: var(--talk-murasaki-ring);
+    --talk-speaker-name: var(--talk-murasaki-name);
+}
+.talk-emo {
+    --talk-speaker-ink: var(--talk-emo-ink);
+    --talk-speaker-face: var(--talk-emo-face);
+    --talk-speaker-ring: var(--talk-emo-ring);
+    --talk-speaker-name: var(--talk-emo-name);
+}
+.talk-girl {
+    --talk-speaker-ink: var(--talk-girl-ink);
+    --talk-speaker-face: var(--talk-girl-face);
+    --talk-speaker-ring: var(--talk-girl-ring);
+    --talk-speaker-name: var(--talk-girl-name);
+}
+.talk-boy {
+    --talk-speaker-ink: var(--talk-boy-ink);
+    --talk-speaker-face: var(--talk-boy-face);
+    --talk-speaker-ring: var(--talk-boy-ring);
+    --talk-speaker-name: var(--talk-boy-name);
+}
 .talk-left {
     margin-inline-end: auto;
 }
@@ -647,6 +719,14 @@ mark {
 .hero-faces .hero-face-anthony {
     border-color: var(--talk-anthony-ring);
     background-color: var(--talk-anthony-face);
+}
+.hero-faces .hero-face-murasaki {
+    border-color: var(--talk-murasaki-ring);
+    background-color: var(--talk-murasaki-face);
+}
+.hero-faces .hero-face-emo {
+    border-color: var(--talk-emo-ring);
+    background-color: var(--talk-emo-face);
 }
 /* パート案内: Markdown のリストをカードの格子にする。幅が足りなければ自動で列が減る */
 .hero-toc ul {
@@ -888,6 +968,22 @@ mark {
         --talk-anthony-face: #EEF2FA;
         --talk-anthony-ring: #8FA3C8;
         --talk-anthony-name: #4A6290;
+        --talk-murasaki-ink: #53287A;
+        --talk-murasaki-face: #F1E7FA;
+        --talk-murasaki-ring: #A98BD0;
+        --talk-murasaki-name: #6B3F9C;
+        --talk-emo-ink: #1F5A5A;
+        --talk-emo-face: #E4F3F1;
+        --talk-emo-ring: #7FB8B4;
+        --talk-emo-name: #2C6B6B;
+        --talk-girl-ink: #7A2A22;
+        --talk-girl-face: #FBE9E4;
+        --talk-girl-ring: #D98A7C;
+        --talk-girl-name: #9C3A2E;
+        --talk-boy-ink: #24477A;
+        --talk-boy-face: #E6EEF9;
+        --talk-boy-ring: #86A6D4;
+        --talk-boy-name: #2F5A9C;
 
         /* 影の 2 段（墨 #3A2419 の淡い影） */
         --claudia-shadow-1: 0 1px 0 rgba(58, 36, 25, 0.06), 0 3px 10px rgba(58, 36, 25, 0.08);

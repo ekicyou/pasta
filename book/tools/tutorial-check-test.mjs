@@ -133,7 +133,7 @@ log('\n== (A) 実リポジトリ現状: 全 dic が同じ名前の章と逐語�
   check('実リポジトリ: calendar.csv の全体と一致する csv ブロックがある',
     result.results.some((r) => r.file === CALENDAR_REL && r.matched),
     JSON.stringify(result.results.find((r) => r.file === CALENDAR_REL)));
-  check('実リポジトリ: csv ブロックを見た（全体と抜き出し）', result.csvBlocks >= 2,
+  check('実リポジトリ: csv ブロックを見た（全体）', result.csvBlocks >= 1,
     `csvBlocks=${result.csvBlocks}`);
   check('実リポジトリ: 全 dic が verbatim-match',
     result.results.every((r) => r.matched && r.reason === 'verbatim-match'),

@@ -286,8 +286,13 @@ fn config_reference_doc_matches_ssot() {
     let d = GhostConfig::default();
 
     // キー名を含む表行（例: `talk_interval_min` | ... | `180`）はすべて SSOT 値を記載していること。
-    // テンプレートの既定値行（例: talk_interval_min = 180   # 既定 180）も SSOT 値と一致すること。
-    // 同じキーを複数箇所に書く章で、一部だけ古くなった場合も検出する。
+    // テンプレート（「## すべてのキー」の節。値はどれも既定値）の行（例: talk_interval_min = 180   # …）も
+    // SSOT 値と一致すること。同じキーを複数箇所に書く章で、一部だけ古くなった場合も検出する。
+    let template = doc
+        .split("\n## すべてのキー")
+        .nth(1)
+        .and_then(|s| s.split("\n## ").next())
+        .expect("config reference doc に「## すべてのキー」の節が無い (R5.4/R5.5)");
     let expect_row = |key: &str, value: String| {
         let cell = format!("`{key}`");
         let want = format!("`{value}`");
@@ -305,10 +310,18 @@ fn config_reference_doc_matches_ssot() {
                 "config reference doc の `{key}` 行に SSOT 値 `{value}` が見つからない (R5.4/R5.5): {row}"
             );
         }
-        for line in doc.lines().filter(|l| {
-            let t = l.trim_start();
-            t.starts_with(key) && t[key.len()..].trim_start().starts_with('=') && l.contains("既定")
-        }) {
+        let lines: Vec<&str> = template
+            .lines()
+            .filter(|l| {
+                let t = l.trim_start();
+                t.starts_with(key) && t[key.len()..].trim_start().starts_with('=')
+            })
+            .collect();
+        assert!(
+            !lines.is_empty(),
+            "config reference doc のテンプレートに `{key}` の行が見つからない (R5.4/R5.5)"
+        );
+        for line in lines {
             let v = line
                 .split('=')
                 .nth(1)

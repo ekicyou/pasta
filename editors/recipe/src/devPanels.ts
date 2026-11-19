@@ -1,5 +1,5 @@
 // 動かす面の 2 つの欄（出力 4.2〜4.6／保存変数の表 6.2・6.3・6.6・6.7・7.11）。panels.ts の `.panel` を満たすだけで、押したことは DevActions へ渡す。
-// 台本・ログ・名前・値はディスクやゴーストから来るので textContent だけで書く（4.5）。
+// スクリプト・ログ・名前・値はディスクやゴーストから来るので textContent だけで書く（4.5）。
 import type { VarRow } from "./ipc.ts";
 import type { PanelSection } from "./panels.ts";
 

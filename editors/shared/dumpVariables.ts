@@ -26,7 +26,7 @@ export async function dumpVariables(ctx: FlowContext): Promise<DumpOutcome> {
     return { kind: 'failed', result: reply.result };
   }
 
-  // 台本・台本なし・応答が無い のどれでも、上限まで更新時刻を見る（6.2・6.3）
+  // スクリプト・スクリプトなし・応答が無い のどれでも、上限まで更新時刻を見る（6.2・6.3）
   const maxSleeps = Math.ceil(timing.dumpWaitMs / timing.pollIntervalMs);
   let writtenButUnreadable = false;
   for (let slept = 0; ; slept++) {
@@ -77,7 +77,7 @@ export type SaveVariableType = 'string' | 'number' | 'boolean';
 export type SaveVariableChange = { type: SaveVariableType; value: string } | { type: 'delete' };
 
 export type SetOutcome =
-  | { kind: 'set' }                                   // 204（OnPastaSetSaveVariable は成功で台本を返さない）
+  | { kind: 'set' }                                   // 204（OnPastaSetSaveVariable は成功でスクリプトを返さない）
   | { kind: 'refusedByGhost'; script: string }        // 失敗の表記（【数にできない値：…】 など。7.7）
   | { kind: 'noResponse'; detail: string }            // 送り直さない
   | { kind: 'failed'; result: CallResult };           // 届かない・形が違う（7.8）

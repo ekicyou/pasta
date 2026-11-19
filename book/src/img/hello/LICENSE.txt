@@ -1,0 +1,14 @@
+顔アイコンの出典とライセンス
+============================
+
+このフォルダの顔アイコン 18 枚は、サンプルゴースト hello-pasta のシェルの立ち絵
+（crates/pasta_sample_ghost/ghosts/hello-pasta/shell/master/ の surface0.png〜surface8.png・
+surface10.png〜surface18.png）から、顔の所を切り抜いて 96×96 に縮め、256 色に減色したものです。
+マニュアルの「シェルを自分の絵にする」の表情の一覧と、hello-pasta の紹介ページの案内役
+（女の子・男の子）の顔に使います。
+
+- g0.png〜g8.png: 女の子（笑顔・通常・照れ・驚き・泣き・困惑・キラキラ・眠い・怒り）
+- b10.png〜b18.png: 男の子（同じ並び）
+
+元の立ち絵は Unlicense で公開されています（出典・作り方・原文は
+crates/pasta_sample_ghost/art/README.md）。この切り抜きも同じく Unlicense です。

@@ -70,7 +70,7 @@ RoutingWriter ── 決まった → PastaLogger::write → RollingFileAppender
 
 どちらの OS の実装を使うかは `#[cfg(windows)]` でビルド時に決まる。2 つの関数を使うのは `@enc` と `ffi.load` の名前の扱い（`crates/pasta_lua/src/runtime/ffi_load/resolve.rs`）である。
 
-pasta_shiori は FFI の文字列を読むための変換を、`crates/pasta_shiori/src/util/hglobal/` に別に持つ（`mod.rs` の `ShioriString::to_ansi_str` と `windows_api.rs` の `multi_byte_to_wide_char`）。`crates/pasta_lua/src/encoding/windows.rs` と同じく local-encoding-rs に由来する実装で、`crates/pasta_lua/src/encoding/` は使わない。
+pasta_shiori は FFI の文字列を読むための変換を、`crates/pasta_shiori/src/util/hglobal/` に別に持つ（`mod.rs` の `ShioriString::to_ansi_str` と `windows_api.rs` の `multi_byte_to_wide_char`）。`crates/pasta_lua/src/encoding/` は使わない。
 
 ## 処理とデータの流れ
 
@@ -116,7 +116,12 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 
 フィルタは登録簿の項目（設置パス）ごとに 1 つある。項目を作ったときは既定の設定でこの順をたどり、段階 1.5 は毎回、`[logging]` の設定（無ければ既定の設定）で作り直したフィルタをその項目に入れる。再読み込みで `[logging]` を消すと、フィルタは既定に戻る。あるゴーストの `[logging]` は、そのゴーストのログだけに効く。
 
-購読者のフィルタ `RegistryFilter` は、イベントごとに下の振り分けの規則と同じ決まりで項目を選び、その項目のフィルタで判定する。選べなければ出さない。判定の決まりの詳細と、スパンの中身で絞る指定が効かないことは [SHIORI 層](shiori.md#ログの量の判定) が書く。
+購読者は `registry().with(fmt::layer().with_writer(GlobalLoggerRegistry).with_filter(RegistryFilter))` の 1 つで、プロセスに 1 つの量の設定は持たない。購読者のフィルタ `RegistryFilter` は、イベントごとに下の振り分けの規則と同じ決まりで項目を選び、その項目のフィルタで判定する。
+
+- `RegistryFilter::enabled` は、書き込み先を選ぶのと同じ決まりで項目を選び、その項目の量の設定で判定する。スレッドの文脈があればその項目、無ければロガーを持つ項目がちょうど 1 つのときだけその項目である。選べなければ出さない。ほかのゴーストの設定へ逃げない。
+- 判定はスレッドの文脈で変わるので、`callsite_enabled` は `Interest::sometimes()` を返し、コールサイトごとに覚えさせない。`max_level_hint` は全部の項目の量の最大（項目が無ければ OFF）で、それより細かいイベントは購読者に届く前に止まる。表を変えたら、ロックを外してから `rebuild_interest_cache()` で作り直す（ロックを持ったまま呼ぶと、`max_level_hint` が同じロックを取って止まる）。
+- 1 つの `EnvFilter` を項目ごとに `Filter::enabled` で呼ぶだけなので、スパンの中身で絞る指定（`[span{field=…}]` のような動的な指定）は効かない。ターゲットと量の指定（`warn,pasta_lua=debug` など）は効く。
+- 同じ理由で、`tracing::enabled!` はディレクトリごとの断りを映さない。答えは全部の項目の量の最大だけで決まる。実際の書き出しは、選んだ項目の量の設定に従う。
 
 ### ログ 1 件がファイルに届くまで
 
@@ -124,6 +129,12 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 2. fmt レイヤはイベントごとに `GlobalLoggerRegistry::make_writer` を呼ぶ。`make_writer` はそのスレッドの `CURRENT_LOAD_DIR` を読み、`resolve` で書き込み先のロガーを決めて（下の 3 規則）、`RoutingWriter` を返す。
 3. `RoutingWriter` は、ロガーがあれば `PastaLogger::write` へ渡し、無ければ書いたバイト数を返して捨てる。捨てるときもエラーや panic は起こさない。
 4. `PastaLogger::write` は、ミューテックスで守った `RollingFileAppender` に、呼び出したスレッドのまま書く。書き込み用のスレッドは作らない（下の「ログファイル」）。
+
+届いた 1 行は次の形になる。時刻は UTC である。`lua_source`・`lua_line`・`lua_fn` は `@pasta_log` が足すフィールドである（[`@pasta_log` の呼び出し](#pasta_log-の呼び出し)）。
+
+```text
+2026-11-15T02:34:59.166636Z  WARN pasta_lua::runtime::log: OnPastaScene: scene not found: global='ムらさき異世界の門_オチ' lua_source=...ost/master/profile/pasta/pasta_scripts/pasta\failure.lua lua_line=141 lua_fn=warn
+```
 
 ### 振り分けの規則
 
@@ -150,16 +161,44 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 
 ### 残るログと捨てるログ
 
-旧来の入口だけを使うホスト（SSP）では、登録簿のロガーは 0 個か 1 個である。そのため、ロガーが登録されている間に出たログは、どのスレッドで出たものでもログファイルに残る。捨てるのはロガーが登録されていないときのログだけである。版 3 のインスタンスが並ぶと、文脈の無いログは規則 3 で捨てる。
+旧来の入口だけを使うホスト（SSP）では、登録簿のロガーは 0 個か 1 個である。そのため、ロガーが登録されている間に出たログは、どのスレッドで出たものでもログファイルに残る。捨てるのはロガーが登録されていないときのログだけである。版 3 のインスタンスが並ぶときや、組み込みで複数のゴーストを読むときは、ロガーが 2 つ以上になり、文脈の無いログは規則 3 で捨てる。
 
-| ログ | 扱い |
-| ---- | ---- |
-| ロガーが登録されている間の、アクタースレッド・ローダのログ | 文脈のとおり自分のロガーへ届く（規則 1） |
-| ロガーが登録されている間の、FFI 入口のログ（`request` の warn・panic の error・観測用の debug と trace、`loadu` 済みで無視した `load` の warn、`unload` の teardown の異常の warn など） | 唯一のロガーへ届く（規則 2） |
-| 終了処理の間のログ（`SHIORI.unload` の結果、永続化データの保存の失敗、登録解除の通知「Unregistering logger」） | 登録解除の前に出るので届く。登録解除がファイルを閉じる最後の手順である |
-| 最初の `load` の段階 1 より前のログ（入口の引数の誤り、設置パスを読めないなど） | 登録が 0 個なので捨てる（規則 3） |
-| 終了処理の完了の通知（done ack）の後のログ（アクタースレッドの `actor.done`、FFI 入口の「done ack received」） | 登録解除の後なので捨てる（規則 1・規則 3） |
-| 同じプロセスに 2 つ以上のロガーがあるとき（版 3 のインスタンスが並ぶ場合や、組み込みで複数のゴーストを読む場合）の、文脈の無いログ | どのゴーストのものか決められないので捨てる（規則 3） |
+#### 入口ごとの扱い
+
+SHIORI の各入口のログは、振り分けの規則で次のようになる。
+
+| 入口・処理 | スレッドの文脈 | 扱い |
+| ---------- | -------------- | ---- |
+| アクタースレッド（メッセージループの観測ログ、`PastaShiori` の各メソッドのログ） | スレッドの入口で設置パスの `LoadDirGuard` を張り、片付けと ack を終えて約束を待つ前に外す | 自分のロガーへ届く |
+| `ActorInstance` の起動と後始末（占有を断った warn・引き継いだ warn・起動の失敗の error・スレッドを手放した warn） | 出す間だけ設置パスの `LoadDirGuard` を張る | そのディレクトリのロガーへ届く。起動の失敗は、その場で既定のロガーを登録してから出す |
+| 旧来の `loadu`・`load`（`load_entry`） | 無し。`load_impl` は入口名と成否の 1 行を出す間だけ張り直す | 最初のロード前の引数の誤りや設置パスを読めないときのログは、登録が無いので捨てる。`loadu` 済みで無視した `load` の warn は、登録されたロガーがちょうど 1 つなら届く |
+| 旧来の `request` | 無し。解けない要求の warn（`request.unreadable`）だけはインスタンスの設置パスで張って出す | 解けない要求の warn はそのインスタンスのロガーへ届く。不正な引数や UTF-8 として読めない要求の warn、境界での panic の error、観測用の debug・trace は、登録されたロガーがちょうど 1 つなら届く。`load` の前・`unload` の後は捨てる |
+| 旧来の `unload` | 無し | teardown の異常の warn は後述 |
+| `DllMain`（どの通知でも） | — | 何もしないので、ログも出ない。プロセスの終了では `SHIORI.unload` と永続化データの保存も走らない |
+| 版 3 の `load`・`request`・`notify` | 入口の 1 行・弾いた要求の debug・解けない要求の warn・開始行を読めない warn を出す間だけ、インスタンスの設置パスで張る | そのインスタンスのロガーへ届く。絶対パスでない・ディレクトリが無いときは置き場が無いのでログを出さない |
+
+#### 終了処理のログ
+
+終了処理（`unload`）のログは、出る時点で次のように分かれる。
+
+```text
+FFI 入口のスレッド: send(Stop{done})
+  debug「Stop enqueued」                  … アクターの登録解除より前なら届く
+アクタースレッド: Stop を受けてループを抜け、drop(shiori)（PastaShiori の Drop）
+  SHIORI.unload・永続化データの保存のログ … 届く
+  info「Unregistering logger」            … 届く
+  ロガーの登録を外す（ファイルを閉じる）
+アクタースレッド: drop(rx) → done.send(())
+  debug「actor.done」                     … 捨てる
+FFI 入口のスレッド: recv_timeout(5 秒)
+  届いた       → debug「done ack received」 … 捨てる。続けて join
+  Timeout      → warn                       … 届く（ロガーはまだ登録されている）
+                 warn「actor thread abandoned」… 届く（設置パスの文脈を張って出す）
+  Disconnected → warn                       … 登録解除の後なら捨てる
+```
+
+- 完了の通知（done ack）の後のログは、そのディレクトリのロガーがもう登録されていないので捨てる。done ack を送る位置は変えないため、通知を受け取った時点で VM・ログファイルの解放が済んでいる、という不変条件は保たれる。
+- Timeout のとき、アクターは終了処理の途中で、ロガーは登録されたままである。FFI 入口のスレッドの文脈の無い warn は、ロガーがちょうど 1 つなら届く。Disconnected は巻き戻すプロファイルでの panic でしか起きず、そのときロガーが既に登録を外されていれば warn は捨てる。
 
 ログを残すために、SHIORI の応答・応答までの待ち時間の上限・`unload` の戻り値は変えない。FFI 入口のスレッドが登録簿のミューテックスを取るのは、ログのイベントが全部の項目の量の最大（`max_level_hint`）を通って、量の判定と書き込み先を引くときだけで、mailbox の送信の経路には触れない。
 
@@ -252,7 +291,7 @@ VM の中の文字列（DSL から生成したコード、`scripts/` の Lua ソ
 ## 不変条件と制約
 
 - tracing の購読者はプロセスに 1 つで、最初の `init_tracing` だけが設置する。先に別の購読者が設置されていた場合、pasta の購読者は設置されず、`update_tracing_filter` は項目のフィルタを替えるだけで、出力には効かない。
-- フィルタは登録簿の項目（設置パス）ごとに持ち、あるゴーストの `[logging]` はそのゴーストのログだけに効く。スパンの中身で絞る指定は効かず、`tracing::enabled!` はディレクトリごとの断りを映さない（[SHIORI 層](shiori.md#ログの量の判定)）。
+- フィルタは登録簿の項目（設置パス）ごとに持ち、あるゴーストの `[logging]` はそのゴーストのログだけに効く。スパンの中身で絞る指定は効かず、`tracing::enabled!` はディレクトリごとの断りを映さない（[ログフィルタ](#ログフィルタ)）。
 - ログの振り分け先は、イベントを出したスレッドの `CURRENT_LOAD_DIR` と登録簿の中身だけで決まる（振り分けの 3 規則）。文脈のあるスレッドのログを別の設置パスのロガーへ書くことは無い。捨てるときもエラーにならない。
 - 登録簿のキーは設置パスの `PathBuf` で、正規化せずに完全一致で比べる。段階 1 と段階 1.5 は同じ設置パスの値を使う。
 - ログファイルのパスは、設置パスからの相対パスが `profile/` ディレクトリの下にあり `..` を含まないものに限られる。満たさない `file_path` は既定のログファイルに切り替わる。ファイルは追記で、ローテーションも切り詰めもしない。

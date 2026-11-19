@@ -13,7 +13,7 @@ import { dumpVariables, formatDump, formatSet, setSaveVariable } from './dumpVar
 const ghost: GhostTarget = { root: 'C:\\g', master: 'C:\\g\\ghost\\master', displayName: 'g', key: 'c:\\g' };
 const LOG = 'C:\\g\\ghost\\master\\profile\\pasta\\logs\\pasta.log';
 const VARS = 'C:\\g\\ghost\\master\\profile\\pasta\\debug\\variables.toml';
-// 待ちの上限は sleep 3 回（読み込み・書き出し）・2 回（台本の記録の引き直し）
+// 待ちの上限は sleep 3 回（読み込み・書き出し）・2 回（スクリプトの記録の引き直し）
 const timing: Timing = { loadTimeoutMs: 3, pollIntervalMs: 1, scriptLogWaitMs: 2, dumpWaitMs: 3, callTimeoutMs: 100 };
 
 const L = {
@@ -148,7 +148,7 @@ test('読み込み直し: BOM 付きの pasta.toml の 1 行目の [logging] を
 
 // ---- 再生 ----
 
-test('再生: 台本を返す・Reference2 が無ければ references は 2 つ', async () => {
+test('再生: スクリプトを返す・Reference2 が無ければ references は 2 つ', async () => {
   const { io, ctx, call } = setup();
   queueCleanReload(io);
   io.queuePost(ok(entry(7, 'Ghost:OnTalk', 'x')), ok('OK:\nScript: \\0hello\\e'));
@@ -161,7 +161,7 @@ test('再生: 台本を返す・Reference2 が無ければ references は 2 つ'
     name: 'raise_event',
     args: { event: 'OnPastaSceneAt', references: ['C:\\g\\ghost\\master\\dic\\a.pasta', '12'], ghost_name: 'C:\\g' },
   });
-  assert.ok(formatScene(o).lines.includes('台本:'));
+  assert.ok(formatScene(o).lines.includes('スクリプト:'));
 });
 
 test('再生: ローカル変数を付けると references は 3 つ', async () => {
@@ -182,11 +182,11 @@ test('再生: 204 は案内と、この再生で増えた OnPastaSceneAt: の警
   assert.deepEqual(o.kind === 'noScript' && o.reasons, [reason]);
   const f = formatScene(o);
   assert.equal(f.notice, DEBUG_HINT);
-  assert.ok(f.lines.some((l) => l.includes('台本を返しませんでした（204）')));
+  assert.ok(f.lines.some((l) => l.includes('スクリプトを返しませんでした（204）')));
   assert.ok(f.lines.includes(`  ${reason}`));
 });
 
-test('再生: 応答が無ければ、送る前の番号より後の台本の記録を引き直して見つける', async () => {
+test('再生: 応答が無ければ、送る前の番号より後のスクリプトの記録を引き直して見つける', async () => {
   const { io, ctx, call, waits } = setup();
   queueCleanReload(io);
   io.queuePost(
@@ -202,7 +202,7 @@ test('再生: 応答が無ければ、送る前の番号より後の台本の記
   assert.equal(call(5).args.since_id, 7);
   assert.equal(io.posts.length, 7, 'raise_event は送り直さない');
   assert.deepEqual(waits, [1]);
-  assert.ok(formatScene(o).lines.includes('台本（応答が無かったため、再生の記録から）:'));
+  assert.ok(formatScene(o).lines.includes('スクリプト（応答が無かったため、再生の記録から）:'));
 });
 
 test('再生: 応答が無く、記録にも見つからなければ確かめられなかったと言う', async () => {
@@ -213,7 +213,7 @@ test('再生: 応答が無く、記録にも見つからなければ確かめら
   assert.equal(o.kind, 'unconfirmed');
   assert.equal(o.kind === 'unconfirmed' && o.detail, 'gone');
   assert.deepEqual(waits, [1, 1]);
-  assert.equal(formatScene(o).notice, '台本を確かめられませんでした');
+  assert.equal(formatScene(o).notice, 'スクリプトを確かめられませんでした');
 });
 
 // ---- 書き出しの待ち ----

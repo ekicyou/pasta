@@ -1,0 +1,13 @@
+{
+  "feature_name": "manual-reader-first",
+  "created_at": "2026-11-19T00:00:00Z",
+  "updated_at": "2026-11-19T12:00:00Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "implementation": {
+      "completed": true,
+      "completed_at": "2026-11-19T12:00:00Z"
+    }
+  }
+}

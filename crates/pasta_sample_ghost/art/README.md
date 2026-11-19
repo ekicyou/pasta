@@ -7,7 +7,7 @@
 
 ## 1. 出典とライセンス
 
-- 絵は Unlicense で公開する。対象は、シェルの立ち絵 18 枚（`ghosts/hello-pasta/shell/master/` の `surface0.png`〜`surface8.png`・`surface10.png`〜`surface18.png`）と、このディレクトリの設定画像 2 枚。原文は 10 節。入門ガイドに載せた写し（`book/src/img/hello-pasta/` の 2 枚）は、シェルの絵とバイト単位で同じファイル。
+- 絵は Unlicense で公開する。対象は、シェルの立ち絵 18 枚（`ghosts/hello-pasta/shell/master/` の `surface0.png`〜`surface8.png`・`surface10.png`〜`surface18.png`）と、このディレクトリの設定画像 2 枚。原文は 10 節。入門ガイドに載せた写し（`book/src/img/hello-pasta/` の 2 枚）は、シェルの絵とバイト単位で同じファイル。マニュアルに載せた顔の切り抜き 18 枚（`book/src/img/hello/`。シェルの章の表情の一覧と、hello-pasta の紹介ページの案内役の顔）と当たり判定の図 1 枚（`book/src/img/shell/`）は、シェルの絵を切り抜き・縮小・減色し、枠を重ねて作ったもので、同じく Unlicense。
 - 絵は AI 生成物。画像生成モデルの出力を貼り合わせて縮小したもので、人が描いた絵ではない（モデルは 3 節、手順は 4〜7 節）。
 - 画風の手本は、ponapalt さんのゴースト「悪役令嬢クローディア」（<https://github.com/ponapalt/claudia>。参照したコミットは `02cbd4f5`。Unlicense）。生成に参照画像として渡したファイルは `shell/master/surface0.png`（女の子の設定画像と、男の子の設定画像の段階 1 に使った）。`shell/master/surface10.png` を渡した試行は不採用にした（4 節）。手本の絵そのものは、立ち絵に取り込んでいない。
 - 立ち絵を生成したのは、本リポジトリの開発者（ekicyou）。手本の作者は、この立ち絵の制作に関わっていない。

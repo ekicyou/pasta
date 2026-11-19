@@ -14,7 +14,7 @@
 //   B. Lua 網羅（R5.1, R5.5）   — 公開モジュール名の登場・LuaJIT 2.1 明示
 //   C. チュートリアル（R6.1, R6.2 / getting-started-story-guide 1.2, 1.4, 7.1, 10.1, 10.7, 10.8） — 前提環境/UTF-8 注意・
 //      段の章の本文（C-steps）、目次の並び（C-order）、tutorial-check 逐語一致、
-//      段の章の H2 5 種（C-sections）、台詞以外の段落は指示の一文だけ（C-prose）
+//      段の章の H2 4 種（C-sections）、台詞以外の段落は指示の一文だけ（C-prose）
 //   D. ボイス（R7.1, R7.2, R7.4 / ssot 1.7） — 導入/締めのキャラ口調（判定は findVoice）・コードフェンス内に口調なし
 //   E. 外部参照（R8.2, R8.3）   — milkpot(lua51/lua52)＋luajit.org 絶対 URL・lua55 不採用明記
 //   F. バージョン（R9.1, R9.3, R9.4） — introduction の対象バージョンが Cargo.toml と一致・LuaJIT 2.1・将来変更注記
@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { runTutorialCheck, listGuideChapters, findProseParagraphs } from './tutorial-check.mjs';
 import { GENERATION_MAP, findVoice, extractBody, chapterRegions } from './gen-skill-refs.mjs';
 import { maskFences, listMarkdownFiles, summaryChapters } from './link-check.mjs';
-import { SPEAKERS, FACE_DIR, MAX_FACE_BYTES, NO_TALK_CHAPTERS, scanTalk, checkRegion } from './talk/talk.mjs';
+import { SPEAKERS, faceDir, castOf, MAX_FACE_BYTES, NO_TALK_CHAPTERS, scanTalk, checkRegion } from './talk/talk.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '../..');
@@ -216,7 +216,7 @@ const LUA_MODULES = [
 // C. チュートリアル（R6.1 前提環境/手順/UTF-8 / R6.2 起動可能な最小一式に一致）
 // ============================================================
 // 段の章（ファイル名が 2 桁の数字とハイフンで始まる章）が持つ H2。この順で現れること。
-const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞書ファイルを足す', '起動して確かめる', 'もっと詳しく'];
+const GUIDE_SECTIONS = ['叶えたいこと', '辞書を書く', '確かめる', 'もっと詳しく'];
 {
   const gsDir = `${SRC}/getting-started`;
   const gsFiles = listGuideChapters(REPO_ROOT);
@@ -250,9 +250,9 @@ const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞�
       ? `段の章（2 桁の数字とハイフンで始まる .md）が ${gsDir} に 1 枚も無い`
       : `段の章が本文不足/プレースホルダ: ${thin.join(', ')}`,
   );
-  // C-order: 目次の入門の並びが、入口・準備 2 章・段の章（ファイル名の昇順）と一致する（1.2, 1.4）。
+  // C-order: 目次の入門の並びが、入口・まず会ってみる・自分のゴーストを始める・段の章（ファイル名の昇順）・付録と一致する（1.2, 1.4）。
   {
-    const want = ['index.md', 'prerequisites.md', 'setup.md', ...stageFiles];
+    const want = ['index.md', 'hello.md', 'setup.md', ...stageFiles, 'prerequisites.md'];
     const have = [...read(`${SRC}/SUMMARY.md`).matchAll(/\]\((?:\.\/)?getting-started\/([^)\s#]+\.md)(?:#[^)]*)?\)/g)]
       .map((m) => m[1]);
     const missing = want.filter((f) => !have.includes(f));
@@ -261,7 +261,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞�
     assert(
       'C-order',
       have.length === want.length && at < 0,
-      `SUMMARY.md の入門の並びが、入口・準備 2 章・段の章 ${stageFiles.length} 枚の昇順と一致する`,
+      `SUMMARY.md の入門の並びが、入口・導入 2 章・段の章 ${stageFiles.length} 枚の昇順・付録と一致する`,
       missing.length > 0 || extra.length > 0
         ? `SUMMARY.md の入門の章が章立てと違う: ${[
           ...missing.map((f) => `目次に無い章 ${f}`),
@@ -274,7 +274,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞�
   for (const f of gsFiles) {
     const rel = `${gsDir}/${f}`;
     const md = read(rel);
-    // C-sections: 段の章が H2 5 種をこの順で持つ（10.7。I-sections と同じ判定。フェンス内の行は見出しとみなさない）。
+    // C-sections: 段の章が H2 4 種をこの順で持つ（10.7。I-sections と同じ判定。フェンス内の行は見出しとみなさない）。
     if (stageFiles.includes(f)) {
       const h2s = stripCodeFences(md)
         .split(/\r?\n/)
@@ -286,7 +286,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞�
       assert(
         `C-sections:${f}`,
         missing.length === 0 && ordered,
-        `段の章 ${f} が H2 5 種をこの順で持つ`,
+        `段の章 ${f} が H2 4 種をこの順で持つ`,
         missing.length > 0
           ? `段の章 ${f} に H2 が無い: ${missing.join(', ')}`
           : `段の章 ${f} の H2 の順序が違う（期待: ${GUIDE_SECTIONS.join(' → ')}／実際: ${h2s.filter((h) => GUIDE_SECTIONS.includes(h)).join(' → ')}）`,
@@ -342,7 +342,7 @@ function listChapters(dirs) {
     // D1: 散文部（コードフェンス除去後）にキャラ口調がある = 導入/締めボイスの存在。
     const prose = stripCodeFences(md);
     // 台詞を置かない章は口調を検査しない（記録もしない）。
-    if (!Object.hasOwn(NO_TALK_CHAPTERS, rel.slice(SRC.length + 1))) assert(
+    if (!Object.hasOwn(NO_TALK_CHAPTERS, rel.slice(SRC.length + 1)) && castOf(rel.slice(SRC.length + 1)) === 'claudia') assert(
       `D-voice:${rel}`,
       hasVoice(prose),
       `${rel} の散文部にキャラ口調（導入/締め）がある`,
@@ -460,8 +460,9 @@ for (const ch of DEBUG_CHAPTERS) {
     `デバッグ章 ${ch}.md が本文不足/プレースホルダ`,
   );
   // G-voice: 散文部（コードフェンス除去後）に導入/締めのキャラ口調がある（R7.1）。
+  // 口調マーカーは Claudia のものなので、配役が claudia の章だけを見る（emo2 の 2 人が案内する章は対象外）。
   const prose = stripCodeFences(md);
-  assert(
+  if (castOf(`debug/${ch}.md`) === 'claudia') assert(
     `G-voice:${ch}`,
     hasVoice(prose),
     `デバッグ章 ${ch}.md の散文部にキャラ口調（導入/締め）がある`,
@@ -601,7 +602,8 @@ for (const ch of INTERNALS_CHAPTERS) {
   for (const rel of listChapters([...VOICE_DIRS, 'debug'])) {
     const ch = rel.slice(SRC.length + 1);
     const md = read(rel);
-    const { blocks, errors } = scanTalk(md);
+    const cast = castOf(ch);
+    const { blocks, errors } = scanTalk(md, cast);
     // T-syntax: 記法の不正を全件（章パス・行番号・種類・詳細）。
     report(`T-syntax:${ch}`, rel, errors, `${rel} の台詞部品の記法に不正なし`);
     // T-notalk: 台詞を置かない章は導入・締めの代わりに台詞が 1 つも無いことを求める。
@@ -619,17 +621,18 @@ for (const ch of INTERNALS_CHAPTERS) {
       fail(`T-outro:${ch}`, `${rel} の章構造不備: ${e.message}`);
       continue;
     }
-    const cover = ch === 'introduction.md';
-    report(`T-intro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.intro, { cover }),
+    const cover = ch === 'introduction.md' || ch === 'debug/index.md'; // 扉を持つページ
+    report(`T-intro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.intro, { cover, cast }),
       `${rel} の導入が二人の台詞だけでできている`);
-    report(`T-outro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.outro, { cover }),
+    report(`T-outro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.outro, { cover, cast }),
       `${rel} の締めが二人の台詞だけでできている`);
   }
 
-  // T-assets: 顔画像フォルダが登録簿の画像＋LICENSE.txt と完全一致（立ち絵の混入なし）し、各画像が上限以下。
-  {
-    const dir = `${SRC}/${FACE_DIR}`;
-    const want = new Set([...SPEAKERS.flatMap((sp) => Object.values(sp.faces).map((f) => `${f}.png`)), 'LICENSE.txt']);
+  // T-assets: 配役ごとの顔画像フォルダが登録簿の画像＋LICENSE.txt と完全一致（立ち絵の混入なし）し、各画像が上限以下。
+  for (const cast of [...new Set(SPEAKERS.map((sp) => sp.cast))]) {
+    const dir = `${SRC}/${faceDir(cast)}`;
+    const want = new Set([...SPEAKERS.filter((sp) => sp.cast === cast)
+      .flatMap((sp) => Object.values(sp.faces).map((f) => `${f}.png`)), 'LICENSE.txt']);
     const have = exists(dir) ? fs.readdirSync(abs(dir)) : [];
     const problems = [
       ...[...want].filter((f) => !have.includes(f)).map((f) => `欠落 ${f}`),
@@ -640,7 +643,7 @@ for (const ch of INTERNALS_CHAPTERS) {
         .map(([f, size]) => `容量超過 ${f} ${size} バイト（上限 ${MAX_FACE_BYTES}）`),
     ];
     assert(
-      'T-assets',
+      `T-assets:${cast}`,
       problems.length === 0,
       `${dir} が登録簿の画像 ${want.size - 1} 枚と LICENSE.txt に一致し、各画像が ${MAX_FACE_BYTES} バイト以下`,
       `${dir} の不備: ${problems.join(', ')}`,

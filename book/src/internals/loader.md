@@ -52,7 +52,9 @@
 | `setup_package_path` | `crates/pasta_lua/src/runtime/module_registry.rs` | `package.path` を設定し、searcher を置換し、読み込んだファイルの表（`@pasta_chunks`）を作る。`@pasta_config` の登録（`register_config_module`）も同じファイルにある |
 | searcher | `crates/pasta_lua/src/runtime/searcher.rs` | `install_module_searcher`。`package.loaders` の 2 番目（Lua ファイルの searcher）を Rust の実装に置き換える。`register_chunk_table` が作る `@pasta_chunks` に、読み込めたファイルを書き足す |
 | `RuntimeConfig`・`lua_require` | `crates/pasta_lua/src/runtime/runtime_config.rs` | VM に入れる標準ライブラリと、シーン名の別名表を持つ設定。`[loader] ffi` が真なら `with_ffi` が `std_ffi` を足す。`lua_require` は Rust から Lua の `require` を呼ぶ |
-| `ffi.load` の置き換え | `crates/pasta_lua/src/runtime/ffi_load/` | 設置（`install`）・Lua のラッパ・`prepare`・名前の規則（`resolve.rs`）・Windows の呼び出し（`win32.rs`）。詳細は [ffi.load の置き換え](#ffiload-の置き換え) |
+| `ffi.load` の置き換え | `crates/pasta_lua/src/runtime/ffi_load/mod.rs` | 設置（`install`）・Lua のラッパ（`WRAPPER_CHUNK`）・`prepare` の組み立て・pasta の理由の文言。`setup_package_path` から呼ばれる。詳細は [ffi.load の置き換え](#ffiload-の置き換え) |
+| 名前を解く規則 | `crates/pasta_lua/src/runtime/ffi_load/resolve.rs` | 名前を読むパスへ解く規則（`resolve`・拡張子の規則・ANSI の往復の確かめ・`\\?\` の形）。`unsafe` を持たない |
+| Windows の呼び出し | `crates/pasta_lua/src/runtime/ffi_load/win32.rs` | `unsafe` の Windows の呼び出し（`LoadLibraryExW`・`GetModuleHandleW`・`FreeLibrary`・`FormatMessageW`）と `DllPins` |
 | 既定の `main` | `crates/pasta_lua/pasta_scripts/main.lua` | 空の表を返すだけの利用者初期化スクリプト。自己展開され、`scripts/main.lua` があればそちらが優先される |
 | `pasta.config` | `crates/pasta_lua/pasta_scripts/pasta/config.lua` | `@pasta_config` を `pcall(require, …)` で取り込み、`get(section, key, default)` で値か既定値を返す Lua 側のラッパ。`@pasta_config` を取得できない環境（テストなど）では空の表を使う |
 
@@ -101,9 +103,9 @@ load_with_config(base_dir, runtime_config)
 
 1. 全体を TOML の表として読む。
 2. `loader` キーを表から取り除き、`LoaderConfig` へ変換する。各キーは serde の既定値の関数で補われ、型の合わない値は解析エラーになる。`loader` キーが無ければ `LoaderConfig::default()` を使う。
-3. `[scene.alias]` を同じ内容から読み直し、有効な別名表（`scene_aliases`）とその出どころ（`scene_alias_source`）を決める。`[scene.alias]` が無ければ既定の表（`SceneAliasTable::builtin_default` の 7 件）を使い、あれば `SceneAliasTable::with_written` で書いたキーだけ既定の別名を書いた配列に置き換える（空の配列なら消すだけ。書かなかったキーの既定は残す。見出しだけなら既定の表と等しく、出どころも既定になる）。型の合わない値・空の名前・別名の重複・置き換え先を別名にも書いた表・残った既定の別名とぶつかる表は解析エラーになり、起動を止める（利用者向けの説明は [pasta.toml の `[scene]`](../reference/pasta-toml.md#sceneシーン名)）。
+3. `[scene.alias]` から、有効な別名表（`scene_aliases`）とその出どころ（`scene_alias_source`）を決める。無ければ既定の表（`SceneAliasTable::builtin_default` の 7 件）を使う。あれば `SceneAliasTable::with_written` が、書いたキーの既定の別名だけを、書いた配列に置き換える（見出しだけなら既定の表と等しく、出どころも既定になる）。不正な表は解析エラーになり、起動を止める（不正の種類は [不変条件と制約](#不変条件と制約)、利用者向けの説明は [pasta.toml の `[scene]`](../reference/pasta-toml.md#sceneシーン名)）。
 4. 残りの表をすべて `custom_fields` とする。`[scene]` も書いたとおりに残り、既定の別名表は書き足さない。`[loader]` 以外のセクションはこの段階では型付きの値にしない。
-5. `[actor."名前"]` の `font` を、`actor_font::apply` が `pasta_core` の `ActorFont` で検査し、`custom_fields` の中で検査済みのタグ列の文字列に置き換える（`font = { color = "90,110,140", bold = true }` は `\f[color,90,110,140]\f[bold,1]`、空の表は空文字列）。属性の書いた順は、同じ内容を `toml::de::DeTable` で読み直して値の位置から取る。知らない属性・型の合わない値・空の文字列・`]` か `\` を含む値・表でない `font` は解析エラーになり、起動を止める。エラーの文言にはアクター名・属性名と、取れるときは行番号が入る。同じ規則で `pasta_check validate` も `config-actor-font` を報告する（利用者向けの説明は [装い（font）](../reference/pasta-toml.md#装いfont)、出し入れは [トーク出力とアピアランス](talk-output.md#装いの出し入れ)）。
+5. `[actor."名前"]` の `font` を、`actor_font::apply` が `pasta_core` の `ActorFont` で検査し、`custom_fields` の中で検査済みのタグ列の文字列に置き換える（`font = { color = "90,110,140", bold = true }` は `\f[color,90,110,140]\f[bold,1]`、空の表は空文字列）。属性の書いた順は、同じ内容を `toml::de::DeTable` で読み直して値の位置から取る。不正な `font` は解析エラーになり、起動を止める（不正の種類は [不変条件と制約](#不変条件と制約)）。同じ規則で `pasta_check validate` も `config-actor-font` を報告する（利用者向けの説明は [装い（font）](../reference/pasta-toml.md#装いfont)、出し入れは [トーク出力とアピアランス](talk-output.md#装いの出し入れ)）。
 6. `apply_shiori_defaults` で SHIORI 用の既定値を補完する。
 
 `apply_shiori_defaults` は `custom_fields` の `[ghost]` に、書かれていないキー（`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines`・`choice_newlines`・`after_choice_newlines`・`line_newlines`）だけを `GhostConfig::default()` の値で書き足す。`[ghost]` が無ければ表を作って 7 キーとも入れる。書かれている値は上書きしないため、2 回適用しても結果は変わらない。あわせて `[actor]` が表として存在しなければ警告を 1 行出す（起動は止めない）。補完をここ 1 か所でだけ行うので、Rust 側の消費者と Lua 側（`@pasta_config`）は同じ補完後の値を見る。
@@ -202,9 +204,10 @@ dic/v1.2.pasta
 ```
 
 - `.lua` も `.pasta` と同じ規則で名前とキャッシュ先が決まる。拡張子が違うだけの同名ファイルは同じモジュール名になるため、検出の手順 6 で `.lua` を除く。
-- 違うファイルが同じモジュール名になることがある（`dic/会話-朝.pasta` と `dic/会話_朝.pasta` はどちらも `pasta.scene.会話_朝`）。大文字と小文字だけが違う名前（`pasta.scene.A_b` と `pasta.scene.a_b`）も、Windows ではキャッシュの 1 つのファイルを奪い合うため、OS によらず同じ名前として扱う。`.pasta` 同士・`.lua` 同士のこの組は、検出の手順 5 で読み込みエラーになる。エラーの文は組ごとに、モジュール名が完全に同じなら `モジュール名: ファイル, ファイル`、大文字と小文字だけが違うなら `ファイル (モジュール名), ファイル (モジュール名)` の形でファイルを並べ、組が複数なら ` / ` でつなぐ。ファイルはゴーストのフォルダーから見たパスである。利用者から見たエラーの例は [起動シーケンス](../reference/startup.md#手順-3-典型的な原因を読み分ける) が正である。
+- 違うファイルが同じモジュール名になることがある（`dic/会話-朝.pasta` と `dic/会話_朝.pasta` はどちらも `pasta.scene.会話_朝`）。大文字と小文字だけが違う名前（`pasta.scene.A_b` と `pasta.scene.a_b`）も、Windows ではキャッシュの 1 つのファイルを奪い合うため、OS によらず同じ名前として扱う。`.pasta` 同士・`.lua` 同士のこの組は、検出の手順 5 で読み込みエラーになる。エラーの文の形は [起動シーケンス](../reference/startup.md#手順-3-典型的な原因を読み分ける) が正である。
 - 非 ASCII の文字はそのまま残す。モジュール名を解決する searcher も UTF-8 のまま扱う（次節）。
 - `dic` を除くのは、`dic` がパス要素として完結する場合だけである。`dictionary.pasta` や `dicx/foo.pasta` はそのまま残る。
+
 モジュール名の一覧は増分処理で集められ、`scene_dic.lua` が並べ替えて `require` する（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。`require("pasta.scene.baseware.system")` は、次節の searcher が検索パスの `profile/pasta/cache/lua` から `pasta/scene/baseware/system.lua` を見つけることで解決する。searcher はモジュール名の `.` をすべてパス区切りに戻すため、キャッシュ先はモジュール名から同じ規則で導出し、ファイル名やディレクトリ名に含まれる `.` はモジュール名の時点で `_` に置き換えておく。
 
 ### モジュール検索パス
@@ -353,7 +356,7 @@ ffi.load(name, ...)                                  … ラッパ（Lua）
 - 自己展開先は `profile/pasta/pasta_scripts` に固定されており、`lua_search_paths` からは独立している。検索パスからこのディレクトリを外すと、展開は行われてもフレームワークスクリプトは解決されない。
 - キャッシュの出力先（`transpiled_output_dir`）と検索パスも独立している。`pasta.scene.*` と `pasta.scene_dic` は検索パスを通して解決されるため、出力先を変えるときは検索パスにもそれを含める必要がある。また、検索パスで先に来るディレクトリに同じ相対パスのファイルがあれば、そちらが解決される。
 - ファイル検出は `profile/` 配下を常に除く。キャッシュや自己展開先が検出の対象になることはない。
-- 設定読込を失敗させるのは、`[loader]` の型の誤りと、不正な `[scene]`／`[scene.alias]` と、不正な `[actor."名前"]` の `font` だけである。`[scene]`／`[scene.alias]` の不正とは、型の合わない値（`scene`・`alias` が表でない、別名が文字列の配列でないなど）・空の名前・別名の重複・置き換え先を別名にも書いた表（連鎖）・既定の別名とのぶつかり・既定の別名を置き換え先に書いた表である。`font` の不正は [設定読込](#設定読込) の 5 のとおりである。ほかのセクションの型の誤りは、使う時点でそのセクションが既定値になるだけで、エラーにも警告にもならない。
+- 設定読込を失敗させるのは、`[loader]` の型の誤りと、不正な `[scene]`／`[scene.alias]` と、不正な `[actor."名前"]` の `font` だけである。`[scene]`／`[scene.alias]` の不正とは、型の合わない値（`scene`・`alias` が表でない、別名が文字列の配列でないなど）・空の名前・別名の重複・置き換え先を別名にも書いた表（連鎖）・既定の別名とのぶつかり・既定の別名を置き換え先に書いた表である。`font` の不正とは、知らない属性・型の合わない値・空の文字列・`]` か `\` を含む値・表でない `font` である。エラーの文言にはアクター名・属性名と、取れるときは行番号が入る。ほかのセクションの型の誤りは、使う時点でそのセクションが既定値になるだけで、エラーにも警告にもならない。
 - ランタイムの構築は `std` のワイド文字 API でモジュールを開くため、`require` の解決は設置パスの長さと文字種に依存しない。ゴースト作者のコードが直接呼ぶ `io.open` などは対象外である（[既知の制限](../reference/startup.md#3-既知の制限)）。
 - `ffi.load` の置き換えは `ffi` の表の `load` の 1 つだけを書き換え、LuaJIT のソースには手を入れない。元の `ffi.load` に渡すファイル名は ANSI で表せるものに限られ、表せなければ読む前に失敗させる。
 
@@ -368,17 +371,6 @@ ffi.load(name, ...)                                  … ラッパ（Lua）
 - `crates/pasta_lua/src/runtime/ffi_load/`
 - `crates/pasta_lua/pasta_scripts/main.lua`
 - `crates/pasta_lua/pasta_scripts/pasta/config.lua`
-
-`ffi.load` の置き換えのファイルと役割は次のとおりである。
-
-| ファイル | 役割 |
-| -------- | ---- |
-| `crates/pasta_lua/src/runtime/ffi_load/mod.rs` | 設置（`install`）・Lua のラッパ（`WRAPPER_CHUNK`）・`prepare` の組み立て・pasta の理由の文言 |
-| `crates/pasta_lua/src/runtime/ffi_load/resolve.rs` | 名前を読むパスへ解く規則（`resolve`・拡張子の規則・ANSI の往復の確かめ・`\\?\` の形）。`unsafe` を持たない |
-| `crates/pasta_lua/src/runtime/ffi_load/win32.rs` | `unsafe` の Windows の呼び出し（`LoadLibraryExW`・`GetModuleHandleW`・`FreeLibrary`・`FormatMessageW`）と `DllPins` |
-| `crates/pasta_lua/src/runtime/module_registry.rs` | `setup_package_path` から `ffi_load::install` を呼ぶ |
-| `crates/pasta_lua/src/runtime/runtime_config.rs` | `with_ffi` が `[loader] ffi` を `std_ffi` に変える |
-| `crates/pasta_lua/src/loader/config/mod.rs` | `LoaderConfig` の `ffi`（既定 `false`） |
 
 埋め込みの zip に固める対象は `crates/pasta_lua/pasta_scripts/` のツリー全体である。テストは `crates/pasta_lua/src/loader/extract_tests.rs`・`crates/pasta_lua/src/loader/discovery_tests.rs`・`crates/pasta_lua/src/loader/config_tests.rs`・`crates/pasta_lua/tests/build_determinism_test.rs`・`crates/pasta_lua/tests/loader/` にある。`ffi.load` の置き換えのテストは、各ファイルの単体テストと `crates/pasta_lua/tests/ffi/`（テスト用の DLL をその場で作り、元の `ffi.load` と並べて比べるテストを含む）にある。
 

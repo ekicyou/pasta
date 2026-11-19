@@ -61,25 +61,11 @@ STORE.reset()
 
 ### 循環参照回避の原則
 
-共有するデータは STORE に集め、他のモジュールが STORE を `require` する一方向の依存を保つ。STORE 自身は他の `pasta.*` モジュールを `require` しない。
-
-```lua
--- 正しい依存の向き: 他のモジュール → STORE
--- pasta.store
-local STORE = {}
-STORE.actors = {}
-return STORE
-
--- pasta.actor
-local STORE = require("pasta.store")
-STORE.actors["さくら"] = { name = "さくら" }
-```
-
-例外は Rust 製のモジュール `@pasta_config` だけであり、`pcall` を通して `require` する（前節）。`@pasta_config` は Lua のモジュールを `require` しないため、循環は生じない。モジュール全体の `require` の関係は [Lua 側のモジュールの関係](https://ekicyou.github.io/pasta/internals/execution-model.html#lua-側のモジュールの関係) で扱う。
+共有するデータは STORE に集め、他のモジュールが STORE を `require` する一方向の依存を保つ。例外は Rust 製のモジュール `@pasta_config` だけであり、`pcall` を通して `require` する（前節）。`@pasta_config` は Lua のモジュールを `require` しないため、循環は生じない。モジュール全体の `require` の関係は [Lua 側のモジュールの関係](https://ekicyou.github.io/pasta/internals/execution-model.html#lua-側のモジュールの関係) で扱う。
 
 ## ACT の内部
 
-ACT は、シーン関数が第 1 引数で受け取るオブジェクトである。`pasta.act` が基本の ACT を、`pasta.shiori.act` が SHIORI 用の ACT を作る。SHIORI のイベントごとに `SHIORI_ACT.new(STORE.actors, req)` で新しい ACT が作られる（[イベントからシーンへ](https://ekicyou.github.io/pasta/internals/execution-model.html#イベントからシーンへ)）。この節では ACT の構造と、メソッド・アクタープロキシの解決、`init_scene` とシーン文脈の復元、名前の解決のメソッド、Call のキーと失敗表記、生成コード用のメソッドと動的参照のキーの変換を扱う。トーク系メソッドなど個々のメソッドの使い方は [スクリプト用ランタイム API](script-api.md) で、トークンの蓄積と組立は [トーク出力とアピアランス](https://ekicyou.github.io/pasta/internals/talk-output.html#トークンの蓄積) で扱う。
+ACT は、シーン関数が第 1 引数で受け取るオブジェクトである。`pasta.act` が基本の ACT を、`pasta.shiori.act` が SHIORI 用の ACT を作る。SHIORI のイベントごとに `SHIORI_ACT.new(STORE.actors, req)` で新しい ACT が作られる（[イベントからシーンへ](https://ekicyou.github.io/pasta/internals/execution-model.html#イベントからシーンへ)）。この節では ACT の構造と、メソッド・アクタープロキシの解決、`init_scene` とシーン文脈の復元、名前の解決のメソッド、Call のキーと失敗表記、生成コード用のメソッドと動的参照のキーの変換を扱う。トーク系メソッドなど個々のメソッドの使い方は [スクリプト用ランタイム API](script-api.md) で、トークンの蓄積と組立は [トーク出力とアピアランス](https://ekicyou.github.io/pasta/internals/talk-output.html#トークンの蓄積) で扱う。引数・戻り値・警告の文言は各小節の頭に挙げる利用者向けの章が正で、この節は実装の内部の構成だけを扱う。
 
 ### ACT オブジェクトの構造
 
@@ -154,8 +140,8 @@ end
 4. `FAILURE.bind(self)` で、実行中のスレッドにこの ACT を対応させる（[失敗の報告](#失敗の報告pastafailure)）。
 5. `self.save, self.var` を返す。新しい表は作らない。
 
-- トランスパイラは、すべてのシーン関数の先頭に `local save, var = act:init_scene(SCENE, 書いた名前…, 行の対応)` を生成する（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。作者が Lua で書いたシーン関数と、引数を渡さない古いキャッシュでは、3 つのフィールドは `nil` になる。
-- `scene_name`・`local_scene_name`・`line_map` は、[止まるエラーの表記](https://ekicyou.github.io/pasta/reference/runtime-failures.html#止まるエラーの表記)にだけ使う。出力・名前の検索には使わず、止まるエラーが起きない要求では定数を受け取って控える以外の仕事をしない。止まったときに `pasta.shiori.stop` が、名前から止まった場所（`＊天気・雨の日`）を作り、行の対応を最後の `|` で切って読み解いて、変換した Lua の行を `.pasta` の行に直す（[止まるエラーの控えと応答](https://ekicyou.github.io/pasta/internals/shiori.html#止まるエラーの控えと応答)）。名前が `nil` のときは、`current_scene.__global_name__` から通し番号を落とした名前を使う。エラー文のチャンクが作者の `.lua` か変換した Lua のキャッシュかは、Rust のモジュール探索関数が読み込んだファイルを書き足す表 `@pasta_chunks` で見分ける。値は、作者の `.lua`（`dic/` の `.lua` の写しを含む）ならゴーストのフォルダーから見たそのファイルのパス、`.pasta` から変換したキャッシュなら表 `{ pasta = "dic\\天気.pasta" }`、見分けられない重複なら `false` で、標準ランタイムなどは表に無い。キャッシュの行は、行の対応のファイルが `pasta` と同じときだけ `.pasta` の行に直す（[止まるエラーの場所](https://ekicyou.github.io/pasta/internals/debug.html#止まるエラーの場所)）。
+- トランスパイラは、すべてのシーン関数の先頭に `local save, var = act:init_scene(SCENE, 書いた名前…, 行の対応)` を生成する（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。作者が Lua で書いたシーン関数のように引数を省いた呼び出しでは、3 つのフィールドは `nil` になる。
+- `scene_name`・`local_scene_name`・`line_map` は、[止まるエラーの表記](https://ekicyou.github.io/pasta/reference/runtime-failures.html#止まるエラーの表記)にだけ使う。出力・名前の検索には使わない。止まったときに `pasta.shiori.stop` が、名前から止まった場所（`＊天気・雨の日`）を作り、行の対応で変換した Lua の行を `.pasta` の行に直す（[止まるエラーの控えと応答](https://ekicyou.github.io/pasta/internals/shiori.html#止まるエラーの控えと応答)・[止まるエラーの場所](https://ekicyou.github.io/pasta/internals/debug.html#止まるエラーの場所)）。名前が `nil` のときは、`current_scene.__global_name__` から通し番号を落とした名前を使う。
 - `current_scene` は、単語参照・Call・式関数の名前の解決のうち、L1（`current_scene[key]` の完全一致）と L2（`current_scene.__global_name__` をスコープとするローカル辞書の前方一致）が使う（[ローカル優先の検索順](https://ekicyou.github.io/pasta/internals/registry-search.html#ローカル優先の検索順)）。`init_scene` を呼ばない関数の中では、`current_scene` は直前に `init_scene` したシーンのままである。
 - `init_scene` は `current_scene`・書いた名前と行の対応・`last_global_scene` を上書きするだけで、自分では元へ戻さない。呼び出し元へ戻ったときに `current_scene` などを戻すのは呼ぶ側である（次節）。`last_global_scene` は戻さない。
 
@@ -180,7 +166,7 @@ end
 ```
 
 - `restore_scene` は `fn(...)` を呼び、戻った後に、呼ぶ前の `current_scene`・`scene_name`・`local_scene_name`・`line_map` の 4 つをそのまま戻す。途中の Call や関数から戻った後の行で止まると、止まるエラーの表記は呼び出し元のローカルシーンの名前と `.pasta` の行まで示せる。
-- `restore_scene` の引数は、前は `(scene, ...)`（戻す先のシーンテーブルと、そのまま返す値）だった。今は `(fn, ...)`（呼ぶ関数と、その引数）で、関数を呼ぶことまでを引き受ける。関数でない値を渡したときの専用のエラー文は無い。
+- `restore_scene` の引数は `(fn, ...)`（呼ぶ関数と、その引数）で、関数を呼ぶことまでを引き受ける。関数でない値を渡したときの専用のエラー文は無い。
 - `STORE.last_global_scene` は触らない。`fn` の戻り値をすべて返すため、呼んだ関数の複数の戻り値も保たれる。
 - 途中の Call（ローカルシーンの最後の項目でない Call）の生成コードは `act:call_restore(…)` である（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。`call_restore` の中の `self:call(…)` は末尾位置ではないため、呼び出しのたびにフレームが 1 つ増える。呼ばれた側の中で `return act:call(…)` がつながっても深くならず、その連鎖から戻った時点で、外側の `call_restore` が 1 回だけ復元する。
 - 復元は、`act:call` の中で何が起きたか（シーン関数・Lua の関数を呼んだ、見つからなかった、キーが `nil`・「呼ばない」印だった）にかかわらず同じ経路で行う。呼ばれた側が `yield` で中断した場合は、コルーチンの再開後に戻った時点で行う。
@@ -190,7 +176,7 @@ end
 
 ### Call のキーと失敗表記（call_key・failure）
 
-`call_key`・`failure` の引数・戻り値・警告の文言は [call_key](script-api.md#call_keyvalue-var_path-desc)・[failure](script-api.md#failuretext-warning) が、失敗表記の文言は [実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html) が正である。ここでは実装の内部の構成だけを扱う。
+`call_key`・`failure` の引数・戻り値・警告の文言は [call_key](script-api.md#call_keyvalue-var_path-desc)・[failure](script-api.md#failuretext-warning) が、失敗表記の文言は [実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html) が正である。
 
 - 動的コールの値の判定（`nil` の判定を含む）は、生成コードではなく実行時の `call_key` が行う。生成コードは式の値を `tostring` せずにそのまま渡す（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。キーの式は `act:call`・`act:call_restore` の第 2 引数のため、引数の式より先に評価される。
 - 検索キーにできない値のとき、`call_key` は警告と失敗表記を出してから、`pasta.act` の局所の表 `SKIP_CALL`（「呼ばない」印）を返す。式が関数呼び出し 1 つ（`desc` があり `var_path` が無い）で、その関数の参照が報告済み（`FAILURE.take_fn_failed`）のときは、重ねて報告せずに印だけを返す。`ACT_IMPL.call` は `key == SKIP_CALL` なら検索も警告もせずに `nil` を返す。印はモジュールの外へ公開されず、文字列や `false` と一致しない。
@@ -201,24 +187,32 @@ end
 
 ### 名前の解決のメソッド
 
-ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call`・`call_restore` と `find_handler`・`find_act_handler` の引数・戻り値・警告は [検索と呼び出し](script-api.md#検索と呼び出し)（[word(name, var_path)](script-api.md#wordname-var_path)・[expr_fn_var(value, var_path, ...)](script-api.md#expr_fn_varvalue-var_path-) を含む）が、検索の各段の意味は [ローカル優先の検索順](https://ekicyou.github.io/pasta/internals/registry-search.html#ローカル優先の検索順) が正である。ここでは実装の内部の構成だけを扱う。
+ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call`・`call_restore` と `find_handler`・`find_act_handler` の引数・戻り値・警告は [検索と呼び出し](script-api.md#検索と呼び出し)（[word(name, var_path)](script-api.md#wordname-var_path)・[expr_fn_var(value, var_path, ...)](script-api.md#expr_fn_varvalue-var_path-) を含む）が、検索の各段の意味は [ローカル優先の検索順](https://ekicyou.github.io/pasta/internals/registry-search.html#ローカル優先の検索順) が正である。
 
-- `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。`call_expr` は `find_handler("expr", key, skip_methods)` が関数なら、`restore_scene` で `h(self, ...)` を呼び、実行中のシーンの文脈を呼ぶ前の値に戻してから戻り値を返し、それ以外は「報告済み」の印（`FAILURE.set_fn_failed`）を真にし、接頭辞 `act:expr_fn` の警告（`handler not found`）とともに「関数が見つからない」を `FAILURE.report` で報告して `nil` を返す。関数が見つかったときは、関数が戻った後に印を偽にする。アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
+- `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。
+- `call_expr` は `find_handler("expr", key, skip_methods)` が関数なら、`restore_scene` で `h(self, ...)` を呼び、実行中のシーンの文脈を呼ぶ前の値に戻してから戻り値を返す。関数が戻った後に「報告済み」の印（`FAILURE.set_fn_failed`）を偽にする。
+- 関数でなければ、印を真にし、接頭辞 `act:expr_fn` の警告（`handler not found`）とともに「関数が見つからない」を `FAILURE.report` で報告して `nil` を返す。
+- アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
 - `skip_methods` を真にするのは、`var_path` を受け取った `word` と `expr_fn_var`（生成コードの動的参照）だけである。`find_scene`・`call` と、`var_path` の無い `word`・`expr_fn` は `skip_methods` を渡さない。`find_handler` は `find_act_handler` と同じ関数である（`ACT_IMPL.find_handler = ACT_IMPL.find_act_handler`）。呼ぶ側は `self:find_handler` で引くので、インスタンスに `find_handler` を置けばその上書きが効く。
 
 ### 生成コード用のメソッド（actor_proxy・global_fn）
 
-アクション行のアクター（`act:actor_proxy("名前")`）と `＠＊名前（…）`（`act:global_fn("名前", …)`）の生成コードが呼ぶメソッドである。引数・戻り値・警告の文言は [アクター・グローバル関数](script-api.md#アクターグローバル関数) が、生成コードの形は [生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形) が正である。ここでは実装の内部の構成だけを扱う。
+アクション行のアクター（`act:actor_proxy("名前")`）と `＠＊名前（…）`（`act:global_fn("名前", …)`）の生成コードが呼ぶメソッドである。引数・戻り値・警告の文言は [アクター・グローバル関数](script-api.md#アクターグローバル関数) が、生成コードの形は [生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形) が正である。
 
-- `actor_proxy(self, name)` は、`self.actors[name]` があれば `ACTOR.create_proxy(アクター, self)` を返す。無ければ `self.token` を末尾から見て、最初に当たる話者のトークン（`talk`・`sakura_script`・`actor` 付きの `raw_script`）の `actor.name` が `name` と同じならその `actor` の表を再利用してプロキシを作る。そうでなければ `{ name = name }`（メタテーブルなし）を作り、`FAILURE.mark_unregistered_actor` で未登録の印を付け、「未登録アクター」を `FAILURE.report` で報告して目印（`actor` 付きの `raw_script` トークン）を積んでからプロキシを作る。再利用によって同じ未登録の名前の連続する発言は同じ表を持ち、`build` のグループ化（表の同一性で判定する）で 1 つのグループになる（[グループ化トークン](https://ekicyou.github.io/pasta/internals/talk-output.html#グループ化トークン)）。
+- `actor_proxy(self, name)` は、`self.actors[name]` があれば `ACTOR.create_proxy(アクター, self)` を返す。
+- 無ければ `self.token` を末尾から見て、最初に当たる話者のトークン（`talk`・`sakura_script`・`actor` 付きの `raw_script`）の `actor.name` が `name` と同じなら、その `actor` の表を再利用してプロキシを作る。再利用によって、同じ未登録の名前の連続する発言は同じ表を持ち、`build` のグループ化（表の同一性で判定する）で 1 つのグループになる（[グループ化トークン](https://ekicyou.github.io/pasta/internals/talk-output.html#グループ化トークン)）。
+- どちらでもなければ `{ name = name }`（メタテーブルなし）を作り、`FAILURE.mark_unregistered_actor` で未登録の印を付け、「未登録アクター」を `FAILURE.report` で報告して目印（`actor` 付きの `raw_script` トークン）を積んでからプロキシを作る。
 - その場限りのアクターは `STORE.actors`・`self.actors`・`STORE.actor_spots` のどれにも書かれず、ACT にもフィールドを足さない。状態は `self.token` の中にしか無いため、`build`・`yield` でトークンが空になると、次の発言で目印がまた付く。`name` だけの表のため、プロキシの検索の A1 は `name` にしか一致せず、A2 のアクター単語も無い（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
 - `global_fn(self, name, ...)` は `GLOBAL[name]` が関数なら、`restore_scene` で `f(self, ...)` を呼び、実行中のシーンの文脈を戻してから戻り値をすべて返し、関数でなければ「報告済み」の印を真にし、「関数が見つからない」を `FAILURE.report` で報告して `nil` を返す。名前の解決の 5 段の検索（`find_act_handler`）は通らない。関数の中で起きたエラーは捕まえない。
+
 ### 被演算子の変換（ACT.num・ACT.str）
 
-式の算術と連結の生成コードが被演算子に使う `PASTA.num`・`PASTA.str` の実体である。引数・戻り値・警告の文言は [PASTA.num](script-api.md#pastanumop-v-desc)・[PASTA.str](script-api.md#pastastrv-desc) が、生成コードの形は [生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形) が正である。ここでは実装の内部の構成だけを扱う。
+式の算術と連結の生成コードが被演算子に使う `PASTA.num`・`PASTA.str` の実体である。引数・戻り値・警告の文言は [PASTA.num](script-api.md#pastanumop-v-desc)・[PASTA.str](script-api.md#pastastrv-desc) が、生成コードの形は [生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形) が正である。
 
 - `num(op, v, desc)`・`str(v, desc)` は `pasta.act` のモジュールの関数（`ACT.num`・`ACT.str`）で、`ACT_IMPL` には置かれない。そのため ACT の `__index` と `find_act_handler` の 3 段目には現れない（[メソッドとアクタープロキシの解決](#メソッドとアクタープロキシの解決__index)）。`self` を取らず、失敗の報告のほかは ACT の状態を読み書きしない。
-- 値の判定は `type` で行う。`num` は `number` をそのまま、`string` を `tonumber` で、`str` は `string` をそのまま、`number` を `tostring` で変換する。`nil` は警告せずに `0`・`""` を返し、それ以外の値（`num` では `tonumber` で数値にできない文字列も含む）は、実行中の act（`FAILURE.running_act()`）へ「数にできない値」・「文字列にできない値」を `FAILURE.report` で報告して（警告 1 行。act が見つからなければ警告だけ）`0`・`""` を返す。表に `tostring` しないため、`__tostring` などのメタメソッドは呼ばれない。警告の `value=` の表記は、`call_key` と同じ局所関数 `arith_value_text` が作る。
+- 値の判定は `type` で行う。`num` は `number` をそのまま、`string` を `tonumber` で、`str` は `string` をそのまま、`number` を `tostring` で変換する。`nil` は警告せずに `0`・`""` を返す。
+- それ以外の値（`num` では `tonumber` で数値にできない文字列も含む）は、実行中の act（`FAILURE.running_act()`）へ「数にできない値」・「文字列にできない値」を `FAILURE.report` で報告して（警告 1 行。act が見つからなければ警告だけ）`0`・`""` を返す。
+- 表に `tostring` しないため、`__tostring` などのメタメソッドは呼ばれない。警告の `value=` の表記は、`call_key` と同じ局所関数 `arith_value_text` が作る。
 - `pasta`（`pasta` モジュール）は、`PASTA` のメタテーブルの `__index` で `num`・`str` を初めて参照したときに `require("pasta.act")` し、参照したキーの関数（`ACT.num` か `ACT.str`）を `rawset` で `PASTA` に載せる。以後の参照はメタテーブルを通らず、`PASTA.num` と `ACT.num` は同じ関数である。`require "pasta"` の時点では `pasta.act` を読み込まないため、`pasta` を読み込んでも `pasta.act` の読み込みの順序は変わらない。
 
 ### 動的参照のキー（WORD.dynamic_key）
@@ -227,12 +221,14 @@ ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call`・`call_resto
 
 ### 失敗の報告（pasta.failure）
 
-`pasta.failure` は、実行時の失敗の報告の唯一の出口である。失敗の種類・表記・出る位置・重ねない規則は [実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html) が正である。ここでは実装の内部の構成だけを扱う。
+`pasta.failure` は、実行時の失敗の報告の唯一の出口である。失敗の種類・表記・出る位置・重ねない規則は [実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html) が正である。
 
 - `FAILURE.report(act, record)` は、`record.warning` があれば `@pasta_log` の `warn` で 1 行出し、`FAILURE.enabled()` が真なら `FAILURE.format` で作った表記を `{ type = "raw_script", text = 表記, actor = record.actor }` として `act.token` に積んで `nil` を返す。偽のときは、未登録アクターの目印（`record.actor` あり）だけを空文字列の `text` で積む。`act` が `nil` なら警告だけを出す。`FAILURE.notation(record)` は警告を出して表記の文字列（偽なら `nil`）を返し、トークンには積まない。
 - 記録（`FailureRecord`）は `label`（種類の名前。`FAILURE.LABEL` の値）・`subject`（対象）・`detail`（説明）・`warning`（ログの警告文）・`actor`（未登録アクターの目印のときのアクター）を持つ。報告のたびに作って捨てる。
 - `FAILURE.format(label, subject, detail)` は中身を `FAILURE.escape`（`\` → `\\`、`%` → `\%`、CR・LF → 空白）にかけてから `【` `】` で囲む。対象の名前は `FAILURE.var`（`var.x` → `＄x`・`save.x` → `＄＊x`・`args[1]` → `＄０`）と `FAILURE.fn`（`@f()` → `＠f（）` など）で辞書の書き方に直す。知らない形はそのまま返す。
-- イベントのハンドラと関数の呼び出しの部品も持つ。`FAILURE.reply(act, record)` は `FAILURE.report` と同じく報告してから `act:build()` の結果を返す（`OnPastaScene`・`OnPastaSceneAt`・`OnPastaCallFunction`・`OnPastaSetSaveVariable`・`OnRecommendsiteChoice` の失敗の応答）。`FAILURE.is_name(v)` は空でない文字列かを、`FAILURE.quoted(v)` はログの警告に出す引数の値（`nil` は `nil`、それ以外は `'値'`）を返す。`FAILURE.bad_reference0(act, event, value)` は `Reference0` が名前にならないときの失敗（種類は名前にならない値、対象は `イベント名 Reference0`）を `reply` で返す。`FAILURE.fn_succeeded(act, ...)` は、関数の参照が成功して呼んだ関数が戻った後に「報告済み」の印を偽にし、残りの引数をそのまま返す（`pasta.act`・`pasta.actor` の関数の呼び出しが使う）。SHIORI のイベントの言い回し（`Reference0`）が入るのは、名前の検査と失敗の表記を 1 か所にするためである。act はメソッドを呼ぶだけで、`require` はしない。
+- `FAILURE.reply(act, record)` は `FAILURE.report` と同じく報告してから `act:build()` の結果を返す（`OnPastaScene`・`OnPastaSceneAt`・`OnPastaCallFunction`・`OnPastaSetSaveVariable`・`OnRecommendsiteChoice` の失敗の応答）。
+- `FAILURE.is_name(v)` は空でない文字列かを、`FAILURE.quoted(v)` はログの警告に出す引数の値（`nil` は `nil`、それ以外は `'値'`）を返す。`FAILURE.bad_reference0(act, event, value)` は `Reference0` が名前にならないときの失敗（種類は名前にならない値、対象は `イベント名 Reference0`）を `reply` で返す。SHIORI のイベントの言い回し（`Reference0`）が入るのは、名前の検査と失敗の表記を 1 か所にするためである。
+- `FAILURE.fn_succeeded(act, ...)` は、関数の参照が成功して呼んだ関数が戻った後に「報告済み」の印を偽にし、残りの引数をそのまま返す（`pasta.act`・`pasta.actor` の関数の呼び出しが使う）。act はメソッドを呼ぶだけで、`require` はしない。
 - `FAILURE.raise(record)` は、記録の表にメタ表を付けて `error` で投げる（戻らない）。止まるエラーのうち「条件に合うシーンが無い」（`FAILURE.LABEL.SCENE_UNMET`）がこれを使う（`act:call` と既定の OnChoiceSelectEx）。`FAILURE.is_raised(v)` はその値かを見分け、`STOP.response` は記録の種類と対象を表記に、止まった場所を説明に使う。`tostring` は表記の中身（`種類：対象`）になる。
 - `FAILURE.enabled()` は報告のたびに `pasta.config` の `get("logging", "balloon_warning", true)` を読み、真偽値でなければ `true` を返す。`@pasta_log` と `pasta.config` は報告の時点で `require` するため、`pasta.failure` は読み込みの時点では他のモジュールを `require` しない。そのため `pasta.act`・`pasta.actor`・`pasta.word`・`pasta.shiori.sakura_builder` のどれから `require` しても循環は生じない。
 - 状態は弱参照の表 3 つで持ち、永続化しない。`RUNNING`（スレッド → 実行中の act。`init_scene` が `FAILURE.bind` で書き、`ACT.num`・`ACT.str` が `FAILURE.running_act` で引く）、`FN_FAILED`（act → 直前の関数の参照が報告済みか。`set_fn_failed`・`take_fn_failed`）、`UNREGISTERED`（アクターの表 → 未登録の印。`mark_unregistered_actor`・`is_unregistered_actor`。`sakura_builder` の `emit_actor_switch` が、印のあるアクターでは立ち位置の警告を出さないために読む）である。
@@ -276,14 +272,23 @@ act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.
 | `sakura_script(self, text)` | `self.act:sakura_script(self.actor, text)` | `nil` |
 | `find_actor_handler(self, mode, key, skip_methods)` | `mode` が `"word"` でなければ `nil`。`self.actor[key]`（`skip_methods` が真なら `rawget(self.actor, key)`）が `nil` でなければそれ（A1）。次に `@pasta_search` を `pcall(require, …)` で得られれば `SEARCH:search_word(key, "__actor_" .. アクター名 .. "__")`（A2） | 見つかった値、または `nil` |
 | `find_handler(self, mode, key, skip_methods)` | `find_actor_handler` で見つからなければ `self.act:find_act_handler(mode, key, skip_methods)` に委ねる。`skip_methods` は両方に渡す | 見つかった値、または `nil` |
-| `word(self, name, var_path)` | `var_path` が `nil` なら、`name` が `nil` か空文字列のとき `nil` を返す。`var_path` があれば `WORD.dynamic_key(name, var_path, "proxy:word", self.act)` でキーにし（`nil` ならそこで `nil` を返す）、`skip_methods` を真にする。そのうえで `find_handler` と同じ順序で、`find_actor_handler("word", …)`（アクターの段）、見つからなければ `self.act:find_act_handler("word", …)`（ACT の段）を引く（ACT の `word` と同じ規則。[word(name, var_path)](script-api.md#wordname-var_path)）。結果が関数なら、アクターの段で見つかったときは `h(self)`（引数はプロキシ）、ACT の段で見つかったときは `h(self.act)`（引数は ACT）を呼び、戻り値を `ACTOR.drop_self` で正規化して返す。それ以外の値なら `tostring(h)`。見つからなければ「単語が見つからない」を `FAILURE.report(self.act, …)` で報告する（警告は `via=proxy(アクター名)`） | 単語の文字列、関数の戻り値（正規化後）、または `nil` |
+| `word(self, name, var_path)` | キーを決め、アクターの段 → ACT の段の順に引く（表の下の手順） | 単語の文字列、関数の戻り値（正規化後）、または `nil` |
 | `expr_fn(self, key, ...)` | 局所関数 `call_expr(self, key, nil, ...)` | 関数の戻り値、または `nil` |
 | `expr_fn_var(self, value, var_path, ...)` | `value` を `WORD.dynamic_key(value, var_path, "proxy:expr_fn", self.act)` でキーにし（`nil` ならそこで `nil` を返す）、`call_expr(self, キー, true, ...)` | 関数の戻り値、または `nil` |
 
+`word(self, name, var_path)` は次の順に進む。
+
+1. キーを決める。`var_path` が `nil` なら `name` をそのまま使い、`name` が `nil` か空文字列なら `nil` を返す。`var_path` があれば `WORD.dynamic_key(name, var_path, "proxy:word", self.act)` でキーにし（`nil` ならそこで `nil` を返す）、`skip_methods` を真にする。
+2. `find_handler` と同じ順序で引く。`find_actor_handler("word", …)`（アクターの段）、見つからなければ `self.act:find_act_handler("word", …)`（ACT の段）である（ACT の `word` と同じ規則。[word(name, var_path)](script-api.md#wordname-var_path)）。
+3. 結果が関数なら呼ぶ。アクターの段で見つかったときは `h(self)`（引数はプロキシ）、ACT の段で見つかったときは `h(self.act)`（引数は ACT）で、戻り値を `ACTOR.drop_self` で正規化して返す。関数でない値なら `tostring(h)` を返す。
+4. 見つからなければ「単語が見つからない」を `FAILURE.report(self.act, …)` で報告する（警告は `via=proxy(アクター名)`）。
+
+ほかのメソッドの細部は次のとおりである。
+
 - `call_expr` は `pasta.actor` の局所関数で（`pasta.act` の同名の局所関数とは別）、`find_handler("expr", key, skip_methods)` の結果が関数なら `self.act:restore_scene` で `h(self.act, ...)`（第 1 引数は ACT）を呼び、実行中のシーンの文脈を呼ぶ前の値に戻し、戻り値を `ACTOR.drop_self` で正規化して返す。プロキシの `word` も、関数を同じく `restore_scene` で呼ぶ。関数でなければ「関数が見つからない」を `FAILURE.report(self.act, …)` で報告する（警告は `proxy:expr_fn - handler not found`）。「報告済み」の印の読み書きは ACT の `call_expr` と同じである。`"expr"` モードでは `find_actor_handler` が `nil` を返すため、見つかる関数は常に ACT の段のものである。
-- `ACTOR.drop_self(act, r, ...)` は戻り値の正規化の部品で、先頭の戻り値 `r` が `act` と `==` で等しいか、メタテーブルが `PROXY_IMPL`（どのアクターのプロキシでも）なら `nil` を返し、そうでなければ `r, ...` を複数の戻り値も含めてそのまま返す。ACT・プロキシは `__eq` を持たないため、比較は同一性である。プロキシの `word`・`expr_fn`・`expr_fn_var` と、ACT の `word`（関数のとき）・`expr_fn`・`expr_fn_var`・`global_fn` がこの部品を通す（[関数の戻り値の扱い](script-api.md#関数の戻り値の扱い)）。前は `pasta.actor` の局所関数で、プロキシの段だけが、その ACT とそのプロキシ自身だけを `nil` にしていた。
+- `ACTOR.drop_self(act, r, ...)` は戻り値の正規化の部品で、先頭の戻り値 `r` が `act` と `==` で等しいか、メタテーブルが `PROXY_IMPL`（どのアクターのプロキシでも）なら `nil` を返し、そうでなければ `r, ...` を複数の戻り値も含めてそのまま返す。ACT・プロキシは `__eq` を持たないため、比較は同一性である。プロキシの `word`・`expr_fn`・`expr_fn_var` と、ACT の `word`（関数のとき）・`expr_fn`・`expr_fn_var`・`global_fn` がこの部品を通す（[関数の戻り値の扱い](script-api.md#関数の戻り値の扱い)）。
 - A1 は通常の添字参照であるため、アクターオブジェクトのフィールド（`name`・`spot`・`pasta.toml` の `[actor.名前]` のキー）と、メタテーブル経由の `create_word` も一致の対象になる。`skip_methods` が真のとき（動的参照）は `rawget` で引くため、アクターオブジェクト自身のフィールドだけが対象になり、`create_word` などのメソッドには一致しない。
-- A2 が渡すスコープ名は元のアクター名から組み立てるが、`search_word` の入口でサニタイズされてから照合されるため、記号を含むアクター名（`さくら・改`）でも、`register_actor` がサニタイズした名前で登録したキー（`:__actor_さくら_改__:…`）に一致する（[照合規則の共有](https://ekicyou.github.io/pasta/internals/registry-search.html#照合規則の共有)）。
+- A2 のスコープ名は `search_word` の入口でサニタイズされるため、記号を含むアクター名（`さくら・改`）でも一致する（[照合規則の共有](https://ekicyou.github.io/pasta/internals/registry-search.html#照合規則の共有)）。
 - 検索の全体の順序（A1 → A2 → L1〜L5）と各段の意味は [ローカル優先の検索順](https://ekicyou.github.io/pasta/internals/registry-search.html#ローカル優先の検索順) で扱う。
 - `word` が見つけた関数に渡す第 1 引数は、アクターの段で見つかったときはプロキシ、ACT の段で見つかったときは ACT である。`expr_fn`・`expr_fn_var` が見つけた関数には常に ACT を渡す。ACT の `word`・`expr_fn`・`expr_fn_var`・`call` が見つけた関数にも ACT を渡す。利用者から見た規則は [関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先) が正である。
 
@@ -310,9 +315,7 @@ STORE.scenes = {
 }
 ```
 
-- グローバルシーン名（登録名）は、照合用の名前・区切りの `_`・通し番号の 3 つからなる（`base_name .. "_" .. 番号`）。照合用の名前はトランスパイラが渡す基本名（`sanitize_name` でサニタイズ済みのシーン名）で、通し番号は `create_scene` が照合用の名前ごとに 1 から振った番号である（1 つ目の `＊メイン` は `メイン_1`、1 つ目の `＊挨拶・朝` は `挨拶_朝_1`）。基本名は宣言名（pasta.toml の別名表で置き換えた後の名前）から作られるため、既定の別名表のもとで `＊OnTalk` の無いゴーストの 1 つ目の `＊会話` は `OnTalk_1` になる（[登録と生成](https://ekicyou.github.io/pasta/internals/transpiler.html#登録と生成単一走査)）。区切りがあるため、`＊A1` の 1 つ目（`A1_1`）と `＊A` の 11 個目（`A_11`）は別の登録名になる。Rust 側で同じ形を作るのは `pasta_core` の `SceneRegistry::registered_name` である。
-- ローカルシーンのキー（生成コードの関数名）も同じ形の登録名である。照合用の名前は `・` の後に書いたローカルシーン名をサニタイズしたもので、通し番号は同じグローバルシーンの中で照合用の名前ごとに 1 から数える（`・選択肢` の 1 つ目は `選択肢_1`。`・挨拶・1` と `・挨拶_1` はどちらも照合用の名前が `挨拶_1` なので `挨拶_1_1`・`挨拶_1_2`）。無名の開始シーンは `__start__` である。
-- 登録名を（名前, 通し番号）に分けるのは Rust の `SceneRegistry::split_registered_name` だけであり、Lua 側には分ける関数は無い。最後の `_` の後ろが 1 文字以上の半角数字（`0`〜`9`）で、`_` の前が空でないときだけ分ける（`挨拶_朝_1` → （`挨拶_朝`, 1））。それ以外（`__start__`・`加算ループ`・`_1`・全角数字で終わる名前・`usize` に収まらない数字列）は分けず、名前の全体を通し番号なしとして扱う。Lua ブロックで直接定義した関数も同じ規則で分けるため、`step_2` は（`step`, 2）になる。分けた結果を使うのは、検索キーの作成（[検索キーの形式](https://ekicyou.github.io/pasta/internals/registry-search.html#検索キーの形式)）、辞書確定の登録順（[辞書確定](https://ekicyou.github.io/pasta/internals/registry-search.html#辞書確定)）、位置からシーンを引く索引の突き合わせ（[シーン identity 索引](https://ekicyou.github.io/pasta/internals/debug.html#シーン-identity-索引)）である。
+- グローバルシーン名（登録名）は `照合用の名前_通し番号` の形で、`create_scene` が照合用の名前ごとに 1 から番号を振る（1 つ目の `＊メイン` は `メイン_1`）。ローカルシーンのキー（生成コードの関数名）も同じ形で（`・選択肢` の 1 つ目は `選択肢_1`）、無名の開始シーンは `__start__` である。登録名の規則と、（名前, 通し番号）に分ける規則は [登録名の構成](https://ekicyou.github.io/pasta/internals/registry-search.html#登録名の構成) で扱う。
 - `__global_name__` 以外のキーはすべてシーン関数として扱われ、辞書確定で `(グローバルシーン名, キー)` の組として集められる（[finalize_scene](#finalize_scene)）。
 - メタテーブルの `__index` が `SCENE_TABLE_IMPL` を指すため、`scene:create_word(キー)` は `WORD.create_local(scene.__global_name__, キー)` のビルダーを返す。生成コードの `SCENE:create_word(キー):entry(値, …)` がこれを使う。通常の添字参照（ACT の L1 の完全一致を含む）でも、キー `create_word` はこのメソッドに一致する。動的参照の L1 は `rawget` で引くため、シーンテーブル自身のキー（`__global_name__` とシーン関数）だけが対象になり、`create_word` には一致しない。
 
@@ -407,7 +410,7 @@ local save = persistence.load()
 return save
 ```
 
-- `load()` が呼ばれるのは、`pasta.save` が最初に `require` されたときの 1 回だけである。結果の表は `package.loaded["pasta.save"]` に入り、以後の `require` は同じ表を返す。
+- `load()` が呼ばれるのは、`pasta.save` が最初に `require` されたときの 1 回だけである。
 - `ACT.new` が ACT ごとに `require("pasta.save")` を `act.save` に入れるため、全 ACT と `init_scene` の戻り値 `save` は同じ表を指す。
 - ランタイムの破棄時に保存されるのは `package.loaded["pasta.save"]` の表である。読み書きの時点と保存の処理は [永続化](https://ekicyou.github.io/pasta/internals/execution-model.html#永続化) で、`@pasta_persistence` の API と設定は [@pasta_persistence](pasta-persistence.md) で扱う。キーの命名規約とアクセスの方法は [スクリプト用ランタイム API](script-api.md) で扱う。
 
@@ -424,7 +427,7 @@ require("pasta").finalize_scene()
 - `pasta`（`pasta` モジュール）は、何もしないスタブの `PASTA.finalize_scene` を持つ。
 - ランタイムの構築は、`main`・`pasta.shiori.entry`・`pasta.scene_dic` を読み込む前に、Rust の `register_finalize_scene` でこのスタブを Rust の関数に置き換える。`pasta` がまだ読み込まれていなければ、その場で `require` してから置き換える。
 - そのため、ランタイムの上で `finalize_scene` を呼ぶと常に Rust 側の処理が動く。Rust を通さずに `pasta` を読み込む環境（単体テストなど）では、スタブが呼ばれて何も起きない。
-- `@pasta_search` は VM の構築時にも、空の登録表で一度登録されている。そのため `finalize_scene` の前の検索は、どれも見つからない。`finalize_scene` はそれを、Lua 側の登録から作り直した検索表で置き換える。
+- `finalize_scene` の前の `@pasta_search` は空の登録表で、検索はどれも見つからない（[段階構成](https://ekicyou.github.io/pasta/internals/transpiler.html#段階構成)）。
 
 ### 呼び出しタイミング
 
@@ -444,19 +447,9 @@ require("pasta").finalize_scene()
 
 ### シーン収集データ構造
 
-Rust 側は `pasta.scene` の `get_all_scenes()` を呼び、`STORE.scenes` を受け取る。
+Rust 側は `pasta.scene` の `get_all_scenes()` を呼び、`STORE.scenes` を受け取る（形は [シーンテーブル](#シーンテーブル) の図のとおり）。
 
-```lua
-{
-  ["メイン_1"] = {
-    __global_name__ = "メイン_1",
-    __start__ = function(act, ...) … end,
-    ["選択肢_1"] = function(act, ...) … end,
-  },
-}
-```
-
-- 外側のキーはグローバルシーン名、内側はシーンテーブル（[シーンテーブル](#シーンテーブル)）である。
+- 外側のキーはグローバルシーン名、内側はシーンテーブルである。
 - Rust 側での集め方（`__global_name__` 以外のキーを組にすること、関数を写さないこと）は [辞書確定](https://ekicyou.github.io/pasta/internals/registry-search.html#辞書確定) で扱う。
 
 ### 単語収集データ構造
@@ -483,7 +476,6 @@ Rust 側は `pasta.word` の `get_all_words()` を呼ぶ。この関数は、STO
 
 - 単語キーの値は「値リストの配列」である。ビルダーの `entry(...)` を 1 回呼ぶごとに、その引数を値リスト 1 つとして配列の末尾に足す。引数が 0 個の `entry()` は何も足さない。
 - Rust 側での集め方（値リスト 1 つにつき 1 つの収集項目を作り、収集した表でスコープが決まること）は [辞書確定](https://ekicyou.github.io/pasta/internals/registry-search.html#辞書確定) で扱う。
-- `local` は Lua の予約語であるため、表のキーは `["local"]` と書く。
 
 ### 単語ビルダーの内部
 
