@@ -432,3 +432,45 @@
 - 結論: **通った**。main の辞書に入れ替わり `changed` の台詞が出て、取ったファイルは変わった 16 本だけで `pasta.dll` を取らず、次の更新確認は `No Update`（`none`）。公開サイトの実 URL での確認（要件 10.4 の後半）はタスク 5.3 で行う。
 - SSP 本体の更新ログの文字列は、14.1 と同じ理由（複製の SSP の MCP に届かない）で読んでいない。サーバーの要求の記録と `OnUpdateReady`・`OnUpdateComplete` の Reference で確かめた。
 - 片付け: 試験用の SSP はプロセスを指定して強制終了（WM_CLOSE・`ゴースト終了` は使っていない）。普段の SSP は動いたまま。サーバーは止め、SSP の複製は消した。
+
+### 14.6 公開サイトの実 URL で main の辞書が届く（2026-11-19・タスク 5.3）
+
+- main の run: squash マージ（PR #289・`fe13586e`）の push で走った `manual.yml` の run 44484273654 が緑。
+  - `build-manual` 08:02:28→08:03:24（56 秒）。main の最初の run なので `pasta_check` のキャッシュは外れ（キャッシュはブランチごとで、ブランチの run で作ったものは main から見えない）、Install・Save pasta_check が走った。以後の main の run はこのキャッシュに当たる（要件 8.6。当たった run の増分は 14.4 の +5〜+10 秒）。
+  - 「Check freshness」が成功し、公開する側の枝（publish=true）を通った。「Upload Pages artifact」も成功。
+  - `deploy-manual` 08:03:29→08:03:48（19 秒）で成功。マージの push から公開までおよそ 1 分 20 秒（要件 3.1）。
+- 公開中の `https://ekicyou.github.io/pasta/hello-pasta/updates.txt`（`Last-Modified: Thu, 19 Nov 2026 08:03:42 GMT`・41 行）:
+  - 手元で `assemble-site.sh fe13586e v0.6.2 <v0.6.2 の nar> <出力先>`（`PASTA_CHECK` は crates.io の 0.6.2）で組んだ `updates.txt` と、`date=` の欄を除いてすべての行が一致（`date=` は組んだ時刻なので違う）。
+  - v0.6.2 の公開の `updates.txt`（14.2 で取ったもの）と比べて md5 が違う行は 16 行で、`git diff --name-only v0.6.2 fe13586e -- crates/pasta_sample_ghost/ghosts/hello-pasta/` の 16 本とちょうど同じ。`pasta.dll` の行は v0.6.2 と同じ md5（`e91d580f…`）・`size=3670016`。
+  - `node book/tools/ghost-site/ghost-site.mjs verify-live --nar <v0.6.2 の nar> --tree v0.6.2:crates/pasta_sample_ghost/ghosts/hello-pasta --base https://ekicyou.github.io/pasta/hello-pasta/ --attempts 1 --full` は `OK updates.txt: 1 回目で nar の側の 3 行が一致（--full: 40 ファイルも一致）`、終了コード 0。
+- SSP: 14.5 と同じ手順（`C:\wintools\ssp` を `target/ssp-t53` に複製・立てる前に `app.dat` の `SelfUpdate.Pending.*` の 2 行を消す・`--option bootunlock,standalone --sstp-listen 9802 --ghost <複製の ghost/hello-pasta>`）。SSP/2.9.34 のまま動いた（複製の `ssp.exe` は元と同じ md5）。
+- ゴースト: v0.6.2 の nar をそのまま展開し、**`homeurl` は書き換えない**（`https://ekicyou.github.io/pasta/hello-pasta/` のまま）。更新の指示のシーンは 14.5 と同じく新しいファイル `dic/99-test.pasta` に置いた。更新の指示は SSTP の NOTIFY `OnPastaCallFunction`（Reference0 = `更新テスト`）を 2 回。
+- ローカルのサーバーが無いので、取ったファイルは `pasta.log` の Reference と、更新の前後のフォルダの md5 で確かめた。
+
+#### 1 回目（v0.6.2 → 公開中の main）
+
+```text
+ID: OnUpdateReady
+Reference0: 15
+Reference1: ghost/master/descript.txt,ghost/master/dic/01-boot.pasta,…,ghost/master/dic/13-calendar.pasta,ghost/master/pasta.toml,shell/master/descript.txt（16 本）
+…
+2026-11-19T08:07:26.065812Z  INFO pasta::shiori: Starting PastaShiori load …   ← 読み込み直し
+ID: OnUpdateComplete
+Reference0: changed
+Reference1: descript.txt,01-boot.pasta,…,pasta.toml,descript.txt（16 本）
+…
+Value: \p[0]\s[0]新装開店です！\_w[450]　いらっしゃいませ！\_w[450]\p[1]\s[15]…\_w[150]…\_w[150]ぼく、\_w[450]さっきまでのぼくと同じだよね？\_w[450]\e
+```
+
+- 更新の前と後で md5 が変わったのは（`profile/` を除く）16 本とルートの `updates.txt` だけ。16 本は上の `git diff` の 16 本と同じ。**`pasta.dll` は前後とも `e91d580f…`（v0.6.2 のまま）**。ルートの `updates.txt` は公開中のものとバイト一致。手元で組んだ置き場所との違いは、手で足した `dic/99-test.pasta`、`ghost/master/updates.txt`（v0.6.2 の nar のまま・14.5 と同じ）、ルートの `updates.txt` の `date=` の欄だけ。
+
+#### 2 回目（手元と公開中が同じ）
+
+- `pasta.log`: `OnUpdateBegin`（Reference0 `hello-pasta`）に main の辞書が「本店から新しいのが届いてないか、見てくるね。」を返し、`OnUpdateComplete` は **Reference0 `none`**・Reference1 空で、「新しいのは、なし！　届いてたのは、家賃の請求書だけでした。」を返した。
+- 2 回目の後のフォルダの md5 は 1 回目の後と同じ（何も取っていない）。
+- `pasta.log` 全体で `ERROR` は 0 件（`WARN` は最初の起動の「Persistence file not found」の 1 件だけ）。
+
+#### 結論と片付け
+
+- 結論: **通った**。公開サイトの実 URL から、5.2 と同じ結果（`changed` の台詞・変わった 16 本だけを取り `pasta.dll` を取らない・次は `none`）になった（要件 10.4・10.5）。
+- 片付け: 試験用の SSP は PID を指定して強制終了（WM_CLOSE・`ゴースト終了` は使っていない）。普段の SSP は動いたまま。SSP の複製と手元で組んだ置き場所は消した。
