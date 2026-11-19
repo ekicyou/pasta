@@ -6,6 +6,7 @@
 // タスク 1.3: buildSite（置き場所の組み立て）と CLI `build`。
 // タスク 1.4: verifyLive（実 URL の見比べ）と CLI `verify-live`。
 // hello-pasta-book-sync タスク 2.1: listTree・narOnlyFiles（nar の側の規則）と CLI `nar-only`。
+// hello-pasta-book-sync タスク 2.2: verifyLive を nar の側の行の見比べに変える（CLI `verify-live` に必須の --tree）。
 
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
@@ -266,17 +267,30 @@ async function fetchOnce(fetchFn, url) {
 const stateOf = (r) => (r.error ? `取得できない（${r.error}）` : `HTTP ${r.status}・長さ ${r.body.length}・md5 ${md5Of(r.body)}`);
 
 /**
- * 実 URL の updates.txt を nar の updates.txt とバイト一致で見比べる。一致するまで attempts 回まで intervalMs おきに取り直す
- * （HTTP 200 以外・ネットワークの失敗も取り直す。最後の回の後は待たない）。取得には一意のクエリ cb=<ラベル>-<回数> を付ける。
- * full なら、一致の後に updates.txt の各行のファイルを 1 回ずつ取って md5・大きさを照合し、問題を 1 件 1 行で全部集める。
- * 戻り値の attempts は updates.txt を取った回数（一致した回、諦めたときは上限。nar に updates.txt が無ければ 0）。
- * @param {{ files: NarFile[], base: string, attempts: number, intervalMs: number, full: boolean, fetchFn?: typeof fetch }} opts
- * @returns {Promise<CheckResult & { attempts: number }>}
+ * nar の updates.txt の行のうち、nar の側のファイル（narOnlyFiles）の行を「比べる行」とし、実 URL の updates.txt に
+ * 比べる行が全部、同じパス・md5・大きさで載れば一致とする（日付の欄と、比べる行の外の行は見ない）。
+ * 一致するまで attempts 回まで intervalMs おきに取り直す（HTTP 200 以外・解釈できない・ネットワークの失敗も取り直す。
+ * 最後の回の後は待たない）。取得には一意のクエリ cb=<ラベル>-<回数> を付ける。比べる行が 0 本なら取らずに失敗する。
+ * full なら、一致の後に実 URL の updates.txt の各行のファイルを 1 回ずつ取って md5・大きさを照合し、問題を 1 件 1 行で全部集める。
+ * 戻り値の attempts は updates.txt を取った回数（一致した回、諦めたときは上限。取らずに失敗したときは 0）、
+ * compared は比べる行の本数、checked は full で照合したファイルの数。
+ * @param {{ files: NarFile[], tree: Set<string>, base: string, attempts: number, intervalMs: number, full: boolean, fetchFn?: typeof fetch }} opts
+ * @returns {Promise<CheckResult & { attempts: number, compared: number, checked: number }>}
  */
-export async function verifyLive({ files, base, attempts, intervalMs, full, fetchFn = fetch }) {
+export async function verifyLive({ files, tree, base, attempts, intervalMs, full, fetchFn = fetch }) {
   if (!(Number.isInteger(attempts) && attempts >= 1)) throw new Error(`attempts は 1 以上の整数: ${attempts}`);
+  const fail = (problems, extra = {}) => ({ ok: false, problems, attempts: 0, compared: 0, checked: 0, ...extra });
   const local = files.find((f) => f.name === 'updates.txt');
-  if (!local) return { ok: false, problems: ['NG updates.txt: nar の直下に無い'], attempts: 0 };
+  if (!local) return fail(['NG updates.txt: nar の直下に無い']);
+  let wanted;
+  try {
+    const narOnly = new Set(narOnlyFiles(files, tree).map((f) => f.name));
+    wanted = parseUpdates(local.data.toString('utf8')).filter((r) => narOnly.has(r.path));
+  } catch (e) {
+    return fail([`NG updates.txt: ${e.message}`]);
+  }
+  const compared = wanted.length;
+  if (compared === 0) return fail(['NG updates.txt: nar の側の行が 0 本（タグのツリーの渡し間違いの疑い）']);
   const root = base.endsWith('/') ? base : `${base}/`;
   const { GITHUB_RUN_ID: id, GITHUB_RUN_ATTEMPT: at } = process.env;
   // 再実行（同じ run ID）でも別のクエリになるよう試行の番号も入れる。
@@ -287,29 +301,44 @@ export async function verifyLive({ files, base, attempts, intervalMs, full, fetc
     return u.href;
   };
 
+  // 比べる行ごとの違い（無ければ空）。実 URL が 200 で解釈できたときだけ作る。
+  const diffOf = (records) => {
+    const byPath = new Map(records.map((r) => [r.path, r]));
+    return wanted.flatMap((w) => {
+      const r = byPath.get(w.path);
+      if (!r) return [`NG ${w.path}: 実 URL の updates.txt に無い`];
+      return [
+        ...(r.md5 !== w.md5 ? [`NG ${w.path}: md5 が違う（nar: ${w.md5}、実 URL: ${r.md5}）`] : []),
+        ...(r.size !== w.size ? [`NG ${w.path}: 大きさが違う（nar: ${w.size}、実 URL: ${r.size}）`] : []),
+      ];
+    });
+  };
   let last;
+  let records;
   let n = 1;
   for (; n <= attempts; n++) {
     last = await fetchOnce(fetchFn, urlOf('updates.txt', n));
-    if (last.status === 200 && last.body.equals(local.data)) break;
+    if (last.status === 200) {
+      try {
+        records = parseUpdates(last.body.toString('utf8'));
+        last.diff = diffOf(records);
+      } catch (e) {
+        last.parseError = e.message;
+      }
+      if (last.diff?.length === 0) break;
+    }
     last.mismatch = true;
     if (n < attempts) await sleep(intervalMs);
   }
   if (last.mismatch) {
-    return {
-      ok: false,
-      problems: [`NG updates.txt: ${attempts} 回取っても nar と一致しない（最後: ${stateOf(last)}、nar: 長さ ${local.data.length}・md5 ${md5Of(local.data)}）`],
+    const why = last.parseError ? `${stateOf(last)}・${last.parseError}` : stateOf(last);
+    return fail([`NG updates.txt: ${attempts} 回取っても nar の側の ${compared} 行が一致しない（最後: ${why}）`, ...(last.diff ?? [])], {
       attempts,
-    };
+      compared,
+    });
   }
-  if (!full) return { ok: true, problems: [], attempts: n };
+  if (!full) return { ok: true, problems: [], attempts: n, compared, checked: 0 };
 
-  let records;
-  try {
-    records = parseUpdates(local.data.toString('utf8'));
-  } catch (e) {
-    return { ok: false, problems: [`NG updates.txt: ${e.message}`], attempts: n };
-  }
   const problems = [];
   for (const r of records) {
     const got = await fetchOnce(fetchFn, urlOf(r.path, 'full'));
@@ -321,13 +350,13 @@ export async function verifyLive({ files, base, attempts, intervalMs, full, fetc
     if (actual !== r.md5) problems.push(`NG ${r.path}: md5 が違う（updates.txt: ${r.md5}、実 URL: ${actual}）`);
     if (got.body.length !== r.size) problems.push(`NG ${r.path}: 大きさが違う（updates.txt: ${r.size}、実 URL: ${got.body.length}）`);
   }
-  return { ok: problems.length === 0, problems, attempts: n };
+  return { ok: problems.length === 0, problems, attempts: n, compared, checked: records.length };
 }
 
 const USAGE = `使い方:
   node ghost-site.mjs build --nar <file> --out <dir> --index <html>
   node ghost-site.mjs nar-only --nar <file> --tree <treeish> --out <dir>
-  node ghost-site.mjs verify-live --nar <file> --base <url> [--attempts 30] [--interval 30] [--full]
+  node ghost-site.mjs verify-live --nar <file> --tree <treeish> --base <url> [--attempts 30] [--interval 30] [--full]
     （--interval は秒）`;
 
 const usage = (msg) => {
@@ -363,17 +392,18 @@ async function main(argv) {
     run = async () => {
       for (const n of writeNarOnly({ narPath: values.nar, treeish: values.tree, outDir: values.out })) console.log(n);
     };
-  } else if (cmd === 'verify-live' && values.nar && values.base) {
+  } else if (cmd === 'verify-live' && values.nar && values.tree && values.base) {
     const attempts = Number(values.attempts);
     const interval = Number(values.interval);
     if (!Number.isInteger(attempts) || attempts < 1) return usage(`--attempts は 1 以上の整数: ${values.attempts}`);
     if (!Number.isInteger(interval) || interval < 0) return usage(`--interval は 0 以上の整数（秒）: ${values.interval}`);
     run = async () => {
       const files = readNar(fs.readFileSync(values.nar));
-      const r = await verifyLive({ files, base: values.base, attempts, intervalMs: interval * 1000, full: values.full });
+      const tree = listTree(values.tree);
+      const r = await verifyLive({ files, tree, base: values.base, attempts, intervalMs: interval * 1000, full: values.full });
       if (!r.ok) throw new Error(r.problems.join('\n'));
-      const listed = values.full ? parseUpdates(files.find((f) => f.name === 'updates.txt').data.toString('utf8')).length : 0;
-      console.log(`OK updates.txt: ${r.attempts} 回目で一致${values.full ? `（--full: ${listed} ファイルも一致）` : ''}`);
+      // publish-ghost-site.ps1 が「<n> 回目で」から回数を読む。
+      console.log(`OK updates.txt: ${r.attempts} 回目で nar の側の ${r.compared} 行が一致${values.full ? `（--full: ${r.checked} ファイルも一致）` : ''}`);
     };
   } else {
     return usage();
