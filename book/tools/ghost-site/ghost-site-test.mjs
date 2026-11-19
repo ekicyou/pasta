@@ -1,4 +1,4 @@
-// ghost-site-test.mjs — ghost-site の自己テスト（hello-pasta-network-update タスク 1.1–1.4 / 要件 1.1–1.3, 1.5, 3.1–3.3, 4.4, 5.1, 5.3, 5.4, 7.1–7.3, 10.4, 11.4）。
+// ghost-site-test.mjs — ghost-site の自己テスト（hello-pasta-network-update タスク 1.1–1.4 / 要件 1.1–1.3, 1.5, 3.1–3.3, 4.4, 5.1, 5.3, 5.4, 7.1–7.3, 10.4, 11.4）、hello-pasta-book-sync タスク 2.1（要件 1.2–1.6, 2.6, 7.1）。
 //
 // 観測する完了条件（design「GhostSite」Invariants・Testing Strategy）:
 //   - readNar がテスト内で組んだ zip（保存・deflate）を読み、ディレクトリのエントリを捨てる。
@@ -17,7 +17,17 @@ import path from 'node:path';
 import http from 'node:http';
 import { spawnSync, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readNar, parseUpdates, checkIntegrity, extractNar, buildSite, verifyLive, NarError } from './ghost-site.mjs';
+import {
+  readNar,
+  parseUpdates,
+  checkIntegrity,
+  extractNar,
+  buildSite,
+  verifyLive,
+  listTree,
+  narOnlyFiles,
+  NarError,
+} from './ghost-site.mjs';
 
 // --- 最小 assert ハーネス（依存ゼロ） ---
 let passed = 0;
@@ -423,6 +433,127 @@ test('CLI: 引数の不足・不明なサブコマンドは使い方を出して
     assert.equal(r.status, 1, JSON.stringify(args));
     assert.match(r.stderr, /使い方/);
   }
+});
+
+// --- listTree・narOnlyFiles と CLI `nar-only`（hello-pasta-book-sync タスク 2.1 / 要件 1.2–1.6, 2.6, 7.1） ---
+// 一時の git リポジトリで、hello/ の下をタグにし、その後で作業ツリーから消す（main で消したものに当たる）。
+// コミットを作らず、ツリーのオブジェクトに軽いタグを付ける（利用者の git 設定の署名などに左右されない）。
+const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+const git = (cwd, ...args) => {
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', env: gitEnv });
+  if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
+  return r.stdout.trim();
+};
+function withRepo(fn) {
+  withTmp((tmp) => {
+    const repo = path.join(tmp, 'repo');
+    fs.mkdirSync(repo);
+    git(repo, 'init', '-q');
+    for (const [p, d] of [['hello/install.txt', 'type,ghost\r\n'], ['hello/ghost/master/old.pasta', 'old'], ['other/x.txt', 'x']]) {
+      fs.mkdirSync(path.dirname(path.join(repo, p)), { recursive: true });
+      fs.writeFileSync(path.join(repo, p), d);
+    }
+    git(repo, 'add', '-A');
+    git(repo, 'tag', 'v1', git(repo, 'write-tree'));
+    git(repo, 'rm', '-q', '-f', 'hello/ghost/master/old.pasta');
+    fn(tmp, repo);
+  });
+}
+const narOnlyNar = () => {
+  const entries = [
+    ['install.txt', 'type,ghost\r\n'],
+    ['ghost/master/old.pasta', 'old'],
+    ['ghost/master/pasta.dll', 'DLL'],
+    ['ghost/master/scripts/README.md', '# readme'],
+  ];
+  return [
+    file('updates.txt', updatesOf(entries)),
+    file('updates2.dau', 'dau'),
+    ...entries.map(([p, d]) => file(p, d)),
+    file('ghost/master/updates.txt', 'nested'),
+    file('ghost/master/updates2.dau', 'nested dau'),
+    file('ghost/master/developer_options.txt', 'dev'),
+    file('bal/updates.txt', 'bal'),
+  ];
+};
+const NAR_ONLY = ['ghost/master/pasta.dll', 'ghost/master/scripts/README.md'];
+
+test('listTree: タグのツリーを hello/ からの相対の名前の集合で読む', () => {
+  withRepo((tmp, repo) => {
+    assert.deepEqual([...listTree('v1:hello', repo)].sort(), ['ghost/master/old.pasta', 'install.txt']);
+  });
+});
+
+test('listTree: 読めないタグは git の文を添えて失敗する', () => {
+  withRepo((tmp, repo) => {
+    assert.throws(() => listTree('nope:hello', repo), /nope/);
+  });
+});
+
+test('narOnlyFiles: ツリーに在るもの・どの階層の除外の 3 つの名前も外し、順は nar のまま', () => {
+  const files = narOnlyNar();
+  const out = narOnlyFiles(files, new Set(['install.txt', 'ghost/master/old.pasta']));
+  assert.deepEqual(out.map((f) => f.name), NAR_ONLY);
+  assert.ok(out.every((f) => files.includes(f)), 'nar のファイルそのもの（バイトを変えない）');
+});
+
+const cliIn = (cwd, args) =>
+  spawnSync(process.execPath, [SCRIPT, ...args], { cwd, encoding: 'utf8', env: { ...gitEnv, GITHUB_ACTIONS: '' } });
+
+test('CLI nar-only: nar の側だけを nar のバイトのまま書き、名前を 1 行ずつ出す（main で消したものも残らない）', () => {
+  withRepo((tmp, repo) => {
+    const files = narOnlyNar();
+    const out = path.join(tmp, 'out');
+    const r = cliIn(repo, ['nar-only', '--nar', writeNar(tmp, files), '--tree', 'v1:hello', '--out', out]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.deepEqual(r.stdout.trim().split(/\r?\n/), NAR_ONLY);
+    assert.deepEqual(listAll(out), NAR_ONLY);
+    for (const n of NAR_ONLY) assert.deepEqual(fs.readFileSync(path.join(out, n)), files.find((f) => f.name === n).data);
+  });
+});
+
+test('CLI nar-only: nar に updates.txt が無ければ何も書かずに終了コード 1', () => {
+  withRepo((tmp, repo) => {
+    const out = path.join(tmp, 'out');
+    const nar = writeNar(tmp, narOnlyNar().filter((f) => f.name !== 'updates.txt'));
+    const r = cliIn(repo, ['nar-only', '--nar', nar, '--tree', 'v1:hello', '--out', out]);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /NG updates\.txt/);
+    assert.ok(!fs.existsSync(out));
+  });
+});
+
+test('CLI nar-only: 無いタグは git の文を出して終了コード 1、何も書かない', () => {
+  withRepo((tmp, repo) => {
+    const out = path.join(tmp, 'out');
+    const r = cliIn(repo, ['nar-only', '--nar', writeNar(tmp, narOnlyNar()), '--tree', 'nope:hello', '--out', out]);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /nope/);
+    assert.ok(!fs.existsSync(out));
+  });
+});
+
+test('CLI nar-only: nar の側が 0 本・出力先が空でない・引数の不足は終了コード 1', () => {
+  withRepo((tmp, repo) => {
+    const entries = [['install.txt', 'type,ghost\r\n']];
+    const only = writeNar(tmp, [file('updates.txt', updatesOf(entries)), file('install.txt', 'type,ghost\r\n')]);
+    let r = cliIn(repo, ['nar-only', '--nar', only, '--tree', 'v1:hello', '--out', path.join(tmp, 'o1')]);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /0 本/);
+    assert.ok(!fs.existsSync(path.join(tmp, 'o1')));
+
+    const full = path.join(tmp, 'o2');
+    fs.mkdirSync(full);
+    fs.writeFileSync(path.join(full, 'keep.txt'), 'old');
+    r = cliIn(repo, ['nar-only', '--nar', writeNar(tmp, narOnlyNar()), '--tree', 'v1:hello', '--out', full]);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /空でない/);
+    assert.deepEqual(listAll(full), ['keep.txt']);
+
+    r = cliIn(repo, ['nar-only', '--nar', 'x.nar', '--out', full]);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /使い方/);
+  });
 });
 
 // --- verifyLive と CLI `verify-live`（タスク 1.4 / 要件 1.3, 5.1, 5.3, 5.4, 10.4） ---

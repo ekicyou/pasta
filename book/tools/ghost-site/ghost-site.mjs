@@ -5,6 +5,7 @@
 // タスク 1.2: checkIntegrity（updates.txt とエントリの照合）・extractNar（出力先への展開）。
 // タスク 1.3: buildSite（置き場所の組み立て）と CLI `build`。
 // タスク 1.4: verifyLive（実 URL の見比べ）と CLI `verify-live`。
+// hello-pasta-book-sync タスク 2.1: listTree・narOnlyFiles（nar の側の規則）と CLI `nar-only`。
 
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
@@ -12,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 /** @typedef {{ name: string, data: Buffer }} NarFile */
 /** @typedef {{ path: string, md5: string, size: number }} UpdateRecord */
@@ -208,6 +210,47 @@ export function buildSite({ narPath, outDir, indexPath }) {
   if (diff.length > 0) throw new Error(diff.join('\n'));
 }
 
+/** pasta_check release が更新の対象から外す名前（update_files.rs の EXCLUDED_FILES と同じ）。どの階層でも最後の部品で比べる。 */
+export const EXCLUDED_NAMES = Object.freeze(['updates.txt', 'updates2.dau', 'developer_options.txt']);
+
+/**
+ * git ls-tree -r --name-only -z <treeish> の名前の集合（<タグ>:<hello-pasta のパス> なら hello-pasta からの相対）。
+ * git が失敗したら、git の標準エラーを添えて Error を投げる。
+ * @param {string} treeish @param {string} [cwd] @returns {Set<string>}
+ */
+export function listTree(treeish, cwd) {
+  let out;
+  try {
+    out = execFileSync('git', ['ls-tree', '-r', '--name-only', '-z', treeish], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    throw new Error(`NG ${treeish}: タグのツリーを読めない（${(e.stderr || e.message).trim()}）`);
+  }
+  return new Set(out.split('\0').filter((n) => n !== ''));
+}
+
+/**
+ * nar の側: files のうち、tree に無く、最後の部品が EXCLUDED_NAMES に当たらないもの。順は files のまま。
+ * @param {NarFile[]} files @param {Set<string>} tree @returns {NarFile[]}
+ */
+export function narOnlyFiles(files, tree) {
+  return files.filter((f) => !tree.has(f.name) && !EXCLUDED_NAMES.includes(f.name.split('/').pop()));
+}
+
+/**
+ * nar を照合し、nar の側のファイルを nar のバイトのまま outDir へ書いて、書いた名前を返す。
+ * 照合の問題・git の失敗・nar の側が 0 本・出力先が空でない、は何も書かずに Error を投げる。
+ * @param {{ narPath: string, treeish: string, outDir: string }} opts @returns {string[]}
+ */
+export function writeNarOnly({ narPath, treeish, outDir }) {
+  const files = readNar(fs.readFileSync(narPath));
+  const r = checkIntegrity(files);
+  if (!r.ok) throw new Error(r.problems.join('\n'));
+  const picked = narOnlyFiles(files, listTree(treeish));
+  if (picked.length === 0) throw new Error(`NG ${treeish}: nar の側のファイルが 0 本（タグのツリーの渡し間違いの疑い）`);
+  extractNar(picked, outDir);
+  return picked.map((f) => f.name);
+}
+
 const md5Of = (buf) => crypto.createHash('md5').update(buf).digest('hex');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -283,6 +326,7 @@ export async function verifyLive({ files, base, attempts, intervalMs, full, fetc
 
 const USAGE = `使い方:
   node ghost-site.mjs build --nar <file> --out <dir> --index <html>
+  node ghost-site.mjs nar-only --nar <file> --tree <treeish> --out <dir>
   node ghost-site.mjs verify-live --nar <file> --base <url> [--attempts 30] [--interval 30] [--full]
     （--interval は秒）`;
 
@@ -302,6 +346,7 @@ async function main(argv) {
         nar: { type: 'string' },
         out: { type: 'string' },
         index: { type: 'string' },
+        tree: { type: 'string' },
         base: { type: 'string' },
         attempts: { type: 'string', default: '30' },
         interval: { type: 'string', default: '30' },
@@ -314,6 +359,10 @@ async function main(argv) {
   let run;
   if (cmd === 'build' && values.nar && values.out && values.index) {
     run = async () => buildSite({ narPath: values.nar, outDir: values.out, indexPath: values.index });
+  } else if (cmd === 'nar-only' && values.nar && values.tree && values.out) {
+    run = async () => {
+      for (const n of writeNarOnly({ narPath: values.nar, treeish: values.tree, outDir: values.out })) console.log(n);
+    };
   } else if (cmd === 'verify-live' && values.nar && values.base) {
     const attempts = Number(values.attempts);
     const interval = Number(values.interval);
