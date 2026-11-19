@@ -44,7 +44,7 @@
   - _Dispatch: standard — 既存の道具をつなぐ新しい台本と実物での照合_
   - _Requirements: 1.1, 1.5, 1.7, 1.8, 2.1, 2.2, 2.3, 2.4, 2.5, 3.3, 7.1, 7.2_
 
-- [ ] 3. CI へのつなぎ込み
+- [x] 3. CI へのつなぎ込み
 - [x] 3.1 マニュアル公開 CI の置き場所の段を新しい組み立てに替える
   - 起動の条件の hello-pasta の 2 行を、hello-pasta の配下全部の 1 行に替える（push・pull_request の両方）
   - concurrency の `pages` の組を main の run だけにし、ほかは event と ref ごとの組にする
@@ -66,7 +66,7 @@
   - _Dispatch: standard — 設計が判定の形を与えた分岐の実装_
   - _Requirements: 2.7, 5.1, 5.2, 5.3, 5.4, 8.4_
 
-- [ ] 3.3 (P) リリース CI の見比べに `--tree` を渡す
+- [x] 3.3 (P) リリース CI の見比べに `--tree` を渡す
   - `publish-ghost-site.ps1` が、`<タグ>:crates/pasta_sample_ghost/ghosts/hello-pasta` を `--tree` として `verify-live` に渡す。hello-pasta のパスはスクリプトの中の決まった文字列にし、`release.yml` は変えない
   - 説明と結果の文を「Release の nar の側の行と一致」に替える。古いタグの判定・起動・待ち・`status`・`reason`・回数・間隔・summary の形は変えない
   - `release-scripts-test.ps1` の項目 22 の引数の照合に `--tree v0.0.2:crates/pasta_sample_ghost/ghosts/hello-pasta` を足し、項目 18〜28 が全部通る
