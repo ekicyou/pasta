@@ -12,7 +12,8 @@ VSCode 拡張と pasta-recipe は「SHIORI をリロード」を呼べるが、�
 ## Current State
 
 - 有効かどうかは、SHIORI の読み込みのたびに 1 回だけ、`crates/pasta_lua/src/debug/config.rs` の `resolve_enabled` が決める。順は `PASTA_DEBUG` ＞ `[debug] enabled` ＞ false。呼ぶのはローダの Phase 5.5（`crates/pasta_lua/src/loader/mod.rs`）で、シーンマップを作るかどうかもここで決まる。Lua のランタイムはまだ起きていない。
-- 保存変数（`＄＊名前`）は `@pasta_persistence` のセーブファイル（既定 `profile/pasta/save/save.toml`、`obfuscate = true` なら gzip の `save.dat`）にある。ランタイムの Drop（SHIORI を下ろすとき）に自動で書かれる（`runtime/lifecycle.rs`）。`profile/` の中なので配布物には入らない。Rust の側には `persistence::load_from_file`（gzip も読む）がある。
+- グローバル変数（`＄＊名前`）は、シーンからは `SAVE` として見え、SHIORI を下ろすとき（ランタイムの Drop）に保存され、次の読み込みで戻る。`profile/` の中に保存されるので配布物には入らない。
+- シーンマップ（`SourceMap`）は Phase 5.5 で作り、ランタイムを作るときに渡している（`runtime/factory.rs`）。そのため今は、Lua が起きる前に有効かどうかが決まっている。
 - `OnPastaSetSaveVariable`（`pasta/shiori/event/external_control.lua`）は、外から保存変数を書く。デバッグが無効でも効く。型は Reference2 の `number`・`string`・`boolean`・`delete`。pasta-recipe は `editors/shared/dumpVariables.ts` の `setSaveVariable` から使っている。
 - リロードは `editors/shared/reloadShiori.ts` の `reloadAndWait`（MCP の `reload` → pasta.log の読み込み完了の印を待つ）。デバッグが有効なら、読み込みのときに pasta.log に `Debug enabled: development events are allowed` が 1 行出る。
 - マニュアルは `book/src/debug/index.md` の「デバッグの有効化」節（pasta.toml・環境変数・優先順位・確かめ方）。
@@ -27,15 +28,17 @@ VSCode 拡張と pasta-recipe は「SHIORI をリロード」を呼べるが、�
 
 ## Approach
 
-今ある部品をつなぐ。新しく作るのは、読み込みのときに保存変数を読む 1 か所だけ。
+今ある部品をつなぐ。新しく作るのは、読み込みのときにグローバル変数 `＄＊デバッグ` で有効かどうかを決める所だけ。値は、シーンから見える `＄＊デバッグ` と同じものを使う。どのファイルにどう保存されているか（書式・gzip）には触れない。
 
 ```text
 「SHIORI デバッグを有効にする」
   → OnPastaSetSaveVariable（デバッグ, true, boolean）   ← 今ある
-  → reload（下ろすときに save.toml へ書かれる）         ← 今ある
-  → 読み込みで resolve_enabled がセーブファイルの「デバッグ」を読む ← 新しい
+  → reload（下ろすときにグローバル変数が保存される）     ← 今ある
+  → 読み込みで ＄＊デバッグ を見て有効かどうかを決める   ← 新しい
   → pasta.log の「Debug enabled …」の行で効いたかを見る ← 今ある
 ```
+
+**設計の議題に残すこと**: 今は Lua が起きる前（Phase 5.5）に有効かどうかを決め、シーンマップをランタイムを作るときに渡している。`＄＊デバッグ` を見るには、判断を Lua が起きた後へ移すことになる。シーンマップを作る時期と渡し方、`@pasta_debug` の有効の読み方を、無効なときに余計なものを作らないという制約を保って設計で決める。
 
 discovery の議案（2026-11-19 開発者が推奨案で承認）:
 
@@ -48,7 +51,7 @@ discovery の議案（2026-11-19 開発者が推奨案で承認）:
 ## Scope
 
 - **In**:
-  - `resolve_enabled` で、セーブファイルの `デバッグ` を読む（パスと gzip は `[persistence]` の設定に従う。読めない・無いなら書いていないのと同じ）。優先の順の変更と単体テスト。
+  - 読み込みのときに `＄＊デバッグ` で有効かどうかを決める（無い・真偽値でないなら書いていないのと同じ）。優先の順の変更、判断の時期の移し替え、単体テスト。
   - `editors/shared/` のトグルの流れ（保存変数を書く → リロード → 状態を返す）とテスト。
   - VSCode 拡張の 2 つのコマンド（`package.json` の登録、日本語の表示名、結果の表示）。
   - pasta-recipe のトグルのボタン（リロードの隣）と、押した後の状態の表示。
@@ -71,11 +74,11 @@ discovery の議案（2026-11-19 開発者が推奨案で承認）:
 
 - デバッグのイベント（`OnPastaSceneAt`・`OnPastaDumpVariables`）の中身。
 - `OnPastaSetSaveVariable` の振る舞い（今のまま使う）。
-- セーブファイルの書式と、書く時期（Drop のとき）。
+- グローバル変数の保存の仕組み（書式・場所・書く時期）。
 
 ## Upstream / Downstream
 
-- **Upstream**: `@pasta_persistence`（セーブファイルの場所・gzip）、`OnPastaSetSaveVariable`（`external-control-events`）、`reloadAndWait`（`vscode-mcp-client`）、pasta-recipe の開発の道具（`pasta-recipe-dev-actions`）。
+- **Upstream**: グローバル変数（`＄＊名前`・`SAVE`）、`OnPastaSetSaveVariable`（`external-control-events`）、`reloadAndWait`（`vscode-mcp-client`）、pasta-recipe の開発の道具（`pasta-recipe-dev-actions`）。
 - **Downstream**: 開発の道具でデバッグを前提にする後の機能は、無効なときにトグルを案内できる。
 
 ## Existing Spec Touchpoints
@@ -86,7 +89,7 @@ discovery の議案（2026-11-19 開発者が推奨案で承認）:
 ## Constraints
 
 - 決めるのは読み込みのときの 1 回だけ、という今の形を保つ。デバッグが無効なら、シーンマップを作らず、生成した `.lua` も変わらないこと。
-- セーブファイルを読むのは、Lua の `pasta.save` が読むのと同じファイル・同じ読み方（`load_from_file`）。壊れたファイルの退避（`save.toml.broken`）は Lua の側の仕事のまま。Phase 5.5 では退避しない。
+- グローバル変数の保存の仕組み（ファイルの書式・場所・gzip・壊れたファイルの退避）には手を入れない。
 - デバッグの待ち受けは 127.0.0.1 固定・単一 DLL・opt-in のまま。`OnPastaSetSaveVariable` は前からいつでも効くので、外から有効にできることで開く口は増えない。
-- `cargo test` は環境変数に左右されない（`PASTA_DEBUG` の `#[ctor]` の中和）。セーブファイルを読むテストも、決まったパスに置いた場所で走らせる。
+- `cargo test` は環境変数に左右されない（`PASTA_DEBUG` の `#[ctor]` の中和）。`＄＊デバッグ` で決まることのテストも、置いた場所に左右されないように走らせる。
 - マニュアルが権威。挙動と同じ変更でマニュアルとスキルの `references/` を直す。
