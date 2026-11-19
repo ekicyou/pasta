@@ -225,3 +225,66 @@
 
 - **議題 1（新しい dll が要る辞書）**: 最新の Release の版の `pasta_check` で、重ねた中身を検査する（crates.io から入れ、版ごとにキャッシュ）。誤りなら公開ごと止める。PR でも失敗にする。キャッシュが効くときの増分は 1 分以内。Lua を動かさない検査で止められない違いは、手順書に書く（要件 4・8.6）。
 - **議題 2（消えたファイル）**: `delete.txt` は出さない。`hello-pasta-network-update` の決定のまま、手順書の注意にとどめる（要件 7）。
+
+## 11. 設計フェーズの調べもの（2026-11-19・`/kiro-spec-design`）
+
+- 調べ方: 既存の仕組みの拡張なので、軽い調べ（`design-discovery-light`）。使ったスキル: `kiro-spec-design` の規則（設計の原則・軽い調べ・合成・レビューの関門）。サブエージェントは使っていない。
+
+### 11.1 改行（7 章の 1）
+
+- `git -c core.eol=lf -c core.autocrlf=true archive v0.6.2 -- crates/pasta_sample_ghost/ghosts/hello-pasta/` で取り出すと、公開中の `updates.txt` の 37 行の md5 と全部一致した（Linux の既定 `core.eol=lf` を真似た実測。git 2.56 の Windows 版）。
+- 同じ取り出しを `core.autocrlf=false` にすると、19 本が合わない。
+- git の文書では、`core.autocrlf=true` は「全部のファイルに `text=auto` を付け、`core.eol=crlf` にするのと同じ」である。OS の既定の改行に依らない。ubuntu の git でも同じ CRLF になる見込みが高い。ubuntu での一致は、実装の PR の run で確かめる。
+- `.gitattributes` の案は採らない。リポジトリ全体の決まりが増え、ubuntu の `cargo test` の辞書も CRLF になる。取り出し方 1 つで足りる。
+- 除外の 3 つの名前は、GNU `tar` の `--exclude` で外せる。`git archive` の `:(exclude,glob)**/…` の pathspec でも外せることを確かめた。
+
+### 11.2 `updates.txt` の作り手（7 章・5 章の案）
+
+- `pasta_check release` の引数は `--target`・`--release`・`--nar`・`--copy`（0 回以上、後勝ち）。v0.6.2 のタグと同じ引数である（`git diff v0.6.2` で `pasta_check/src` の差は無い）。
+- 段 2 で `--target` を写し、段 3 で `--copy` を重ね、段 4 で `ghost/master` の辞書を検査し、段 5 で `updates.txt` を作ってルートと `ghost/master/` に置き、段 6 で nar を作る。
+- `pasta.dll` が無くても動く（段 4 は Lua を動かさない）。
+- v0.6.2 の取り出し（37 本）で動かすと 0.5 秒で終わった。できた `updates.txt` の 37 行は、日付の欄を除いて、公開中の行と全部同じだった（足りないのは nar の側の 3 本だけ）。
+- 段 6 の nar を、今の `ghost-site.mjs build` にそのまま渡せた（40 ファイル＝37＋`updates.txt` 2 本＋`index.html`）。
+- 今の main の hello-pasta も、v0.6.2 と同じ検査の規則（`pasta_dsl`・`pasta_core`・`pasta_check` の src に v0.6.2 からの差が無い）で、誤り 0 件で通った。
+- crates.io の `pasta_check` は 0.6.2 まで出ている。依存は 63 個で、Lua に依存しない。
+- 結論: 案 B（最新 Release の `pasta_check release` に作らせる）。`--target` にリポジトリの側、`--copy` に nar の側を渡すと、重ねる・検査する・作り直すが 1 回で済む。作り手は 1 つのままなので、要件 2.3 の一致のテストは要らない。
+
+### 11.3 `ghost/master/updates.txt`（7 章の 4）
+
+- UKADOC「ネットワーク更新への対応」: SSP は `homeurl` の直下の `updates2.dau`（または `updates.txt`）を取る。
+- UKADOC「生成処理」: SSP 自身も、作った更新ファイルを `ghost\master` にも写す。`pasta_check release` も同じく写す。
+- 置き場所の `ghost/master/updates.txt` は `updates.txt` に載らないので、利用者には届かない。今の置き場所にも在る。
+- 結論: `pasta_check release` が写したもの（作り直した中身）をそのまま置く。新しい処理は要らない。
+
+### 11.4 `date=`（7 章の 6）
+
+- UKADOC「フィールド詳細」: `date=` は省略できる拡張の欄。「概要」は、サーバーの定義とローカルを比べて差分を取ると書き、比べるのは md5 である。`date=` を比べに使うとは書いていない。
+- 結論: 日付の欄は何でもよいと仮定する。実機確認（要件 10.2）で確かめる。
+
+### 11.5 古い run の見分け（5.2・5.4）
+
+- `manual.yml` の concurrency は、main では 1 つの組 `pages`・`cancel-in-progress: false`。走っている run は止めず、待っている run は 1 つだけ残る（新しいものが古い待ちを取り消す）。
+- だから、main の先頭までに起動の条件のファイルを変えたコミットがあれば、その run は、この run の後に走るか、すでに終わっている。
+- 案 A（採った）: 組み立ての後に、最新の tag と main の先頭を見る。tag が変わった・main の先頭までに起動の条件のファイルが変わった、なら公開を飛ばし、成功で終える。起動の条件は `manual.yml` から `yq` で読む（2 か所に書かない）。`contents: read` で足りる。
+- 案 B（退けた）: main の run は、いつも main の先頭を checkout する。古い run の再実行で、古い `manual.yml` の段と新しい道具が組み合わさり、失敗しうる。
+- 案 C（退けた）: 飛ばした後に `manual.yml` を起動し直す。`actions: write` が要り、要件 8.3 の権限の形を崩す。
+- 案 D（退けた）: 新しい run があるかを Actions の API で見る。`actions: read` が要り、再実行のときの判定が込み入る。
+
+### 11.6 `pasta_check` のキャッシュ（8.6）
+
+- リポジトリのワークフローは、まだ `actions/cache` を使っていない（`Swatinem/rust-cache` は使っている）。`pasta_check` の実行ファイル 1 つを残すだけなので、`actions/cache` で足りる。
+- 鍵は OS と版。`cargo install --root ~/pasta-check` で入れて、そのフォルダを残す。
+- リリース CI は `publish-crates` の後に Release を作る（`github-release` は `publish-crates` を待つ）。だから Release が最新になったとき、その版は crates.io に在る。
+
+### 11.7 リリース CI の見比べ（要件 6）
+
+- `publish-ghost-site` はタグで checkout しているので、タグのツリーは手元に在る。`git ls-tree -r --name-only <tag>:crates/pasta_sample_ghost/ghosts/hello-pasta` で、hello-pasta のフォルダからの相対の名前が取れる。
+- 「nar の側」の決め方を `ghost-site.mjs` に置けば、置き場所の組み立てと見比べで同じ規則を使える。`release.yml` は変えずに済む（`pasta-dll-multiarch` と重ならない）。
+
+## 12. 設計の判断（合成）
+
+- **まとめた**: 「nar の側」の規則は、置き場所の組み立て（要件 1.4）と見比べ（要件 6.1）の 2 つで要る。`ghost-site.mjs` の `narOnlyFiles` 1 つにした。
+- **使ったもの**: 重ねる・検査する・作り直すは `pasta_check release` の `--target`・`--copy`。照合と展開は今の `buildSite`。改行は `git archive` の `core.autocrlf`。古い run は concurrency と `git diff`。
+- **作るもの**: `nar-only`（nar の側を書き出す CLI）・`listTree`・`verify-live` の比べ方・台本 `assemble-site.sh`。台本は、CI と手元（要件 10.4）で同じ手順を使うために置く。
+- **削ったもの**: Node で `updates.txt` を作る処理と、その一致のテスト（案 A・C）。`delete.txt`。
+- **残した危険**: リリースの直後の短い間に、nar の側が 1 つ前の Release のままであること（今の作りと同じ）。`date=` の扱い（実機で確かめる）。
