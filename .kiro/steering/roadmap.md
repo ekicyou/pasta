@@ -118,6 +118,10 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
   `book/src/debug/source-level.md` の「切り替えても `.pasta` のブレークポイントは有効」は事実と違うが、`vscode-mcp-client` がその頁ごと消すので、0.5.0 の外へは出ない。`ponytail-editor-tooling` が範囲から外した DAP の側の直し（`host` の廃止など）は、`vscode-mcp-client` が受け継ぐ。この spec の brief は git の `ae04a28b` で読める。
 
+### 統合して閉じたもの（2026-11-19）
+
+- `novel-variable-scope`（変数の保存の範囲を、セーブごとと全セーブ共通に書き分ける文法）— 2026-11-19 の discovery（ノベルゲームの深掘り）で閉じた（開発者の決定）。変数はローカルとグローバルの 2 種類のままにし、文法を足さない。**名前が「スロット」で始まるグローバル変数（`＄＊スロット好感度`）だけが、セーブのスロットに出し入れされ、ロードと巻き戻しで戻る。** ほかのグローバル変数は今のまま（終了しても残り、ロードしても戻らない。これが全セーブ共通の変数になる）。エンジン予約の `pasta_` で始まる名前も、戻らない側に入る。今のゴーストの辞書と `save.toml` は、そのまま動く。「スロット」は、作者向けの言葉としては初出である（マニュアルに無い。立ち位置の「スポット」と 1 字違い）。残った仕事（「スロット」で始まる変数を写し取る・表を取り替えずに戻す口。1〜2 タスク）は `novel-checkpoint-rollback` が持つ。スロットの出し入れは、場面から呼ぶ関数で行う（`novel-save-slots`。開発者の決定）。保存できない値は `toml-serialization` の決まり（キーごとに外して警告）のままで、控えにも同じ物差しを当てる。保存の時機は変えない。旧 brief は git の `ecf45714` で読める。この roadmap と各 brief の古い節に残る `novel-variable-scope` は、この節と読み替える（文法・`element_gen.rs`・LSP・VSCode の着色とのファイルの重なりは無くなった）。
+
 ## 0.6.1 の範囲：時報の後のトーク時刻の直しと、祝日・行事の日時変数（2026-11-14 開発者の決定）
 
 不具合なので、即時の版（開発者「バグなので即時リリース版」）。spec は `onhour-talk-recount` と `date-var-calendar`（同じ日に開発者「版は0.6.1」）の 2 本（台帳の行にある）。2 本とも入ったら `/release 0.6.1`。
@@ -287,7 +291,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
   - 選択肢の振り分け（`shiori/event/choice_select.lua`）は、`shell-element-click` と `scene-anchor-link` が共有する。先に入る側が、振り分けを関数として取り出す。
   - 場面の関数を出すコード生成（`code_gen/scope_gen.rs`）は、`scene-attribute-store`・`cue-command-runtime`（2026-10-17 に `scene-stage-attributes` をまとめた）が触る。この順に置く。場面の関数の頭は `act:init_scene(SCENE, 書いたグローバル名, 書いたローカル名, 行の表)` で、行の表は最後の引数である（`runtime-error-balloon` が入れた。`transpiler.rs` の `fill_line_maps` が後から差し込む）。引数を足す spec は、この形を保つ。
   - `act.lua` は 857 行あり（2026-11-12）、1,000 行に近い。`cue-command-runtime`・`scene-exact-match`・`scene-anchor-link`・`novel-talk-flow` が足すので、足す側が分け方を考える。ト書きの新しい入口は、別のファイルに置く。
-  - 変数の書き方（`grammar.pest`・`code_gen/element_gen.rs` の `save.x`）は、`novel-variable-scope` が触る。文法を触る `scene-exact-match`・`scene-anchor-link`・`cue-command-runtime` と同じウェーブに置かない。
+  - 変数の書き方（`grammar.pest`・`code_gen/element_gen.rs` の `save.x`）は、どの spec も触らない（2026-11-19 に `novel-variable-scope` を閉じた。文法を足さない）。
   - 設定の読み込み（`loader/config/`）は、`cue-command-runtime`（別名表）と `novel-talk-flow`（ノベル向けの切り替え）が触る。
 - **検証で分かった制約**（2026-10-10。詳しくは各 brief の「検証で見つかった穴」）:
   - NOTIFY のイベントには台本を返せない。ノベル用のイベントは、すべて GET で送ってもらう。GET の応答は 5 秒以内に返す。
@@ -303,11 +307,10 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 | 順 | spec | 要件定義 | 規模 | 先に要るもの |
 | -- | ---- | -------- | ---- | ------------ |
 | 1 | novel-areka-contract | Opus | 6〜9（文書だけ） | なし。**0.7.0 のゴールの先頭**（areka の側が早く動けるよう、最初に始める） |
-| 3 | novel-variable-scope（2026-10-17 に `novel-checkpoint-rollback` から分けた） | Fable | 8〜10 | なし（文法と `element_gen.rs` を触るので、`scene-exact-match`・`scene-anchor-link`・`cue-command-runtime` と同じウェーブに置かない） |
 | 4 | cue-command-runtime（ト書きと柱。2026-10-17 に `scene-stage-attributes` をまとめた） | Fable | 17〜21（超えるならト書きと柱に分け直す） | `scene-attribute-store`（柱の分。2026-11-03 に入った）。語彙の名前は `novel-areka-contract` から引く |
 | 5 | shell-element-click | Opus | 5〜8 | `novel-areka-contract`（完全一致の場面選びは `touch-poke-shortcuts` が入れてある）。`scene-anchor-link` とは `choice_select.lua` を共有する |
 | 6 | novel-talk-flow | Fable | 17〜21（超えるなら出力の分（Fable）と場面の流れの分（Opus）に分ける） | `cue-command-runtime`、`novel-areka-contract` |
-| 8 | novel-checkpoint-rollback | Fable | 13〜15 | `novel-talk-flow`、`novel-variable-scope` |
+| 8 | novel-checkpoint-rollback | Fable | 14〜17 | `novel-talk-flow`（2026-11-19 に `novel-variable-scope` を閉じ、「スロット」で始まる変数を写し取る・戻す口をこちらが持つ） |
 | 9 | novel-save-slots | Opus | 8〜12 | `novel-checkpoint-rollback` |
 | 10 | hello-novel-sample | Opus | 15〜18 | 2〜9 の全部と、areka の側の実装 |
 | 11 | manual-novel-guide | Opus | 8〜12 | `hello-novel-sample` |
@@ -331,7 +334,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 
 ### spec の要件へ送った未定の項目
 
-- 変数の保存の範囲の書き方（今の `＄＊` をセーブごとにするか、全セーブ共通にするか）— `novel-variable-scope` の要件の最初の議題（2026-10-17 に `novel-checkpoint-rollback` から分けた）。
+- 変数の保存の範囲の書き方 — 2026-11-19 に決めた。文法は足さず、名前が「スロット」で始まるグローバル変数だけがスロットに入る（上の「統合して閉じたもの（2026-11-19）」）。
 - 条件つきの選択肢（フラグが立っているときだけ出す）— `novel-talk-flow` の要件で、要るかどうかを決める。
 - 背景を柱にどう書くか（アクター指定行に並べるか、属性にするか）— `cue-command-runtime` の要件（柱の分）。
 - ノベルを 1 本の配布物としてどう起動するか、動画が要るか — `novel-areka-contract` の要件。
@@ -380,14 +383,13 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 - [ ] shiori-debug-toggle -- 保存変数 `＄＊デバッグ`（真偽値）でデバッグを入れたり切ったりする。優先は `PASTA_DEBUG` ＞ `＄＊デバッグ` ＞ `[debug] enabled` ＞ false で、シーンから見える `＄＊デバッグ` と同じ値で読み込みのときに決める（判断を Lua が起きた後へ移す作りは設計で決める）。VSCode 拡張の「SHIORI デバッグを有効にする／無効にする」と pasta-recipe のトグルのボタンは、`OnPastaSetSaveVariable` で書いてからリロードする（`editors/shared/` の流れを共有）。`DEBUG_HINT` とマニュアルの「デバッグの有効化」も直す（2026-11-19 起票）。版は未定。Dependencies: none
 - [x] manual-download-page -- マニュアルに「ダウンロード」のページ（`book/src/download.md`）を足す。目次の「はじめに」の次と扉の案内の先頭に置き、「やりたいこと → 取るファイル」の表と各ファイルの短い説明にする。トップページ（`introduction.md`）は削り込み、「AI にゴーストを書かせるとき」をこのページへ移し、「このマニュアルの歩き方」を消す。ほかの章と README の入手の説明はこのページへのリンクに寄せる（2026-11-14 起票。方針は discovery の推奨案のまま開発者が承認）。版は未定。`pasta-dll-multiarch` と同じウェーブに置くなら、このページの節を持ち場分けする。Dependencies: none
 - [ ] novel-areka-contract -- pasta と areka の取り決め（台本に載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票）。Dependencies: none
-- [ ] novel-variable-scope -- 変数の保存の範囲を、セーブごとと全セーブ共通の 2 つに分ける書き方。今の `＄＊x` と保存ファイルとの互換、保存できない値の扱い（2026-10-17 の棚卸で `novel-checkpoint-rollback` から分割）。Dependencies: none
 - [ ] cue-command-runtime -- キューコマンド行 `！命令＠対象（引数）` を、実行時に `\![…]` として台本へ流す。日本語の名前の別名表、引数の穴（数字で始まる引数など）の手当て。柱に書いた `＆属性` とアクター指定行も、場面に入ったときに台本へ流す（受け継ぎと、Call から戻ったときの打ち直し）。2026-10-17 に `scene-stage-attributes` をまとめた。Dependencies: none（`scene-attribute-store` は入った）
 - [ ] shell-element-click -- エレメントのクリック（名前つき）を、選択肢と同じ振り分けで場面へ届ける。シェルとして組んだシステム画面を、場面が動かせるようにする。Dependencies: novel-areka-contract（`scene-anchor-link` と `choice_select.lua` を触る順番に注意）
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアル、`pasta_check validate` の飛び先の検査まで揃える（2026-10-08 起票）。版は未定。Dependencies: none（先に置いた `scene-condition-attributes` は 2026-11-05 に入った。`scene-exact-match` とは文法・`act.lua`・`choice_select.lua`・`references.rs` を共有するので、同じウェーブに置かない）
 - [ ] novel-talk-flow -- ノベル向けの出力に切り替える設定。台詞ごとのクリック待ち、話者名と声と変わらない行 ID、ランダムトークと時報の停止、起動時の場面、「次の場面へ」、完全一致の場面選びの切り替え（2026-10-21 に仕組みを `scene-exact-match` へ移した。こちらは設定を入れるだけ）。Dependencies: novel-areka-contract, cue-command-runtime, scene-exact-match
-- [ ] novel-checkpoint-rollback -- 台本に目印の ID を埋め、応答ごとに状態と台本を控える。areka が知らせた ID の時点へ戻す（変数の保存の範囲は 2026-10-17 に `novel-variable-scope` へ分けた）。Dependencies: novel-talk-flow, novel-variable-scope
+- [ ] novel-checkpoint-rollback -- 台本に目印の ID を埋め、応答ごとに状態と台本を控える。areka が知らせた ID の時点へ戻す（「スロット」で始まるグローバル変数を写し取る・戻す口も持つ。2026-11-19 に `novel-variable-scope` を閉じた）。Dependencies: novel-talk-flow
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
-- [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.7.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, novel-areka-contract（areka の側の実装も要る）
+- [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.7.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-checkpoint-rollback, novel-save-slots, shell-element-click, novel-areka-contract（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 - [ ] scene-exact-match -- 完全一致でシーンを呼ぶ `＞＞シーン名`（同名が複数ならランダム。既存の `search_scene_exact` を使う）と、`pasta.toml` の `[scene] match = "exact"`（`＞`・イベントの受け口・OnTalk・時報・選択肢の飛び先を全部完全一致にする。既定は前方一致）を足す。既定のモードでも、イベントの受け口はイベント ID の直後が英大文字で続く候補（`＊OnInstallCompleteAll` など）を外す。`novel-talk-flow` の完全一致の切り替えを引き取る（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者が承認して `event-scene-exact-match` から広げた）。版は未定。`scene-anchor-link` と同じウェーブに置かない（文法・`act.lua`・`choice_select.lua` を共有する）。Dependencies: none
 - [x] vsce-4-upgrade -- `@vscode/vsce` を 4.x に上げる。リリース CI の Node は `ponytail-manual-ci` が 22 にした。`--azure-credential` の公開の道を `release-setup-check.yml` で確かめる。だめなら 4.x の OIDC の口へ移すかを決める（2026-10-24 起票。`/update` から）。版は未定。`pasta-dll-multiarch`・`pasta-recipe`（`release.yml`）、`pasta-recipe-dev-actions` は入った（`editors/vscode/package.json`・lock は変えず、`build.yml` に job `vscode-test` を足した）。Dependencies: none（`ponytail-manual-ci` は入った）
