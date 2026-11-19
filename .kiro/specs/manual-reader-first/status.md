@@ -39,28 +39,21 @@ node book/tools/verify-search.mjs --no-build
 
 | 波 | 対象 | 状態 |
 | -- | ---- | ---- |
-| 1 | リファレンス 3 章（`startup`・`pasta-toml`・`runtime-failures`） | 直し済み（2026-11-19）。開発者の確認待ち |
-| 1 | 内部設計 10 章 | 直し済み（2026-11-19。監査のとおりの軽い手入れ）。開発者の確認待ち |
-| 1 | シェルの章の絵（顔の切り抜き 18 枚・当たり判定の図 1 枚。`book/src/img/shell/`） | 直し済み（2026-11-19）。開発者の確認待ち |
-| 1 | デバッグの部（6 章）。話し手は emo2 の 2 人 | 作業中（分身 1 名） |
-| 1 | 台詞部品に 2 組目の話し手（emo2）を足す。顔アイコン `book/src/img/emo2/` | 作業中（分身 1 名） |
-| 2 | 文法の部（10 章） | 作業中（分身 2 名） |
-| 3 | 入門ガイド（17 章）・hello-pasta の辞書・絵 16 枚・スターターの nar | 未着手 |
-| — | 規約 `book/AUTHORING.md` と検査の直し | 波ごとに同じ変更で直す |
+| 1 | リファレンス 3 章（`startup`・`pasta-toml`・`runtime-failures`） | 直してコミット済み（`db1ecd4c`）。開発者の確認待ち |
+| 1 | 内部設計 10 章 | 直してコミット済み。開発者の確認待ち |
+| 1 | シェルの章の絵（`book/src/img/shell/`） | 直してコミット済み。開発者の確認待ち |
+| 1 | デバッグの部 →「書いて試す」（6 章）。案内役は emo2 の 2 人（配役の仕組みと顔アイコン 23 枚 `book/src/img/emo2/`） | 直してコミット済み。開発者の確認待ち |
+| 2 | 文法の部（10 章）。概要を台本の全体像に・目次の並べ替え | 直してコミット済み。開発者の確認待ち |
+| 3 | hello-pasta の台詞の下書き（`draft-dic/`） | 作業中（分身 1 名）。出来たら開発者に見せて承認をもらう |
+| 3 | 入門ガイド（17 章）・絵 16 枚・スターターの nar・規約第 8 節と検査 | 未着手。台詞の承認と、章の見本（「まず会ってみる」と 1 段目）の承認の後に進める |
 
-親がやること（分身が戻ってから）:
+2026-11-19 の時点で、マニュアルの検査（`verify-content`・`link-check`・`tutorial-check`・`gen-skill-refs --check`・`verify-static`・`verify-search`・道具の自己テスト）は全部通る。`config_reference_doc_matches_ssot` とエディタの共有部・pasta-recipe のテストも通る（VS Code 拡張の WASM を読むテスト 3 件は、このワークツリーに WASM が無いので走らせられない）。
 
-- `book/src/SUMMARY.md` の部の題・章の題・文法の並びを直す。
-- `node book/tools/gen-skill-refs.mjs` でスキルの参照ファイルを作り直す。
-- `book/AUTHORING.md` 第 4 節の「検査対象の 6 キー」を 7 キーに、テンプレートの行の説明を今の形に直す。
-- 手書きのスキル `pasta-ghost-authoring/SKILL.md` の `[package]` の語（「エンジンプロファイル専用」）と、文法の概要の使いみちの文。`.claude/skills` の編集は開発者の許可が要る。
-- 全部の検査を通して、プレビューを作り直す。
+残っている後始末:
 
-済んだ後始末:
-
-- `config_reference_doc_matches_ssot` を、「## すべてのキー」の節の行を見る形に直した（テンプレートのコメントから「既定」を消したため）。
-- エディタの出力の文言と、テスト・コメントの「台本」を「スクリプト」に置き換えた（`editors/shared/runSceneAtCursor.ts` ほか）。
-- 見本の絵の README（`crates/pasta_sample_ghost/art/README.md`）に、シェルの章の派生の絵を 1 行足した。
+- 手書きのスキル `pasta-ghost-authoring/SKILL.md` の 3 か所（46 行目の grammar-index の使いみち・49 行目の旧題「Call / Jump」・365 行目の `[package]` の「エンジンプロファイル専用」）。`.claude/skills` の手書きの編集は開発者の許可が要る。
+- 文法の概要の対応の表は、幅の狭い画面で 1 列目の見出しが縦に折れる。見出しを短くするか確かめる。
+- 波 3 で入門の構成を変えるとき、`reference/shell.md` の「この章の前提」と `download.md` の入門へのリンクを直す。
 
 ## 決定の記録
 
