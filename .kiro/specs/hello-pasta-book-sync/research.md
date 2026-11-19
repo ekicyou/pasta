@@ -343,3 +343,30 @@
   | `origin` を無い場所に替えて `git fetch` が失敗する | 128 | なし | なし（ジョブの失敗） |
 
 - `git diff` に要るのは両方のコミットのツリーだけなので、浅い checkout に main の先頭を `--depth=1` で足すだけで比べられた。
+
+### 14.4 ブランチの CI・検査で止まること・所要の時間（2026-11-19・タスク 5.1）
+
+- ブランチの run（`gh workflow run manual.yml --ref <ブランチ>`）。どれも緑で、公開はされなかった（「Check freshness」「Upload Pages artifact」は skipped、`deploy-manual` は skipped）。
+
+  | run | コミット | キャッシュ | build-manual の所要 | 主な段 |
+  |-----|---------|-----------|--------------------|--------|
+  | 44473058112 | 3.1 | 外れ | 71 秒（06:33:46→06:34:57） | Install・Save pasta_check が走った。置き場所の段は成功 |
+  | 44473670154 | 3.2 | 当たり | 40 秒（06:38:46→06:39:26） | Install・Save は skipped。「Show trigger paths (yq)」で `yq v4.54.3` が在った |
+  | 44476014020 | bb202a3a（この時点の先頭） | 当たり | 35 秒（06:58:05→06:58:40） | 同上。Resolve latest Release→Fetch→Restore→Build hello-pasta update site→yq の 5 段で 3 秒 |
+
+- 前の作りの基準: 直前の main の run 5 本（44460339770・44453981500・44452775421・44447683401・44441227657）の build-manual は 28・33・30・31・27 秒（中央値 30 秒）。前の作りの置き場所の段（nar の取得と展開）は 1 秒。
+- 増分: キャッシュが当たった run で **+5〜+10 秒**（35・40 秒 対 30 秒）。1 分以内を満たす（要件 8.6）。外れた run は +41 秒（`cargo install pasta_check` の分）。
+- 検査で止まること（手元。0.6.2 の `pasta_check`・v0.6.2 の nar・タグ `v0.6.2`）。一時の変更は scratchpad の使い捨てのワークツリー（detached）でコミットし、`assemble-site.sh <そのコミット> v0.6.2 <nar> <出力先>` に渡した:
+  - `pasta.toml` の `[loader]` に未知のキーを足した場合: 0.6.2 は誤りにしなかった（誤り 0 件で終了コード 0）。この書き方は止める例にならないため、構文の誤りに替えた。
+  - `dic/02-talk.pasta` の末尾に `＊＊＊` の行を足した場合: 段 4 で止まり、ファイルと理由を出して終了コード 1。出力先は作られなかった（要件 4.2・4.4）。
+
+    ```text
+    [4/6] Validating dictionaries...
+    ghost/master/dic/02-talk.pasta:12:2: 誤り: 構文エラー:   --> 12:2 | 12 | ＊＊＊ |  ^--- | = expected id or attr
+    検査した辞書ファイル 13 個: 誤り 1 件、注意 0 件
+    Error: dictionary validation found 1 error(s); update files and NAR were not created
+    ```
+
+  - 注意だけの変更（無いシーンへの Call `＞存在しないシーン` を足した）: 段 4 で `注意: Call の飛び先「存在しないシーン」が辞書のシーンにありません…`（誤り 0 件、注意 1 件）を出して続け、終了コード 0（要件 4.5）。`updates.txt`（41 行）・`index.html`・`ghost/`・`shell/` が置かれた。
+  - 片付け: 使い捨てのワークツリーと出力先を消した（`git worktree list` に残っていない。作業ツリーは clean）。
+- `git diff origin/main -- .github/workflows/release.yml crates/pasta_check/` は空（要件 8.1・8.2）。
