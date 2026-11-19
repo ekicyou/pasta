@@ -380,6 +380,7 @@ areka へ返す形: `\![parallel,1]\p[0]\s[12]\_w[200]\s[10]\_w[200]\s[12]\![par
 
 - 選択肢の行に、シーンの宣言と同じ形の条件を付ける（`＠？手を振る「手を振ってみる」　＆＄＊スロット訪ねた数≧３`）。今の `choice_line` は、飛び先と表示だけである。
 - `！select（２００００、時間切れ）` の 2 つ目の引数で、時間切れの飛び先を書く。
+- **`！select` の時間は、ミリ秒に替える**（開発者: 「ミリ秒にそろえる。リリースにちゃんと変更を書けば『ぱすた開発』も『emo2開発』も追従してくれるはず」。骨子 2.4）。今は秒で、pasta が 1000 倍している（`sakura_builder.lua` の `choice_timeout`・`scope_gen.rs` の `generate_choice_timeout`）。この spec が、飛び先を足すのと同じ版で替える。**破壊的な変更である。** 一緒に直す物: Lua の `act:choice_timeout`（引数をミリ秒に）・入門 9 章（`book/src/getting-started/09-choice.md`）・見本ゴースト hello-pasta の `09-choice.pasta`（`!select(10)` → `!select(10000)`）・マニュアルの `！select` の記述（`grammar/`・`lua/script-api.md`・`lua/patterns.md`）・リリースノート（変更の前後の書き方を、例つきで書く）。ゴーストを作っているセッション（「ぱすた開発」・「emo2 開発」）は、リリースノートを見て追従する。小さい数を書いた時に知らせる検査は、足さない。
 
 ### 設定のモード（開発者の決定。骨子 4 章の C）
 
