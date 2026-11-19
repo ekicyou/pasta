@@ -27,8 +27,11 @@
 #     -> hello-pasta の更新の置き場所（最新 Release の tag を特定し、その nar と tag を取り、その版の pasta_check を
 #        キャッシュから取り戻すか入れて、assemble-site.sh で「このコミットの hello-pasta ＋ tag のツリーに無い nar の側のファイル」を
 #        重ね・検査・照合して book/book/hello-pasta へ。失敗で中断。hello-pasta-book-sync）
+#     -> 古い run の見分け（main のときだけ。最新 Release の tag が変わった・main の先頭までに起動の条件のファイルが
+#        変わったなら、後の run に任せて公開せず成功で終える。hello-pasta-book-sync 要件 5）
 #     -> Pages artifact（./book/book）をアップロード -> deploy-pages で公開。
 # すべて build ジョブ内で検証するため、失敗時は deploy（needs: build）が走らず公開されない。
+# 見分けが公開しないと決めたときも、build の出力 publish で Upload と deploy を止める（要件 8.4）。
 name: Manual
 
 on:
@@ -77,6 +80,9 @@ jobs:
   build:
     name: build-manual
     runs-on: ubuntu-latest
+    # 段 6 の見分けの結果。deploy の条件に使う（main 以外の run では空）。
+    outputs:
+      publish: ${{ steps.fresh.outputs.publish }}
     env:
       # 着せ替え前の版（classic/）を作る固定コミット（manual-claudia-theme 要件 11.1, 11.2）。定義はここ 1 か所。
       CLASSIC_REF: 6d4e868d799abb619f7db67611511f3196cd1ace
@@ -257,10 +263,60 @@ jobs:
           TAG: ${{ steps.rel.outputs.tag }}
         run: bash book/tools/ghost-site/assemble-site.sh HEAD "$TAG" "$RUNNER_TEMP/release/hello-pasta.nar" book/book/hello-pasta
 
-      # 公開は main のときだけ（ブランチの手動実行では検査だけ走らせて緑で終える）。
+      # 段 6 が読む起動の条件を、どの run でも yq で読めることを確かめる（ブランチの run でも走らせる）。
+      - name: Show trigger paths (yq)
+        shell: bash
+        run: |
+          set -euo pipefail
+          yq --version
+          yq '.on.push.paths[]' .github/workflows/manual.yml
+
+      # 段 6: 古い run の見分け（FreshnessGate。hello-pasta-book-sync 要件 5.1〜5.4・design「古い run の見分け」）。
+      # 最新 Release の tag が組み立ての tag と違う、または main の先頭までに起動の条件（on.push.paths）の
+      # ファイルが変わったなら、後の run が公開するので公開しない。そのときは notice と summary に理由を出して成功で終える。
+      # gh api・git fetch の失敗はジョブの失敗にする。checkout は浅いが、git diff は両方のコミットのツリーだけで足りるので
+      # main の先頭を深さ 1 で取れば足りる。
+      - name: Check freshness
+        id: fresh
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: |
+          set -euo pipefail
+          skip() {
+            echo "::notice::$1"
+            echo "$1" >> "$GITHUB_STEP_SUMMARY"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          }
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          if [ "$latest" != "$TAG" ]; then
+            skip "公開しない: 最新の Release が $TAG から $latest に変わった。リリース CI の起動する run が公開する。"
+            exit 0
+          fi
+          git fetch --no-tags --depth=1 origin main
+          head=$(git rev-parse FETCH_HEAD)
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # GitHub の paths の * は / をまたがないので、git の側も :(glob) でそろえる。
+          raw=$(yq '.on.push.paths[]' .github/workflows/manual.yml)
+          [ -n "$raw" ] || { echo "::error::on.push.paths is empty"; exit 1; }
+          mapfile -t paths < <(printf '%s\n' "$raw" | sed 's/^/:(glob)/')
+          rc=0
+          git diff --quiet "$GITHUB_SHA" "$head" -- "${paths[@]}" || rc=$?
+          case "$rc" in
+            0) echo "publish=true" >> "$GITHUB_OUTPUT" ;;
+            1) skip "公開しない: main が $head まで進み、起動の条件のファイルが変わった。後の run が公開する。" ;;
+            *) echo "::error::git diff failed ($rc)"; exit 1 ;;
+          esac
+
+      # 公開は main で、段 6 が公開すると決めたときだけ（ブランチの手動実行では検査だけ走らせて緑で終える）。
       # v4 から . で始まるファイルを既定で外すため、mdBook の .nojekyll を入れるよう指定する。
       - name: Upload Pages artifact
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && steps.fresh.outputs.publish == 'true'
         uses: actions/upload-pages-artifact@v5
         with:
           path: ./book/book
@@ -269,7 +325,7 @@ jobs:
   deploy:
     name: deploy-manual
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && needs.build.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       pages: write

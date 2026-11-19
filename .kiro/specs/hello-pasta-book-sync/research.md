@@ -324,3 +324,22 @@
   - 置き場所の `ghost/master/updates.txt` はルートの `updates.txt` とバイト一致。`index.html` も置かれた。
 - main の先頭: このブランチと origin/main の分かれ目 `fcc3ecd0`（＝ その時点の origin/main の先頭、#288）で組み立てると終了コード 0。md5 が v0.6.2 と違う行は 16 本で、`git diff --name-only v0.6.2 fcc3ecd0 -- crates/pasta_sample_ghost/ghosts/hello-pasta/` の 16 本（`ghost/master/descript.txt`・`dic/01-boot.pasta`〜`dic/13-calendar.pasta`・`pasta.toml`・`shell/master/descript.txt`）とちょうど同じ。増えた行・消えた行は無い。`pasta.dll` の行は md5 `e91d580fef3a33a269aef17a121ae7fd`・`size=3670016` のまま。
 - 失敗の確かめ（どれも終了コード 1）: 引数の数の誤り、無いタグ（`nar-only` が git の文を添えて失敗）、無いコミット（`git archive` の失敗）、空でない出力先（`build` が失敗）、`PASTA_CHECK` が無いコマンド。一時のフォルダは毎回消えた。
+
+### 14.3 古い run の見分けの段の 4 つの枝（2026-11-19・タスク 3.2）
+
+- 作り: `manual.yml` の「Check freshness」の段の `run:` の本文を、そのまま一時のファイルに書き出して `bash` で動かした（本文に `${{ }}` は無く、`TAG`・`GITHUB_SHA`・`GITHUB_REPOSITORY`・`GH_TOKEN`・`GITHUB_OUTPUT`・`GITHUB_STEP_SUMMARY` は環境変数で与えた）。
+- 一時の git リポジトリ: 元のリポジトリ（`manual.yml` の写し・`book/x.md`・`other.txt` を持つコミット A）を作り、`file://` から `--depth 1` で clone した作業ツリー（CI の浅い checkout と同じ形）で動かした。`GITHUB_SHA` は A。main を進めるときは元のリポジトリにコミットを足した。
+- 偽の道具: `PATH` の先頭に、`gh api repos/o/r/releases/latest --jq .tag_name` に `FAKE_LATEST` を返す偽の `gh` を置いた。手元に `yq` が無いため、`yq '.on.push.paths[]' <file>` に `on.push.paths` の行を awk で返す偽の `yq` を置いた（本物の `yq` の式は、ブランチの run の「Show trigger paths (yq)」の段で確かめる）。
+- 結果（すべて期待どおり）:
+
+  | 場合 | 終了コード | `publish` | notice・summary |
+  |------|-----------|-----------|-----------------|
+  | 最新の tag が v0.0.1 から v0.0.2 に変わった | 0 | `false` | 「最新の Release が v0.0.1 から v0.0.2 に変わった…」 |
+  | main の先頭が A のまま | 0 | `true` | なし |
+  | main が進み、`other.txt` だけ変わった（差なし） | 0 | `true` | なし |
+  | さらに `crates/a/b/README.md` を足した（`crates/*/README.md` の `*` は `/` をまたがないので差なし） | 0 | `true` | なし |
+  | さらに `book/x.md` を変えた（差あり） | 0 | `false` | 「main が <先頭> まで進み、起動の条件のファイルが変わった…」 |
+  | 偽の `gh` が失敗する | 1 | なし | なし（ジョブの失敗） |
+  | `origin` を無い場所に替えて `git fetch` が失敗する | 128 | なし | なし（ジョブの失敗） |
+
+- `git diff` に要るのは両方のコミットのツリーだけなので、浅い checkout に main の先頭を `--depth=1` で足すだけで比べられた。
