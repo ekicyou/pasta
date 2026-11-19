@@ -2,7 +2,7 @@
 
 `/kiro-discovery` で起票（2026-10-10・main `88c4bc0e`）。0.5.0「areka でノベルゲームが作れる」の道筋の 2 番目。
 
-2026-10-17 の `/kiro-discovery` で、`scene-stage-attributes`（柱の属性とアクター指定行を、場面に入ったときに台本へ流す）をこの spec にまとめた。どちらも `grammar.pest`・`parse_scene.rs`・`scope_gen.rs` を触り、同じ `\![…]` の通り道を作る。もともと 1 本ずつ順に入れると決めていた 2 本なので、まとめても並走できる分は減らない。規模は 8〜10 と 6〜8 で、合わせて 14〜18 タスクの見当である。
+2026-10-17 の `/kiro-discovery` で、`scene-stage-attributes`（柱の属性とアクター指定行を、場面に入ったときにさくらスクリプトへ流す）をこの spec にまとめた。どちらも `grammar.pest`・`parse_scene.rs`・`scope_gen.rs` を触り、同じ `\![…]` の通り道を作る。もともと 1 本ずつ順に入れると決めていた 2 本なので、まとめても並走できる分は減らない。規模は 8〜10 と 6〜8 で、合わせて 14〜18 タスクの見当である。
 
 ## Problem
 
@@ -17,8 +17,8 @@
 - 構文と AST はある。`crates/pasta_dsl/src/parser/ast/cue.rs` の `CueCommandNode`（命令の名前・対象 `ScopedName{actor,name}`・引数の列 `CueArgToken`）。マニュアルは `book/src/grammar/block-structure.md` の「キューコマンド行」。
 - コード生成は `crates/pasta_lua/src/code_gen/scope_gen.rs` 340〜345 行で、`select` だけを `act:choice_timeout` にし、ほかを捨てる。`scope_gen_tests.rs` 311〜322 行のテストが、この挙動を固定している。
 - 命令の名前と引数には、日本語が書ける（`grammar.pest` 210・218 行）。
-- 台詞の中の知らない `\![…]` は、日本語の引数を含めて、そのまま台本に残る。待ちも改行も挟まれず、文字の幅にも数えられない（`sakura_script/tokenizer.rs` 138〜146 行、`wait_inserter.rs` 77〜80 行、`line_breaker.rs` 33〜45 行）。
-- `！` 行は、areka の土台（dola）の要請で入った（`.kiro/specs/completed/pasta-cue-dsl-extension/`）。当時の構想は、dola が pasta の AST を直に読んで台本にすることだった。この道は、どちらの側にも実装が無い。
+- 台詞の中の知らない `\![…]` は、日本語の引数を含めて、そのままさくらスクリプトに残る。待ちも改行も挟まれず、文字の幅にも数えられない（`sakura_script/tokenizer.rs` 138〜146 行、`wait_inserter.rs` 77〜80 行、`line_breaker.rs` 33〜45 行）。
+- `！` 行は、areka の土台（dola）の要請で入った（`.kiro/specs/completed/pasta-cue-dsl-extension/`）。当時の構想は、dola が pasta の AST を直に読んでキューシート（`CueSheet`）にすることだった。この道は、どちらの側にも実装が無い。
 
 ### 柱（`＆属性` とアクター指定行）
 
@@ -56,11 +56,11 @@
 
 ## Desired Outcome
 
-- `！` 行が、書いた順のまま、台本に `\![…]` として出る。pasta は命令の名前を知らなくてよい。語彙は areka との取り決め（`novel-areka-contract`）で増やせる。
+- `！` 行が、書いた順のまま、さくらスクリプトに `\![…]` として出る。pasta は命令の名前を知らなくてよい。語彙は areka との取り決め（`novel-areka-contract`）で増やせる。
 - 日本語の名前で書ける。取り決めの名前との対応は、pasta.toml の別名表が持つ。
 - `！select` の挙動は変わらない。
 - ト書きの穴が、直されるか、マニュアルに決まりとして書かれている。
-- 柱に書いた属性のうち、演出の語彙にある名前のものが、場面に入ったときに台本へ流れる。
+- 柱に書いた属性のうち、演出の語彙にある名前のものが、場面に入ったときにさくらスクリプトへ流れる。
 
 ```pasta
 ＆曲：朝の光
@@ -73,7 +73,7 @@
 - ファイルの属性が、そのファイルの場面へ受け継がれる。1 ファイルを 1 つの場所として書ける。
 - 語彙に無い名前の属性は、これまでどおりメタデータのままで、何も出力しない。Call の絞り込み（`call-attribute-filter`）とぶつからない。
 - `＞別の場面` から戻ったときの扱いが決まっている。
-- アクター指定行が、「この場面にいる人」として台本に伝わる。
+- アクター指定行が、「この場面にいる人」としてさくらスクリプトに伝わる。
 - マニュアル・LSP の色付け・VSCode の文法定義が、新しい挙動に合っている。
 
 ## Approach
@@ -101,7 +101,7 @@
 - **場面に入るとは**: グローバルシーンの開始、ローカルシーンへの Call、選択肢からの開始、イベントからの開始。それぞれで何を打つか。
 - **戻ったとき**: `＞別の場面` から戻ったら、呼び出し元の柱を打ち直す案。同じ値なら areka は何もしない、という取り決めにする。
 - **受け継ぎ**: ファイルの属性はグローバルシーンへ。ローカルシーンと名前なしの `＊` へ受け継ぐか（旧仕様は「ローカルシーンには影響しない」だった）。
-- **登場人物**: アクター指定行を、台本にどう伝えるか。席の並べ方は areka に任せる。
+- **登場人物**: アクター指定行を、さくらスクリプトにどう伝えるか。席の並べ方は areka に任せる。
 - **背景を柱にどう書くか**: アクター指定行に並べるか（`％教室と窓、さくら`）、属性にするか（`＆背景：教室`）。開発者の例は前者に近い。
 - **実行時に読むか、生成時に埋めるか**: 属性は静的なので、コード生成が場面の関数の頭に命令を埋める手もある。`scene-attribute-store` の実行時の倉を読む手もある。
 
@@ -109,7 +109,7 @@
 
 ## Scope
 
-- **In**: `！` 行のコード生成と実行時の出力。宿主に依らないトークン。別名表と、その設定の読み込み。引数の穴の手当て。柱の属性とアクター指定行を、場面に入ったときに台本へ流すこと。受け継ぎと打ち直しの決まり。テスト、マニュアル、スキル references の再生成、LSP と VSCode の追従。
+- **In**: `！` 行のコード生成と実行時の出力。宿主に依らないトークン。別名表と、その設定の読み込み。引数の穴の手当て。柱の属性とアクター指定行を、場面に入ったときにさくらスクリプトへ流すこと。受け継ぎと打ち直しの決まり。テスト、マニュアル、スキル references の再生成、LSP と VSCode の追従。
 - **Out**: 語彙そのもの（`novel-areka-contract`）。属性の保持・型の解釈・宣言行の属性のパース（`scene-attribute-store`）。Call の絞り込み（`call-attribute-filter`）。areka の側の解釈。
 
 ## Boundary Candidates
@@ -222,7 +222,7 @@ ghost_dev の「ぱすた開発」セッションは、**外見として記録�
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
 - 参照: `.kiro/specs/completed/scene-condition-attributes/brief.md`。
-- この spec への影響: `＄` で始まる属性は条件である。柱から台本へ流す語彙の名前とは取り合わない（`＄` で始まる名前を語彙に入れない）。
+- この spec への影響: `＄` で始まる属性は条件である。柱からさくらスクリプトへ流す語彙の名前とは取り合わない（`＄` で始まる名前を語彙に入れない）。
 
 ## 申し送り（2026-10-29 の版の組み替えより）
 
@@ -256,7 +256,7 @@ ghost_dev の「ぱすた開発」セッションは、**外見として記録�
 - **触るファイル**: `grammar.pest` 285（`！` 行の規則は 220〜229 行。単語の重みとはぶつからない）・`parse_scene.rs` 444・`ast/cue.rs` 99・`scope_gen.rs` 498（`！select` だけを生成するのは 357・395〜408 行）・`scope_gen_tests.rs` 690・`transpiler.rs` 292・`context.rs` 295・`act.lua` 857（新しい入口を別のファイルに置くかを設計の最初の議題にする）・`shiori/sakura_builder.lua` 690・`shiori/act.lua` 375・`loader/config/`（`mod.rs` 359・`sections.rs` 324）・`validate/config.rs` 455・`choice_select.lua` 73・VSCode の文法定義 408、見本とスナップショット、マニュアル。`act.lua`・`sakura_builder.lua` は、この spec・`novel-talk-flow`・`novel-checkpoint-rollback`・`scene-anchor-link` が足すと 1,000 行に届きうるので、足す分は別のファイルに置く。テストは `sakura_builder_test.lua`（3,638 行）に足さず、新しいファイルに置く。
 - **規模**: 17〜21 のまま（受け継ぎが決まって軽くなった分と、予約の名前を除く分・継ぎ目の印の扱いが増えた分で差し引き同じ）。
 - **先に要るもの**: 機能の上ではなし（`scene-attribute-store` は入った。名前は `novel-areka-contract` から引くが、待たずに作れる）。ファイルの重なり（未完了）: 0.7.0 の `novel-talk-flow`（`act.lua`・`sakura_builder.lua`・`loader/config/`・`validate/config.rs`）・`novel-checkpoint-rollback`（`sakura_builder.lua`）・`novel-variable-scope`（`grammar.pest`・`scope_gen.rs`）・`shell-element-click`（柱を `choice_select.lua` で打つ場合）、版の決まっていない `scene-anchor-link`（`grammar.pest`・`act.lua`・`sakura_builder.lua`・`choice_select.lua`・VSCode の文法定義）・`scene-exact-match`（`act.lua`・`choice_select.lua`・`loader/config/`）。0.5.0 の 3 本と `debug-mcp-runtime` は入って外れた。
-- **種別**: 機能（`！select` 以外の `！` 行は何も出さずに捨てられ、柱の属性は実行時に台本へ流れない）。開発者の 0.7.0 の目標と、2026-10-17 のまとめの決定から。
+- **種別**: 機能（`！select` 以外の `！` 行は何も出さずに捨てられ、柱の属性は実行時にさくらスクリプトへ流れない）。開発者の 0.7.0 の目標と、2026-10-17 のまとめの決定から。
 - **要件定義のモデル**: Fable のまま。柱とト書きが実行時に何をいつ出すかという DSL の意味で、areka がその `\![…]` の上に作る。受け継ぎは決まったが、「場面に入る」の数え方（グローバルの開始・ローカルへの Call・選択肢・イベント）、生成で埋めるか実行時に読むか、引数の穴の直し方、出力を外見に記録するか（2026-10-21 の申し送り）の 4 つが絡み、推奨案がまだ無い（3 つ以上の絡む問い）。
 - **分割の案**: 20 をはっきり超えたら `cue-command-runtime`（ト書き）と `scene-stage-attributes`（柱）に戻す。どちらも `scope_gen.rs`・`act.lua` を触るので 1 本ずつ入れる。21 にわずかに届くだけなら分けない。
 - **見つけた穴・古くなった記述**: 「Current State」の「順番が消える（`HashMap`）」は解けた（上の柱の倉）。行番号: `！` 行の生成 → `scope_gen.rs` 357・395〜408 行、`generate_local_scene` → 230 行、命令の名前と引数の規則 210・218 行 → `grammar.pest` 223・229 行、`shiori/act.lua` の `escape_tag_arg` 245 行 → 249 行、`choice_select.lua` の直に入るローカルシーン 60 行 → 70 行（`SCENE.wrap`）。
