@@ -261,7 +261,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 
 > **版の読み替え（2026-10-29 開発者の決定）**: ノベルゲームは 0.6.0 へ順延した（2026-11-14 に 0.7.0 へ送った）。この節で「0.5.0」と書いてあるのは、ノベルゲームの版のことで、今は 0.7.0 と読む。0.5.0 は「属性関係の整備」になった（上の「0.5.0 の範囲」）。`scene-attribute-store`・`scene-condition-attributes` は 0.5.0 へ移したので、下の順番の 2 番と 7 番は、0.7.0 の時点では入っている前提で読む。
 
-> **2026-11-19 の深掘りで決めたこと（開発者の決定・承認）**: 骨子を先に決める discovery を行い、議題 18 件を閉じた。決定の本文は、brief 5 本（`novel-areka-contract`・`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-save-slots`）の末尾の節に在る。台本を書く人の目線のまとめは `.kiro/specs/novel-areka-contract/play-script-guide.md`、経緯は同じ場所の `discovery-2026-11-19.md`。この節の下の記述と食い違う所は、brief が正しい。
+> **2026-11-19 の深掘りで決めたこと（開発者の決定・承認）**: 骨子を先に決める discovery を行い、議題を全部閉じた。**骨子の全体は `.kiro/specs/novel-areka-contract/final-model-2026-11-19.md` に在る（要件定義は、これを正として始める）。** spec ごとの決定は、brief 5 本（`novel-areka-contract`・`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-save-slots`）の「決定（2026-11-19。最終形）」の節に在る。台本を書く人の目線のまとめは同じ場所の `play-script-guide.md`、経緯は `discovery-2026-11-19.md`。この節の下の記述と食い違う所は、骨子と brief が正しい。最後の洗い直しで出た整理 5 件（骨子の 4 章）は、開発者の承認を待っている。
 >
 > - **版**: Phase 13 を 0.7.0 から外す。「areka の準備待ち。版は未定」とする。0.7.0 に残す物は、次の棚卸（`/kiro-next`）で決める。この節と棚卸の節で「0.7.0」と書いてあるノベルの spec は、版が未定と読む。
 > - **フェーズ**: pasta の側を 3 つに分ける。フェーズ 1 ＝今の SSP で動く物、フェーズ 2 ＝ SSP が対応すれば動く物、フェーズ 3 ＝ areka（合成した舞台）が要る物（前半は最低限、後半は重い物）。フェーズ 1（`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` の控えと再開・`novel-save-slots`・`shell-element-click`）は、areka を待たずに作れて、SSP の実機で測れる。どの版に置くかは、棚卸で決める。同じ台本を、SSP でも areka でも動かす（pasta が、ベースウェアを見てタグを直す）。
@@ -283,8 +283,8 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 | ト書き | `！` 行を、実行時に `\![…]` として流す。dola が AST を直に読む構想から切り替えた。pasta は命令の名前を知らない |
 | 柱 | 柱に書いた `＆名前：値` は、場面に入ったときに自動で打たれる `！名前（値）` である。流すのは、語彙の表にある名前だけ |
 | フラグによる分岐 | Call の属性の絞り込みで書く。属性の倉は 1 つで、読み手は演出と絞り込みの 2 人。モードの切り替えは作らない |
-| バックログと巻き戻し | 一覧は areka が持つ（pasta.dll に依らないベースウェアの機能）。pasta はさくらスクリプトに目印を埋める。目印はイベントの名前と ID を運ぶ（`\![play,mark,OnRollback,12]`。名前は仮）。areka は、選ばれた行の直近の目印のイベントを GET で送る。**2026-11-19 に方式を改めた**: 目印は、イベントかジャンプ（最後の行の `＞`）でシーンの頭に着いたときに作る。pasta は目印ごとにシーンの名前・スロット変数・ローカル変数を控え、戻るときは変数を戻してそのシーンを頭から走り直す（KAG3・Narrat と同じ型。さくらスクリプトは控えない）。詳しくは `novel-checkpoint-rollback` の brief |
-| 表示の進み具合に関わる機能 | クリック送り・早送り・オート・既読とスキップは areka が持つ。どこまで表示したかを知っているのは areka だけ |
+| バックログと巻き戻し | 一覧は areka が持つ（pasta.dll に依らないベースウェアの機能）。pasta はさくらスクリプトに目印を埋める。目印はイベントの名前と ID を運ぶ（`\![play,mark,OnRollback,12]`。名前は仮）。areka は、選ばれた行の直近の目印のイベントを GET で送る。**2026-11-19 に方式を改めた**: 目印は、演劇の 1 本（アクション行）ごとに付ける。pasta は 1 本ごとに、再生位置（シーンの名前と行の番号）・変数・アクター状態を控え、戻るときは、シーンを頭から早回しして位置を合わせ、控えの状態を置く（さくらスクリプトは控えない）。セーブとロードも、同じ仕組みである。詳しくは `novel-checkpoint-rollback` の brief |
+| 表示の進み具合に関わる機能 | **2026-11-19 に改めた**: pasta が、アクション行ごとにさくらスクリプトを 1 本返すので、どの行まで読んだかは pasta が知る。待つのはベースウェア（`\x`）。オートと高速再生の入切は、pasta が覚える。既読も pasta が覚える案が、承認待ちである（骨子 4 章の D） |
 | システム画面 | areka が出すのは部品だけ（エレメント単位のクリック・シェルの中のバルーン・サーフェスの階層）。タイトル・セーブ・ロード・設定は、シェルとして組み、pasta の場面が動かす。見本を同梱する |
 | 0.5.0 の外 | CG 鑑賞・回想・音楽室。全セーブ共通の変数があれば作者が組めるので、専用の仕組みは作らない |
 
@@ -395,7 +395,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 - [ ] shell-element-click -- エレメントのクリック（名前つき）を、選択肢と同じ振り分けで場面へ届ける。シェルとして組んだシステム画面を、場面が動かせるようにする。Dependencies: novel-areka-contract（`scene-anchor-link` と `choice_select.lua` を触る順番に注意）
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアル、`pasta_check validate` の飛び先の検査まで揃える（2026-10-08 起票）。版は未定。Dependencies: none（先に置いた `scene-condition-attributes` は 2026-11-05 に入った。`scene-exact-match` とは文法・`act.lua`・`choice_select.lua`・`references.rs` を共有するので、同じウェーブに置かない）
 - [ ] novel-talk-flow -- ノベル向けの出力に切り替える設定。台詞ごとのクリック待ち、話者名と声と変わらない行 ID、ランダムトークと時報の停止、起動時の場面、「次の場面へ」、完全一致の場面選びの切り替え（2026-10-21 に仕組みを `scene-exact-match` へ移した。こちらは設定を入れるだけ）。Dependencies: novel-areka-contract, cue-command-runtime, scene-exact-match
-- [ ] novel-checkpoint-rollback -- さくらスクリプトに目印の ID を埋め、応答ごとに状態とさくらスクリプトを控える。areka が知らせた ID の時点へ戻す（「スロット」で始まるグローバル変数を写し取る・戻す口も持つ。2026-11-19 に `novel-variable-scope` を閉じた）。Dependencies: novel-talk-flow
+- [ ] novel-checkpoint-rollback -- さくらスクリプトに目印の ID を埋め、演劇の 1 本ごとに、再生位置・変数・アクター状態を控える（さくらスクリプトは控えない）。ベースウェアが知らせた ID の時点へ戻す（「スロット」で始まるグローバル変数を写し取る・戻す口も持つ。2026-11-19 に `novel-variable-scope` を閉じた）。Dependencies: novel-talk-flow
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.7.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-checkpoint-rollback, novel-save-slots, shell-element-click, novel-areka-contract（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
