@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. 最初の関門: SSP が `updates.txt` の日付の欄を比べに使わないことを確かめる
+- [x] 1. 最初の関門: SSP が `updates.txt` の日付の欄を比べに使わないことを確かめる
   - 公開中の v0.6.2 の置き場所を写し、`updates.txt` の各行の日付の欄だけを書き換えて、ローカルの HTTP サーバーに置く
   - v0.6.2 の `hello-pasta.nar` を入れた、別ポートの複製した SSP（bootunlock・standalone）の `homeurl` をそのローカルの置き場所に向け、更新確認をする
   - SSP の更新のログが `No Update` で、ファイルを 1 本も取っていないことを確かめ、ログの抜き書きを `research.md` の「実機確認」の節に記録する
@@ -124,3 +124,8 @@
   - _Depends: 5.1, 5.2_
   - _Dispatch: standard — 公開後の実機の確認_
   - _Requirements: 3.1, 8.6, 10.4, 10.5_
+
+## Implementation Notes
+
+- SSP の実機確認で SSP を複製するときは、立てる前に複製の `data/profile/app.dat` から `SelfUpdate.Pending.*` の行を消す（残すと複製が普段の SSP の保留中の自己更新を使って自分を更新し、`temp/cache` の zip を消費する。タスク 1 で発生）。
+- 複製の SSP の MCP は普段の SSP が口を持つので届かない。更新の結果はローカルの HTTP サーバーの要求の記録と `pasta.log` の `OnUpdateComplete` の Reference0 で見る。

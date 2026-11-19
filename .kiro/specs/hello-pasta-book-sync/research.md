@@ -292,3 +292,26 @@
 ## 13. 設計の議題の確定（2026-11-19・開発者が推奨どおり承認）
 
 - **議題 1（リリースの直後の数分）**: 要件 5.1 の例外として残し、手順書に書く。`release.yml` は変えない（`pasta-dll-multiarch` と重ねない）。キャッシュの取り戻しと保存を分けて、間が延びないようにする。
+
+## 14. 実機確認
+
+### 14.1 SSP は `updates.txt` の日付の欄を比べに使わない（2026-11-19・タスク 1）
+
+- 材料: v0.6.2 の Release の添付 `hello-pasta.nar`（3,670,331 バイト・sha256 `ac8fe3a6078d6774c81abd6ea4f527fa376349d18db4ee7d2ecc3ff997beefa8`）。中の `descript.txt` は `homeurl,https://ekicyou.github.io/pasta/hello-pasta/`。公開中の `https://ekicyou.github.io/pasta/hello-pasta/updates.txt`（41 行・4,161 バイト）は nar のルートの `updates.txt` とバイト一致（`updates2.dau` は 404）。
+- 置き場所の写し: 公開中の `updates.txt` に載る 40 ファイルを公開サイトから取り、md5 がすべて一覧と一致することを確かめた。`updates.txt` だけ、各行の `date=…` を `date=2031-01-02T03:04:05` に置き換えた（改行 CRLF・大きさ 4,161 バイトのまま。`file,`・md5・`size=` の欄は元と同じことを `diff` で確かめた）。要求をすべて記録する小さな node:http の静的サーバーで `127.0.0.1:8761/hello-pasta/` から配信した。
+- SSP: `C:\wintools\ssp` を作業ツリーの無視される `target/ssp-t1` に複製し（`ghost/`・`plugin/`・`temp/` は空）、`ssp.exe --option bootunlock,standalone --sstp-listen 9802 --ghost <複製の ghost/hello-pasta-t1>` で立てた。ゴーストは v0.6.2 の nar をそのまま展開し、`descript.txt` の `name`（`hello-pasta-t1`）と `homeurl`（`http://127.0.0.1:8761/hello-pasta/`）だけを書き換え、`02-talk.pasta` の末尾に `＊更新テスト`（`\![updatebymyself]` を出すだけ）を足した。手元のルートの `updates.txt` は公開中のもの（元の日付）と同じ。
+- 更新の指示: SSTP の NOTIFY `OnPastaCallFunction`（Reference0 = `更新テスト`）。2 回行った（2 回目はゴーストを nar から作り直し、`＊OnUpdateBegin`・`＊OnUpdateReady`・`＊OnUpdateComplete`・`＊OnUpdateFailure` に Reference を返すシーンを足した。pasta は 204 の応答をログに書かないため）。
+- サーバーの記録（2 回とも同じ。2 回目の抜き書き）:
+
+  ```text
+  2026-11-19T06:14:44.728Z GET /hello-pasta/updates2.dau 404 0 UA=SSP/2.9.36 (20261119-3; Windows NT 10.0.26300)
+  2026-11-19T06:14:44.761Z GET /hello-pasta/updates.txt 200 4161 UA=SSP/2.9.36 (20261119-3; Windows NT 10.0.26300)
+  ```
+
+  これ以外の要求は 0 件。日付の違う 40 行のファイルを 1 本も取りに来なかった。
+- ゴーストに届いた更新のイベント（2 回目の `pasta.log` の抜き書き）: `OnUpdateBegin`（Reference3 `ghost`・Reference4 `script`）→ `OnUpdateComplete`（**Reference0 `none`**・Reference1 空）。`OnUpdateReady` は来なかった。`ERROR` は 0 件。
+- 更新後のフォルダ: 手元のルートの `updates.txt` はサーバーのもの（日付 2031）に置き換わった。nar の一覧と md5 を照合すると、違うのは手で書き換えた `descript.txt`・`02-talk.pasta` の 2 つだけ（上書きされていない＝取っていない）。`pasta.dll` などはそのまま。
+- 結論: **`No Update`（OnUpdateComplete の Reference0 が `none`）で、ファイルは 1 本も取らなかった**。SSP は `updates.txt` の行を日付の欄で比べない（md5 で比べる）。`date=` の時刻が版ごとに変わっても、中身の同じファイルは取り直されない（要件 1.6・10.2）。
+- SSP 本体の更新ログの文字列（`No Update` の行）は読めなかった。SSP の MCP（HTTP の API、9821）は普段の SSP が持っていて、複製の SSP は API の口を開かなかったため。代わりに、SSP がゴーストへ送る `OnUpdateComplete` の `none` と、サーバーの要求の記録で確かめた。
+- 片付け: 試験用の SSP はプロセスを指定して強制終了（WM_CLOSE・`ゴースト終了` は使っていない）。普段の SSP は動いたまま。サーバーは止め、SSP の複製は消した。
+- 気づいたこと: 複製した `data/profile/app.dat` に、普段の SSP の保留中の自己更新（`SelfUpdate.Pending.ZipPath`。`C:\wintools\ssp\temp\cache\9\…zip`）が載っていたため、複製の SSP は最初の起動でその zip を使って自分を 2.9.36 に更新して終わった（2 回目の起動から普通に動いた）。その zip は元の `temp/cache` から消えた。普段の SSP の `ssp.exe` は変わっていない。次に複製するときは、`app.dat` の `SelfUpdate.Pending.*` の 2 行を消してから立てる。
