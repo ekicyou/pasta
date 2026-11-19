@@ -105,7 +105,7 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
 
 #### Acceptance Criteria
 
-1. When 最新の Release の `hello-pasta.nar` で入れた直後の利用者が更新確認をする, the 更新の置き場所 shall その nar より古いファイルを返さない。（置き場所のリポジトリの側は、その Release 以降の main のコミット、nar の側は、その Release のものである。）
+1. When 最新の Release の `hello-pasta.nar` で入れた直後の利用者が更新確認をする, the 更新の置き場所 shall その nar より古いファイルを返さない。（置き場所のリポジトリの側は、その Release 以降の main のコミット、nar の側は、その Release のものである。）例外として、Release が最新になってから、リリース CI の起動したマニュアル公開 CI が公開を終えるまでの数分は、nar の側が 1 つ前の Release のままでありうる。次の更新確認で新しいものに戻る。この間は手順書に書く（2026-11-19 開発者の承認。塞ぐには `release.yml` を変える必要があり、この仕様の外）。
 2. If マニュアル公開 CI が公開しようとする中身が、main の最新のコミットの中身より古い（古い run の再実行・追い越された run など）, then the マニュアル公開 CI shall それを公開せず、理由を表示して、失敗にしない。
 3. The 更新の置き場所 shall nar の側のファイルを、最新の Release より古い Release のものにしない。
 4. When 5.2 で公開を飛ばす, the マニュアル公開 CI shall main の最新の中身が公開されないままにならないようにする。（新しいコミットがマニュアル公開 CI の起動の条件に当たらないときも、取りこぼさない。）

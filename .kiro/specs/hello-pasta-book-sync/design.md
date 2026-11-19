@@ -130,7 +130,7 @@ book/tools/ghost-site/
 - `book/tools/ghost-site/ghost-site-test.mjs` — 上の表のとおり。
 - `.github/scripts/release/publish-ghost-site.ps1` — `verify-live` に `--tree <タグ>:<hello-pasta のパス>` を渡す。説明と結果の文を「nar の側の行」に合わせる。
 - `.github/scripts/release/release-scripts-test.ps1` — 項目 22 の `verify-live` の引数の照合に `--tree` を足す。
-- `crates/pasta_sample_ghost/RELEASE.md` — 置き場所の作り方・2 つのきっかけ・検査で止まったときの読み方と直し方・検査で止められない違い・見比べの読み方・消えたファイルの注意（今のまま）。手元で置き場所を組み立てる手順（`assemble-site.sh`）。
+- `crates/pasta_sample_ghost/RELEASE.md` — 置き場所の作り方・2 つのきっかけ・リリースの直後の数分の間（要件 5.1 の例外）・検査で止まったときの読み方と直し方・検査で止められない違い・見比べの読み方・消えたファイルの注意（今のまま）。手元で置き場所を組み立てる手順（`assemble-site.sh`）。
 - `.claude/skills/release/procedure.md` — 結果表の 8 行目の見比べを「nar の側の行」に合わせる（編集が拒否されたら、開発者の許可を求める）。
 - `.github/release-ci-setup.md` — 置き場所の作り方の記述を合わせる。設定の変更は要らないことを書く。
 - `.kiro/specs/completed/hello-pasta-network-update/requirements.md` — 置き換わる項に、この仕様で置き換わったことを書き足す。
@@ -531,6 +531,6 @@ function verifyLive(opts: {
 - **決めた: `yq`。** GitHub の `ubuntu-latest` の runner には `yq`（mikefarah 版）が入っている。実装の PR の run で在ることを確かめ、無ければ起動の条件を Node で読む小さな処理に替える。
 - **決めた: `verify-live --full`。** 一致の後に、実 URL の `updates.txt` の全部の行のファイルを取り、その行の md5・大きさと照合する（置き場所が自分と合っているか）。手で使うだけである。
 - **決めた: 名前がぶつかるとき。** タグのツリーに無く、公開するコミットにも nar にも在るファイルは、次のリリースまで nar の中身を置く（`--copy` が後から重なる）。要件 1.4 の「タグのツリーで分ける」1 つの規則に従う。次のリリースでタグのツリーに入れば、リポジトリの側になる。要件 1.1 に、この例外を書いた。
-- **危険（議題 2）: リリースの直後の短い間。** Release が最新になってから、リリース CI の起動した run が公開を終えるまで（数分。キャッシュが外れると数分増える）、置き場所の nar の側は 1 つ前の Release のままである。この間に新しい nar を入れて更新確認をした利用者は、古い `pasta.dll` を受け取りうる（要件 5.1）。今の `hello-pasta-network-update` の作りにも同じ間がある。この仕様では `release.yml` の流れを変えないので、この間は残し、手順書に書く、と仮定した。
+- **決めた（2026-11-19 開発者の承認）: リリースの直後の短い間。** Release が最新になってから、リリース CI の起動した run が公開を終えるまで（数分）、置き場所の nar の側は 1 つ前の Release のままである。この間に新しい nar を入れて更新確認をした利用者は、古い `pasta.dll` を受け取り、次の更新確認で新しいものに戻る。今の `hello-pasta-network-update` の作りにも同じ間がある。塞ぐには `release.yml` で Release を最新にする時機を変える必要があり、この仕様の外なので、この間は残す。要件 5.1 に例外として書き、RELEASE.md にも書く（Docs）。キャッシュを取り戻しと保存に分けたので、外れたときも間は数分を大きく超えない。
 - **危険: SSP が `date=` を見るか。** UKADOC は md5 で比べると書き、`date=` を比べに使うとは書いていない。作り直した `updates.txt` の日付の欄は nar と違うので、もし SSP が見るなら、要件 10.2（変わったファイルだけを取る）が通らない。実装の最初のタスクで確かめる（Testing Strategy「最初に確かめる」）。
 - **危険: `release` スキルの編集が拒否されうる。** そのときは、入った分と残りを示して、開発者の許可を求める（要件 9.2）。
