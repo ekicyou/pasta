@@ -496,7 +496,7 @@ function verifyLive(opts: {
 - `release-scripts-test.ps1` 項目 22: `verify-live` の引数に `--tree v0.0.2:crates/pasta_sample_ghost/ghosts/hello-pasta` が入る（6.1）。他の項目（18〜28）はそのまま通る（6.4・6.5）。
 - `manual.yml` の PR の run: 実物の hello-pasta で `assemble-site.sh` が通る（2.7・3.2・4.4）。
 - 実装のときに 1 回: `assemble-site.sh <v0.6.2 のコミット> v0.6.2 <v0.6.2 の nar>` で作った `updates.txt` が、公開中の v0.6.2 の `updates.txt` と、日付の欄を除いて全部の行で一致する（1.8・2.2）。
-- 実装のときに 1 回: 辞書に、古い `pasta_check` が誤りにする書き方（`pasta.toml` の未知のキーなど）を入れたブランチで、`manual.yml` が段 4 で失敗し、ファイルと理由が出る（4.2）。
+- 実装のときに 1 回: 辞書に、古い `pasta_check` が誤りにする書き方（辞書の構文の誤りなど。0.6.2 は `pasta.toml` の未知のキーを誤りにしない）を入れたブランチで、`manual.yml` が段 4 で失敗し、ファイルと理由が出る（4.2）。
 
 ### 最初に確かめる（実装の最初のタスク）
 
