@@ -8,7 +8,7 @@
   - _Dispatch: standard — 実機の SSP を手で動かして判定する確認_
   - _Requirements: 1.6, 10.2, 10.5_
 
-- [ ] 2. 置き場所の部品（nar の側の規則と組み立ての台本）
+- [x] 2. 置き場所の部品（nar の側の規則と組み立ての台本）
 - [x] 2.1 nar の側を選ぶ規則と `nar-only` 命令を足す
   - 用意: `gh release download v0.6.2 --pattern hello-pasta.nar` で v0.6.2 の nar をスクラッチに取り、`git fetch origin refs/tags/v0.6.2:refs/tags/v0.6.2` でタグを手元に置く（2.3・5.2 も使う）
   - タグのツリーを相対の名前の集合として読む処理を足す。読めないタグでは、git の文を添えた誤りになる
@@ -31,7 +31,7 @@
   - _Dispatch: standard — 既存の見比べの判定の中身を書き替える_
   - _Requirements: 6.1, 6.2, 6.3_
 
-- [ ] 2.3 置き場所を組み立てる台本を書き、タグのコミットで nar と一致することを確かめる
+- [x] 2.3 置き場所を組み立てる台本を書き、タグのコミットで nar と一致することを確かめる
   - 用意: 最新 Release と同じ版の `pasta_check` を `cargo install pasta_check --version 0.6.2 --locked --root <スクラッチ>` で入れ、`PASTA_CHECK` をそれに向ける（手元の開発版は検査が違いうるので使わない）
   - 引数はコミット・タグ・Release の nar・出力先。リポジトリのルートで動き、`pasta_check` は `PATH` から（環境変数 `PASTA_CHECK` で上書きできる）取る。どの段の失敗も終了コード 1
   - リポジトリの側は、コミットの hello-pasta の配下を `core.autocrlf=true` の `git archive` で取り出し、除外の 3 つの名前を外す。取り出しが 0 本なら失敗する

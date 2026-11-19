@@ -315,3 +315,12 @@
 - SSP 本体の更新ログの文字列（`No Update` の行）は読めなかった。SSP の MCP（HTTP の API、9821）は普段の SSP が持っていて、複製の SSP は API の口を開かなかったため。代わりに、SSP がゴーストへ送る `OnUpdateComplete` の `none` と、サーバーの要求の記録で確かめた。
 - 片付け: 試験用の SSP はプロセスを指定して強制終了（WM_CLOSE・`ゴースト終了` は使っていない）。普段の SSP は動いたまま。サーバーは止め、SSP の複製は消した。
 - 気づいたこと: 複製した `data/profile/app.dat` に、普段の SSP の保留中の自己更新（`SelfUpdate.Pending.ZipPath`。`C:\wintools\ssp\temp\cache\9\…zip`）が載っていたため、複製の SSP は最初の起動でその zip を使って自分を 2.9.36 に更新して終わった（2 回目の起動から普通に動いた）。その zip は元の `temp/cache` から消えた。普段の SSP の `ssp.exe` は変わっていない。次に複製するときは、`app.dat` の `SelfUpdate.Pending.*` の 2 行を消してから立てる。
+
+### 14.2 `assemble-site.sh` で組んだ置き場所と公開中の v0.6.2 の一致（2026-11-19・タスク 2.3）
+
+- 道具: `pasta_check` は `cargo install pasta_check --version 0.6.2 --locked --root <スクラッチ>` で入れた crates.io の 0.6.2 を `PASTA_CHECK` で渡した（手元の開発版は使っていない）。nar は 14.1 と同じ v0.6.2 の `hello-pasta.nar`、タグは手元の `refs/tags/v0.6.2`。
+- タグのコミット: `assemble-site.sh 97db0132（v0.6.2） v0.6.2 <v0.6.2 の nar> <出力先>` は終了コード 0。nar の側は `ghost/master/pasta.dll`・`ghost/master/THIRD_PARTY_LICENSES.txt`・`ghost/master/scripts/README.md` の 3 本。`pasta_check release` は 37＋3 本を重ね、辞書 13 個で誤り 0 件、`updates.txt` 40 行を作った。
+  - できた `updates.txt`（41 行）は、公開中の v0.6.2 の `updates.txt` と、各行の日付の欄（4 つ目の欄）を空にして `diff` すると全部の行で一致した（行の順・パス・md5・`size=`・CRLF とも）。違うのは日付の欄だけ（作り直した側は `2026-11-15T11:16:37` と、作業ツリーの時刻の `2026-11-19T06:28:25`）。
+  - 置き場所の `ghost/master/updates.txt` はルートの `updates.txt` とバイト一致。`index.html` も置かれた。
+- main の先頭: このブランチと origin/main の分かれ目 `fcc3ecd0`（＝ その時点の origin/main の先頭、#288）で組み立てると終了コード 0。md5 が v0.6.2 と違う行は 16 本で、`git diff --name-only v0.6.2 fcc3ecd0 -- crates/pasta_sample_ghost/ghosts/hello-pasta/` の 16 本（`ghost/master/descript.txt`・`dic/01-boot.pasta`〜`dic/13-calendar.pasta`・`pasta.toml`・`shell/master/descript.txt`）とちょうど同じ。増えた行・消えた行は無い。`pasta.dll` の行は md5 `e91d580fef3a33a269aef17a121ae7fd`・`size=3670016` のまま。
+- 失敗の確かめ（どれも終了コード 1）: 引数の数の誤り、無いタグ（`nar-only` が git の文を添えて失敗）、無いコミット（`git archive` の失敗）、空でない出力先（`build` が失敗）、`PASTA_CHECK` が無いコマンド。一時のフォルダは毎回消えた。
