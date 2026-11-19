@@ -51,7 +51,7 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
 
 #### Acceptance Criteria
 
-1. When マニュアル公開 CI が main のコミットから置き場所を作る, the 更新の置き場所 shall リポジトリの `crates/pasta_sample_ghost/ghosts/hello-pasta/` に在るファイルを、そのコミットの内容のまま、同じフォルダ構造で置く。
+1. When マニュアル公開 CI が main のコミットから置き場所を作る, the 更新の置き場所 shall リポジトリの `crates/pasta_sample_ghost/ghosts/hello-pasta/` に在るファイルを、そのコミットの内容のまま、同じフォルダ構造で置く。（1.2 の nar の側に当たるもの、つまり最新の Release のタグのツリーに無く nar に在るファイルは、次のリリースまで nar の中身を置く。）
 2. The 更新の置き場所 shall 最新の Release の `hello-pasta.nar` に在り、その Release のタグのツリーに無いファイル（ビルドで作ったもの。2026-11-19 時点では `ghost/master/pasta.dll`・`ghost/master/THIRD_PARTY_LICENSES.txt`・`ghost/master/scripts/README.md` の 3 本）を、nar の中身のまま置く。
 3. If nar に在るファイルが、その Release のタグのツリーにも在る, then the 更新の置き場所 shall それをリポジトリの側とし、公開するコミットに在ればその内容を置き、無ければ置かない。
 4. The マニュアル公開 CI shall どちらの出どころから置くかを「最新の Release のタグのツリーに在るか」だけで決め、ファイル名の一覧を決め打ちで持たない。（公開するコミットで消したファイルが、nar の側として置かれないため。）（nar に arch ごとの `pasta.dll` などが足されても、この仕様の変更なしに nar の側として置かれる。）

@@ -125,7 +125,7 @@ book/tools/ghost-site/
 
 ### Modified Files
 
-- `.github/workflows/manual.yml` — 起動の条件に hello-pasta の配下を足す。置き場所の段を「最新 Release の特定→nar とタグの取得→`pasta_check` の用意→`assemble-site.sh`」に替える。main のときだけ「古い run の見分け」の段を足し、その結果で Upload と `deploy` を止める。冒頭の説明の注釈を合わせる。
+- `.github/workflows/manual.yml` — 起動の条件に hello-pasta の配下を足す。concurrency の `pages` の組を main の run だけにする。置き場所の段を「最新 Release の特定→nar とタグの取得→`pasta_check` の用意→`assemble-site.sh`」に替える。main のときだけ「古い run の見分け」の段を足し、その結果で Upload と `deploy` を止める。冒頭の説明の注釈を合わせる。
 - `book/tools/ghost-site/ghost-site.mjs` — 上の表のとおり。
 - `book/tools/ghost-site/ghost-site-test.mjs` — 上の表のとおり。
 - `.github/scripts/release/publish-ghost-site.ps1` — `verify-live` に `--tree <タグ>:<hello-pasta のパス>` を渡す。説明と結果の文を「nar の側の行」に合わせる。
@@ -391,11 +391,12 @@ function verifyLive(opts: {
 **責務と制約**
 
 - `on.push.paths` と `on.pull_request.paths` の hello-pasta の 2 行（`dic/**`・`calendar.csv`）を、`crates/pasta_sample_ghost/ghosts/hello-pasta/**` の 1 行に替える（3.1・3.2）。
+- concurrency の組を、main の run だけ `pages` にする。`group: ${{ github.ref == 'refs/heads/main' && 'pages' || format('manual-{0}-{1}', github.event_name, github.ref) }}`。今は PR 以外の run が全部 `pages` に入るので、ブランチでの手動実行（リリースの予行など）が、main の待ちの run を取り消しうる。GitHub は組ごとに待ちの run を 1 つしか残さないためである。取り消されると、FreshnessGate が「後の run が公開する」と見込んだ run が消え、main の中身が出ないまま残る（5.4）。
 - 今の「Fetch latest hello-pasta.nar」と「Build hello-pasta update site」の 2 段を、次の段に替える（旧版の生成の後・Upload の前のまま）。
   1. **Resolve latest Release**（`id: rel`）: `gh api repos/$GITHUB_REPOSITORY/releases/latest --jq .tag_name`。`vX.Y.Z` の形でなければ失敗。出力は `tag` と `version`（`v` を外したもの）。`GH_TOKEN: ${{ github.token }}`。
   2. **Fetch hello-pasta.nar and tag**: `gh release download <tag> --pattern hello-pasta.nar --dir $RUNNER_TEMP/release` と `git fetch --no-tags --depth=1 origin refs/tags/<tag>:refs/tags/<tag>`。
-  3. **Cache pasta_check**（`actions/cache`）: 置き場所 `~/pasta-check`、鍵 `pasta-check-${{ runner.os }}-${{ steps.rel.outputs.version }}`。
-  4. **Install pasta_check**（キャッシュが外れたときだけ）: `cargo install pasta_check --version <version> --locked --root ~/pasta-check`。その後 `~/pasta-check/bin` を `GITHUB_PATH` に足す（当たったときも足す）。
+  3. **Restore pasta_check**（`actions/cache/restore`）: 置き場所 `~/pasta-check`、鍵 `pasta-check-${{ runner.os }}-${{ steps.rel.outputs.version }}`。
+  4. **Install pasta_check**（キャッシュが外れたときだけ）: `cargo install pasta_check --version <version> --locked --root ~/pasta-check`。入れた直後に **Save pasta_check**（`actions/cache/save`、同じ鍵）で残す。`actions/cache` の 1 段の形は、ジョブが成功したときにしか残さないので、後の段が落ちた run でも入れた分を残すために、取り戻しと保存を分ける。その後 `~/pasta-check/bin` を `GITHUB_PATH` に足す（当たったときも足す）。
   5. **Build hello-pasta update site**: `bash book/tools/ghost-site/assemble-site.sh HEAD <tag> $RUNNER_TEMP/release/hello-pasta.nar book/book/hello-pasta`。
   6. **Check freshness**（`id: fresh`・`if: github.ref == 'refs/heads/main'`）: FreshnessGate。
 - Upload の条件を `github.ref == 'refs/heads/main' && steps.fresh.outputs.publish == 'true'` にする。`build` ジョブの `outputs.publish` に `steps.fresh.outputs.publish` を出す。`deploy` の条件を `github.ref == 'refs/heads/main' && needs.build.outputs.publish == 'true'` にする（8.4）。
@@ -497,6 +498,12 @@ function verifyLive(opts: {
 - 実装のときに 1 回: `assemble-site.sh <v0.6.2 のコミット> v0.6.2 <v0.6.2 の nar>` で作った `updates.txt` が、公開中の v0.6.2 の `updates.txt` と、日付の欄を除いて全部の行で一致する（1.8・2.2）。
 - 実装のときに 1 回: 辞書に、古い `pasta_check` が誤りにする書き方（`pasta.toml` の未知のキーなど）を入れたブランチで、`manual.yml` が段 4 で失敗し、ファイルと理由が出る（4.2）。
 
+### 最初に確かめる（実装の最初のタスク）
+
+- 作り直した `updates.txt` の日付の欄は、必ず nar と違う。SSP が日付の欄を比べに使うなら、要件 1.6・1.8・10.2 が全部崩れ、この作りは成り立たない。
+- だから実装の最初に、公開中の v0.6.2 の置き場所を写し、`updates.txt` の日付の欄だけを書き換えて、ローカルの HTTP サーバーに置く。v0.6.2 を入れた別ポートの SSP で更新確認をして、`No Update` になることを確かめる。
+- ならなければ、そこで止めて開発者に報告する（作りを考え直す。要件 10.5）。
+
 ### 実機（SSP）
 
 - v0.6.2 の nar を入れた別ポートの SSP で、ローカルの HTTP サーバーに置いた `assemble-site.sh` の出力に更新確認をする。main の辞書に入れ替わり、`OnUpdateComplete`（`changed`）の台詞が出る。更新のログで、取ったファイルが変わったものだけで、`pasta.dll` を取っていないことを確かめる（10.1・10.2）。
@@ -520,8 +527,10 @@ function verifyLive(opts: {
 
 ## Open Questions / Risks
 
-- **仮定（議題 1）: 古い run の見分け方。** 組み立ての後に「最新の tag が変わったか」「main の先頭までに、起動の条件のファイルが変わったか」を見て、変わっていれば公開を飛ばす。別の案は「main の run は、いつも main の先頭を checkout して作る」である。こちらは段が 1 つ減るが、古い run を再実行したときに、古い `manual.yml` の段で新しい道具を動かすことになり、失敗しうる（要件 5.2 は失敗にしないことを求める）。
-- **仮定: `yq` が ubuntu の runner に在る。** 無いときは、起動の条件を Node で読む小さな処理に替える。
+- **決めた: 古い run の見分け方。** 組み立ての後に「最新の tag が変わったか」「main の先頭までに、起動の条件のファイルが変わったか」を見て、変わっていれば公開を飛ばす。「main の run は、いつも main の先頭を checkout して作る」案は、古い run を再実行したときに古い `manual.yml` の段で新しい道具を動かすことになり、失敗しうるので採らない（要件 5.2）。取りこぼさないことは、concurrency の組を main だけにすることで保つ（ManualWorkflow）。
+- **決めた: `yq`。** GitHub の `ubuntu-latest` の runner には `yq`（mikefarah 版）が入っている。実装の PR の run で在ることを確かめ、無ければ起動の条件を Node で読む小さな処理に替える。
+- **決めた: `verify-live --full`。** 一致の後に、実 URL の `updates.txt` の全部の行のファイルを取り、その行の md5・大きさと照合する（置き場所が自分と合っているか）。手で使うだけである。
+- **決めた: 名前がぶつかるとき。** タグのツリーに無く、公開するコミットにも nar にも在るファイルは、次のリリースまで nar の中身を置く（`--copy` が後から重なる）。要件 1.4 の「タグのツリーで分ける」1 つの規則に従う。次のリリースでタグのツリーに入れば、リポジトリの側になる。要件 1.1 に、この例外を書いた。
 - **危険（議題 2）: リリースの直後の短い間。** Release が最新になってから、リリース CI の起動した run が公開を終えるまで（数分。キャッシュが外れると数分増える）、置き場所の nar の側は 1 つ前の Release のままである。この間に新しい nar を入れて更新確認をした利用者は、古い `pasta.dll` を受け取りうる（要件 5.1）。今の `hello-pasta-network-update` の作りにも同じ間がある。この仕様では `release.yml` の流れを変えないので、この間は残し、手順書に書く、と仮定した。
-- **危険: SSP が `date=` を見るか。** UKADOC は md5 で比べると書き、`date=` を比べに使うとは書いていない。作り直した `updates.txt` の日付の欄は nar と違うので、もし SSP が見るなら、要件 10.2（変わったファイルだけを取る）が通らない。実機確認で確かめる。
+- **危険: SSP が `date=` を見るか。** UKADOC は md5 で比べると書き、`date=` を比べに使うとは書いていない。作り直した `updates.txt` の日付の欄は nar と違うので、もし SSP が見るなら、要件 10.2（変わったファイルだけを取る）が通らない。実装の最初のタスクで確かめる（Testing Strategy「最初に確かめる」）。
 - **危険: `release` スキルの編集が拒否されうる。** そのときは、入った分と残りを示して、開発者の許可を求める（要件 9.2）。
