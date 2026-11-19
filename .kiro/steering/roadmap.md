@@ -261,7 +261,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 
 > **版の読み替え（2026-10-29 開発者の決定）**: ノベルゲームは 0.6.0 へ順延した（2026-11-14 に 0.7.0 へ送った）。この節で「0.5.0」と書いてあるのは、ノベルゲームの版のことで、今は 0.7.0 と読む。0.5.0 は「属性関係の整備」になった（上の「0.5.0 の範囲」）。`scene-attribute-store`・`scene-condition-attributes` は 0.5.0 へ移したので、下の順番の 2 番と 7 番は、0.7.0 の時点では入っている前提で読む。
 
-> **2026-11-19 の深掘りで決めたこと（開発者の決定・承認）**: 骨子を先に決める discovery を行い、議題を全部閉じた。**骨子の全体は `.kiro/specs/novel-areka-contract/final-model-2026-11-19.md` に在る（要件定義は、これを正として始める）。** spec ごとの決定は、brief 5 本（`novel-areka-contract`・`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-save-slots`）の「決定（2026-11-19。最終形）」の節に在る。台本を書く人の目線のまとめは同じ場所の `play-script-guide.md`、経緯は `discovery-2026-11-19.md`。この節の下の記述と食い違う所は、骨子と brief が正しい。最後の洗い直しで出た整理 5 件（骨子の 4 章）は、開発者の承認を待っている。
+> **2026-11-19 の深掘りで決めたこと（開発者の決定・承認）**: 骨子を先に決める discovery を行い、議題を全部閉じた。**骨子の全体は `.kiro/specs/novel-areka-contract/final-model-2026-11-19.md` に在る（要件定義は、これを正として始める）。** spec ごとの決定は、brief 5 本（`novel-areka-contract`・`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-save-slots`）の「決定（2026-11-19。最終形）」の節に在る。台本を書く人の目線のまとめは同じ場所の `play-script-guide.md`、経緯は `discovery-2026-11-19.md`。この節の下の記述と食い違う所は、骨子と brief が正しい。最後の洗い直しで出た整理 5 件（骨子の 4 章）も、開発者との議論で閉じた。走り方は、呼び出しの対でなく、柱 `＆再生モード`（トーク・演劇・設定）で書く形に決まった。
 >
 > - **版**: Phase 13 を 0.7.0 から外す。「areka の準備待ち。版は未定」とする。0.7.0 に残す物は、次の棚卸（`/kiro-next`）で決める。この節と棚卸の節で「0.7.0」と書いてあるノベルの spec は、版が未定と読む。
 > - **フェーズ**: pasta の側を 3 つに分ける。フェーズ 1 ＝今の SSP で動く物、フェーズ 2 ＝ SSP が対応すれば動く物、フェーズ 3 ＝ areka（合成した舞台）が要る物（前半は最低限、後半は重い物）。フェーズ 1（`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` の控えと再開・`novel-save-slots`・`shell-element-click`）は、areka を待たずに作れて、SSP の実機で測れる。どの版に置くかは、棚卸で決める。同じ台本を、SSP でも areka でも動かす（pasta が、ベースウェアを見てタグを直す）。
