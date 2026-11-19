@@ -267,7 +267,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 > - **フェーズ**: pasta の側を 3 つに分ける。フェーズ 1 ＝今の SSP で動く物、フェーズ 2 ＝ SSP が対応すれば動く物、フェーズ 3 ＝ areka（合成した舞台）が要る物（前半は最低限、後半は重い物）。フェーズ 1（`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` の控えと再開・`novel-save-slots`・`shell-element-click`）は、areka を待たずに作れて、SSP の実機で測れる。どの版に置くかは、棚卸で決める。同じ台本を、SSP でも areka でも動かす（pasta が、ベースウェアを見てタグを直す）。
 > - **モデル**: `cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` の要件定義は、Fable から Opus へ替える（絡み合う問いは、この discovery で決まった）。細かい決めごと（見本の置き場所・物語の長さ・Lua の範囲・マニュアルの章の割り方）は、要件定義に任せる。
 > - **先に始められる物**: `novel-areka-contract`（文書だけ）は、areka を待たずに作れる。
-> - **実機**: フェーズ 1 の線は、SSP 2.9.34 で一部を確かめた（`research-ssp-capabilities.md` の D 節）。クリックの要る項目は、まだ見ていない。
+> - **実機**: フェーズ 1 の芯（`\x` と `\![raise]` で 1 行ずつ渡す・待ちの間のクリック・貯めない区間・透明度と大きさの時間）は、SSP 2.9.34 で確かめた（`research-ssp-capabilities.md` の D 節）。ウインドウモードと音は、まだ見ていない。
 
 2026-10-10 の `/kiro-discovery` で起こした（main `88c4bc0e`）。国産 10 系統・欧米 9 系統のノベルゲームのスクリプト仕様を調べ、pasta と areka の現在地と照らした。調査ノートは `.kiro/specs/novel-areka-contract/` の `research-jp-engines.md` と `research-western-engines.md` にある。0.5.0 の目標（2026-10-10 開発者の決定）は、別リポジトリで開発中の areka で、ノベルゲームが作れるようになること。
 
