@@ -8,7 +8,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 - **0.6.0: VS Code を使わないエディタ pasta-recipe**（2026-11-12 開発者の決定「次のリリースにする。最優先事項」）。2026-11-12 にウェーブ 1 の 2 本（`vscode-scene-outline-play`・`scene-play-locals`）が入り、2026-11-13 にウェーブ 2 の `pasta-recipe` と、ウェーブ 3 の `pasta-recipe-dev-actions`（アプリのシーンの ▶・リロード・保存変数の表と書き換え・値を入れて実行）が入った。2026-11-14 に `pasta-recipe-multiarch`（x64・arm64 の 2 つの zip）が入った。0.6.0 の spec は揃い、残りはリリース（下の「0.6.0 の範囲」と棚卸）。
 - **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`、2026-11-14 に起票した `manual-download-page`、2026-11-19 に起票した `shiori-debug-toggle`。まとめは下の「版がまだ決まっていないもの」にある。
-- **Phase 13: areka でノベルゲーム（0.7.0。2026-10-29 に 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性の 2 本（`scene-attribute-store`・`scene-condition-attributes`）は、2026-10-29 に 0.5.0 へ移した。
+- **Phase 13: areka でノベルゲーム（0.7.0。2026-10-29 に 0.5.0 から 0.6.0 へ、2026-11-14 に 0.7.0 へ順延）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性の 2 本（`scene-attribute-store`・`scene-condition-attributes`）は、2026-10-29 に 0.5.0 へ移した。**2026-11-19 の深掘りで、Phase 13 を 0.7.0 から外し、「areka の準備待ち。版は未定」にした**（下の Phase 13 の頭の「2026-11-19 の深掘りで決めたこと」）。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
 Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイドの絵で完了した（「完了フェーズ」）。
@@ -261,6 +261,14 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 
 > **版の読み替え（2026-10-29 開発者の決定）**: ノベルゲームは 0.6.0 へ順延した（2026-11-14 に 0.7.0 へ送った）。この節で「0.5.0」と書いてあるのは、ノベルゲームの版のことで、今は 0.7.0 と読む。0.5.0 は「属性関係の整備」になった（上の「0.5.0 の範囲」）。`scene-attribute-store`・`scene-condition-attributes` は 0.5.0 へ移したので、下の順番の 2 番と 7 番は、0.7.0 の時点では入っている前提で読む。
 
+> **2026-11-19 の深掘りで決めたこと（開発者の決定・承認）**: 骨子を先に決める discovery を行い、議題 18 件を閉じた。決定の本文は、brief 5 本（`novel-areka-contract`・`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-save-slots`）の末尾の節に在る。台本を書く人の目線のまとめは `.kiro/specs/novel-areka-contract/play-script-guide.md`、経緯は同じ場所の `discovery-2026-11-19.md`。この節の下の記述と食い違う所は、brief が正しい。
+>
+> - **版**: Phase 13 を 0.7.0 から外す。「areka の準備待ち。版は未定」とする。0.7.0 に残す物は、次の棚卸（`/kiro-next`）で決める。この節と棚卸の節で「0.7.0」と書いてあるノベルの spec は、版が未定と読む。
+> - **フェーズ**: pasta の側を 3 つに分ける。フェーズ 1 ＝今の SSP で動く物、フェーズ 2 ＝ SSP が対応すれば動く物、フェーズ 3 ＝ areka（合成した舞台）が要る物（前半は最低限、後半は重い物）。フェーズ 1（`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` の控えと再開・`novel-save-slots`・`shell-element-click`）は、areka を待たずに作れて、SSP の実機で測れる。どの版に置くかは、棚卸で決める。同じ台本を、SSP でも areka でも動かす（pasta が、ベースウェアを見てタグを直す）。
+> - **モデル**: `cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` の要件定義は、Fable から Opus へ替える（絡み合う問いは、この discovery で決まった）。細かい決めごと（見本の置き場所・物語の長さ・Lua の範囲・マニュアルの章の割り方）は、要件定義に任せる。
+> - **先に始められる物**: `novel-areka-contract`（文書だけ）は、areka を待たずに作れる。
+> - **実機**: フェーズ 1 の線は、SSP 2.9.34 で一部を確かめた（`research-ssp-capabilities.md` の D 節）。クリックの要る項目は、まだ見ていない。
+
 2026-10-10 の `/kiro-discovery` で起こした（main `88c4bc0e`）。国産 10 系統・欧米 9 系統のノベルゲームのスクリプト仕様を調べ、pasta と areka の現在地と照らした。調査ノートは `.kiro/specs/novel-areka-contract/` の `research-jp-engines.md` と `research-western-engines.md` にある。0.5.0 の目標（2026-10-10 開発者の決定）は、別リポジトリで開発中の areka で、ノベルゲームが作れるようになること。
 
 ### 決めたこと（開発者の決定）
@@ -307,10 +315,10 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 | 順 | spec | 要件定義 | 規模 | 先に要るもの |
 | -- | ---- | -------- | ---- | ------------ |
 | 1 | novel-areka-contract | Opus | 6〜9（文書だけ） | なし。**0.7.0 のゴールの先頭**（areka の側が早く動けるよう、最初に始める） |
-| 4 | cue-command-runtime（ト書きと柱。2026-10-17 に `scene-stage-attributes` をまとめた） | Fable | 17〜21（超えるならト書きと柱に分け直す） | `scene-attribute-store`（柱の分。2026-11-03 に入った）。語彙の名前は `novel-areka-contract` から引く |
+| 4 | cue-command-runtime（ト書きと柱。2026-10-17 に `scene-stage-attributes` をまとめた） | Opus（2026-11-19 に Fable から替えた） | 17〜21（超えるならト書きと柱に分け直す） | `scene-attribute-store`（柱の分。2026-11-03 に入った）。語彙の名前は `novel-areka-contract` から引く |
 | 5 | shell-element-click | Opus | 5〜8 | `novel-areka-contract`（完全一致の場面選びは `touch-poke-shortcuts` が入れてある）。`scene-anchor-link` とは `choice_select.lua` を共有する |
-| 6 | novel-talk-flow | Fable | 17〜21（超えるなら出力の分（Fable）と場面の流れの分（Opus）に分ける） | `cue-command-runtime`、`novel-areka-contract` |
-| 8 | novel-checkpoint-rollback | Fable | 14〜17 | `novel-talk-flow`（2026-11-19 に `novel-variable-scope` を閉じ、「スロット」で始まる変数を写し取る・戻す口をこちらが持つ） |
+| 6 | novel-talk-flow | Opus（2026-11-19 に Fable から替えた） | 17〜21（超えるなら出力の分と場面の流れの分に分ける） | `cue-command-runtime`、`novel-areka-contract` |
+| 8 | novel-checkpoint-rollback | Opus（2026-11-19 に Fable から替えた） | 14〜17 | `novel-talk-flow`（2026-11-19 に `novel-variable-scope` を閉じ、「スロット」で始まる変数を写し取る・戻す口をこちらが持つ） |
 | 9 | novel-save-slots | Opus | 8〜12 | `novel-checkpoint-rollback` |
 | 10 | hello-novel-sample | Opus | 15〜18 | 2〜9 の全部と、areka の側の実装 |
 | 11 | manual-novel-guide | Opus | 8〜12 | `hello-novel-sample` |
@@ -335,7 +343,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 ### spec の要件へ送った未定の項目
 
 - 変数の保存の範囲の書き方 — 2026-11-19 に決めた。文法は足さず、名前が「スロット」か `slot_` で始まるグローバル変数だけがスロットに入る（上の「統合して閉じたもの（2026-11-19）」）。
-- 条件つきの選択肢（フラグが立っているときだけ出す）— `novel-talk-flow` の要件で、要るかどうかを決める。
+- 条件つきの選択肢（フラグが立っているときだけ出す）— 2026-11-19 に決めた。選択肢の行に、シーンの宣言と同じ形の条件を書けるようにする（文法に足す。`novel-talk-flow` の brief）。
 - 背景を柱にどう書くか（アクター指定行に並べるか、属性にするか）— `cue-command-runtime` の要件（柱の分）。
 - ノベルを 1 本の配布物としてどう起動するか、動画が要るか — `novel-areka-contract` の要件。
 - 数のしきい値（好感度が 50 以上、など）の書き方 — 2026-10-29 に決めた。場面の側に `＆＄＊好感度≧50` と書く（`scene-condition-attributes`）。
