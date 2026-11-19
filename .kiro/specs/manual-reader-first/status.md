@@ -44,14 +44,32 @@ node book/tools/verify-search.mjs --no-build
 | 1 | シェルの章の絵（`book/src/img/shell/`） | 直してコミット済み。開発者の確認待ち |
 | 1 | デバッグの部 →「編集ツールとデバッグ」（6 章）。案内役は emo2 の 2 人（配役の仕組みと顔アイコン 23 枚 `book/src/img/emo2/`） | 直してコミット済み。開発者の確認待ち |
 | 2 | 文法の部（10 章）。概要を台本の全体像に・目次の並べ替え | 直してコミット済み。開発者の確認待ち |
-| 3 | hello-pasta の台詞の下書き（`draft-dic/`） | 作業中（分身 1 名）。出来たら開発者に見せて承認をもらう |
-| 3 | 入門ガイド（17 章）・絵 16 枚・スターターの nar・規約第 8 節と検査 | 未着手。台詞の承認と、章の見本（「まず会ってみる」と 1 段目）の承認の後に進める |
+| 3 | hello-pasta の台詞（13 枚）と `[debug] enabled = true` | 開発者が方向を承認。本物の辞書へ反映してコミット済み（`9aeb1137`）。テストは通る。実機では未確認 |
+| 3 | スターター `pasta-starter.nar`（ゴースト名 `my-ghost`。素材は `crates/pasta_sample_ghost/starter/` の 3 ファイル、残りは hello-pasta から組む） | リリースの道具に足してコミット済み。手元で作った nar は検査を通る。GitHub Actions と SSP への実機インストールは未確認 |
+| 3 | 入門の見本 3 章（`index.md`・新しい `hello.md`「まず会ってみる」・`01-boot.md`） | 書いてプレビューに載せた（未コミット）。開発者の確認待ち |
+| 3 | 入門の残り 15 章・規約第 8 節・検査（C-order・段の章の H2・章の数）・`STAGES.md` の言い方 | 見本の承認の後に進める |
+| 3 | 絵 16 枚の撮り直し・エディタの絵 | 章を書き終えてから |
+
+入門の新しい型（見本で決めたもの。承認されたら規約第 8 節に書く）:
+
+- 並び: `index` → `hello`（まず会ってみる）→ `setup`（自分のゴーストを始める。スターターを入れる）→ 段の章 → `prerequisites`（付録：フォルダの中身と文字コード）。
+- 段の章の H2 は 4 つ: `叶えたいこと` → `辞書を書く`（全文 1 つと「行 → 意味」の表。初出のイベントの出典の表もここ）→ `確かめる`（手順・成功の目印・絵の行）→ `もっと詳しく`。
+- 事実は 1 回だけ、手順・表・コード・成功の目印に書く。台詞は動機・安心・読者の疑問・小さな笑いを運び、手順を言い直さない。
+- 確かめ方は、エディタ（pasta-recipe か VS Code）の「▶ シーンを実行」。
+- 1 段目は、スターターに入っている `01-boot.pasta` を読んで書き換える段。2 段目からファイルを足す。
+
+`tutorial-check`（と、それを含む `verify-content`）は、入門の 2〜13 段の章を書き直すまで落ちる。
 
 2026-11-19 の時点で、マニュアルの検査（`verify-content`・`link-check`・`tutorial-check`・`gen-skill-refs --check`・`verify-static`・`verify-search`・道具の自己テスト）は全部通る。`config_reference_doc_matches_ssot` とエディタの共有部・pasta-recipe のテストも通る（VS Code 拡張の WASM を読むテスト 3 件は、このワークツリーに WASM が無いので走らせられない）。
 
 残っている後始末:
 
-- 手書きのスキル `pasta-ghost-authoring/SKILL.md` の 3 か所（46 行目の grammar-index の使いみち・49 行目の旧題「Call / Jump」・365 行目の `[package]` の「エンジンプロファイル専用」）。`.claude/skills` の手書きの編集は開発者の許可が要る。
+- `.claude/skills` の手書きの編集（開発者の許可が要る。まだ触っていない）:
+  - `pasta-ghost-authoring/SKILL.md`: 46 行目の grammar-index の使いみち・49 行目の旧題「Call / Jump」・365 行目の `[package]` の「エンジンプロファイル専用」。
+  - `pasta-ghost-authoring/references/authoring-patterns.md` 128 行目ほか: hello-pasta の古い台詞の写し。
+  - `release/scripts/release-state.ps1` 84〜87 行: 添付の一覧に `pasta-starter.nar` を足し、`/8` を `/9` に。
+  - `release/procedure.md` 152・593・599・649 行: 添付の数（8 → 9）と配布物の列挙。
+  - `pasta-check/SKILL.md` 179 行: 配布物の列挙に `pasta-starter.nar`。
 - 文法の概要の対応の表は、幅の狭い画面で 1 列目の見出しが縦に折れる。見出しを短くするか確かめる。
 - 波 3 で入門の構成を変えるとき、`reference/shell.md` の「この章の前提」と `download.md` の入門へのリンクを直す。
 
