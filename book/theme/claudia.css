@@ -728,6 +728,48 @@ mark {
     border-color: var(--talk-emo-ring);
     background-color: var(--talk-emo-face);
 }
+/* hello-pasta の紹介ページの扉: 立ち絵 2 枚（nar へのリンク）と、大きなダウンロードのボタン */
+.hello-hero {
+    text-align: center;
+}
+.hello-hero > p:first-of-type {
+    margin: 4px 0 12px;
+}
+.content .hello-hero > p:first-of-type > a {
+    display: inline-flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 8px;
+    max-width: 100%;
+    text-decoration: none;
+}
+.hello-hero > p:first-of-type img {
+    width: auto;
+    height: 280px;
+    max-width: 46%;
+    object-fit: contain;
+}
+.content .hello-hero > p:nth-of-type(2) > a {
+    display: inline-block;
+    padding: 14px 40px;
+    color: var(--claudia-paper);
+    background-color: var(--claudia-accent);
+    border-radius: 14px;
+    box-shadow: var(--claudia-shadow-2);
+    font-family: var(--claudia-font-heading);
+    font-size: 1.35em;
+    font-weight: 700;
+    line-height: 1.4;
+    text-decoration: none;
+}
+.content .hello-hero > p:nth-of-type(2) > a:hover {
+    filter: brightness(1.08);
+}
+.hello-hero > p:last-of-type {
+    margin: 10px 0 0;
+    color: var(--claudia-ink2);
+    font-size: 0.9em;
+}
 /* パート案内: Markdown のリストをカードの格子にする。幅が足りなければ自動で列が減る */
 .hero-toc ul {
     display: grid;

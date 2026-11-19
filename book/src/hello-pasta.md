@@ -8,13 +8,23 @@
 
 ---
 
+<section class="claudia-hero hello-hero" aria-label="ダウンロード">
+<i class="hero-corner hero-corner-tl" aria-hidden="true"></i><i class="hero-corner hero-corner-tr" aria-hidden="true"></i><i class="hero-corner hero-corner-bl" aria-hidden="true"></i><i class="hero-corner hero-corner-br" aria-hidden="true"></i>
+
+[![赤いエプロンドレスの女の子が、両腕を下ろして笑っている立ち絵](img/hello-pasta/surface0.png)![白いコック服の男の子が、両腕を下ろして笑っている立ち絵](img/hello-pasta/surface10.png)](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)
+
+[hello-pasta をダウンロード（.nar）](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)
+
+落とした `hello-pasta.nar` を、SSP に出ているゴーストの上へドロップすると入る。ネットワーク更新に対応している。
+
+</section>
+
 ## どんなゴースト
 
 hello-pasta は、pasta で動く見本のゴーストである。パスタ屋の見習いの 2 人が、デスクトップでおしゃべりをする。
 
 | 女の子 | 男の子 |
 | --- | --- |
-| ![赤いエプロンドレスの女の子が、両腕を下ろして笑っている立ち絵](img/hello-pasta/surface0.png) | ![白いコック服の男の子が、両腕を下ろして笑っている立ち絵](img/hello-pasta/surface10.png) |
 | 給仕の見習い。おやつとまかないが大好き | 料理人の見習い。世話焼きで、落ち着いて言い返す |
 
 > 【男の子】ぼくが厨房で、こっちが給仕。……のはずなんだけど、厨房によく来るんだよね。
@@ -24,7 +34,7 @@ hello-pasta は、pasta で動く見本のゴーストである。パスタ屋�
 ## 入れる
 
 1. SSP を用意する（[SSP の配布サイト](https://ssp.shillest.net/)）。
-2. [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar) を落とす。
+2. このページの上のボタンから、`hello-pasta.nar` を落とす。
 3. 落とした `hello-pasta.nar` を、SSP に出ているゴーストの上へドロップする。
 4. ゴーストを右クリックし、メニューの「ゴースト切り替え」から hello-pasta を選ぶ。
 
