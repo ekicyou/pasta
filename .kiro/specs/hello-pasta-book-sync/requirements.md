@@ -22,7 +22,7 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
   - マニュアル公開 CI の起動の条件に、hello-pasta の配下を足すこと。
   - 新しい `pasta.dll` が要る辞書を、古い dll と組で出さないこと。
   - 置き場所を古い中身に戻さないこと。
-  - main で消した・改名したファイルの扱い。
+  - main で消した・改名したファイルを、置き場所に置かないこと。
   - リリース CI の公開後の見比べを、新しい作り方に合わせること。
   - 手順書と、`hello-pasta-network-update` の置き換わる項の記録。
   - 実機の SSP での確認（PR #288 の台詞の、最初の本番の確認を兼ねる）。
@@ -35,6 +35,7 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
   - マニュアルの中身と、入門の章と辞書の照合（`tutorial-check`）。
   - hello-pasta の台詞・シェル。
   - `pasta.dll` の arch ごとの配布（`pasta-dll-multiarch`）。
+  - 利用者の手元に残った、消した・改名したファイルを消させること（`delete.txt`）。`hello-pasta-network-update` の決定のまま、手順書の注意にとどめる（2026-11-19 議題 2）。
 - **Adjacent expectations**:
   - `hello-pasta-network-update`（完了）: 置き場所の URL・`homeurl`・入口のページ・照合・公開の経路・報告の表・失敗からの回復は、そのまま使う。置き場所の中身を「最新 Release の nar の展開」とする項と、公開後の見比べの項だけを、この仕様が置き換える。
   - `pasta-check-bundled-balloon`（完了）: `updates.txt` の書式と、載せるファイルの決まり。この仕様はそれに合わせる側で、変えない。
@@ -91,11 +92,12 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
 
 #### Acceptance Criteria
 
-1. When 置き場所の中身を作る, the マニュアル公開 CI shall 重ねた中身の辞書が、最新の Release の版の pasta で読み込めるかを検査する。*（仮定: 検査の方法は設計で決める。例として、最新の Release の `pasta_check` で、重ねた中身を検査する。）*
-2. If 重ねた中身が、最新の Release の版の検査で誤りになる, then the マニュアル公開 CI shall どのファイルの何が誤りかを表示して失敗し、サイトを公開しない。*（仮定: 公開ごと止める。その間はマニュアルの公開も止まる。古い中身で出し直すと、すでに届いた辞書を古いものに戻すため、その道は採らない。OPEN QUESTION 1。）*
+1. When 置き場所の中身を作る, the マニュアル公開 CI shall 重ねた中身を、最新の Release の版の `pasta_check` で検査する。
+2. If 重ねた中身が、最新の Release の版の検査で誤りになる, then the マニュアル公開 CI shall どのファイルの何が誤りかを表示して失敗し、サイト（マニュアルと置き場所）を公開しない。（置き場所とマニュアルは 1 回の公開で丸ごと入れ替わるので、置き場所だけを止めることはしない。古い中身で出し直すと、すでに届いた辞書を古いものに戻すので、その道も採らない。）
 3. When その辞書を読める `pasta.dll` を持つ Release が公開される, the マニュアル公開 CI shall 手作業なしに検査に通り、置き場所を公開する。
-4. While PR またはブランチで実行されている, the マニュアル公開 CI shall 同じ検査を行い、誤りなら失敗にする。*（仮定: main と同じく失敗にする。OPEN QUESTION 1。）*
+4. While PR またはブランチで実行されている, the マニュアル公開 CI shall 同じ検査を行い、誤りなら失敗にする。
 5. The 検査 shall 最新の Release の版の pasta で読める辞書の変更を止めない。
+6. The 手順書 shall この検査が Lua を動かさない検査で、実行の結果だけが変わる違い（新しい日時変数の値が空になるなど）は止められないことを書く。
 
 ### Requirement 5: 古い中身に戻さない
 
@@ -122,14 +124,12 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
 
 ### Requirement 7: 消えたファイル
 
-**Objective:** As a hello-pasta の利用者, I want main で消した・改名したファイルが、手元に残ってゴーストの振る舞いを変えないこと, so that 古い辞書が読まれ続けない
+**Objective:** As a hello-pasta の利用者, I want main で消した・改名したファイルが、更新で新しく届かないこと, so that 消したはずの辞書を新しく受け取らない
 
 #### Acceptance Criteria
 
 1. When main で hello-pasta のファイルを消す・改名する, the 更新の置き場所 shall 消したファイル・改名の前の名前のファイルを置かず、`updates.txt` に載せない。
-2. Where 最新の Release の nar に在って、公開するコミットのリポジトリにも nar の側にも無いファイルがある, the 更新の置き場所 shall そのファイルを利用者の手元から消す指示（SSP の `delete.txt`）を出す。*（仮定: 消す指示を出す。比べる相手は最新の Release の nar だけとする。OPEN QUESTION 4。）*
-3. The 消す指示 shall 置き場所に置くファイルを含めない。（SSP は、`delete.txt` に書かれたファイルを、書かれている間ずっと消し続けるため。）
-4. If 消すファイルが無い, then the 更新の置き場所 shall 利用者の手元のファイルを、どれも消させない。
+2. The 更新の置き場所 shall 利用者の手元のファイルを消させる指示（SSP の `delete.txt`）を出さない。（`hello-pasta-network-update` の決定のまま。利用者の手元に残った古いファイルは、pasta に読まれ続けうる。）
 
 ### Requirement 8: 既存の約束を保つ
 
@@ -142,7 +142,7 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
 3. The マニュアル公開 CI shall 公開サイトへの公開を `deploy` ジョブ 1 か所で行い、ワークフロー全体の権限を `contents: read` のまま保ち、公開の権限を `deploy` ジョブにだけ与える。
 4. The 公開サイト shall 1 回の公開で丸ごと入れ替わり、マニュアルと置き場所のどちらかを欠いた形で公開されない。
 5. The マニュアル公開 CI shall 置き場所を作るために、`pasta.dll` のビルドや Windows の実行環境を要さない。
-6. While マニュアルだけを変える PR を検証する, the マニュアル公開 CI shall 置き場所の組み立てで、検証の時間を大きく延ばさない。*（仮定: 今の所要時間からの増分を設計で見積もり、増分が数分を超える作り方は採らない。OPEN QUESTION 5。）*
+6. While キャッシュが効いている, the マニュアル公開 CI shall 置き場所の組み立てと Requirement 4 の検査で増える所要の時間を、今（40〜50 秒）から 1 分以内にとどめる。
 7. The この仕様の変更 shall マニュアルの中身・章立てと、入門の章と辞書の照合を変えない。
 
 ### Requirement 9: 手順書と記録の更新
@@ -151,11 +151,11 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
 
 #### Acceptance Criteria
 
-1. The `crates/pasta_sample_ghost/RELEASE.md` shall 置き場所が「main のリポジトリのファイル＋最新の Release の nar にだけ在るファイル」で作られること、出る 2 つのきっかけ（main への push・リリース）、Requirement 4 で止まったときの読み方と直し方、Requirement 6 の見比べの読み方を書く。
+1. The `crates/pasta_sample_ghost/RELEASE.md` shall 置き場所が「main のリポジトリのファイル＋最新の Release の nar にだけ在るファイル」で作られること、出る 2 つのきっかけ（main への push・リリース）、Requirement 4 で止まったときの読み方と直し方（リリースを出す・辞書を戻す）と、検査で止められない違い（Requirement 4.6）、Requirement 6 の見比べの読み方を書く。
 2. The `release` スキル shall リリースの確認と最終報告の内容を、Requirement 6 の見比べに合わせる。
 3. The `.github/release-ci-setup.md` shall 置き場所の作り方の記述を、新しい作り方に合わせる。
 4. The `hello-pasta-network-update` の要件 shall 置き換わる項（置き場所を最新の Release の nar の展開とする項と、公開後の見比べの項。要件 1.2・1.4・4.3・4.8・5.1・9.6 など）に、この仕様で置き換わったことを記録する。
-5. The 手順書 shall Requirement 7 の扱い（消す指示を出すか、出さないならその注意）を書く。
+5. The 手順書 shall 消した・改名したファイルが利用者の手元に残り、pasta に読まれ続けうることを、今の注意のまま書く（Requirement 7.2）。
 
 ### Requirement 10: 実機（SSP）での確認
 
@@ -166,6 +166,5 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
 1. When v0.6.2 の `hello-pasta.nar` を入れた SSP（別ポートの別のインスタンス）で、この仕様の後の置き場所に対して更新確認を行う, the hello-pasta shall main の辞書に入れ替わり、`OnUpdateComplete`（`changed`）の台詞を出す。（PR #288 の台詞の、最初の本番の確認を兼ねる。）
 2. The 実機確認 shall その更新で取られたファイルが変わったファイルだけで、`pasta.dll` を取り直していないことを、SSP の更新のログで確かめて記録する。
 3. When 置き場所と手元の中身が同じ状態で更新確認を行う, the 実機確認 shall SSP が `No Update` になることを確かめる。
-4. Where Requirement 7.2 の消す指示を出す, the 実機確認 shall 消した・改名したファイルが、更新で手元から消えることを、ローカルの置き場所で確かめる。
-5. The 実機確認 shall ローカルの HTTP サーバーの置き場所での確認をマージの前に、公開サイト（GitHub Pages）の実際の URL での確認を main へのマージの直後に行って記録する。（公開は main からしかできないため。）
-6. If 実機確認が通らない, then the 完了の判定 shall この仕様を完了としない。（部分的な出荷はせず、原因を直すかリジェクトする。）
+4. The 実機確認 shall ローカルの HTTP サーバーの置き場所での確認をマージの前に、公開サイト（GitHub Pages）の実際の URL での確認を main へのマージの直後に行って記録する。（公開は main からしかできないため。）
+5. If 実機確認が通らない, then the 完了の判定 shall この仕様を完了としない。（部分的な出荷はせず、原因を直すかリジェクトする。）
