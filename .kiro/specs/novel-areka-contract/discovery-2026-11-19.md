@@ -34,7 +34,11 @@
 
 残っていること:
 
-1. **次は、設計の段の洗い出し**（開発者: 「この後設計レベルまで洗い出しを依頼するので、まだ PR はしませんよ」）。指示を待つ。**PR は、まだ出さない。** push もしていない（main より 120 本ほど先）。
+1. **設計の段の洗い出しを、走らせている**（2026-11-19。開発者: 「暫定設計まで進めて問題点を洗い出したい」「暫定で良いので現在の要件に対して設計と検証まで行った記録を残し、設計矛盾点を大枠で検討しておきたい」「ディスカッションに関してはこちらのセッションで取りまとめ、問題点を整理してから行いましょう」）。**PR は、まだ出さない。** push もしていない。
+   - pasta の側: Phase 13 の 8 本（`novel-areka-contract`・`cue-command-runtime`・`shell-element-click`・`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-save-slots`・`hello-novel-sample`・`manual-novel-guide`）に、ワークフロー（run `wf_9f09d32d-e0f`）で、暫定の設計（Opus）→ 独立した検証（Opus）を並行に行い、最後に spec をまたぐ矛盾を 3 つの見方（インターフェース・骨子の決まりごとの持ち分・通しの場面）で洗う。
+   - 記録の置き場: 各 spec のフォルダの `provisional-design.md`・`provisional-design-validation.md` と、`novel-areka-contract/provisional-cross-check-{interfaces,model-coverage,scenarios}.md`。正式な `requirements.md`・`design.md`・`spec.json` は作らない（後の `/kiro-start` と混ざらないように、名前を分けた）。
+   - areka の側: areka のセッションへ、同じ事（全 brief の暫定設計と検証。ディスカッションはしない）を頼み、再生モードの形も知らせた。返事（記録の置き場・pasta に期待している事・重大な問題・差し戻しが要りそうな所・開発者に諮る問い）を待っている。
+   - この後: 記録を読み、問題点を「spec の中で閉じる物・spec をまたぐ物・骨子へ差し戻す物」に分けて取りまとめ、開発者と議論する。
 2. 「ぱすた開発」の返事（書き直した台本と、書けなかった所の一覧）を読んで、骨子と照らす。
 3. SSP の実機で見ていない物: ウインドウモード・音のタグ・早送りキーを有効にした設定。
 4. areka への知らせ（再生モード）。
