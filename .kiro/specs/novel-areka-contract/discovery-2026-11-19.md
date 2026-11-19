@@ -38,7 +38,9 @@
    - pasta の側: Phase 13 の 8 本（`novel-areka-contract`・`cue-command-runtime`・`shell-element-click`・`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-save-slots`・`hello-novel-sample`・`manual-novel-guide`）に、ワークフロー（run `wf_9f09d32d-e0f`）で、暫定の設計（Opus）→ 独立した検証（Opus）を並行に行い、最後に spec をまたぐ矛盾を 3 つの見方（インターフェース・骨子の決まりごとの持ち分・通しの場面）で洗う。
    - 記録の置き場: 各 spec のフォルダの `provisional-design.md`・`provisional-design-validation.md` と、`novel-areka-contract/provisional-cross-check-{interfaces,model-coverage,scenarios}.md`。正式な `requirements.md`・`design.md`・`spec.json` は作らない（後の `/kiro-start` と混ざらないように、名前を分けた）。
    - areka の側: areka のセッションへ、同じ事（全 brief の暫定設計と検証。ディスカッションはしない）を頼み、再生モードの形も知らせた。返事（記録の置き場・pasta に期待している事・重大な問題・差し戻しが要りそうな所・開発者に諮る問い）を待っている。
-   - この後: 記録を読み、問題点を「spec の中で閉じる物・spec をまたぐ物・骨子へ差し戻す物」に分けて取りまとめ、開発者と議論する。
+   - **済んだ（2026-11-19）。** pasta の 19 体（設計 8・検証 8・照らし合わせ 3）も、areka の 16 本も、終わった。判定は、どれも条件つき GO。「ぱすた開発」の書き直した台本 2 本は、全文を骨子と照らし、食い違いは無かった（困りごとの一覧は `author-feedback-2026-11-19.md`）。
+   - **取りまとめは `provisional-design-issues-2026-11-19.md`**（これを読めば、議論の入口が分かる）。開発者が選ぶ物 13 個（D1〜D13）・spec をまたぐ継ぎ目 12 個（S1〜S12。持ち主を決める）・骨子に足す文 9 つ・areka の側の要点。**どれも、まだ決めていない。** 議論は、開発者の合図の後に、1 つずつ行う。
+   - areka の側のまとめの写しは `areka-provisional-design-summary-2026-11-19.md`。
 2. 「ぱすた開発」の返事（書き直した台本と、書けなかった所の一覧）を読んで、骨子と照らす。
 3. SSP の実機で見ていない物: ウインドウモード・音のタグ・早送りキーを有効にした設定。
 4. areka への知らせ（再生モード）。
