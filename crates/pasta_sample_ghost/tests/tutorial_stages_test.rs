@@ -390,6 +390,30 @@ fn stage7_greeting_reads_reference_without_transfer() {
     );
 }
 
+/// 7 段目の `＊OnUpdateComplete` は、`＆＄ｒ０` の条件で Reference0 に合う場面だけを選ぶ。
+/// 条件が効かなければ 2 つの場面からの抽選になるので、繰り返して確かめる。
+#[test]
+fn stage7_update_complete_picks_scene_by_reference0() {
+    let rows = parse_stage_table(&read_stages_md());
+    let ghost = assemble_stage(&rows, 7);
+    let runtime = PastaLoader::load(ghost.path()).expect("stage 7: load failed");
+    let request = |r0: &str| shiori_request(&runtime, "OnUpdateComplete", &[(0, r0.to_string())]);
+    for (r0, line) in [("changed", "新装開店"), ("none", "請求書")] {
+        for _ in 0..8 {
+            let response = request(r0);
+            assert!(
+                response.contains(line),
+                "OnUpdateComplete（{r0}）の応答に「{line}」が無い:\n{response}"
+            );
+        }
+    }
+    let response = request("other");
+    assert!(
+        response.starts_with("SHIORI/3.0 204"),
+        "どの条件にも合わない OnUpdateComplete が 204 でない:\n{response}"
+    );
+}
+
 /// 13 段目: `calendar.csv` の各名前に `＊行事_名前` があり、`＊行事_なし` があり、
 /// `＞「行事_」＆＄行事` で振り分ける場面がある（date-var-calendar 要件 10.1・10.2）。
 #[test]

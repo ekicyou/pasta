@@ -133,7 +133,7 @@ hello-pasta/
 │       │   ├── 04-variety.pasta  # 4 段: 同名シーン・単独 ＊ で毎回ちがう話
 │       │   ├── 05-words.pasta    # 5 段: 単語の定義と参照
 │       │   ├── 06-hour.pasta     # 6 段: 時報
-│       │   ├── 07-greeting.pasta # 7 段: 挨拶（OnGhostChanged/Changing・OnFirstBoot・OnClose）
+│       │   ├── 07-greeting.pasta # 7 段: 挨拶（OnGhostChanged/Changing・OnFirstBoot・OnClose・OnUpdate*）
 │       │   ├── 08-touch.pasta    # 8 段: つつき・撫での反応（ショートカットのシーン）
 │       │   ├── 09-choice.pasta   # 9 段: 選択肢
 │       │   ├── 10-save.pasta     # 10 段: 保存される変数（＄＊回数）
