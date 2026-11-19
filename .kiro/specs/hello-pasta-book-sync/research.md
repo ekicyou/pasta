@@ -370,3 +370,65 @@
   - 注意だけの変更（無いシーンへの Call `＞存在しないシーン` を足した）: 段 4 で `注意: Call の飛び先「存在しないシーン」が辞書のシーンにありません…`（誤り 0 件、注意 1 件）を出して続け、終了コード 0（要件 4.5）。`updates.txt`（41 行）・`index.html`・`ghost/`・`shell/` が置かれた。
   - 片付け: 使い捨てのワークツリーと出力先を消した（`git worktree list` に残っていない。作業ツリーは clean）。
 - `git diff origin/main -- .github/workflows/release.yml crates/pasta_check/` は空（要件 8.1・8.2）。
+
+### 14.5 ローカルの置き場所から main の辞書が届く（2026-11-19・タスク 5.2）
+
+- 置き場所: `git fetch` した後の origin/main の先頭 `fcc3ecd0`（14.2 の main の先頭と同じ）で、`assemble-site.sh fcc3ecd0 v0.6.2 <v0.6.2 の nar> <出力先>`（`PASTA_CHECK` は 14.2 と同じ crates.io の 0.6.2）。終了コード 0、辞書 13 個で誤り 0 件、`updates.txt` 40 行。
+  - 置き場所の `ghost/master/descript.txt` だけ、`homeurl` をローカルのサーバー（`http://127.0.0.1:8762/hello-pasta/`）に書き換え、ルートと `ghost/master/` の `updates.txt` のその行の md5・`size=` を合わせた（CRLF のまま。他の 39 行は手を入れていない）。書き換えないと、更新で届く main の `descript.txt` の `homeurl` が公開サイトを指し、2 回目の更新確認が公開中の v0.6.2 へ行ってしまうため。`descript.txt` は main で変わったファイルなので、取られるかどうかの判定には効かない。
+  - 14.1 と同じ要求を記録する node:http のサーバーで `127.0.0.1:8762/hello-pasta/` から配信した。
+- SSP: `C:\wintools\ssp` を作業ツリーの無視される `target/ssp-t52` に複製し（`ghost/`・`plugin/`・`temp/` は空）、立てる前に `data/profile/app.dat` の `SelfUpdate.Pending.ZipPath`・`SelfUpdate.Pending.VersionStr` の 2 行を消した。`ssp.exe --option bootunlock,standalone --sstp-listen 9802 --ghost <複製の ghost/hello-pasta>` で立てた（自分を更新せず、SSP/2.9.34 のまま動いた）。
+- ゴースト: v0.6.2 の nar をそのまま展開し、`descript.txt` の `homeurl` だけをローカルのサーバーに書き換えた（`name` は `hello-pasta` のまま）。更新の指示のシーンは、`updates.txt` に載らない新しいファイル `dic/99-test.pasta` に置いた（`＊更新テスト` が `\![updatebymyself]` を出す・`＊OnUpdateReady` が一言話す）。既存の辞書に足すと、そのファイルが main で変わっていれば上書きされてシーンが消え、2 回目の指示が出せなくなり、取ったかどうかの判定にも手の変更が混じるため。`99-test.pasta` は一覧に無いので取られず、消されもせず、更新の後も残る。
+- 更新の指示: SSTP の NOTIFY `OnPastaCallFunction`（Reference0 = `更新テスト`）を 2 回。
+
+#### 1 回目（v0.6.2 → main）
+
+- サーバーの記録（更新の要求のすべて。最初の 1 行は手で確かめた PowerShell の要求なので除く）:
+
+  ```text
+  2026-11-19T07:04:56.722Z GET /hello-pasta/updates2.dau 404 0 UA=SSP/2.9.34 (20261113-4; Windows NT 10.0.26300)
+  2026-11-19T07:04:56.732Z GET /hello-pasta/updates.txt 200 4163 UA=SSP/2.9.34 (20261113-4; Windows NT 10.0.26300)
+  2026-11-19T07:04:59.170Z GET /hello-pasta/ghost/master/descript.txt 200 252 …
+  2026-11-19T07:04:59.394Z GET /hello-pasta/ghost/master/dic/01-boot.pasta 200 352 …
+  （dic/02-talk.pasta 〜 dic/13-calendar.pasta の 12 本が同じ形で続く）
+  2026-11-19T07:05:02.195Z GET /hello-pasta/ghost/master/pasta.toml 200 2923 …
+  2026-11-19T07:05:02.411Z GET /hello-pasta/shell/master/descript.txt 200 212 …
+  ```
+
+  取ったファイルは 16 本で、`git diff --name-only v0.6.2 fcc3ecd0 -- crates/pasta_sample_ghost/ghosts/hello-pasta/` の 16 本（`ghost/master/descript.txt`・`dic/01-boot.pasta`〜`dic/13-calendar.pasta`・`pasta.toml`・`shell/master/descript.txt`）とちょうど同じ。**`pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`scripts/README.md`・シェルの画像は 1 本も取っていない**（要件 10.2）。
+- ゴーストに届いた更新のイベント（`pasta.log` の抜き書き）:
+
+  ```text
+  ID: OnUpdateReady
+  Reference0: 15
+  Reference1: ghost/master/descript.txt,ghost/master/dic/01-boot.pasta,…（16 本）
+  Reference3: ghost
+  Reference4: script
+  …
+  2026-11-19T07:05:02.991202Z  INFO pasta::shiori: Starting PastaShiori load …   ← 読み込み直し
+  ID: OnUpdateComplete
+  Reference0: changed
+  Reference1: descript.txt,01-boot.pasta,…,pasta.toml,descript.txt（16 本）
+  …
+  Value: \p[0]\s[0]新装開店です！\_w[450]　いらっしゃいませ！\_w[450]\p[1]\s[15]…\_w[150]…\_w[150]ぼく、\_w[450]さっきまでのぼくと同じだよね？\_w[450]\e
+  ```
+
+  読み込み直した後の main の辞書（`07-greeting.pasta` の `＊OnUpdateComplete　＆＄ｒ０＝「changed」`）が台詞を返した（要件 10.1。PR #288 の台詞の最初の本番の確認）。`OnUpdateReady` の Reference0 は 15 で、Reference1 の本数（16）より 1 少ない（SSP の数え方による。判定には Reference1 の一覧とサーバーの記録を使った）。`OnUpdateBegin` は v0.6.2 の辞書にシーンが無く 204 のため、ログに無い。`ERROR` は 0 件。
+- 更新後のフォルダ（`profile/` を除く）を置き場所と md5 で照合: 違うのは、手で足した `dic/99-test.pasta`、SSP が作った `shell/master/profile/shell.dat`、`ghost/master/updates.txt`（v0.6.2 の nar のまま）の 3 つだけ。ルートの `updates.txt` と 16 本は置き場所とバイト一致。更新の前と後で変わったのは 16 本とルートの `updates.txt` だけで、`pasta.dll` は v0.6.2 のまま。`ghost/master/updates.txt` は一覧に載らないファイルなので、SSP は取り直さない（SSP が比べに使うのはルートの `updates.txt`）。
+
+#### 2 回目（手元と置き場所が同じ）
+
+- サーバーの記録:
+
+  ```text
+  2026-11-19T07:05:41.253Z GET /hello-pasta/updates2.dau 404 0 UA=SSP/2.9.34 (20261113-4; Windows NT 10.0.26300)
+  2026-11-19T07:05:41.255Z GET /hello-pasta/updates.txt 200 4163 UA=SSP/2.9.34 (20261113-4; Windows NT 10.0.26300)
+  ```
+
+  これ以外の要求は 0 件。
+- `pasta.log`: `OnUpdateBegin`（Reference0 `hello-pasta`）に main の辞書が「本店から新しいのが届いてないか、見てくるね。」を返し、`OnUpdateComplete` は **Reference0 `none`**・Reference1 空で、「新しいのは、なし！　届いてたのは、家賃の請求書だけでした。」の台詞を返した（要件 10.3）。`ERROR` は 0 件（`WARN` は最初の起動の「Persistence file not found」の 1 件だけ）。
+
+#### 結論と片付け
+
+- 結論: **通った**。main の辞書に入れ替わり `changed` の台詞が出て、取ったファイルは変わった 16 本だけで `pasta.dll` を取らず、次の更新確認は `No Update`（`none`）。公開サイトの実 URL での確認（要件 10.4 の後半）はタスク 5.3 で行う。
+- SSP 本体の更新ログの文字列は、14.1 と同じ理由（複製の SSP の MCP に届かない）で読んでいない。サーバーの要求の記録と `OnUpdateReady`・`OnUpdateComplete` の Reference で確かめた。
+- 片付け: 試験用の SSP はプロセスを指定して強制終了（WM_CLOSE・`ゴースト終了` は使っていない）。普段の SSP は動いたまま。サーバーは止め、SSP の複製は消した。
