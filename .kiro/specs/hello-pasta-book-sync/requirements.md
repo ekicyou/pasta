@@ -51,12 +51,13 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
 #### Acceptance Criteria
 
 1. When マニュアル公開 CI が main のコミットから置き場所を作る, the 更新の置き場所 shall リポジトリの `crates/pasta_sample_ghost/ghosts/hello-pasta/` に在るファイルを、そのコミットの内容のまま、同じフォルダ構造で置く。
-2. The 更新の置き場所 shall リポジトリに無く、最新の Release の `hello-pasta.nar` にだけ在るファイル（2026-11-19 時点では `ghost/master/pasta.dll`・`ghost/master/THIRD_PARTY_LICENSES.txt`・`ghost/master/scripts/README.md` の 3 本）を、nar の中身のまま置く。
-3. If 同じパスのファイルが、リポジトリと nar の両方に在る, then the 更新の置き場所 shall リポジトリのコミットの内容を置く。
-4. The マニュアル公開 CI shall どちらの出どころから置くかを「そのコミットのリポジトリに在るか」だけで決め、ファイル名の一覧を決め打ちで持たない。（nar に arch ごとの `pasta.dll` などが足されても、この仕様の変更なしに nar の側として置かれる。）
-5. If リポジトリに在るファイルが、`pasta_check release` が `updates.txt` に載せない種類のもの（`updates.txt`・`updates2.dau`・`developer_options.txt`）である, then the 更新の置き場所 shall それを置かず、`updates.txt` にも載せない。
+2. The 更新の置き場所 shall 最新の Release の `hello-pasta.nar` に在り、その Release のタグのツリーに無いファイル（ビルドで作ったもの。2026-11-19 時点では `ghost/master/pasta.dll`・`ghost/master/THIRD_PARTY_LICENSES.txt`・`ghost/master/scripts/README.md` の 3 本）を、nar の中身のまま置く。
+3. If nar に在るファイルが、その Release のタグのツリーにも在る, then the 更新の置き場所 shall それをリポジトリの側とし、公開するコミットに在ればその内容を置き、無ければ置かない。
+4. The マニュアル公開 CI shall どちらの出どころから置くかを「最新の Release のタグのツリーに在るか」だけで決め、ファイル名の一覧を決め打ちで持たない。（公開するコミットで消したファイルが、nar の側として置かれないため。）（nar に arch ごとの `pasta.dll` などが足されても、この仕様の変更なしに nar の側として置かれる。）
+5. If リポジトリに在るファイルが、`pasta_check release` が `updates.txt` に載せない種類のもの（`updates.txt`・`updates2.dau`・`developer_options.txt`）である, then the 更新の置き場所 shall それを置かず、`updates.txt` にも載せない。nar の `updates.txt`・`ghost/master/updates.txt` も、nar の側として置かない（ルートの `updates.txt` は Requirement 2 で作り直す。`ghost/master/updates.txt` の扱いは設計で決める）。
 6. While 2 つのリリースの間で、リポジトリに在るファイルだけが変わる, the 更新の置き場所 shall nar の側のファイル（`pasta.dll` など）を、最新の Release の nar と同じ内容のまま置き続ける。（利用者が、辞書の更新のたびに `pasta.dll` を取り直さない。）
 7. The 入口のページ（`hello-pasta-network-update` 要件 7） shall 今のとおり置き場所の直下に置き、`updates.txt` に載せない。
+8. The 更新の置き場所 shall リポジトリの側の文字のファイルを、nar と同じ改行（CRLF）で置く。（リリースのコミットから作った置き場所では、リポジトリの側の各ファイルの md5 が、その Release の nar と一致する。改行が違うと、中身が同じでも利用者が全部を取り直す。）
 
 ### Requirement 2: `updates.txt` の作り直しと公開前の照合
 
@@ -103,8 +104,9 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
 #### Acceptance Criteria
 
 1. When 最新の Release の `hello-pasta.nar` で入れた直後の利用者が更新確認をする, the 更新の置き場所 shall その nar より古いファイルを返さない。（置き場所のリポジトリの側は、その Release 以降の main のコミット、nar の側は、その Release のものである。）
-2. If マニュアル公開 CI が、main の最新ではないコミットで公開しようとする（古い run の再実行など）, then the マニュアル公開 CI shall 置き場所を、そのコミットの古い中身で公開しない。*（仮定: 公開を行わず、その理由を表示する。失敗にするか、成功のまま公開を飛ばすかは OPEN QUESTION 2。）*
+2. If マニュアル公開 CI が公開しようとする中身が、main の最新のコミットの中身より古い（古い run の再実行・追い越された run など）, then the マニュアル公開 CI shall それを公開せず、理由を表示して、失敗にしない。
 3. The 更新の置き場所 shall nar の側のファイルを、最新の Release より古い Release のものにしない。
+4. When 5.2 で公開を飛ばす, the マニュアル公開 CI shall main の最新の中身が公開されないままにならないようにする。（新しいコミットがマニュアル公開 CI の起動の条件に当たらないときも、取りこぼさない。）
 
 ### Requirement 6: リリース CI の公開後の見比べ
 
@@ -112,8 +114,8 @@ hello-pasta のネットワーク更新の中身が、辞書を直しても変�
 
 #### Acceptance Criteria
 
-1. When リリース CI が起動したマニュアル公開 CI の公開が完了する, the リリース CI shall 実際の URL の `updates.txt` を取り、その Release の nar の側のファイル（リポジトリに無いファイル）の行が、nar の `updates.txt` の行と md5・大きさで一致することを確かめる。*（仮定: OPEN QUESTION 3。）*
-2. The リリース CI shall リポジトリの側のファイルについては、md5 の一致を求めない。（Release のタグの後に main へ入った辞書の変更で、違いうるため。リポジトリの側は、公開前の照合 Requirement 2 で確かめ済み。）*（仮定: OPEN QUESTION 3。）*
+1. When リリース CI が起動したマニュアル公開 CI の公開が完了する, the リリース CI shall 実際の URL の `updates.txt` を取り、その Release の nar の側のファイル（Requirement 1.2 の決め方で決まるもの）の行が、nar の `updates.txt` の行と md5・大きさで一致することを確かめる。
+2. The リリース CI shall リポジトリの側のファイルについては、md5 の一致を求めない。（Release のタグの後に main へ入った辞書の変更で、違いうるため。リポジトリの側は、公開前の照合 Requirement 2 で確かめ済み。）
 3. The リリース CI shall `updates.txt` の日付の欄の違いを、不一致としない。
 4. If 見比べる行が一致しない、または実際の URL の `updates.txt` が取れない, then the リリース CI shall 結果を `failed` として報告の表に出し、他の公開先の status を変えない。
 5. The リリース CI shall 報告の表の置き場所の行の書式・取り直しの回数と間隔・最新ではないタグのときの `skipped` を、今のとおりに保つ。
