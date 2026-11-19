@@ -316,7 +316,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 | -- | ---- | -------- | ---- | ------------ |
 | 1 | novel-areka-contract | Opus | 6〜9（文書だけ） | なし。**0.7.0 のゴールの先頭**（areka の側が早く動けるよう、最初に始める） |
 | 4 | cue-command-runtime（ト書きと柱。2026-10-17 に `scene-stage-attributes` をまとめた） | Opus（2026-11-19 に Fable から替えた） | 17〜21（超えるならト書きと柱に分け直す） | `scene-attribute-store`（柱の分。2026-11-03 に入った）。語彙の名前は `novel-areka-contract` から引く |
-| 5 | shell-element-click | Opus | 5〜8 | `novel-areka-contract`（完全一致の場面選びは `touch-poke-shortcuts` が入れてある）。`scene-anchor-link` とは `choice_select.lua` を共有する |
+| 5 | shell-element-click（**2026-11-19: `novel-talk-flow` に入れて閉じる、と決まった。行とフォルダの片付けは、PR をまとめる時**） | Opus | 5〜8 | `novel-areka-contract`（完全一致の場面選びは `touch-poke-shortcuts` が入れてある）。`scene-anchor-link` とは `choice_select.lua` を共有する |
 | 6 | novel-talk-flow | Opus（2026-11-19 に Fable から替えた） | 17〜21（超えるなら出力の分と場面の流れの分に分ける） | `cue-command-runtime`、`novel-areka-contract` |
 | 8 | novel-checkpoint-rollback | Opus（2026-11-19 に Fable から替えた） | 14〜17 | `novel-talk-flow`（2026-11-19 に `novel-variable-scope` を閉じ、「スロット」で始まる変数を写し取る・戻す口をこちらが持つ） |
 | 9 | novel-save-slots | Opus | 8〜12 | `novel-checkpoint-rollback` |

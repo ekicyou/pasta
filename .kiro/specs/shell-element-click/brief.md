@@ -172,3 +172,9 @@
 8 本の暫定設計を別々の係が書いたら、同じ仕事を 2〜3 本が別々の形で持っていた。骨子 5 章の持ち分どおりに、持ち主を 1 つにする。くわしくは `novel-areka-contract/provisional-design-issues-2026-11-19.md` の 4 章と、`provisional-cross-check-interfaces.md`。この spec の暫定の設計と検証は、このフォルダの `provisional-design.md`・`provisional-design-validation.md`（正式な設計ではない。要件定義と設計の材料にする）。
 
 - 中身のほとんど（ローカルを先に探す・進める・画面の場面の決め方）が、`novel-talk-flow` と今の条件の属性に吸収された。残すか、`novel-talk-flow` に入れて閉じるかを、開発者に諮っている。
+
+## 決定（2026-11-19 の暫定設計の議論。骨子 8 章より、この spec の分）
+
+骨子（`novel-areka-contract/final-model-2026-11-19.md`）の 8 章が正である。上の節と食い違う所は、この節が勝つ。
+
+- **この spec は、`novel-talk-flow` に入れて閉じる**（議題 14。開発者の承認）。中身のほとんどが、`novel-talk-flow` と今の条件の属性に吸収されたためである。roadmap の表と、このフォルダの片付けは、PR をまとめる時に行う。
