@@ -166,7 +166,7 @@ fn test_ukadoc_files() {
         "ghost descript.txt に craftman がありません"
     );
     assert!(
-        ghost_desc.contains("craftmanw,どっとステーション駅長"),
+        ghost_desc.contains("craftmanw,えちょ"),
         "ghost descript.txt に craftmanw がありません"
     );
     assert!(

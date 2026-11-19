@@ -78,7 +78,7 @@ hello-pasta の台詞は、エディタで書き換えて、その場で鳴ら�
 
 | 項目 | 中身 |
 | ---- | ---- |
-| 作者 | ekicyou（どっとステーション駅長） |
+| 作者 | えちょ |
 | 頭脳（SHIORI） | `pasta.dll`（[pasta](https://github.com/ekicyou/pasta)）。同梱のソフトウェアのライセンスは、`ghost/master/THIRD_PARTY_LICENSES.txt` にある |
 | 辞書と設定 | pasta のリポジトリと同じ MIT License |
 | 絵 | 画像生成 AI の出力から作った。Unlicense（[見本の絵のライセンス](reference/shell.md#見本の絵のライセンス)） |

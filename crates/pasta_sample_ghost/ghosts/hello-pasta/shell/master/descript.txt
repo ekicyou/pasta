@@ -2,7 +2,7 @@ charset,UTF-8
 type,shell
 name,master
 craftman,ekicyou
-craftmanw,どっとステーション駅長
+craftmanw,えちょ
 seriko.use_self_alpha,1
 sakura.balloon.offsetx,100
 sakura.balloon.offsety,-105
