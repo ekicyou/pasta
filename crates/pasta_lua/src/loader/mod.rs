@@ -225,7 +225,7 @@ impl PastaLoader {
         // the generated `.lua` from Phase 4 stays byte-invariant (requirements 3.1
         // / 7.1). The map is built AFTER transpile (Phase 4) so the ordering is
         // transpile → build map → enable-with-map (requirement 3.1).
-        let debug_enabled = crate::debug::resolve_enabled(config.debug().as_ref());
+        let debug_enabled = crate::debug::resolve_enabled(config.debug().as_ref(), || None);
         let source_map = if debug_enabled {
             let map = Self::build_source_map(&pasta_files, &transpiler);
             debug!("Phase 5.5: Built source map for debug session");
