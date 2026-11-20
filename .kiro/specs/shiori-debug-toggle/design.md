@@ -219,6 +219,7 @@ stateDiagram-v2
 
 - 「読み込み直しの後」は、トグル（書けてリロードを頼んだとき）・「SHIORI をリロード」・▶・「値を入れて実行」の 4 つ（7.4）。リロードを頼めなかったときも `debugStateOf` が `unconfirmed` を返すので「有効にする」へ戻る（**仮定**。OPEN QUESTION 4）。
 - 操作の間に別のゴーストを開いていたら、前のゴーストの結果で向きを改めない（今の `#readTable` と同じ守り）。
+- 「別のゴーストを開いた」は、確かめたゴーストと今のゴーストの master が違うこと。切り替えの途中の `setGhost(null)` や、開けずに同じゴーストへ戻ったことでは戻さない。
 - 開いたときに前の pasta.log から状態を読まない（7.3）。
 
 ## Requirements Traceability
@@ -356,7 +357,7 @@ pub(super) const SAVE_SWITCH_NAMES: [&str; 2] = ["デバッグ", "debug"];
   - `[logging] level = "warn"` でも有効・無効の行が pasta.log に出る。
   - 保存ファイルが無い・壊れている → `[debug] enabled` で決まり、読み込みは成功する。
 - 今の試験の `scene_play_event_test.rs` の「無効なゴーストに有効の行が無い」はそのまま通る（文が違う）。`multi_instance_test.rs` のコメント「warn だと有効の info の行まで絞られ」は古くなるので直す。
-- `pasta_shiori` の `ffi_loadu_test.rs`・`v3_load_entry_log_test.rs` は、ログを絞ったゴーストで「読み込みの終わりの行のほかの info は出ない」を `Startup sequence completed` が無いことで確かめている。有効・無効の行は意図して通す例外なので、この 2 本は変えずに通る。決まりの言い方（「印の行と有効・無効の行のほかは絞られる」）は、マニュアルの `[logging]` と `internals/logging-encoding.md` で直す。
+- `pasta_shiori` の `ffi_loadu_test.rs`・`v3_load_entry_log_test.rs` は、ログを絞ったゴーストで「読み込みの終わりの行のほかの info は出ない」を `Startup sequence completed` が無いことで確かめている。有効・無効の行は意図して通す例外なので、今の確かめは変えずに通る。そのうえで、道具が頼る順（判断の行は印より前）を FFI の入口を通して守るため、この 2 本に「ログを絞ったゴーストでも判断の行がちょうど 1 行あり、`SHIORI load entry completed` より前にある」を足す（無効のゴーストと、有効のゴーストを 1 本ずつ）。決まりの言い方（「印の行と有効・無効の行のほかは絞られる」）は、マニュアルの `[logging]` と `internals/logging-encoding.md` で直す。
 
 #### PersistencePath
 
@@ -518,15 +519,16 @@ export interface DevActionsDeps {
 }
 
 class DevActions {
-  #debugOn: boolean;                  // 初めは false（まだ確かめていない）
-  toggleDebug(): Promise<void>;       // #debugOn なら無効にする、でなければ有効にする（saves: true）
+  #debugOn: { master: string; on: boolean } | undefined;   // 初めは undefined（まだ確かめていない）
+  toggleDebug(): Promise<void>;       // 今のゴーストで on なら無効にする、でなければ有効にする（saves: true）
   // reload()・#play() の run の中で、読み込み直しの結果を #observe へ渡す
-  // #observe(ctx, reload): 操作のゴーストが今のゴーストのときだけ #debugOn = debugStateOf(reload) === 'enabled'
-  // setGhost(info): master が替わったら #debugOn = false
+  // #observe(ctx, reload): 操作のゴーストが今のゴーストのときだけ #debugOn = { master, on: debugStateOf(reload) === 'enabled' }
+  // 向き: #debugOn?.master が今のゴーストの master と同じで on のときだけ「無効にする」
+  // setGhost(null) では消さない（main.ts は切り替えの初めに null を挟み、開けなければ同じゴーストへ戻す）
 }
 ```
 
-- State model: 1 つの真偽値。保存しない（アプリを開き直せば「まだ確かめていない」）。開いたときに前の pasta.log を読まない（7.3）。
+- State model: 確かめたゴーストの master と真偽値の組 1 つ。保存しない（アプリを開き直せば「まだ確かめていない」）。開いたときに前の pasta.log を読まない（7.3）。別のゴーストを開くと master が合わなくなるので「まだ確かめていない」と同じ向きになり（7.5）、切り替えに失敗して同じゴーストへ戻ったときは向きを保つ（7.2）。
 - `RELOAD` は今の定数の `DevCommand` から、`#observe` を呼べるようにクラスの中で作る形にする。
 - `main.ts`: `reloadButton` の後に `debugButton` を作り、文は `ENABLE_DEBUG`、押すと `devActions.toggleDebug()`。`onDebugState` で `ENABLE_DEBUG`／`DISABLE_DEBUG` に替える。ツールバーは開始の画面で今の CSS が隠す（ボタンも同じに隠れる）。
 
@@ -567,6 +569,7 @@ class DevActions {
 
 - `debug_save_switch_test.rs` の 6 つ（LoaderPhase55 の注のとおり）。`#[ctor]` の中和と一時フォルダで、開発機の `PASTA_DEBUG` と置いた場所に左右されない（10.2）。
 - 無効のときシーンマップが無いこと（`runtime.debug_enabled() == false`）と、`.lua` のキャッシュが有効・無効で同じであること（3.4）。
+- `pasta_shiori` の `ffi_loadu_test.rs`・`v3_load_entry_log_test.rs`: `[logging] level = "warn"` のゴーストで、判断の行がちょうど 1 行あり、`SHIORI load entry completed` より前にある（無効・有効の各 1 本。5.4・10.3）。
 
 ### 道具の試験（`node --test`）
 
@@ -580,7 +583,7 @@ class DevActions {
   - 読み込みの警告の行が要約に出る（5.9）。
   - `debugStateOf` の表。
 - `flows.test.ts`: `reloadAndWait` の `debug` が、印の前の行で決まり、印の後の行で変わらない。案内の 2 つの文が `pasta.toml` を含まない。
-- `devActions.test.ts`（10.3）: 初めは「有効にする」の向き／有効の読み込み直しで「無効にする」へ／▶ の後の無効で「有効にする」へ／リロードを頼めないと「有効にする」へ／別のゴーストを開くと戻る／操作の間にゴーストが替わったら前の結果で改めない／押すと向きに合う値を書く。
+- `devActions.test.ts`（10.3）: 初めは「有効にする」の向き／有効の読み込み直しで「無効にする」へ／▶ の後の無効で「有効にする」へ／リロードを頼めないと「有効にする」へ／別のゴーストを開くと戻る／切り替えに失敗して同じゴーストへ戻ると向きを保つ／操作の間にゴーストが替わったら前の結果で改めない／押すと向きに合う値を書く。
 - VSCode: `contributions.test.ts` で 2 つのコマンドが分類 `Pasta` で登録され `editor/context` に無い（6.1）。`devCommands.e2e.test.ts` で登録の数と、偽の MCP の窓口でのトグルの 1 本（6.2）。
 
 ### Manual / 実機
