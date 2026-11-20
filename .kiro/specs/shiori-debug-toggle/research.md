@@ -201,7 +201,7 @@
   7. recipe のボタンの状態の持ち場（`DevActions` が持ち、`main.ts` へ知らせる口）と、ゴーストの替わりで戻す所（`setGhost`）。
   8. VSCode の右クリックのメニューに足すか（OPEN QUESTION 6）。
   9. 案内の文（`DEBUG_HINT`・`NO_SCRIPT_GUIDE`）の新しい文。
-  10. 予約グローバル変数の表に載せるか。「pasta.toml に戻す」口が要るか。（要件のディスカッションで what を決める。設計は結論に従う）
+  10. （要件のディスカッションで決着）予約グローバル変数の表に `＄＊デバッグ`・`＄＊debug` を載せる（Req 9.8）。「pasta.toml に戻す」操作は足さない（Req 5.12。戻すときは recipe の変数の表で消す）。
   11. `devCommands.ts` の「拡張は書き換えを送らない」の言い方と、それを書いた内部の章を、トグルを例外として直す（§5 の穴 7）。
 - **調べが要ること（Research Needed）**:
   - `[logging]` の `level`・`filter`・`PASTA_LOG` を変えたとき、`Debug enabled …` が pasta.log に残るかを実機かテストで確かめる。
