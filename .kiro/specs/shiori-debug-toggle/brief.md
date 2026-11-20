@@ -90,7 +90,7 @@ discovery の議案（2026-11-19 開発者が推奨案で承認）:
 ## Existing Spec Touchpoints
 
 - **Extends**: なし（デバッグの有効化を決めた spec・`external-control-events`・`pasta-recipe-dev-actions` はどれも `completed/`）。
-- **Adjacent**: `novel-variable-scope`（保存の範囲を分ける。`＄＊デバッグ` がどちらの範囲に入るかは、あちらが入るときに決める）。`novel-checkpoint-rollback`（状態の巻き戻しで `デバッグ` を戻さないか）。
+- **Adjacent**: `novel-checkpoint-rollback`（状態の巻き戻し）。2026-11-19 の discovery で、ロードと巻き戻しで戻るのは名前が「スロット」か `slot_` で始まるグローバル変数だけと決まった（`novel-variable-scope` は閉じた。roadmap の「統合して閉じたもの（2026-11-19）」）。`＄＊デバッグ` は戻らない側に入る。
 
 ## Constraints
 
