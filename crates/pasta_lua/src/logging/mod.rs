@@ -18,4 +18,6 @@ pub use registry::{
     ClaimToken, GlobalLoggerRegistry, LoadDirGuard, RoutingWriter, get_current_load_dir,
     set_current_load_dir,
 };
-pub use tracing_init::{LOAD_ENTRY_TARGET, init_tracing, update_tracing_filter};
+pub use tracing_init::{
+    DEBUG_STATE_TARGET, LOAD_ENTRY_TARGET, init_tracing, update_tracing_filter,
+};

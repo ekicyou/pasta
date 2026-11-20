@@ -9,7 +9,7 @@
   - _Dispatch: mechanical — 今のコードをそのまま関数に出す抽出_
   - _Requirements: 1.9_
 
-- [ ] 1.2 (P) 有効・無効の行の専用の target を、ログの設定に左右されずに通す
+- [x] 1.2 (P) 有効・無効の行の専用の target を、ログの設定に左右されずに通す
   - `pasta::debug_state` の定数を置き、ログの絞り込みで必ず通す指示に、読み込みの印の target と並べて info で足す
   - ログの部品の公開の口から定数を使えるようにする
   - `[logging] level = "warn"`・環境変数 `PASTA_LOG`・作者の `pasta::debug_state=off` のどれでも、この target の info が通ることを確かめる試験が、今の印の target の試験と並んで通る
