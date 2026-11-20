@@ -268,7 +268,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 > **2026-11-19 の深掘りで決めたこと（開発者の決定・承認）**: 骨子を先に決める discovery を行い、議題を全部閉じた。**骨子の全体は `.kiro/specs/novel-areka-contract/final-model-2026-11-19.md` に在る（要件定義は、これを正として始める）。** spec ごとの決定は、brief 5 本（`novel-areka-contract`・`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-save-slots`）の「決定（2026-11-19。最終形）」の節に在る。台本を書く人の目線のまとめは同じ場所の `play-script-guide.md`、経緯は `discovery-2026-11-19.md`。この節の下の記述と食い違う所は、骨子と brief が正しい。最後の洗い直しで出た整理 5 件（骨子の 4 章）も、開発者との議論で閉じた。走り方は、呼び出しの対でなく、柱 `＆再生モード`（トーク・演劇・設定）で書く形に決まった。
 >
 > - **版**: Phase 13 を 0.7.0 から外す。「areka の準備待ち。版は未定」とする。0.7.0 に残す物は、次の棚卸（`/kiro-next`）で決める。この節と棚卸の節で「0.7.0」と書いてあるノベルの spec は、版が未定と読む。
-> - **フェーズ**: pasta の側を 3 つに分ける。フェーズ 1 ＝今の SSP で動く物、フェーズ 2 ＝ SSP が対応すれば動く物、フェーズ 3 ＝ areka（合成した舞台）が要る物（前半は最低限、後半は重い物）。フェーズ 1（`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` の控えと再開・`novel-save-slots`・`shell-element-click`）は、areka を待たずに作れて、SSP の実機で測れる。どの版に置くかは、棚卸で決める。同じ台本を、SSP でも areka でも動かす（pasta が、ベースウェアを見てタグを直す）。
+> - **フェーズ**: pasta の側を 3 つに分ける。フェーズ 1 ＝今の SSP で動く物、フェーズ 2 ＝ SSP が対応すれば動く物、フェーズ 3 ＝ areka（合成した舞台）が要る物（前半は最低限、後半は重い物）。フェーズ 1（`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` の控えと再開・`novel-save-slots`）は、areka を待たずに作れて、SSP の実機で測れる。どの版に置くかは、棚卸で決める。同じ台本を、SSP でも areka でも動かす（pasta が、ベースウェアを見てタグを直す）。
 > - **モデル**: `cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` の要件定義は、Fable から Opus へ替える（絡み合う問いは、この discovery で決まった）。細かい決めごと（見本の置き場所・物語の長さ・Lua の範囲・マニュアルの章の割り方）は、要件定義に任せる。
 > - **先に始められる物**: `novel-areka-contract`（文書だけ）は、areka を待たずに作れる。
 > - **実機**: フェーズ 1 の芯（`\x` と `\![raise]` で 1 行ずつ渡す・待ちの間のクリック・貯めない区間・透明度と大きさの時間）は、SSP 2.9.34 で確かめた（`research-ssp-capabilities.md` の D 節）。ウインドウモードと音は、まだ見ていない。
@@ -331,7 +331,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 
 2 番の `scene-attribute-store` と 7 番の `scene-condition-attributes` は、2026-10-29 に 0.5.0 へ移した（0.5.0 の 1 番・2 番。2026-11-02 の棚卸で表から外した）。
 
-並べられる組み合わせ（2026-10-17 と 2026-10-18 の棚卸で測った）: `novel-areka-contract`・`scene-attribute-store`・`novel-variable-scope` は、0.4.3 の `shiori4-v3-portable` とソースを共有しない見込み（2026-10-23）。`novel-areka-contract` と `scene-attribute-store` は、互いにも共有しない。`shell-element-click` は `novel-areka-contract` の後、`scene-attribute-store` と並べられる（`scene.lua` を触らない約束で）。`novel-variable-scope` は `scene-attribute-store` と並べられる（`scene-attribute-store` が `partial.rs` と VSCode の文法定義を触らない約束で）。`cue-command-runtime` → `novel-talk-flow` → `novel-checkpoint-rollback` は、`act.lua` と `sakura_builder.lua` を共有するので 1 本ずつ入れる。
+並べられる組み合わせ（2026-10-17 と 2026-10-18 の棚卸で測った）: `novel-areka-contract`・`scene-attribute-store`・`novel-variable-scope` は、0.4.3 の `shiori4-v3-portable` とソースを共有しない見込み（2026-10-23）。`novel-areka-contract` と `scene-attribute-store` は、互いにも共有しない。`shell-element-click` は、2026-11-20 に `novel-talk-flow` に入れて閉じた。`novel-variable-scope` は `scene-attribute-store` と並べられる（`scene-attribute-store` が `partial.rs` と VSCode の文法定義を触らない約束で）。`cue-command-runtime` → `novel-talk-flow` → `novel-checkpoint-rollback` は、`act.lua` と `sakura_builder.lua` を共有するので 1 本ずつ入れる。
 
 ### areka の進み具合との関係
 
@@ -399,7 +399,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 - [ ] novel-talk-flow -- ノベル向けの出力に切り替える設定。台詞ごとのクリック待ち、話者名と声と変わらない行 ID、ランダムトークと時報の停止、起動時の場面、「次の場面へ」、完全一致の場面選びの切り替え（2026-10-21 に仕組みを `scene-exact-match` へ移した。こちらは設定を入れるだけ）。Dependencies: novel-areka-contract, cue-command-runtime, scene-exact-match
 - [ ] novel-checkpoint-rollback -- さくらスクリプトに目印の ID を埋め、演劇の 1 本ごとに、再生位置・変数・アクター状態を控える（さくらスクリプトは控えない）。ベースウェアが知らせた ID の時点へ戻す（「スロット」で始まるグローバル変数を写し取る・戻す口も持つ。2026-11-19 に `novel-variable-scope` を閉じた）。Dependencies: novel-talk-flow
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
-- [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.7.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-checkpoint-rollback, novel-save-slots, shell-element-click, novel-areka-contract（areka の側の実装も要る）
+- [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.7.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-checkpoint-rollback, novel-save-slots, novel-areka-contract（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 - [ ] scene-exact-match -- 完全一致でシーンを呼ぶ `＞＞シーン名`（同名が複数ならランダム。既存の `search_scene_exact` を使う）と、`pasta.toml` の `[scene] match = "exact"`（`＞`・イベントの受け口・OnTalk・時報・選択肢の飛び先を全部完全一致にする。既定は前方一致）を足す。既定のモードでも、イベントの受け口はイベント ID の直後が英大文字で続く候補（`＊OnInstallCompleteAll` など）を外す。`novel-talk-flow` の完全一致の切り替えを引き取る（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者が承認して `event-scene-exact-match` から広げた）。版は未定。`scene-anchor-link` と同じウェーブに置かない（文法・`act.lua`・`choice_select.lua` を共有する）。Dependencies: none
 - [x] vsce-4-upgrade -- `@vscode/vsce` を 4.x に上げる。リリース CI の Node は `ponytail-manual-ci` が 22 にした。`--azure-credential` の公開の道を `release-setup-check.yml` で確かめる。だめなら 4.x の OIDC の口へ移すかを決める（2026-10-24 起票。`/update` から）。版は未定。`pasta-dll-multiarch`・`pasta-recipe`（`release.yml`）、`pasta-recipe-dev-actions` は入った（`editors/vscode/package.json`・lock は変えず、`build.yml` に job `vscode-test` を足した）。Dependencies: none（`ponytail-manual-ci` は入った）
