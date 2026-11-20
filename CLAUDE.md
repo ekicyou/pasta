@@ -71,6 +71,7 @@ Skills are located in `.claude/skills/*/SKILL.md` (mostly `kiro-*`)
 - `pasta-check` — reference for the `pasta_check` CLI (ghost release build `release`, later check commands)
 - `pasta-ghost-authoring` — Pasta DSL grammar and dictionary-writing patterns for a ghost's `.pasta` files
 - `pasta-lua-coding` — pasta.dll Lua runtime API reference and coding conventions (ghost `scripts/`, Lua blocks in Pasta DSL)
+- `comment-cleanup` — comment-only cleanup pass (removes narration, change history and `.kiro` references; keeps `// SAFETY:` and rustdoc contracts); defaults to the uncommitted diff
 - Use skills explicitly requested by the user and skills relevant to the task's domain, including design, accessibility, and UX.
 - Select skills from their descriptions or metadata first, then read only the selected skills and the references needed for the task.
 - Follow explicit host and project rules and retain required workflow checks. Do not skip relevant skills just because the task is small.
@@ -86,3 +87,13 @@ Skills are located in `.claude/skills/*/SKILL.md` (mostly `kiro-*`)
 - Load additional steering only when required by project rules or relevant to the task.
 - Default files: `product.md`, `tech.md`, `structure.md`
 - Custom files are supported (managed via `/kiro-steering-custom`)
+
+## Comments
+
+- Default to no comments. Write one only when names, types, asserts, or tests cannot express the *why*: an external constraint, a workaround, or a rejected alternative that looks better than it is.
+- Do not restate what the code does, narrate steps, or record change history ("fixed", "changed from", "now uses"). Change history belongs in the commit message.
+- Do not reference `.kiro` specs, requirement IDs, or task numbers in code. They are working documents and will drift. Stable external specifications (ukadoc, SHIORI) may be referenced.
+- Exceptions, always kept:
+  - Every `unsafe` block has a `// SAFETY:` comment stating the invariants it relies on.
+  - Public API doc comments (`///`, `//!`) are out of scope for this rule. Keep them accurate and concise.
+- When cleaning up, touch only comments added or changed in the current diff. Never alter code logic as part of comment cleanup. Use `/comment-cleanup`.
