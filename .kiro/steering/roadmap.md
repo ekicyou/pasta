@@ -186,60 +186,23 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
 ### ウェーブ（2026-11-20）
 
-0.7.0 の推奨の範囲の先頭の 3 本を、1 つのウェーブにする。`act.lua` を持つのは `cue-command-runtime` だけである。
+`shiori-debug-toggle` の 1 本だけを、1 つのウェーブにする（開発者の決定 2026-11-20。入ったら、スターターの nar と一緒に `/release 0.6.3` で出す。それまでスターターの 404 は残る）。ノベルの spec は、このウェーブには入れない。
 
 | spec | 子孫 | 種別 | 規模 | 要件定義 |
 | ---- | ---- | ---- | ---- | -------- |
-| novel-areka-contract | 約 7（ノベルのフェーズ 1 の全部と、`novel-backlog-rollback`・`novel-areka-output`） | 文書（areka への依頼を出すための取り決めが無い） | 8〜10 | Opus |
-| cue-command-runtime | 約 7（`scene-stage-attributes` から入門の文章まで） | 機能（`！` 行が `！select` のほかは捨てられる） | 14〜16 | Opus |
 | shiori-debug-toggle | 0 | 機能（開発者の依頼「グローバル変数「デバッグ」に true を設定する方法も」） | 12〜15 | Opus |
 
 開始コマンド（`/kiro-next` の報告と同じ形。俯瞰の頁が、この塊をコピーのボタンつきで出す）:
 
 ```
-Wave 3本
+Wave 1本
 Opus
-/kiro-start novel-areka-contract
-/kiro-start cue-command-runtime
 /kiro-start shiori-debug-toggle
 ```
 
 同じウェーブの約束:
 
-- `novel-areka-contract`: マニュアルのリファレンスの部の新しい 1 章と `SUMMARY.md` のその行だけ。コードは書かない。areka のリポジトリを書き換えない（依頼書を渡すだけ）。
-- `cue-command-runtime`: 文法（`grammar.pest`・`parse_scene.rs`・ト書きの AST）、コード生成（`scope_gen.rs`・`transpiler.rs`）、`act.lua`（入口だけ）、`sakura_builder.lua`、`shiori/act.lua`、設定の読み込み（`loader/config/`）、`validate/config.rs`、`choice_select.lua`、VSCode の文法定義、`pasta_lsp` の `visit_expr.rs`、`pasta_core` の `scene_types.rs`、`pasta/areka/init.lua`、マニュアルの文法の部。`pasta_lua` の `debug/config.rs`・`loader/mod.rs`・`runtime/factory.rs`、`editors/shared/`・`editors/recipe/`・VSCode 拡張の `src/` と `package.json`、マニュアルのデバッグの部と契約の章は触らない（契約の名前は読むだけ）。
-- `shiori-debug-toggle`: `pasta_lua` の `debug/config.rs`・`loader/mod.rs`・`runtime/factory.rs`（保存の読み込みは読むだけ）、`editors/shared/`、VSCode 拡張の `package.json`・`src/devCommands.ts`、pasta-recipe の `devActions.ts`・`devPanels.ts`、マニュアルのデバッグの部と入門の 1 章・14 章。`loader/config/`・文法・`act.lua`・`shiori/act.lua` は触らない。
-- 3 本とも、リリースの席（`release.yml`・`release.ps1`・`.claude/skills/release/`）を触らない。そのため、下の `/release 0.6.3` と並べて走らせられる。
-
-### その先のウェーブ（2026-11-20 の見込み）
-
-見込みで、前のウェーブが入った後の棚卸で確かめてから始める（`/kiro-wave` が始めるのは、上の「ウェーブ」だけ）。0.7.0 の推奨の範囲は、このあと spec のウェーブが 8 つ（2〜9）と、リリースのウェーブ（10）で出せる見込み。下の表はウェーブ 4 まで。ウェーブ 5 は `novel-talk-flow`、6 は `novel-checkpoint-rollback`、7 は `novel-save-slots`、8 は `hello-novel-sample`、9 は `manual-novel-guide`、10 は `/release 0.7.0` の見込み。
-
-| ウェーブ | spec | 入る条件 | 要件定義 |
-| -------- | ---- | -------- | -------- |
-| 2 | scene-stage-attributes | `cue-command-runtime` と `novel-areka-contract`（既定の名前）が入った後（`act.lua`・`sakura_builder.lua` を共有する） | Opus |
-| 3 | scene-exact-match | `scene-stage-attributes` が入った後（`act.lua`・文法・設定の読み込みを共有する） | Opus |
-| 4 | choice-condition-timeout | `scene-exact-match` が入った後（`act.lua`・文法を共有する） | Opus |
-
-```
-Wave 2（見込み）1本
-Opus
-/kiro-start scene-stage-attributes
-```
-
-```
-Wave 3（見込み）1本
-Opus
-/kiro-start scene-exact-match
-```
-
-```
-Wave 4（見込み）1本
-Opus
-/kiro-start choice-condition-timeout
-```
-
-ゴールの後: 版の決まっていないもの: `shiori4-v4-host`（先頭。ノベルに依らない。`build.yml` を `pasta-dll-multiarch` と共有する）、`pasta-dll-multiarch`（先頭。リリースの席）、`scene-anchor-link`（先頭。文法・`act.lua`・`choice_select.lua` を `scene-exact-match`・`novel-talk-flow`・`cue-command-runtime` と共有する）、`shiori4-v4-lua-api`（`shiori4-v4-host` の後）、`novel-backlog-rollback`（フェーズ 2）、`novel-areka-output`（フェーズ 3）。
+- 1 本だけのウェーブなので、ほかの spec との約束は無い。リリースの席（`release.yml`・`release.ps1`・`.claude/skills/release/`）は触らない。
 
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
