@@ -1217,3 +1217,38 @@ fn test_dump_table_unwritable_keeps_previous_file() {
     assert_eq!(fs::read_to_string(&path).unwrap(), "keep = 1\n");
     assert!(!temp_path.is_file());
 }
+
+#[test]
+fn save_file_path_default_is_under_base_dir() {
+    let base = Path::new("base");
+    let path = save_file_path(&PersistenceConfig::default(), base).unwrap();
+    assert_eq!(path, base.join("profile/pasta/save/save.toml"));
+}
+
+#[test]
+fn save_file_path_obfuscate_uses_dat() {
+    let base = Path::new("base");
+    let config = PersistenceConfig {
+        obfuscate: true,
+        ..PersistenceConfig::default()
+    };
+    let path = save_file_path(&config, base).unwrap();
+    assert_eq!(path, base.join("profile/pasta/save/save.dat"));
+}
+
+#[test]
+fn save_file_path_rejects_absolute_and_parent_dir() {
+    let base = Path::new("base");
+    let abs = if cfg!(windows) {
+        "C:\\x\\save.toml"
+    } else {
+        "/x/save.toml"
+    };
+    for bad in [abs, "../save.toml", "a/../../save.toml"] {
+        let config = PersistenceConfig {
+            file_path: bad.to_string(),
+            ..PersistenceConfig::default()
+        };
+        assert_eq!(save_file_path(&config, base), Err(bad.to_string()), "{bad}");
+    }
+}
