@@ -355,7 +355,7 @@
 
 - `editors/recipe/src-tauri/src/recent.rs` — 記録の型の手本
 - `editors/recipe/src/panels.ts`・`src/style.css`・`index.html` — 仕切りを足す所
-- `.kiro/specs/recipe-demo-video/direction.md` 13 節 — 配置の基準（実測）
+- `.kiro/specs/completed/recipe-demo-video/direction.md` 13 節 — 配置の基準（実測）
 - `book/SCREENSHOTS.md` — 撮影の記録の型と決まり
 - `.github/workflows/manual.yml` — マニュアルの検査の順
 - [UKADOC さくらスクリプトリスト `\![move]`](https://ukatech.shillest.net/ukadoc-spec/list_sakura_script.html#bang-move)・[`\![set,balloonoffset,x,y]`](https://ukatech.shillest.net/ukadoc-spec/list_sakura_script.html#bang-set-balloonoffset-x-y) — 位置の合わせ方

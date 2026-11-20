@@ -192,3 +192,15 @@
 骨子（`novel-areka-contract/final-model-2026-11-19.md`）の 8 章が正である。上の節と食い違う所は、この節が勝つ。
 
 - スロットに書く再生位置の「今のシーン」は、登録名である。台本を直した後のロードは、同じ所へ戻るとは約束しない（議題 1）。
+
+## 2026-11-20 棚卸の再測定（main 58aba27c）
+
+- **前提の変化**: 2026-11-19 の決定で、スロットは `save.toml` の中の予約の表（仮 `pasta_slots`）に入り、場面から呼ぶ組み込みの関数 4 つ（保存・読込・消去・参照）と、見出しを引く関数（仮 `＠スロット見出し`）・「セーブが在るか」を答える関数になった。永続化の Rust（`persistence.rs` 709 行・`lifecycle.rs` 61 行）は触らない。保存は今の `@pasta_persistence` の `save` を 1 回呼ぶ（入れ子は `SAVE_MAX_DEPTH` の 32 段まで書ける）。2026-11-20 の areka の決定は、この spec に効かない（セーブデータは pasta だけが持つ）。この spec のソースは前回から動いていない。
+- **触るファイル**: 新しい Lua のファイル（スロットの関数。`novel-checkpoint-rollback` の 2 つの口を使う）、組み込みの名前の登録（`shiori/entry.lua` 120 行。`GLOBAL.pause_auto_talk` と同じ流儀）、`pasta_check` の `validate/builtins.rs` 73 行（名前の表）、マニュアル（`manual-novel-guide` と節を分ける）とスキル references の再生成。
+- **規模**: 6〜8（brief の 4〜5 に、見出しを引く関数・在るかを答える関数・早回しの間に保存しない・検査の名前の表が足される。roadmap の 8〜12 は、置き場所が決まる前の見当）。
+- **先に要るもの**: `novel-checkpoint-rollback` の控えと再開の分（分けるなら、バックログの分は要らない）。ファイルの重なり（未完了）: `novel-talk-flow`（`builtins.rs`・`shiori/entry.lua`）、`novel-checkpoint-rollback`（前後に置く）。
+- **フェーズ**: 全部フェーズ 1（今の SSP で動く）。areka を待たない。
+- **種別**: 機能（スロットを選ぶセーブとロードが無い）。開発者の目標（2026-10-10）から。
+- **要件定義のモデル**: Opus（保存の形は `save.toml` の中の表に決まり、残る問いは名前・日時の形・条件に書く形で、推奨を付けられる）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: 「Current State」の置き場所 `profile/pasta/save/save.json` は、`toml-serialization`（2026-10-24）から `save.toml`。`persistence.rs` の「130〜157 行」は、今は `register` 113 行・`load_impl` 174 行・`save_impl` 189 行。「Approach」の「控えたさくらスクリプトを目印の位置から切り出して返す」と `shell-element-click`、「申し送り（2026-10-17）」の `novel-variable-scope` は、決定の節で読み替え済み（`novel-variable-scope` は閉じ、`shell-element-click` は `novel-talk-flow` に入った）。`スロット参照` を式の中から呼ぶ書き方が今の文法で通るかは、確かめていない。

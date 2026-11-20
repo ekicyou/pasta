@@ -102,20 +102,6 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 - 道具（`wasm-pack`・`cargo-about`）は env の SHA-256 と `Get-FileHash` で照合してから展開する。道具を足す・版を上げるときは、その SHA-256 も env に足す。
 - `build.yml` に job `manual-light`（マニュアルの軽い検査）が増えた。build の job の `upload-artifact` は v7、`release.yml` の `download-artifact` は v8。arm64 の行を足すときは、この版にそろえる。
 
-## 2026-11-12 棚卸の再測定（main 2381bf52）
-
-- **前提の変化**: `release.ps1`（409 行）・`release.yml`（609 行）・`build.yml`（225 行）・`github-release.ps1`（132 行）・`release-scripts-test.ps1`（276 行）・`release-state.ps1`（110 行）・`.cargo/config.toml`・`about.toml` は 2026-11-03 から変わっていない。行は前回のまま（`release.yml` の `rust-toolchain` 75 行・targets 77 行・cache の key 82 行・wasm-pack と cargo-about の SHA-256 は env の 25・26 行・`pasta.dll.zip` の検査 145〜148 行・.nar の検査 182 行、`release.ps1` の 32bit のビルド 73 行・DLL の写し 98〜110 行・段 5 は 249〜273 行、`github-release.ps1` の添付の名前 72 行）。#249 で `release.bat` がルートから `crates/pasta_sample_ghost/release.bat`（`release.ps1` の隣）へ移った。`pasta_sample_ghost/tests/` の変化（`tutorial_stages_test.rs`。`scene-condition-attributes`）は `pasta.dll` に触れない。aarch64・arm64 の言及は今もどこにも無い。新しく、0.5.3 の `pasta-recipe` が添付に `pasta-recipe.zip` を足す（6 → 7）。
-- **触るファイル**: `.cargo/config.toml`、`release.ps1`、`release.bat`（新しい場所。段の説明）、`release.yml`、`github-release.ps1`・`release-scripts-test.ps1`・`release` スキルの `release-state.ps1`（配布物の形を変えるなら）、`build.yml`（arm64 の行を足すなら）、`about.toml`（17 行の targets）、`.gitignore`、`pasta_sample_ghost/tests/` の `pasta.dll` を見る所、マニュアル。1,000 行に近いものは無い。
-- **規模**: 9〜12 のまま。
-- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `pasta-recipe`（`release.yml`・`build.yml`・`github-release.ps1`・`release-state.ps1`・`release-scripts-test.ps1`・`.gitignore`。Tauri で静的 CRT がだめで指定を変えるなら `.cargo/config.toml` も）、`vsce-4-upgrade`（`release.yml`）、`shiori4-v4-host`（`build.yml` に版 4 の 1 往復を足すなら）、`hello-novel-sample`（見本ゴーストのテストを触るなら）。リリースの実行中は `release.ps1`・`release.yml` を main へ入れない。
-- **種別**: 機能（areka の 64bit・arm64 向けの配布物）。
-- **要件定義のモデル**: Opus（前のまま）。
-- **分割の案**: 要らない。
-- **見つけた穴・古くなった記述**
-  - Current State の行番号は古い（上の行が正しい）。`.cargo/config.toml` 11 行「出荷ターゲットは x86（i686）・x64（x86_64）の両方」は x64 の `pasta_check.exe` のことで、x64 の pasta.dll は配っていない（すぐ直せる誤り。前回から残る）。
-  - 前回から残る: CI で arm64 を作るには、arm64 の Windows の runner か x64 からのクロスビルドが要る。aarch64 の LuaJIT と `embed-resource` の VERSIONINFO は、要件の前に試す。
-  - `pasta-recipe` と前後して入るときは、後から入る側が添付の数と `github-release.ps1` 72 行・`release-state.ps1` 84 行・`release-scripts-test.ps1` 項目 10 の名前の並びを合わせる。
-
 ## 申し送り（2026-11-14 の discovery「pasta-recipe-multiarch」より）
 
 - `pasta-recipe-multiarch` も、ルートの `.cargo/config.toml` に `[target.aarch64-pc-windows-msvc]` の `crt-static` を要る。先に入った方が足し、後の方は在るのを確かめる（二重に足さない）。`release.yml` も共有するので、同じウェーブに置かない。
@@ -142,3 +128,16 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 ## 申し送り（2026-11-19 manual-reader-first から）
 
 入門用のスターター `pasta-starter.nar` を配布物に足した。GitHub Release の添付は 9 つ（配布物 8 つ＋詳しいリリースノート）になった。この brief の「添付の数」と、添付の数を書いた所は、ここから数え直す（`release.yml`・`github-release.ps1`・`release` スキルの `release-state.ps1` と `procedure.md` は 9 つに直してある）。スターターは hello-pasta の nar と同じ `pasta.dll` を同梱するので、arch 別の DLL を足すときは `crates/pasta_sample_ghost/release.ps1` のスターターの組み立てと `release.yml` のスターターの検査（中身の完全一致）も合わせる。
+
+## 2026-11-20 棚卸の再測定（main 58aba27c）
+
+- **前提の変化**: `pasta-recipe-multiarch` が入った。ルートの `.cargo/config.toml` に `[target.aarch64-pc-windows-msvc]` の `crt-static` が在る（20〜21 行。11 行の説明も 3 つの arch になった）。`release.yml`（683 行）の build の job は、73 行の `targets:` に 3 つ、78 行の cache の key も 3 つ。PE ヘッダの arch の検査は `.github/scripts/release/verify-recipe-zips.ps1`（108 行。22 行の `$Machines`・`Get-PeMachine`）に在り、pasta.dll にも使える。`build.yml`（411 行）に arm64 のランナー（`windows-11-arm`）の job が 2 本増えた（225 行の `recipe-arm64-test`・263 行の `recipe-arm64-smoke`）。`manual-reader-first` がスターター `pasta-starter.nar` を足した（配布物 8 つ・添付 9 つ）。`hello-pasta-book-sync` が、ネットワーク更新を「main のファイル＋最新 Release の nar にだけ在るファイル」で組むようにした（`book/tools/ghost-site/ghost-site.mjs` の `narOnlyFiles`。git が追わない名前を nar から拾う）。
+- **残る仕事**: `release.ps1`（`crates/pasta_sample_ghost/`。475 行）の 32bit のビルド（78 行）の隣に x64・arm64 の `pasta_shiori` のビルドを足し、`pasta.x64.dll`・`pasta.arm64.dll` を hello-pasta とスターターへ写す（DLL の写しは 104 行、スターターの組み立ては 253 行から、`pasta.dll.zip` は 314 行の段 5）。`release.yml` の検査（`pasta.dll.zip` の中身 126〜129 行・.nar の必須 163 行・スターターの完全一致 173 行）と、pasta.dll の PE の arch の検査を足す。`about.toml` 17 行の targets に aarch64 が無い（pasta.dll のライセンス表示は `release.ps1` 126 行の `cargo about generate` がこれを読む）。`.gitignore` 40 行は `pasta.dll` だけなので、2 つの名前を足す。ネットワーク更新は、git が追わない名前を nar から拾うので、手を入れずに載る見込み（`ghost-site-test.mjs` で確かめる）。マニュアル（`download.md` の表と「SHIORI の本体」の節、`[loader] ffi` の arch の注意）。
+- **触るファイル**: `release.ps1`・`release.bat`（32 行。段の説明）・`release.yml`・`about.toml`（28）・`.gitignore`・pasta.dll の arch の検査（`verify-recipe-zips.ps1` を共通にするか写すか）・`release-scripts-test.ps1`（522）・`build.yml`（arm64 で `pasta_shiori` を試すなら）・`pasta_sample_ghost/tests/` の `pasta.dll` を見る所（`common/mod.rs` 37 行・`integration_test.rs`・`starter_test.rs`・`tutorial_stages_test.rs`）・マニュアル。zip を arch ごとに分けるなら、`github-release.ps1` 72 行・`release-state.ps1` 84 行・`link-check.mjs` の `checkReleaseAssetLinks` も。1,000 行に近いものは無い。
+- **規模**: 9〜11（静的 CRT と `targets:` は済んだ。PE の検査は使い回せる）。
+- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `shiori4-v4-host`（`build.yml`）、`hello-novel-sample`（`tests/common/mod.rs`）。単独の席: `release.yml`・`release.ps1`（リリースの実行中は main へ入れない）。前回の `pasta-recipe`・`vsce-4-upgrade` は入った。
+- **フェーズ**: ノベルではない。areka の x64・arm64 向けだが、SSP の 32bit 版は変えないので、areka を待たずに入れられる（areka の実機の確認は後）。
+- **種別**: 機能（areka の 64bit・arm64 向けの配布物。areka の相談から）。
+- **要件定義のモデル**: Opus（前のまま）。
+- **分割の案**: 要らない。
+- **見つけた穴・古くなった記述**: Current State の行番号、「aarch64・arm64 の言及は無い」「`.cargo/config.toml` に aarch64 の指定は無い」は古い。配布物の数の申し送り（5・6・7・8）は、配布物 8 つ・添付 9 つから数える。前回の「`.cargo/config.toml` 11 行の説明の誤り」は直っていた。前回から残るもの: aarch64 の LuaJIT（mlua）と `embed-resource` の VERSIONINFO は、要件の前に試す（pasta-recipe は LuaJIT を持たないので、確かめたことにならない）。CI の arm64 の pasta.dll を、x64 からのクロス（`pasta-recipe-multiarch` と同じ）で作るか、arm64 のランナーで作るかを決める。

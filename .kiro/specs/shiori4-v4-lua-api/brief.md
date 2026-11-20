@@ -124,13 +124,14 @@
 
 - 0.5.0 の `debug-mcp-runtime` が、キック（`event/kick.lua`）を消す。チェイントークの続きを `STORE.co_preempt` の印で捨てる指名の再生は、`OnPastaScene`・`OnPastaSceneAt` だけになる。
 
-## 2026-11-12 棚卸の再測定（main 2381bf52）
+## 2026-11-20 棚卸の再測定（main 58aba27c）
 
-- **前提の変化**（前回 2026-11-03・`c575febd` から）: `debug-mcp-runtime` が入り（#233）、`event/kick.lua` とキックは消えた。議題 4 の割り込みは `OnPastaScene`・`OnPastaSceneAt` だけを考えればよい（印 `STORE.co_preempt` を付けるのは `scene_play.lua` 113・151 行、判定は `event/init.lua` の `drive_kind` 128〜133 行）。`scene-play-locals` が `scene_play.lua`（165 行）に Reference2 のローカル変数を足したが、印の付け方は変わらない。`actor-line-newlines` が `shiori/act.lua` に `_line_newlines` を足し、`act:get_property` は 322 行になった。外からの呼び出し（`external_control.lua` 45 行）は `act:find_handler` が条件漏れ（`unmet`）を返すと `SCENE_UNMET` の表記で答える。`shiori4-v4-host` は未着手のまま。`callback.lua`（232 行。`CALLBACK.pending` 30・`stage_pending` 44 行）と NOTIFY の後回し（`marshaling.rs`）は動いていない。
-- **触るファイル**: `shiori/act.lua`（375）、新しい `shiori/event/host_complete.lua`、`event/init.lua`（351）の読み込みの 1 行（今の末尾は 91 行の `recommend`）、要れば `event/callback.lua`（232）、DSL から呼ぶ関数、`pasta_check/src/validate/builtins.rs`（73。`get_property` は 65 行）、Lua のテスト、マニュアル（`lua/*.md`・`internals/shiori.md` 683・`internals/execution-model.md` 501・`grammar/variables.md` の `＄％prop` は 19・62 行）。1,000 行に近いものは無い。
+- **前提の変化**（前回 2026-11-12・`2381bf52` から）: `shiori/act.lua` は 386 行で、`get_property` は 333 行。`event/init.lua` は 352 行で、読み込みの末尾は 92 行の `sys_resume`（`onhour-talk-recount` が足した）。`callback.lua`（232）・`scene_play.lua`（165）・`external_control.lua`（131）・`builtins.rs`（73。`get_property` は 65 行）・`marshaling.rs` は動いていない。マニュアルは `manual-reader-first` が書き直し、`internals/shiori.md` は 757 行・`internals/execution-model.md` は 510 行・`grammar/variables.md` は 580 行（`＄％prop` は 19・62 行）。ノベルの骨子（2026-11-19）は版 4 を使わない（SHIORI とさくらスクリプトのまま。areka はプレイヤーのまま）。
+- **ノベルとの関係**: 働きの上で、ノベルの spec に依らない。Downstream の「ノベルの演出で表示の終わりを待つ書き方を使う spec」も無い（骨子は、1 本ずつ返して、ベースウェアが待つ形）。ファイルは共有するので、同じウェーブには置かない（下）。
+- **触るファイル**: 前回のまま（`shiori/act.lua`・新しい `shiori/event/host_complete.lua`・`event/init.lua` の読み込みの 1 行・要れば `callback.lua`・DSL から呼ぶ関数・`builtins.rs`・Lua のテスト・マニュアルの `lua/*.md`・`internals/shiori.md`・`internals/execution-model.md`）。1,000 行に近いものは無い。
 - **規模**: 11〜13 のまま。
-- **先に要るもの**: 働きの上では `shiori4-v4-host`（未着手）と実機の areka v0.2.0。ファイルの重なり（未完了）: `novel-talk-flow`・`novel-checkpoint-rollback`（`shiori/act.lua`・`init.lua`・`callback.lua`）、`shell-element-click`（`init.lua` の読み込みの行）。マニュアルの同じページの別の節は並べてよい。`debug-mcp-runtime` は入ったので外れた。
+- **先に要るもの**: 働きの上では `shiori4-v4-host`（未着手）と、実機の areka v0.2.0。ファイルの重なり（未完了）: `cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback`（`shiori/act.lua`）、`novel-talk-flow`・`novel-checkpoint-rollback`（`event/init.lua`・`callback.lua`）、`cue-command-runtime`・`novel-talk-flow`・`novel-save-slots`（`builtins.rs`）。前回の `shell-element-click` は `novel-talk-flow` に入った。
 - **種別**: 機能（版 4 の作者向けの口。開発者の方針）。
-- **要件定義のモデル**: Fable のまま。(i) SEND の完了を待って続きを書く DSL と Lua の書き方は、公開の取り決めで後から戻しにくい。(ii) その待ちの時の流れが Rust・Lua・SHIORI をまたぎ（`OnHostComplete` でのコルーチンの再開、`STORE.co_preempt` での割り込み、待ち中の unload、NOTIFY の後回しの中でプロパティを同期で読めないこと）、議題 1〜7 にはまだ推奨が無い。キックが消えて割り込みの入口は減ったが、この絡みは残る。
+- **要件定義のモデル**: Opus に替える（2026-11-20 に厳しく測り直した）。(i) は弱い: SEND・NOTIFY・待つ書き方は公開の口だが、上に乗る spec は無い（ノベルは版 4 を使わない）。(ii) も満たさない: 待ちの時の流れには、今の `get_property` と待ちの表 `CALLBACK.pending`（時間切れの掃除・チェイントークの続きとは別に持つ）という前例があり、Approach が既に「その上に乗せる」と決めている。議題 4・5 の割り込みと時間切れは、この前例に揃える案を推奨にできる。深い所（下回りの口の名前と形・版 4 の印）は、先に `shiori4-v4-host` の要件（Opus）が決める。
 - **分割の案**: 不要。
-- **見つけた穴・古くなった記述**: Current State の行番号（`get_property` 294 行・`variables.md` 294 行・`builtins.rs` 55 行）は古い（上の行が正しい）。「チェイントーク」の行の「キック」と `event/kick.lua` は、もう無い。議題 4 の「キック・`OnPastaScene`」は `OnPastaScene`・`OnPastaSceneAt` と読む。「土台: … `host-protocol` は shiori4 の main にまだ入っていない」は古い（0.1.0 で入った。上の節のとおり）。
+- **見つけた穴・古くなった記述**: ステータスの「要件定義は Fable」「0.5.0（ノベルゲームと同じリリース）」と、roadmap の Phase 13 の表の 13 番（Fable）は、上の測りで Opus と読む。前回から残るもの: Current State の行番号（`get_property` 294 行・`variables.md` 294 行・`builtins.rs` 55 行）、キックと `event/kick.lua`、「`host-protocol` は shiori4 の main にまだ入っていない」は古い。議題 4 の「キック・`OnPastaScene`」は `OnPastaScene`・`OnPastaSceneAt` と読む。
