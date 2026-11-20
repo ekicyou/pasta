@@ -274,7 +274,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   ├── scripts/release/     # リリース CI の job 補助スクリプト（verify-tag/publish-crate/publish-vsix/release-notes/github-release/publish-ghost-site の .ps1。pasta-recipe の 2 つの zip の検査 verify-recipe-zips.ps1（main の CI の job recipe とリリース CI が呼ぶ）・ツールの導入 install-tools.ps1）と、その検査 release-scripts-test.ps1（build.yml の release-scripts job で実行）
 │   └── release-ci-setup.md  # リリース CI の一回限りのセットアップ手順書
 ├── img/                     # README のロゴ・スクリーンショット
-├── release/                 # release.ps1 と editors/recipe/scripts/package.ps1 の出力先（pasta_check.zip・.nar・pasta.dll.zip・pasta-skills.zip・pasta-recipe.x64.zip・pasta-recipe.arm64.zip。.gitignore 済み・コミットしない）
+├── release/                 # release.ps1 と editors/recipe/scripts/package.ps1 の出力先（pasta_check.zip・hello-pasta.nar・pasta-starter.nar・pasta.dll.zip・pasta-skills.zip・pasta-recipe.x64.zip・pasta-recipe.arm64.zip。.gitignore 済み・コミットしない）
 ├── Cargo.lock               # 依存の解決結果（コミット対象・リリース CI の build で不変を検査）
 ├── README.md                # プロジェクト概要
 ├── LICENSE                  # ライセンス

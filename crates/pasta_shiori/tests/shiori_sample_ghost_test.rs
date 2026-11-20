@@ -90,7 +90,7 @@ fn test_onboot_response() {
 
     // 5.5: Verify text content from OnBoot scene (dic/01-boot.pasta)
     assert!(
-        response.contains("今日もよろしくね"),
+        response.contains("本日のおすすめは"),
         "Response should contain OnBoot greeting text, got: {}",
         response
     );

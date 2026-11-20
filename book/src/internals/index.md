@@ -63,7 +63,7 @@ pasta ランタイムは、ゴーストの `.pasta` 辞書を Lua コードへ�
 
 ## 利用者向け章との関係
 
-利用者から観測できる挙動（文法・公開 Lua API・`pasta.toml`・起動シーケンスとモジュール解決・デバッグ操作）は、利用者向け章が正である。同じ対象を利用者向け章とこのパートの両方が扱う場合、利用者から観測できる挙動については利用者向け章の記述を正とする。このパートはそれらの事実を再記述せず、利用者向け章へリンクしたうえで、その挙動を実現する仕組みだけを書く。利用者向け章とこのパートの記述が食い違う場合は、利用者向け章と現行実装を照合し、このパートを直す。
+利用者から観測できる挙動（文法・公開 Lua API・`pasta.toml`・起動シーケンスとモジュール解決・デバッグ操作）は、利用者向け章が正である。このパートはそれらを再記述せず、利用者向け章へリンクして、その挙動を実現する仕組みだけを書く。
 
 リンクの規則は次のとおりである。
 
@@ -77,7 +77,7 @@ pasta ランタイムは、ゴーストの `.pasta` 辞書を Lua コードへ�
 
 ## 章と対象ソース範囲
 
-各章が対象とするソース範囲を次の表に示す。spec の完了時には、変更したファイルをこの表と照合し、一致した章が実装に追従しているかを確認する。値が `/` で終わるセルはディレクトリ配下のすべてのファイルに、それ以外は記載のファイルだけに一致する。1 つのファイルが複数の章に一致した場合は、一致したすべての章を確認対象とする。表の各行は、題材章の「ソースの所在」の箇条書きと一致させる。[Lua ランタイム内部モジュール](internal-modules.md) の行は、同章が扱うモジュールのソースである。
+ソースを変えたら、この表で一致した章をすべて確かめる。`/` で終わるセルはディレクトリ配下のすべてのファイルに、それ以外は記載のファイルだけに一致する。
 
 | 章 | 対象ソース範囲 |
 | -- | -------------- |
@@ -91,11 +91,11 @@ pasta ランタイムは、ゴーストの `.pasta` 辞書を Lua コードへ�
 | [開発用のイベントとシーンマップ](debug.md) | `crates/pasta_lua/src/debug/`、`crates/pasta_lua/src/loader/source_map_build.rs`、`crates/pasta_lua/src/code_gen/source_map.rs`、`crates/pasta_lua/pasta_scripts/pasta/shiori/event/scene_play.lua`、`crates/pasta_lua/pasta_scripts/pasta/shiori/stop.lua` |
 | [ロギングとエンコーディング](logging-encoding.md) | `crates/pasta_lua/src/logging/`、`crates/pasta_lua/src/encoding/`、`crates/pasta_lua/src/runtime/log.rs`、`crates/pasta_lua/src/runtime/enc.rs` |
 
-範囲が重なる行（例: `crates/pasta_lua/src/runtime/` と `crates/pasta_lua/src/runtime/finalize.rs`）は意図的な重なりである。次のものは、章の記述に影響しない変更で照合が発火しないよう、表に載せない。
+次のものは表に載せない。
 
-- テストだけを置く場所（`crates/pasta_lua/tests/` などの各クレートの `tests/`）。各章は「ソースの所在」の箇条書きの後にテストの所在を文で示す。`src/` の中のテストモジュール（`*_tests.rs` など）は、ディレクトリの範囲に含まれる場合にだけ一致する。
-- ルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml)。リリースプロファイルは [SHIORI 層](shiori.md) が扱うが、依存更新のたびに照合対象にならないよう載せない。`crates/pasta_shiori/Cargo.toml` は、DLL のライブラリ名と `crate-type` を [SHIORI 層](shiori.md) が扱うため載せる。
-- `crates/pasta_lua/src/lib.rs`。モジュールの宣言と再エクスポートだけを持ち、どの章も記述の対象にしていない。
+- テストだけを置く場所（`crates/pasta_lua/tests/` などの各クレートの `tests/`）。テストの所在は、各章の「ソースの所在」の末尾にある。
+- ルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml)。リリースプロファイルは [SHIORI 層](shiori.md) が扱う。
+- `crates/pasta_lua/src/lib.rs`。モジュールの宣言と再エクスポートだけを持つ。
 
 ---
 

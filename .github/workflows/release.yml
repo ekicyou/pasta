@@ -1,6 +1,6 @@
 # .github/workflows/release.yml
 # リリース CI（release-ci）。リリースタグ vX.Y.Z の push だけで起動し、
-# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（7 つの配布物）の順に進める。
+# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（8 つの配布物）の順に進める。
 # 上流の job が失敗したら後続は needs の既定で止まり、どの公開先にも公開しない。
 name: Release
 
@@ -97,7 +97,7 @@ jobs:
             editors/recipe/package-lock.json
 
       # release.ps1 の cargo は --locked を持たないため、後段の Cargo.lock の不変検査で同等にする。
-      - name: Build pasta.dll.zip, hello-pasta.nar, pasta_check.zip and pasta-skills.zip
+      - name: Build pasta.dll.zip, hello-pasta.nar, pasta-starter.nar, pasta_check.zip and pasta-skills.zip
         run: pwsh -NoProfile -File crates/pasta_sample_ghost/release.ps1
 
       - name: Build VSIX
@@ -167,6 +167,29 @@ jobs:
             if ($nar -cnotcontains $e) { $errors.Add("hello-pasta.nar に $e が無い") }
           }
 
+          # pasta-starter.nar: 入門の出発点 my-ghost。中身はちょうどこれだけ（updates.txt・他の辞書・scripts/ は無い）。
+          # 辞書とシェルは hello-pasta と同じもの・descript.txt に homeurl が無い（ネットワーク更新しない）
+          $starterShell = @($narRequired | Where-Object { $_.StartsWith('shell/') })
+          $starterExpected = @('install.txt', 'ghost/master/descript.txt', 'ghost/master/pasta.toml', 'ghost/master/pasta.dll', 'ghost/master/THIRD_PARTY_LICENSES.txt', 'ghost/master/dic/01-boot.pasta') + $starterShell | Sort-Object
+          $starter = @(Get-ZipEntries 'release/pasta-starter.nar' | Sort-Object)
+          if (($starter -join '|') -cne ($starterExpected -join '|')) {
+            $errors.Add("pasta-starter.nar の中身が決まりと違う: 足りない $(@($starterExpected | Where-Object { $starter -cnotcontains $_ }) -join ', ')／余計 $(@($starter | Where-Object { $starterExpected -cnotcontains $_ }) -join ', ')")
+          }
+          else {
+            $starterDir = Join-Path $env:RUNNER_TEMP 'pasta-starter'
+            # Expand-Archive は .zip の拡張子しか受けない
+            [System.IO.Compression.ZipFile]::ExtractToDirectory((Resolve-Path -LiteralPath 'release/pasta-starter.nar').Path, $starterDir, $true)
+            if ((Get-Content -LiteralPath (Join-Path $starterDir 'ghost/master/descript.txt')) -match '^\s*homeurl\s*,') {
+              $errors.Add('pasta-starter.nar の descript.txt に homeurl が在る')
+            }
+            $helloDir = 'crates/pasta_sample_ghost/ghosts/hello-pasta'
+            foreach ($e in @('ghost/master/dic/01-boot.pasta') + $starterShell) {
+              if ((Get-FileHash -LiteralPath (Join-Path $starterDir $e)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $helloDir $e)).Hash) {
+                $errors.Add("pasta-starter.nar の $e が hello-pasta のものと違う")
+              }
+            }
+          }
+
           # VSIX: 1 つだけ・名前と package.json の版がタグの版・WASM とそのライセンス表示を同梱
           $vsixes = @(Get-ChildItem -Path 'release' -Filter '*.vsix' -File)
           $expected = "pasta-vscode-$env:VERSION.vsix"
@@ -214,6 +237,7 @@ jobs:
           path: |
             release/pasta.dll.zip
             release/hello-pasta.nar
+            release/pasta-starter.nar
             release/pasta_check.zip
             release/pasta-skills.zip
             release/pasta-recipe.x64.zip

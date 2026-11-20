@@ -2,20 +2,22 @@
 // manual-claudia-theme タスク 1.1（要件 3.2, 3.3, 3.4, 3.8, 4.2, 4.8, 10.7 / design「TalkCore」）。
 //
 // 登録簿（SPEAKERS）は話し手と表情の唯一の定義。話し手や表情の追加はこの配列の変更と
-// 顔画像（book/src/img/claudia/）の追加で完結する。
+// 顔画像（book/src/img/<配役>/）の追加で完結する。
+// 配役（cast）: 章が使う話し手の組。debug/ の章は emo2（むらさき・エモ）、ほかの章は claudia（クローディア・アンソニー）。
+//   1 つの章で配役を混ぜない（scanTalk に配役を渡すと、配役の外の話し手を unknown-speaker にする）。
 //
 // 記法（design「データモデル / 記法の文法」）:
 //   > 【表情】本文            … 既定の話し手（Claudia）の表情
 //   > 【話し手】本文          … その話し手の「素」
 //   > 【話し手：表情】本文    … 区切りは全角コロン「：」のみ
-//   話し手名はカタカナの日本語名だけ（別名・欧文名なし）。
+//   話し手名は登録簿の日本語名だけ（別名・欧文名なし）。
 //
 // 共用 export（talk-html.mjs・gen-skill-refs.mjs・verify-content.mjs などが import する）:
-//   SPEAKERS / DEFAULT_SPEAKER_ID / DEFAULT_FACE / FACE_DIR / MAX_FACE_BYTES / TALK_LINE_RE / NO_TALK_CHAPTERS
+//   SPEAKERS / DEFAULT_SPEAKER_ID / DEFAULT_FACE / faceDir / castOf / MAX_FACE_BYTES / TALK_LINE_RE / NO_TALK_CHAPTERS
 //   parseTalkTag(inner) … 【】の内側を解析
 //   faceFilePath(speaker, face) … 顔画像への相対パス（book/src と出力根から）
 //
-//   scanTalk(markdown) … フェンス外の台詞ブロックの列挙と不正の全件列挙
+//   scanTalk(markdown, cast?) … フェンス外の台詞ブロックの列挙と不正の全件列挙（cast を渡すと配役の外の話し手も不正）
 //   checkRegion(blocks, lines, range, opts) … 導入・締めの範囲の検査
 //   faceStats(blocksByChapter, regionsByChapter) … 表情の集計表
 //
@@ -25,20 +27,42 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { REPO_ROOT, listMarkdownFiles, maskFences } from '../link-check.mjs';
 
-const speaker = (id, name, latin, side, faces) =>
-  Object.freeze({ id, name, latin, side, faces: Object.freeze(faces) });
+const speaker = (id, name, latin, side, cast, faces) =>
+  Object.freeze({ id, name, latin, side, cast, faces: Object.freeze(faces) });
 
 export const SPEAKERS = Object.freeze([
-  speaker('claudia', 'クローディア', 'Claudia', 'left', {
+  speaker('claudia', 'クローディア', 'Claudia', 'left', 'claudia', {
     素: 'f0', 照れ: 'f1', 驚き: 'f2', 不安: 'f3', 落胆: 'f4', 高笑い: 'f5', 目閉じ: 'f6',
     不機嫌: 'f7', 冷笑: 'f8', 照れ怒り: 'f9', にっこり: 'f25', したり顔: 'f26', 考え中: 'f27', お辞儀: 'f28',
   }),
-  speaker('anthony', 'アンソニー', 'Anthony', 'right', { 素: 'f10', 刮目: 'f11' }),
+  speaker('anthony', 'アンソニー', 'Anthony', 'right', 'claudia', { 素: 'f10', 刮目: 'f11' }),
+  speaker('murasaki', 'むらさき', 'Murasaki', 'left', 'emo2', {
+    素: 'm0', 笑顔: 'm1', 驚き: 'm2', 不安: 'm3', 落胆: 'm4', 照れ: 'm5', 怒り: 'm6',
+    ジト: 'm7', ぴえん: 'm8', 冷笑: 'm9', 静観: 'm10', 照れ怒り: 'm11',
+  }),
+  speaker('emo', 'エモ', 'Emo', 'right', 'emo2', {
+    素: 'e0', 笑顔: 'e1', 驚き: 'e2', 不安: 'e3', 落胆: 'e4', 照れ: 'e5', 静観: 'e6',
+    怒り: 'e7', 冷笑: 'e8', 照れ怒り: 'e9', ジト: 'e10',
+  }),
+  speaker('girl', '女の子', 'Girl', 'left', 'hello', {
+    素: 'g1', 笑顔: 'g0', 照れ: 'g2', 驚き: 'g3', 泣き: 'g4',
+    困惑: 'g5', キラキラ: 'g6', 眠い: 'g7', 怒り: 'g8',
+  }),
+  speaker('boy', '男の子', 'Boy', 'right', 'hello', {
+    素: 'b11', 笑顔: 'b10', 照れ: 'b12', 驚き: 'b13', 泣き: 'b14',
+    困惑: 'b15', キラキラ: 'b16', 眠い: 'b17', 怒り: 'b18',
+  }),
 ]);
 
 export const DEFAULT_SPEAKER_ID = 'claudia';
 export const DEFAULT_FACE = '素';
-export const FACE_DIR = 'img/claudia';
+// 顔画像の置き場（book/src と出力根から）。配役ごとに分ける。
+export const faceDir = (cast) => `img/${cast}`;
+// 章（book/src か出力根からのパス）が使う配役。
+// hello-pasta の紹介ページだけは、見本ゴーストの 2 人（女の子・男の子）が案内する。
+export const castOf = (chapter) => (chapter.startsWith('debug/') ? 'emo2'
+  : /^hello-pasta\.(md|html)$/.test(chapter) ? 'hello' : 'claudia');
+const castNames = (cast) => SPEAKERS.filter((s) => s.cast === cast).map((s) => s.name);
 export const MAX_FACE_BYTES = 20480;
 
 // 台詞の開始行（字下げも拾う。入れ子の引用・リスト内の判定は走査側で行う）。
@@ -94,7 +118,7 @@ export function parseTalkTag(inner) {
 // 話し手と表情から顔画像への相対パスを組み立てる（例: 'img/claudia/f5.png'）。
 export function faceFilePath(sp, face) {
   if (!Object.hasOwn(sp.faces, face)) throw new Error(`${sp.name} に表情「${face}」はありません`);
-  return `${FACE_DIR}/${sp.faces[face]}.png`;
+  return `${faceDir(sp.cast)}/${sp.faces[face]}.png`;
 }
 
 // ---- 章の Markdown の走査（タスク 1.2 / 要件 3.7, 4.1, 4.3, 4.7, 10.3） ----
@@ -112,7 +136,7 @@ const INNER_FENCE_RE = /^ {0,3}(`{3,}|~{3,})/;
 // 台詞の直前に空行が無くてもよい行（区切り・見出し）。
 const EDGE_RE = /^(-{3,}|#{1,6}(\s.*)?)\s*$/;
 
-export function scanTalk(markdown) {
+export function scanTalk(markdown, cast) {
   const lines = maskFences(markdown).split('\n');
   const blocks = [];
   const errors = [];
@@ -174,8 +198,13 @@ export function scanTalk(markdown) {
         return;
       }
       const r = parseTalkTag(content.slice(1, end));
-      if (r.ok) cur.tag = r.tag;
-      else err(r.kind, no, r.detail);
+      if (r.ok) {
+        cur.tag = r.tag;
+        if (cast && r.tag.speaker.cast !== cast) {
+          err('unknown-speaker', no,
+            `この章の話し手は ${castNames(cast).join('・')} です（${r.tag.speaker.name} は使えません）`);
+        }
+      } else err(r.kind, no, r.detail);
       cur.parts.push(content.slice(end + 1));
       return;
     }
@@ -198,7 +227,7 @@ export function scanTalk(markdown) {
 }
 
 // ---- 領域の検査（導入・締め） ----
-// 範囲（0 始まり・end 排他）の非空行がすべて台詞ブロックに属し、各話し手の台詞が 1 つ以上あるか。
+// 範囲（0 始まり・end 排他）の非空行がすべて台詞ブロックに属し、配役（opts.cast。既定 claudia）の各話し手の台詞が 1 つ以上あるか。
 // cover: true（表紙）では、扉 <section class="claudia-hero">〜</section> の内側と HTML ブロックも許す。
 const HERO_OPEN_RE = /^\s*<section\s[^>]*class="claudia-hero"/;
 const HERO_CLOSE_RE = /<\/section>/;
@@ -223,7 +252,7 @@ export function checkRegion(blocks, markdownLines, range, opts) {
     if (!ok && !prevBad) errors.push({ kind: 'prose-in-region', line: i + 1, detail: '導入・締めには台詞以外を置けません' });
     prevBad = !ok;
   }
-  for (const sp of SPEAKERS) {
+  for (const sp of SPEAKERS.filter((s) => s.cast === (opts.cast ?? 'claudia'))) {
     if (!inRange.some((b) => b.tag.speaker === sp)) {
       errors.push({ kind: 'missing-speaker', line: range.start + 1, detail: `${sp.name} の台詞がありません` });
     }

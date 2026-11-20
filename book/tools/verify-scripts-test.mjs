@@ -68,11 +68,11 @@ log('\n== verify-content.mjs（コンテンツ整合・網羅レビュー検証�
   check('I-fact（機構網羅・概要章）を実行', count(/PASS {2}\[I-fact:/g) === 2,
     `I-fact PASS=${count(/PASS {2}\[I-fact:/g)}`);
   check('口調検査の走査対象に内部設計パートを含む', /PASS {2}\[D-voice:book\/src\/internals\//.test(out));
-  // 入門ガイド（C 系）が空回りしていない: 段の章 14 章の H2・入門 17 章の段落の検査と、
+  // 入門ガイド（C 系）が空回りしていない: 段の章 14 章の H2・入門 18 章の段落の検査と、
   // 段の章の本文・目次の並び・作例の照合が走って通る。
   check('C-sections を段の章 14 章に実行', count(/PASS {2}\[C-sections:/g) === 14,
     `C-sections PASS=${count(/PASS {2}\[C-sections:/g)}`);
-  check('C-prose を入門 17 章に実行', count(/PASS {2}\[C-prose:/g) === 17,
+  check('C-prose を入門 18 章に実行', count(/PASS {2}\[C-prose:/g) === 18,
     `C-prose PASS=${count(/PASS {2}\[C-prose:/g)}`);
   for (const id of ['C-steps', 'C-order', 'C-tutorial-check']) {
     check(`${id} が PASS`, out.includes(`PASS  [${id}]`));
@@ -83,7 +83,7 @@ log('\n== verify-content.mjs（コンテンツ整合・網羅レビュー検証�
   const toc = summaryChapters();
   // 台詞を置かない章（一覧の章）は T-intro・T-outro の代わりに T-notalk を 1 回ずつ実行する。目次に無い一覧の章は数えない。
   const listed = toc.filter((c) => Object.hasOwn(NO_TALK_CHAPTERS, c)).length;
-  for (const [id, n] of [['T-syntax', toc.length], ['T-intro', toc.length - listed], ['T-outro', toc.length - listed], ['T-notalk', listed], ['T-assets', 1], ['T-authoring', 1]]) {
+  for (const [id, n] of [['T-syntax', toc.length], ['T-intro', toc.length - listed], ['T-outro', toc.length - listed], ['T-notalk', listed], ['T-assets', 3], ['T-authoring', 1]]) {
     check(`${id} を ${n} 件実行`, tcount(id) === n, `${id}=${tcount(id)}`);
   }
   // 検査した章の名前の集合が目次の章と一致する（検査のフォルダの外の章を見落とさない）。

@@ -19,7 +19,8 @@ import {
   SPEAKERS,
   DEFAULT_SPEAKER_ID,
   DEFAULT_FACE,
-  FACE_DIR,
+  faceDir,
+  castOf,
   MAX_FACE_BYTES,
   TALK_LINE_RE,
   parseTalkTag,
@@ -51,16 +52,17 @@ const byId = (id) => SPEAKERS.find((s) => s.id === id);
 // ============================================================
 log('\n== (A) 登録簿の不変条件と初期値 ==');
 {
-  check('A-1 話し手は claudia・anthony の 2 名',
-    JSON.stringify(SPEAKERS.map((s) => s.id)) === '["claudia","anthony"]');
+  check('A-1 話し手は claudia・anthony（配役 claudia）、murasaki・emo（配役 emo2）、girl・boy（配役 hello）の 6 名',
+    JSON.stringify(SPEAKERS.map((s) => [s.id, s.cast]))
+      === '[["claudia","claudia"],["anthony","claudia"],["murasaki","emo2"],["emo","emo2"],["girl","hello"],["boy","hello"]]');
   check('A-2 既定の話し手は claudia・既定の表情は素',
     DEFAULT_SPEAKER_ID === 'claudia' && DEFAULT_FACE === '素' && !!byId(DEFAULT_SPEAKER_ID));
   for (const s of SPEAKERS) {
     check(`A-3 ${s.id} は表情「素」を持つ`, Object.hasOwn(s.faces, DEFAULT_FACE));
     check(`A-4 ${s.id} の id は英小文字だけ`, /^[a-z]+$/.test(s.id));
-    check(`A-5 ${s.id} の名前はカタカナだけ`, /^[ァ-ヺー]+$/.test(s.name), s.name);
+    check(`A-5 ${s.id} の名前はかなと漢字だけ`, /^[ぁ-ゖァ-ヺー一-鿿]+$/.test(s.name), s.name);
     check(`A-6 ${s.id} の配置は left か right`, s.side === 'left' || s.side === 'right');
-    check(`A-7 ${s.id} の画像名は f<数字>`, Object.values(s.faces).every((f) => /^f\d+$/.test(f)));
+    check(`A-7 ${s.id} の画像名は英小文字 1 つ＋数字`, Object.values(s.faces).every((f) => /^[a-z]\d+$/.test(f)));
   }
   const allFaces = SPEAKERS.flatMap((s) => Object.keys(s.faces));
   const clash = SPEAKERS.filter((s) => allFaces.includes(s.name)).map((s) => s.name);
@@ -83,10 +85,24 @@ log('\n== (A) 登録簿の不変条件と初期値 ==');
     JSON.stringify(c.faces));
   check('A-14 アンソニーの表情 2 種と画像の対応',
     JSON.stringify(a.faces) === JSON.stringify({ 素: 'f10', 刮目: 'f11' }), JSON.stringify(a.faces));
-  check('A-15 表情は計 16 種', files.length === 16);
+  check('A-15 表情は Claudia とアンソニーで 16 種・むらさき 12 種・エモ 11 種・女の子と男の子は 9 種ずつ',
+    files.length === 57 && Object.keys(byId('murasaki').faces).length === 12 && Object.keys(byId('emo').faces).length === 11
+      && Object.keys(byId('girl').faces).length === 9 && Object.keys(byId('boy').faces).length === 9);
+  const m = byId('murasaki');
+  const e = byId('emo');
+  check('A-18 むらさき・エモの名前・名札・配置',
+    m.name === 'むらさき' && m.latin === 'Murasaki' && m.side === 'left'
+      && e.name === 'エモ' && e.latin === 'Emo' && e.side === 'right');
+  check('A-19 配役ごとに左右 1 人ずつ', ['claudia', 'emo2', 'hello'].every((cast) =>
+    JSON.stringify(SPEAKERS.filter((s) => s.cast === cast).map((s) => s.side)) === '["left","right"]'));
   check('A-16 登録簿は凍結されている',
     Object.isFrozen(SPEAKERS) && SPEAKERS.every((s) => Object.isFrozen(s) && Object.isFrozen(s.faces)));
-  check('A-17 FACE_DIR・MAX_FACE_BYTES', FACE_DIR === 'img/claudia' && MAX_FACE_BYTES === 20480);
+  check('A-17 faceDir・MAX_FACE_BYTES', faceDir('claudia') === 'img/claudia' && faceDir('emo2') === 'img/emo2' && faceDir('hello') === 'img/hello' && MAX_FACE_BYTES === 20480);
+  check('A-20 castOf: debug/ の章は emo2・hello-pasta の紹介ページは hello・ほかは claudia',
+    castOf('debug/index.md') === 'emo2' && castOf('debug/recipe.html') === 'emo2'
+      && castOf('hello-pasta.md') === 'hello' && castOf('hello-pasta.html') === 'hello' && castOf('getting-started/hello.md') === 'claudia'
+      && castOf('grammar/index.md') === 'claudia' && castOf('introduction.md') === 'claudia'
+      && castOf('internals/debug.md') === 'claudia');
 }
 
 // ============================================================
@@ -155,6 +171,8 @@ log('\n== (D) 顔画像の相対パス ==');
   let threw = false;
   try { faceFilePath(a, '高笑い'); } catch { threw = true; }
   check('D-4 話し手に無い表情は例外', threw);
+  check('D-5 むらさき・エモは img/emo2/',
+    faceFilePath(byId('murasaki'), 'ぴえん') === 'img/emo2/m8.png' && faceFilePath(byId('emo'), '素') === 'img/emo2/e0.png');
 }
 
 // ============================================================
@@ -385,6 +403,29 @@ log('\n== (I) checkRegion ==');
   check('I-7 台詞の無い範囲は両話し手が missing-speaker',
     none.length === 2 && none.every((x) => x.kind === 'missing-speaker'), kinds(none));
 
+  // 配役: debug/ の章は emo2（むらさき・エモ）、ほかの章は claudia。1 つの章で混ぜない。
+  const duo = md('# 題', '', '> 【むらさき：笑顔】a', '', '> 【エモ】b', '', '---');
+  const duoLines = duo.split('\n');
+  const inDebug = scanTalk(duo, castOf('debug/index.md'));
+  check('I-13 emo2 の台詞は debug/ の章で合格',
+    inDebug.errors.length === 0 && inDebug.blocks.length === 2
+      && checkRegion(inDebug.blocks, duoLines, { start: 1, end: 6 }, { cover: false, cast: 'emo2' }).length === 0,
+    kinds(inDebug.errors));
+  const elsewhere = scanTalk(duo, castOf('grammar/index.md'));
+  check('I-14 emo2 の台詞は debug/ の外で unknown-speaker @3・@5',
+    has(elsewhere.errors, 'unknown-speaker', 3) && has(elsewhere.errors, 'unknown-speaker', 5) && elsewhere.errors.length === 2,
+    kinds(elsewhere.errors));
+  const claudiaInDebug = scanTalk(GOOD, castOf('debug/index.md'));
+  check('I-15 Claudia・アンソニーの台詞は debug/ の章で unknown-speaker',
+    claudiaInDebug.errors.length === claudiaInDebug.blocks.length
+      && claudiaInDebug.errors.every((x) => x.kind === 'unknown-speaker' && x.detail.includes('むらさき・エモ')),
+    kinds(claudiaInDebug.errors));
+  const half = md('# 題', '', '> 【むらさき】a', '', '---');
+  const hf = checkRegion(scanTalk(half, 'emo2').blocks, half.split('\n'), { start: 1, end: 4 }, { cover: false, cast: 'emo2' });
+  check('I-16 emo2 の章でエモ不在は missing-speaker 1 件',
+    hf.length === 1 && hf[0].kind === 'missing-speaker' && hf[0].detail.includes('エモ'), kinds(hf));
+  check('I-17 配役を渡さない scanTalk は話し手の組を見ない', scanTalk(duo).errors.length === 0);
+
   const cover = md(
     '# pasta マニュアル', //                                                  1
     '', //                                                                    2
@@ -440,7 +481,7 @@ log('\n== (J) 表情の集計 ==');
   check('J-1 出現数: クローディア 高笑い 1', row('クローディア', '高笑い', '1'), out);
   check('J-2 出現数: アンソニー 刮目 1', row('アンソニー', '刮目', '1'));
   check('J-3 出現数: 使われない表情も 0 で並ぶ', row('クローディア', '冷笑', '0'));
-  check('J-4 出現数は 16 表情すべて', SPEAKERS.every((s) => Object.keys(s.faces).every((f) =>
+  check('J-4 出現数は全話し手の全表情', SPEAKERS.every((s) => Object.keys(s.faces).every((f) =>
     lines.some((l) => l.startsWith(`| ${s.name} | ${f} |`)))));
   check('J-5 章ごと: 導入と締めの組み合わせ',
     row('a.md', 'クローディア：高笑い, アンソニー：素', 'クローディア：にっこり, アンソニー：刮目'), out);

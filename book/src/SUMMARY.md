@@ -2,12 +2,13 @@
 
 [はじめに](introduction.md)
 [ダウンロード](download.md)
+[サンプルゴースト hello-pasta](hello-pasta.md)
 
 # 入門 / チュートリアル
 
 - [入門ガイド](getting-started/index.md)
-  - [前提環境と準備](getting-started/prerequisites.md)
-  - [ゴーストの最小一式を置く](getting-started/setup.md)
+  - [まず会ってみる](getting-started/hello.md)
+  - [自分のゴーストを始める](getting-started/setup.md)
   - [1 段目：しゃべらせたい](getting-started/01-boot.md)
   - [2 段目：二人で掛け合いさせたい](getting-started/02-talk.md)
   - [3 段目：表情を変えたい](getting-started/03-face.md)
@@ -22,19 +23,20 @@
   - [12 段目：もっと凝ったことをしたい](getting-started/12-lua.md)
   - [13 段目：季節の行事でしゃべらせたい](getting-started/13-calendar.md)
   - [14 段目：配布したい](getting-started/14-nar.md)
+  - [付録：フォルダの中身と文字コード](getting-started/prerequisites.md)
 
 # Pasta DSL 文法
 
 - [文法リファレンス概要](grammar/index.md)
   - [キーワード・マーカー](grammar/markers.md)
   - [行とブロック構造](grammar/block-structure.md)
-  - [Call / Jump](grammar/call-jump.md)
-  - [リテラル型](grammar/literals.md)
   - [アクション行](grammar/action-line.md)
-  - [さくらスクリプト](grammar/sakura-script.md)
-  - [変数・スコープ](grammar/variables.md)
-  - [単語定義](grammar/words.md)
   - [アクター辞書](grammar/actor-dictionary.md)
+  - [さくらスクリプト](grammar/sakura-script.md)
+  - [単語定義](grammar/words.md)
+  - [変数・スコープ](grammar/variables.md)
+  - [リテラル型](grammar/literals.md)
+  - [Call（シーンの呼び出し）](grammar/call-jump.md)
 
 # Lua API / コーディング
 
@@ -53,13 +55,13 @@
   - [scripts/ の記述パターン](lua/patterns.md)
   - [DSL と Lua の使い分け](lua/dsl-vs-lua.md)
 
-# デバッグ
+# 編集ツールとデバッグ
 
-- [デバッグ概要](debug/index.md)
-  - [VSCode 接続と拡張導入](debug/vscode-setup.md)
-  - [VS Code を使わずに書く（pasta-recipe）](debug/recipe.md)
-  - [開発支援アクション（シーン再生・SHIORI をリロード・保存変数を表示）](debug/dev-actions.md)
-  - [うまく動かないとき（トラブルシューティング）](debug/troubleshooting.md)
+- [編集ツールとデバッグの概要](debug/index.md)
+  - [pasta-recipe で書く](debug/recipe.md)
+  - [VS Code で書く](debug/vscode-setup.md)
+  - [▶・リロード・保存変数](debug/dev-actions.md)
+  - [うまく動かないとき](debug/troubleshooting.md)
   - [辞書を検査する（pasta_check validate）](debug/validate.md)
 
 # リファレンス
@@ -85,4 +87,5 @@
 
 # 雑記
 
-- [cc-sdd で回す pasta の開発ワークフロー](notes/cc-sdd.md)
+- [雑記](notes/index.md)
+  - [cc-sdd で回す pasta の開発ワークフロー](notes/cc-sdd.md)

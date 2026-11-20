@@ -1,4 +1,4 @@
-// ghost-site-test.mjs — ghost-site の自己テスト（hello-pasta-network-update タスク 1.1–1.4 / 要件 1.1–1.3, 1.5, 3.1–3.3, 4.4, 5.1, 5.3, 5.4, 7.1–7.3, 10.4, 11.4）。
+// ghost-site-test.mjs — ghost-site の自己テスト（hello-pasta-network-update タスク 1.1–1.4 / 要件 1.1–1.3, 1.5, 3.1–3.3, 4.4, 5.1, 5.3, 5.4, 7.1–7.3, 10.4, 11.4）、hello-pasta-book-sync タスク 2.1（要件 1.2–1.6, 2.6, 7.1）・2.2（要件 6.1–6.3）。
 //
 // 観測する完了条件（design「GhostSite」Invariants・Testing Strategy）:
 //   - readNar がテスト内で組んだ zip（保存・deflate）を読み、ディレクトリのエントリを捨てる。
@@ -6,7 +6,7 @@
 //   - parseUpdates が CRLF・0x01 区切り・charset 行・空行を扱い、date= を無視し、解釈できない行で失敗する。
 //   - checkIntegrity が updates.txt の各行をエントリと照合し、問題を全部 1 件 1 行で集める。
 //   - extractNar が nar 全体（bal/ も）を書き、空でない出力先を拒否する。照合の失敗時は何も書かない。
-//   - verifyLive がローカルの HTTP サーバーの updates.txt を一意のクエリ付きで取り直して見比べ、--full で全ファイルを照合する。
+//   - verifyLive がローカルの HTTP サーバーの updates.txt を一意のクエリ付きで取り直し、nar の側の行（パス・md5・大きさ）だけを見比べ、--full で実 URL の全行のファイルを照合する。
 
 import assert from 'node:assert/strict';
 import zlib from 'node:zlib';
@@ -17,7 +17,17 @@ import path from 'node:path';
 import http from 'node:http';
 import { spawnSync, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readNar, parseUpdates, checkIntegrity, extractNar, buildSite, verifyLive, NarError } from './ghost-site.mjs';
+import {
+  readNar,
+  parseUpdates,
+  checkIntegrity,
+  extractNar,
+  buildSite,
+  verifyLive,
+  listTree,
+  narOnlyFiles,
+  NarError,
+} from './ghost-site.mjs';
 
 // --- 最小 assert ハーネス（依存ゼロ） ---
 let passed = 0;
@@ -425,6 +435,127 @@ test('CLI: 引数の不足・不明なサブコマンドは使い方を出して
   }
 });
 
+// --- listTree・narOnlyFiles と CLI `nar-only`（hello-pasta-book-sync タスク 2.1 / 要件 1.2–1.6, 2.6, 7.1） ---
+// 一時の git リポジトリで、hello/ の下をタグにし、その後で作業ツリーから消す（main で消したものに当たる）。
+// コミットを作らず、ツリーのオブジェクトに軽いタグを付ける（利用者の git 設定の署名などに左右されない）。
+const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+const git = (cwd, ...args) => {
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', env: gitEnv });
+  if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
+  return r.stdout.trim();
+};
+function withRepo(fn) {
+  withTmp((tmp) => {
+    const repo = path.join(tmp, 'repo');
+    fs.mkdirSync(repo);
+    git(repo, 'init', '-q');
+    for (const [p, d] of [['hello/install.txt', 'type,ghost\r\n'], ['hello/ghost/master/old.pasta', 'old'], ['other/x.txt', 'x']]) {
+      fs.mkdirSync(path.dirname(path.join(repo, p)), { recursive: true });
+      fs.writeFileSync(path.join(repo, p), d);
+    }
+    git(repo, 'add', '-A');
+    git(repo, 'tag', 'v1', git(repo, 'write-tree'));
+    git(repo, 'rm', '-q', '-f', 'hello/ghost/master/old.pasta');
+    fn(tmp, repo);
+  });
+}
+const narOnlyNar = () => {
+  const entries = [
+    ['install.txt', 'type,ghost\r\n'],
+    ['ghost/master/old.pasta', 'old'],
+    ['ghost/master/pasta.dll', 'DLL'],
+    ['ghost/master/scripts/README.md', '# readme'],
+  ];
+  return [
+    file('updates.txt', updatesOf(entries)),
+    file('updates2.dau', 'dau'),
+    ...entries.map(([p, d]) => file(p, d)),
+    file('ghost/master/updates.txt', 'nested'),
+    file('ghost/master/updates2.dau', 'nested dau'),
+    file('ghost/master/developer_options.txt', 'dev'),
+    file('bal/updates.txt', 'bal'),
+  ];
+};
+const NAR_ONLY = ['ghost/master/pasta.dll', 'ghost/master/scripts/README.md'];
+
+test('listTree: タグのツリーを hello/ からの相対の名前の集合で読む', () => {
+  withRepo((tmp, repo) => {
+    assert.deepEqual([...listTree('v1:hello', repo)].sort(), ['ghost/master/old.pasta', 'install.txt']);
+  });
+});
+
+test('listTree: 読めないタグは git の文を添えて失敗する', () => {
+  withRepo((tmp, repo) => {
+    assert.throws(() => listTree('nope:hello', repo), /nope/);
+  });
+});
+
+test('narOnlyFiles: ツリーに在るもの・どの階層の除外の 3 つの名前も外し、順は nar のまま', () => {
+  const files = narOnlyNar();
+  const out = narOnlyFiles(files, new Set(['install.txt', 'ghost/master/old.pasta']));
+  assert.deepEqual(out.map((f) => f.name), NAR_ONLY);
+  assert.ok(out.every((f) => files.includes(f)), 'nar のファイルそのもの（バイトを変えない）');
+});
+
+const cliIn = (cwd, args) =>
+  spawnSync(process.execPath, [SCRIPT, ...args], { cwd, encoding: 'utf8', env: { ...gitEnv, GITHUB_ACTIONS: '' } });
+
+test('CLI nar-only: nar の側だけを nar のバイトのまま書き、名前を 1 行ずつ出す（main で消したものも残らない）', () => {
+  withRepo((tmp, repo) => {
+    const files = narOnlyNar();
+    const out = path.join(tmp, 'out');
+    const r = cliIn(repo, ['nar-only', '--nar', writeNar(tmp, files), '--tree', 'v1:hello', '--out', out]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.deepEqual(r.stdout.trim().split(/\r?\n/), NAR_ONLY);
+    assert.deepEqual(listAll(out), NAR_ONLY);
+    for (const n of NAR_ONLY) assert.deepEqual(fs.readFileSync(path.join(out, n)), files.find((f) => f.name === n).data);
+  });
+});
+
+test('CLI nar-only: nar に updates.txt が無ければ何も書かずに終了コード 1', () => {
+  withRepo((tmp, repo) => {
+    const out = path.join(tmp, 'out');
+    const nar = writeNar(tmp, narOnlyNar().filter((f) => f.name !== 'updates.txt'));
+    const r = cliIn(repo, ['nar-only', '--nar', nar, '--tree', 'v1:hello', '--out', out]);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /NG updates\.txt/);
+    assert.ok(!fs.existsSync(out));
+  });
+});
+
+test('CLI nar-only: 無いタグは git の文を出して終了コード 1、何も書かない', () => {
+  withRepo((tmp, repo) => {
+    const out = path.join(tmp, 'out');
+    const r = cliIn(repo, ['nar-only', '--nar', writeNar(tmp, narOnlyNar()), '--tree', 'nope:hello', '--out', out]);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /nope/);
+    assert.ok(!fs.existsSync(out));
+  });
+});
+
+test('CLI nar-only: nar の側が 0 本・出力先が空でない・引数の不足は終了コード 1', () => {
+  withRepo((tmp, repo) => {
+    const entries = [['install.txt', 'type,ghost\r\n']];
+    const only = writeNar(tmp, [file('updates.txt', updatesOf(entries)), file('install.txt', 'type,ghost\r\n')]);
+    let r = cliIn(repo, ['nar-only', '--nar', only, '--tree', 'v1:hello', '--out', path.join(tmp, 'o1')]);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /0 本/);
+    assert.ok(!fs.existsSync(path.join(tmp, 'o1')));
+
+    const full = path.join(tmp, 'o2');
+    fs.mkdirSync(full);
+    fs.writeFileSync(path.join(full, 'keep.txt'), 'old');
+    r = cliIn(repo, ['nar-only', '--nar', writeNar(tmp, narOnlyNar()), '--tree', 'v1:hello', '--out', full]);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /空でない/);
+    assert.deepEqual(listAll(full), ['keep.txt']);
+
+    r = cliIn(repo, ['nar-only', '--nar', 'x.nar', '--out', full]);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /使い方/);
+  });
+});
+
 // --- verifyLive と CLI `verify-live`（タスク 1.4 / 要件 1.3, 5.1, 5.3, 5.4, 10.4） ---
 async function atest(name, fn) {
   try {
@@ -464,12 +595,83 @@ const siteOf = (files) => (p) => {
   return f ? { status: 200, body: f.data } : { status: 404, body: 'not found' };
 };
 const STALE = Buffer.from('charset,UTF-8\r\nold\r\n');
+// タグのツリー（リポジトリの側）。liveFiles のうち nar の側＝比べる行は ghost/master/pasta.dll の 1 行。
+const TREE = new Set(['install.txt', 'ghost/master/辞書.pasta']);
+const DLL_ROW = 'ghost/master/pasta.dll';
+// liveFiles の updates.txt の pasta.dll の行だけを row に差し替えた（null なら消した）実 URL の updates.txt。
+const liveWithDllRow = (row) =>
+  Buffer.from(
+    liveFiles()[0]
+      .data.toString('utf8')
+      .split('\r\n')
+      .map((l) => (l.startsWith(`file,${DLL_ROW}\x01`) ? row : l))
+      .filter((l) => l !== null)
+      .join('\r\n'),
+  );
+
+await atest('verifyLive: 日付の欄とリポジトリの側の行が違っても、nar の側の行が同じなら一致する', async () => {
+  const files = liveFiles();
+  const live = updatesOf([['install.txt', 'changed on main'], [DLL_ROW, 'DLL'], ['ghost/master/new.pasta', 'new']]).replace(
+    /date=[^\x01]*/g,
+    'date=2030-01-01T00:00:00',
+  );
+  const s = await serve((p) => (p === 'updates.txt' ? { status: 200, body: live } : { status: 404, body: '' }));
+  try {
+    const r = await verifyLive({ files, tree: TREE, base: s.base, attempts: 3, intervalMs: 10, full: false });
+    assert.deepEqual(r.problems, []);
+    assert.equal(r.ok, true);
+    assert.equal(r.attempts, 1);
+    assert.equal(r.compared, 1);
+  } finally {
+    await s.close();
+  }
+});
+
+await atest('verifyLive: nar の側の行の md5・大きさの違いや行の欠けは、上限まで取り直して失敗し、行を 1 件 1 行で出す', async () => {
+  for (const [row, re] of [
+    [`file,${DLL_ROW}\x01${md5('DLY')}\x01size=3\x01date=2026-11-01T10:00:00\x01`, /^NG ghost\/master\/pasta\.dll: md5 が違う/],
+    [`file,${DLL_ROW}\x01${md5('DLL')}\x01size=4\x01date=2026-11-01T10:00:00\x01`, /^NG ghost\/master\/pasta\.dll: 大きさが違う/],
+    [null, /^NG ghost\/master\/pasta\.dll: 実 URL の updates\.txt に無い/],
+  ]) {
+    const body = liveWithDllRow(row);
+    const s = await serve(() => ({ status: 200, body }));
+    try {
+      const r = await verifyLive({ files: liveFiles(), tree: TREE, base: s.base, attempts: 2, intervalMs: 10, full: false });
+      assert.equal(r.ok, false, String(row));
+      assert.equal(r.attempts, 2);
+      assert.equal(s.urls.length, 2);
+      assert.match(r.problems[0], /^NG updates\.txt: 2 回取っても nar の側の 1 行が一致しない/);
+      assert.equal(r.problems.length, 2, r.problems.join('\n'));
+      assert.match(r.problems[1], re);
+    } finally {
+      await s.close();
+    }
+  }
+});
+
+await atest('verifyLive: 比べる行が 0 本なら取らずに失敗する', async () => {
+  let calls = 0;
+  const r = await verifyLive({
+    files: liveFiles(),
+    tree: new Set([...TREE, DLL_ROW]),
+    base: 'http://127.0.0.1:9/',
+    attempts: 3,
+    intervalMs: 10,
+    full: false,
+    fetchFn: async () => (calls++, new Response('')),
+  });
+  assert.equal(r.ok, false);
+  assert.equal(calls, 0);
+  assert.equal(r.attempts, 0);
+  assert.equal(r.compared, 0);
+  assert.match(r.problems[0], /^NG updates\.txt: nar の側の行が 0 本/);
+});
 
 await atest('verifyLive: 初回で一致すれば 1 回で通り、取得に一意のクエリ cb= を付ける', async () => {
   const files = liveFiles();
   const s = await serve(siteOf(files));
   try {
-    const r = await verifyLive({ files, base: s.base, attempts: 3, intervalMs: 10, full: false });
+    const r = await verifyLive({ files, base: s.base, attempts: 3, intervalMs: 10, tree: TREE, full: false });
     assert.deepEqual(r.problems, []);
     assert.equal(r.ok, true);
     assert.equal(r.attempts, 1);
@@ -487,7 +689,7 @@ await atest('verifyLive: Actions ではラベルを run の ID と試行の番�
   process.env.GITHUB_RUN_ID = '987';
   process.env.GITHUB_RUN_ATTEMPT = '2';
   try {
-    await verifyLive({ files, base: s.base, attempts: 1, intervalMs: 10, full: false });
+    await verifyLive({ files, base: s.base, attempts: 1, intervalMs: 10, tree: TREE, full: false });
     assert.match(s.urls[0], /\?cb=987\.2-1$/);
   } finally {
     for (const [k, v] of [['GITHUB_RUN_ID', saved.id], ['GITHUB_RUN_ATTEMPT', saved.at]]) {
@@ -503,7 +705,7 @@ await atest('verifyLive: 最初の 2 回は古い内容でも、取り直して 
   const site = siteOf(files);
   const s = await serve((p, n) => (p === 'updates.txt' && n <= 2 ? { status: 200, body: STALE } : site(p)));
   try {
-    const r = await verifyLive({ files, base: s.base, attempts: 5, intervalMs: 10, full: false });
+    const r = await verifyLive({ files, base: s.base, attempts: 5, intervalMs: 10, tree: TREE, full: false });
     assert.equal(r.ok, true, r.problems.join('\n'));
     assert.equal(r.attempts, 3);
     assert.equal(s.urls.length, 3);
@@ -517,7 +719,7 @@ await atest('verifyLive: 上限まで違い続ければ失敗し、最後の状�
   const files = liveFiles();
   const s = await serve(() => ({ status: 200, body: STALE }));
   try {
-    const r = await verifyLive({ files, base: s.base, attempts: 3, intervalMs: 10, full: false });
+    const r = await verifyLive({ files, base: s.base, attempts: 3, intervalMs: 10, tree: TREE, full: false });
     assert.equal(r.ok, false);
     assert.equal(r.attempts, 3);
     assert.equal(s.urls.length, 3);
@@ -537,11 +739,11 @@ await atest('verifyLive: 回の間は intervalMs 待ち、最後の回の後は�
   const s = await serve(() => ({ status: 200, body: STALE }));
   try {
     let t = Date.now();
-    await verifyLive({ files, base: s.base, attempts: 1, intervalMs: 10000, full: false });
+    await verifyLive({ files, base: s.base, attempts: 1, intervalMs: 10000, tree: TREE, full: false });
     let took = Date.now() - t;
     assert.ok(took < 3000, `1 回だけなら待たない（最後の後に待てば 10 秒以上）: ${took}ms`);
     t = Date.now();
-    await verifyLive({ files, base: s.base, attempts: 2, intervalMs: 1000, full: false });
+    await verifyLive({ files, base: s.base, attempts: 2, intervalMs: 1000, tree: TREE, full: false });
     took = Date.now() - t;
     assert.ok(took >= 900 && took < 1800, `2 回なら間の 1 回だけ待つ: ${took}ms`);
   } finally {
@@ -553,7 +755,7 @@ await atest('verifyLive: 404 は取り直し、上限なら HTTP 404 で失敗�
   const files = liveFiles();
   let s = await serve(() => ({ status: 404, body: 'nope' }));
   try {
-    const r = await verifyLive({ files, base: s.base, attempts: 2, intervalMs: 10, full: false });
+    const r = await verifyLive({ files, base: s.base, attempts: 2, intervalMs: 10, tree: TREE, full: false });
     assert.equal(r.ok, false);
     assert.equal(s.urls.length, 2);
     assert.match(r.problems[0], /HTTP 404/);
@@ -563,7 +765,7 @@ await atest('verifyLive: 404 は取り直し、上限なら HTTP 404 で失敗�
   const site = siteOf(files);
   s = await serve((p, n) => (n === 1 ? { status: 404, body: 'nope' } : site(p)));
   try {
-    const r = await verifyLive({ files, base: s.base, attempts: 2, intervalMs: 10, full: false });
+    const r = await verifyLive({ files, base: s.base, attempts: 2, intervalMs: 10, tree: TREE, full: false });
     assert.equal(r.ok, true, r.problems.join('\n'));
     assert.equal(r.attempts, 2);
   } finally {
@@ -578,7 +780,7 @@ await atest('verifyLive: ネットワークの失敗も取り直し、上限な�
     calls++;
     throw new TypeError('fetch failed');
   };
-  const r = await verifyLive({ files, base: 'http://127.0.0.1:9/site/', attempts: 3, intervalMs: 10, full: false, fetchFn });
+  const r = await verifyLive({ files, base: 'http://127.0.0.1:9/site/', attempts: 3, intervalMs: 10, tree: TREE, full: false, fetchFn });
   assert.equal(r.ok, false);
   assert.equal(calls, 3);
   assert.equal(r.attempts, 3);
@@ -589,7 +791,7 @@ await atest('verifyLive --full: 全ファイルを取って照合し（日本語
   const files = liveFiles();
   const s = await serve(siteOf(files));
   try {
-    const r = await verifyLive({ files, base: s.base, attempts: 1, intervalMs: 10, full: true });
+    const r = await verifyLive({ files, base: s.base, attempts: 1, intervalMs: 10, tree: TREE, full: true });
     assert.deepEqual(r.problems, []);
     assert.equal(r.ok, true);
     assert.ok(s.urls.some((u) => u.startsWith(`/site/ghost/master/${encodeURIComponent('辞書.pasta')}?`)), s.urls.join(' '));
@@ -606,7 +808,7 @@ await atest('verifyLive --full: 1 ファイルだけ改変されていれば検�
     p === 'ghost/master/pasta.dll' ? { status: 200, body: 'DLX' } : p === 'install.txt' ? { status: 404, body: '' } : site(p),
   );
   try {
-    const r = await verifyLive({ files, base: s.base, attempts: 1, intervalMs: 10, full: true });
+    const r = await verifyLive({ files, base: s.base, attempts: 1, intervalMs: 10, tree: TREE, full: true });
     assert.equal(r.ok, false);
     assert.deepEqual(r.problems.map((x) => x.replace(/:.*/, '')), ['NG install.txt', 'NG ghost/master/pasta.dll']);
     assert.match(r.problems[0], /HTTP 404/);
@@ -624,6 +826,7 @@ await atest('verifyLive: attempts が 1 未満なら取らずに投げる', asyn
       base: 'http://127.0.0.1:9/',
       attempts: 0,
       intervalMs: 10,
+      tree: TREE,
       full: false,
       fetchFn: async () => (calls++, new Response('')),
     }),
@@ -639,6 +842,7 @@ await atest('verifyLive: nar に updates.txt が無ければ取らずに失敗�
     base: 'http://127.0.0.1:9/',
     attempts: 3,
     intervalMs: 10,
+    tree: TREE,
     full: false,
     fetchFn: async () => (calls++, new Response('')),
   });
@@ -649,9 +853,9 @@ await atest('verifyLive: nar に updates.txt が無ければ取らずに失敗�
 });
 
 // サーバーと同じプロセスなので spawnSync でなく非同期で起動する。
-const acli = (args, env = {}) =>
+const acli = (args, env = {}, cwd = undefined) =>
   new Promise((resolve) => {
-    execFile(process.execPath, [SCRIPT, ...args], { encoding: 'utf8', env: { ...process.env, GITHUB_ACTIONS: '', ...env } }, (err, stdout, stderr) =>
+    execFile(process.execPath, [SCRIPT, ...args], { cwd, encoding: 'utf8', env: { ...gitEnv, GITHUB_ACTIONS: '', ...env } }, (err, stdout, stderr) =>
       resolve({ status: err ? err.code : 0, stdout, stderr }),
     );
   });
@@ -660,25 +864,53 @@ await atest('CLI verify-live: 一致は終了コード 0、違いは終了コー
   const files = liveFiles();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ghost-site-test-'));
   const s = await serve(siteOf(files));
+  // タグ v1 の hello/ がリポジトリの側（TREE と同じ）。
+  const repo = path.join(tmp, 'repo');
+  for (const n of TREE) {
+    fs.mkdirSync(path.dirname(path.join(repo, 'hello', n)), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'hello', n), files.find((f) => f.name === n).data);
+  }
+  git(repo, 'init', '-q');
+  git(repo, 'add', '-A');
+  git(repo, 'tag', 'v1', git(repo, 'write-tree'));
+  const vl = (nar, more = [], env = {}) =>
+    acli(['verify-live', '--nar', nar, '--tree', 'v1:hello', '--base', s.base, '--attempts', '2', '--interval', '0', ...more], env, repo);
   try {
     const nar = writeNar(tmp, files);
-    let r = await acli(['verify-live', '--nar', nar, '--base', s.base, '--attempts', '2', '--interval', '0', '--full']);
+    let r = await vl(nar, ['--full']);
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.equal(r.stdout, 'OK updates.txt: 1 回目で一致（--full: 3 ファイルも一致）\n');
-    r = await acli(['verify-live', '--nar', nar, '--base', s.base, '--attempts', '2', '--interval', '0']);
+    assert.equal(r.stdout, 'OK updates.txt: 1 回目で nar の側の 1 行が一致（--full: 3 ファイルも一致）\n');
+    r = await vl(nar);
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.equal(r.stdout, 'OK updates.txt: 1 回目で一致\n');
+    assert.equal(r.stdout, 'OK updates.txt: 1 回目で nar の側の 1 行が一致\n');
 
+    // nar の側の pasta.dll だけが実 URL と違う nar（nar の中は整合している）。
     const other = path.join(tmp, 'other.nar');
-    fs.writeFileSync(other, narOf([file('updates.txt', STALE)]));
-    r = await acli(['verify-live', '--nar', other, '--base', s.base, '--attempts', '2', '--interval', '0'], { GITHUB_ACTIONS: 'true' });
+    fs.writeFileSync(
+      other,
+      narOf(
+        files.map((f) =>
+          f.name === DLL_ROW
+            ? file(DLL_ROW, 'DLY')
+            : f.name === 'updates.txt'
+              ? file('updates.txt', f.data.toString('utf8').replace(md5('DLL'), md5('DLY')))
+              : f,
+        ),
+      ),
+    );
+    r = await vl(other, [], { GITHUB_ACTIONS: 'true' });
     assert.equal(r.status, 1);
     assert.match(r.stdout, /^NG updates\.txt: /m);
     assert.match(r.stdout, /^::error::NG updates\.txt: /m);
+    assert.match(r.stdout, /^NG ghost\/master\/pasta\.dll: md5 が違う/m);
+
+    r = await acli(['verify-live', '--nar', nar, '--tree', 'nope:hello', '--base', s.base, '--attempts', '1', '--interval', '0'], {}, repo);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /nope/);
 
     const junk = path.join(tmp, 'junk.nar');
     fs.writeFileSync(junk, 'not a zip at all, definitely not');
-    r = await acli(['verify-live', '--nar', junk, '--base', s.base, '--attempts', '1', '--interval', '0']);
+    r = await vl(junk, ['--attempts', '1']);
     assert.equal(r.status, 1);
     assert.equal(r.stdout.trim().split(/\r?\n/).length, 1);
     assert.match(r.stdout, /zip/);
@@ -688,12 +920,13 @@ await atest('CLI verify-live: 一致は終了コード 0、違いは終了コー
   }
 });
 
-await atest('CLI verify-live: 引数の不足・不正な回数や間隔は使い方を出して終了コード 1', async () => {
+await atest('CLI verify-live: 引数の不足（--tree 無しも）・不正な回数や間隔は使い方を出して終了コード 1', async () => {
   for (const args of [
     ['verify-live'],
     ['verify-live', '--nar', 'x.nar'],
-    ['verify-live', '--nar', 'x.nar', '--base', 'http://127.0.0.1:9/', '--attempts', '0'],
-    ['verify-live', '--nar', 'x.nar', '--base', 'http://127.0.0.1:9/', '--interval', 'x'],
+    ['verify-live', '--nar', 'x.nar', '--base', 'http://127.0.0.1:9/'],
+    ['verify-live', '--nar', 'x.nar', '--tree', 'v1:hello', '--base', 'http://127.0.0.1:9/', '--attempts', '0'],
+    ['verify-live', '--nar', 'x.nar', '--tree', 'v1:hello', '--base', 'http://127.0.0.1:9/', '--interval', 'x'],
   ]) {
     const r = await acli(args);
     assert.equal(r.status, 1, JSON.stringify(args));

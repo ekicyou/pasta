@@ -14,7 +14,7 @@
 | 4 | 毎回ちがうことを言わせたい | 同じ名前のシーンから 1 つ選ばれる | 同名 `＊会話` の繰り返し、単独 `＊`（同名の別シーン。ファイル先頭は不可。[グローバルシーン](../../book/src/grammar/block-structure.md#グローバルシーン)）。別名は完全一致なので `＊会話朝` は別シーン | — | `04-variety.pasta` |
 | 5 | 単語でちょこっと変えたい | 単語のランダム選択 | [グローバル単語](../../book/src/grammar/words.md#グローバル単語定義) `＠単語：a、b、c`、台詞の中の `＠単語` | — | `05-words.pasta` |
 | 6 | 時刻を知らせたい | 正時に時報 | `＊時報12`・`＊時報その他`（[OnHour](../../book/src/lua/shiori-events.md#onhour) の 4 段の候補）、[日時変数](../../book/src/grammar/variables.md#日時変数) `＄時１２` | — | `06-hour.pasta` |
-| 7 | 挨拶したい | ベースウェアのイベントに応える・付加情報を読む・ベースウェアに聞く | シーン名＝イベント名（[シーン関数フォールバック](../../book/src/lua/shiori-events.md#シーン関数フォールバック)）、[`＄ｒ０`](../../book/src/grammar/variables.md#リクエスト変数reference)（イベントのシーンでは Reference が最初から入っている）、[プロパティ変数](../../book/src/grammar/variables.md#プロパティ変数) `＄％baseware.name`、OnGhostChanged・OnGhostChanging に応答すると OnBoot・OnClose は来ない、マニュアルの一覧に無いイベントも同名シーンで応答できる（[UKADOC の OnGhostChanging](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnGhostChanging)） | `OnGhostChanged`・`OnGhostChanging`・`OnFirstBoot`・`OnClose` | `07-greeting.pasta` |
+| 7 | 挨拶したい | ベースウェアのイベントに応える・付加情報を読む・付加情報で場面を分ける・ベースウェアに聞く | シーン名＝イベント名（[シーン関数フォールバック](../../book/src/lua/shiori-events.md#シーン関数フォールバック)）、[`＄ｒ０`](../../book/src/grammar/variables.md#リクエスト変数reference)（イベントのシーンでは Reference が最初から入っている）、[プロパティ変数](../../book/src/grammar/variables.md#プロパティ変数) `＄％baseware.name`、[条件](../../book/src/grammar/block-structure.md#条件で候補を絞る) `＊OnUpdateComplete　＆＄ｒ０＝「changed」`（付加情報が合うシーンだけが選ばれる）、OnGhostChanged・OnGhostChanging に応答すると OnBoot・OnClose は来ない、マニュアルの一覧に無いイベントも同名シーンで応答できる（[UKADOC の OnGhostChanging](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnGhostChanging)） | `OnGhostChanged`・`OnGhostChanging`・`OnFirstBoot`・`OnClose`・`OnUpdateBegin`・`OnUpdateComplete`・`OnUpdateFailure` | `07-greeting.pasta` |
 | 8 | 触ったら反応してほしい | 触られた部位とキャラで台詞を変える | [ショートカットのシーン](../../book/src/lua/shiori-events.md#つつき撫でのショートカット)の名前 `＊つっつき反応`（つつく）・`＊さわり反応`（撫でる）＋アクター名＋部位の名前（`＊つっつき反応女の子Head`・`＊つっつき反応男の子その他`・`＊つっつき反応Face`・`＊つっつき反応その他`）、同じ名前のシーンからの抽選 | `OnMouseDoubleClick`・`OnMouseMove` | `08-touch.pasta` |
 | 9 | 選ばせたい | 選択肢を出して選ばれた先へ進む | [選択肢行](../../book/src/grammar/block-structure.md#選択肢行) `＠？ジャンプ先「表示」`、[キューコマンド](../../book/src/grammar/block-structure.md#キューコマンド行) `!select(秒)`、選ばれた ID のシーンへの[自動ルーティング](../../book/src/lua/shiori-events.md#onchoiceselectex) | `OnChoiceSelectEx` | `09-choice.pasta` |
 | 10 | 覚えていてほしい | 終了しても残る値 | [グローバル変数](../../book/src/grammar/variables.md#グローバル変数) `＄＊回数`、算術の代入 `＄＊回数＝＄＊回数＋１`（未代入の変数は算術で 0 とみなされる。[値が無いときの扱い](../../book/src/grammar/variables.md#値が無いときの扱い)） | — | `10-save.pasta` |
@@ -36,9 +36,13 @@
 | 7 | `OnGhostChanging` | `0=むらさき, 1=manual, 2=えも？？` |
 | 7 | `OnFirstBoot` | `0=0` |
 | 7 | `OnClose` | `0=user` |
+| 7 | `OnUpdateBegin` | — |
+| 7 | `OnUpdateComplete` | `0=changed` |
+| 7 | `OnUpdateComplete` | `0=none` |
+| 7 | `OnUpdateFailure` | `0=timeout` |
 | 8 | `OnMouseDoubleClick` | `3=0, 4=Head` |
 | 8 | `OnMouseMove` | `3=0, 4=Head` |
-| 9 | `OnChoiceSelectEx` | `0=おやつの話をする, 1=おやつの話, 2=つっつき反応その他` |
+| 9 | `OnChoiceSelectEx` | `0=おすすめを聞く, 1=本日のおすすめ, 2=つっつき反応その他` |
 
 - 検証は全段階で `OnBoot` を送ったうえで、この表の該当行のイベントを Reference 付きで 1 回ずつ送り、エラーにならずに応答が返ることを確かめる（応答の内容は照合しない）。`OnBoot` はこの表に載せない。
 - 載せるのはベースウェアから来る実イベントだけである。仮想イベント（ランダムトーク・時報）は載せない。
@@ -56,6 +60,7 @@
 
 - 段階 N の辞書は、段階 1〜N で追加されるファイルの集まりである（`dic/` のうち `NN` が N 以下のファイル）。
 - 読者は前の段階のファイルに手を入れず、新しいファイルを `dic/` に足すだけで次の段階になる。1 段目の `＊OnBoot` は以後の段階で変えない。
+- 1 段目の `01-boot.pasta` は、入門用のスターター（`pasta-starter.nar`。ゴースト名 `my-ghost`）にはじめから入っている。読者は 1 段目でそれを読み、台詞を自分の言葉に書き換える。ファイルを足すのは 2 段目からである。
 - 段階ごとに変わるのは `dic/` の `.pasta` ファイルの集まりだけである。`pasta.toml`・`descript.txt`・`install.txt`・シェル・`scripts/` は全段階で共通。
 - 例外は 13 段目で足す `ghost/master/calendar.csv`。検査は `ghost/master` を丸ごと写して組み立てるので 1〜12 段目にも表があるが、`＄行事` を使う辞書は 13 段目だけなので、1〜12 段目の応答は変わらない。
 - 段階表の「追加するファイル」の集まり（`—` を除く）は、`dic/*.pasta` の集まりと一致する。
@@ -75,7 +80,7 @@
 
 ## 14 段目：配布したい
 
-`.nar` は SSP の NAR 作成機能で作る。
+`.nar` は SSP の NAR 作成機能で作る。配る前に、ゴーストの名前を `my-ghost` から自分の決めた名前に付け替え、`pasta.toml` の `[debug]` の `enabled` を `false` にする。
 
 1. 本体設定「一般」で開発者用機能を有効にする（6 段目で済ませている）。
 2. 本体設定「開発/その他」の「フォルダをドロップした際に更新ファイルやNARを作成」を ON にする。
@@ -88,7 +93,9 @@
 
 ## 確かめるための道具
 
-読者が書いた辞書を、イベントを待たずに確かめるために、SSP の開発用パレット（[UKADOC SSP ヘルプ](https://ssp.shillest.net/ukadoc/ssphelp/dev-palette.html)）を使う。ここには「どの段でどの道具を使うか」だけを書き、操作の説明は入門ガイドに任せる。
+共通の確かめ方は、エディタ（pasta-recipe か、拡張を入れた VS Code）の「▶ シーンを実行」である。保存と読み込み直しは ▶ が行うので、SSP を起動し直さない。スターターと hello-pasta の `pasta.toml` は `[debug] enabled = true` なので、▶ はそのまま働く。
+
+▶ はシーンを直に鳴らすので、イベントが来る時機（時刻・切り替え・行事の日付）は再現しない。そういう段は、SSP の開発用パレット（[UKADOC SSP ヘルプ](https://ssp.shillest.net/ukadoc/ssphelp/dev-palette.html)）を使う。ここには「どの段でどの道具を使うか」だけを書き、操作の説明は入門ガイドに任せる。
 
 - 6 段目: 本体設定「一般」で開発者用機能を有効にする（初出。7 段目のスクリプト入力、13 段目の日付の仮想的変更と 14 段目の NAR 作成もこの設定を使う）。開発用パレット（`Ctrl+Shift+D`）の「現在時刻の仮想的変更」で、今の時刻の 59 分 30 秒を入れて Apply し、30 秒ほど待って時報を確かめる。確かめ終わったら Reset する。12 時の目印は 11 時 59 分 30 秒を入れれば見られる（入れ直しても余分な時報は出ない）。
   - 調べの結果（2026-10-17・SSP 2.9.18・`pasta.dll` 0.4.0）: SSP は仮想時刻をリクエストのヘッダーには載せない。伝わるのは、プロパティ `system.year`〜`system.second` の値と、毎分・正時のイベント（`OnMinuteChange`・`OnHourTimeSignal`）が届く時機である。pasta は、合図の時機が OS の時計から外れたときにプロパティを読み、OS の時計とのずれを覚えて、時報の判定と日時変数に使う（[OnPastaClock](../../book/src/lua/shiori-events.md#onpastaclock仮想時刻の読み取り)）。

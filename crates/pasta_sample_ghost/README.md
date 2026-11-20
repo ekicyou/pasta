@@ -71,7 +71,7 @@ crates/pasta_sample_ghost/
 1. `pasta_shiori` DLL（32bit Windows）をビルド
 2. `pasta.dll`・第三者ライセンス表示（`THIRD_PARTY_LICENSES.txt`）・`scripts/`（利用者向けの説明 1 枚）を `ghosts/hello-pasta/ghost/master/` に配置
 3. `release/pasta_check.zip` を作成して中身を検査（64 ビット版の `pasta_check.exe` と、その依存の `THIRD_PARTY_LICENSES.txt`）
-4. 手順 3 の `pasta_check.exe` で `pasta_check release` を実行（updates.txt / `release/hello-pasta.nar` 作成）
+4. 手順 3 の `pasta_check.exe` で `pasta_check release` を実行（updates.txt / `release/hello-pasta.nar` 作成）。続けて、入門の出発点 `release/pasta-starter.nar`（`my-ghost`）を同じ `pasta_check release` で作る。`starter/` の 3 ファイル（`install.txt`・`ghost/master/descript.txt`・`ghost/master/pasta.toml`）に、hello-pasta の `dic/01-boot.pasta`・`shell/`・`pasta.dll`・`THIRD_PARTY_LICENSES.txt` を足して `release/pasta-starter-src/` に組み、ネットワーク更新をしないので `updates.txt` を nar から除き、中身がちょうど組んだファイルだけかを検査する
 5. `release/pasta.dll.zip` を作成（`pasta.dll` と `THIRD_PARTY_LICENSES.txt`）
 6. `release/pasta-skills.zip` を作成して中身を検査（pasta のスキル 3 つと `LICENSE`）
 7. バージョン整合チェック
@@ -133,7 +133,7 @@ hello-pasta/
 │       │   ├── 04-variety.pasta  # 4 段: 同名シーン・単独 ＊ で毎回ちがう話
 │       │   ├── 05-words.pasta    # 5 段: 単語の定義と参照
 │       │   ├── 06-hour.pasta     # 6 段: 時報
-│       │   ├── 07-greeting.pasta # 7 段: 挨拶（OnGhostChanged/Changing・OnFirstBoot・OnClose）
+│       │   ├── 07-greeting.pasta # 7 段: 挨拶（OnGhostChanged/Changing・OnFirstBoot・OnClose・OnUpdate*）
 │       │   ├── 08-touch.pasta    # 8 段: つつき・撫での反応（ショートカットのシーン）
 │       │   ├── 09-choice.pasta   # 9 段: 選択肢
 │       │   ├── 10-save.pasta     # 10 段: 保存される変数（＄＊回数）

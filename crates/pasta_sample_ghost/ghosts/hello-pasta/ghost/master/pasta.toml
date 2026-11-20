@@ -58,3 +58,7 @@ spot = 1
 # file_path = "profile/pasta/save/save.toml"
 # true にすると gzip して save.dat に保存する
 # obfuscate = false
+
+[debug]
+# エディター（pasta-recipe・VS Code）の ▶ でシーンを鳴らせるようにする。自分のゴーストを配布する前に false にする
+enabled = true

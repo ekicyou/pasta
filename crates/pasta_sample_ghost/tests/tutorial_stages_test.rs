@@ -206,7 +206,7 @@ return SHIORI.request({{ id = {id}, method = "get", version = 30, charset = "UTF
 }
 
 /// 204 では素通りさせないイベント。9 段目の OnChoiceSelectEx は Reference2（選択肢を出した
-/// シーンの名前）が登録名でなく、グローバル前方一致のフォールバックで `＊おやつの話` に届いて
+/// シーンの名前）が登録名でなく、グローバル前方一致のフォールバックで `＊本日のおすすめ` に届いて
 /// 200 になる。ジャンプ先が壊れると 204 に落ちて検査を素通りするので、ここだけ 200 と
 /// 空でない Value を必須にする（tasks.md Implementation Notes「3.2 で」）。
 const MUST_SPEAK: &[&str] = &["OnChoiceSelectEx"];
@@ -387,6 +387,30 @@ fn stage7_greeting_reads_reference_without_transfer() {
     assert!(
         response.starts_with("SHIORI/3.0 200 OK") && response.contains("むらさき"),
         "OnGhostChanged の応答に ＄ｒ０（むらさき）が出ていない:\n{response}"
+    );
+}
+
+/// 7 段目の `＊OnUpdateComplete` は、`＆＄ｒ０` の条件で Reference0 に合う場面だけを選ぶ。
+/// 条件が効かなければ 2 つの場面からの抽選になるので、繰り返して確かめる。
+#[test]
+fn stage7_update_complete_picks_scene_by_reference0() {
+    let rows = parse_stage_table(&read_stages_md());
+    let ghost = assemble_stage(&rows, 7);
+    let runtime = PastaLoader::load(ghost.path()).expect("stage 7: load failed");
+    let request = |r0: &str| shiori_request(&runtime, "OnUpdateComplete", &[(0, r0.to_string())]);
+    for (r0, line) in [("changed", "新装開店"), ("none", "請求書")] {
+        for _ in 0..8 {
+            let response = request(r0);
+            assert!(
+                response.contains(line),
+                "OnUpdateComplete（{r0}）の応答に「{line}」が無い:\n{response}"
+            );
+        }
+    }
+    let response = request("other");
+    assert!(
+        response.starts_with("SHIORI/3.0 204"),
+        "どの条件にも合わない OnUpdateComplete が 204 でない:\n{response}"
     );
 }
 

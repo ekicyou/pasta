@@ -3,8 +3,9 @@
 | やりたいこと | ファイル |
 | ------------ | -------- |
 | [まずゴーストを動かしてみる](#サンプルゴースト) | [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar) |
+| [自分のゴーストを作り始める](#スターター) | [`pasta-starter.nar`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-starter.nar) |
 | [自分のゴーストの `pasta.dll` を差し替える](#shiori-の本体) | [`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip) |
-| [VS Code を使わずに書く](#vs-code-を使わずに書くアプリ) | [`pasta-recipe.x64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.x64.zip)・[`pasta-recipe.arm64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.arm64.zip) |
+| [pasta-recipe で書く](#pasta-recipe) | [`pasta-recipe.x64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.x64.zip)・[`pasta-recipe.arm64.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-recipe.arm64.zip) |
 | [VS Code で書く](#vs-code-の拡張) | [Marketplace の拡張](https://marketplace.visualstudio.com/items?itemName=ekicyou.pasta-vscode)（VSIX は手動で入れるとき。[最新のリリース](https://github.com/ekicyou/pasta/releases/latest)の Assets にある） |
 | [辞書を検査する・.nar を作る](#検査の-cli) | [`pasta_check.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip) |
 | [AI に書かせる](#ai-向けのスキル) | [`pasta-skills.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-skills.zip) |
@@ -13,29 +14,38 @@
 
 ## サンプルゴースト
 
-`hello-pasta.nar` は、`pasta.dll` とシェルを含む完成版のゴースト一式である。SSP のウィンドウへドロップして入れる。自分のゴーストへ写す元にもなる。
+2 人の紹介と、できることの一覧は [サンプルゴースト hello-pasta](hello-pasta.md) にある。
+`hello-pasta.nar` は、`pasta.dll` とシェルを含む完成版のゴースト一式である。SSP に出ているゴーストの上へドロップして入れる。
 同梱の `pasta.dll` の版は、マニュアルの対象バージョンと同じである。
 hello-pasta は SSP のネットワーク更新に対応している（更新が届くのは、対応した版を入れた後から）。
-更新で変わったファイルは新しい版で上書きされ、hello-pasta の辞書や `pasta.toml` に手で入れた変更は消えることがあるので、自分のゴーストは hello-pasta を書き換えずに別に作る。
-詳しくは[前提環境と準備](getting-started/prerequisites.md)と[hello-pasta から写す](getting-started/setup.md#hello-pasta-から写す)を見る。
+更新で変わったファイルは新しい版で上書きされ、hello-pasta の辞書や `pasta.toml` に手で入れた変更は消えることがあるので、自分のゴーストは[スターター](#スターター)から作る。
+入れ方は[まず会ってみる](getting-started/hello.md)を見る。
+
+## スターター
+
+`pasta-starter.nar` は、自分のゴーストの出発点 `my-ghost` である。`pasta.dll`・シェル・最初の辞書 1 枚を含み、SSP に出ているゴーストの上へドロップして入れる。
+同梱の `pasta.dll` の版は、マニュアルの対象バージョンと同じである。
+ネットワーク更新はしないので、書いた辞書が元に戻ることは無い。
+入れ方は[自分のゴーストを始める](getting-started/setup.md)を見る。
 
 ## SHIORI の本体
 
 `pasta.dll.zip` は、`pasta.dll` とライセンス表示を含む。自分のゴーストの `ghost/master/` にある `pasta.dll` を、これで差し替える。
 マニュアルの対象バージョンと同じ版を使うこと。
-置き方は[hello-pasta から写す](getting-started/setup.md#hello-pasta-から写す)、対象バージョンは[このマニュアルが対象とするバージョン](introduction.md#このマニュアルが対象とするバージョン)を見る。
+置き場所は[ゴーストのフォルダ構成](getting-started/prerequisites.md#ゴーストのフォルダ構成)、対象バージョンは[このマニュアルが対象とするバージョン](introduction.md#このマニュアルが対象とするバージョン)を見る。
 
-## VS Code を使わずに書くアプリ
+## pasta-recipe
 
-pasta-recipe の zip は Windows の種類ごとに 2 つある。自分の Windows（x64 か arm64）に合うほうを選ぶ。
+pasta-recipe は、辞書を書いて、動いているゴーストでその場で鳴らす Windows 11 のアプリである。zip を展開して起動する。
+ふつうは x64 版を、ARM の PC では arm64 版を使う。
 使っている pasta と同じ版を使うこと。
-種類の見分け方と置き方は[入手と置き方](debug/recipe.md#入手と置き方)を見る。
+使い方は[pasta-recipe で書く](debug/recipe.md)を見る。
 
 ## VS Code の拡張
 
 通常は Marketplace から入れる。手動で入れるときは、最新のリリースのページの Assets にある `pasta-vscode-<版>.vsix` を使う。
 使っている pasta と同じ版を選ぶこと。
-詳しくは[VS Code の準備](debug/vscode-setup.md)を見る。
+使い方は[VS Code で書く](debug/vscode-setup.md)を見る。
 
 ## 検査の CLI
 

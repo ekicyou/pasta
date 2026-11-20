@@ -197,7 +197,7 @@ async function main() {
     const sceneWaits = waits.slice(waits.length - 20);
     assert.strictEqual(sceneWaits.reduce((a, b) => a + b, 0), 5000);
     const f = formatScene(o);
-    assert.match(f.notice ?? '', /台本を確かめられませんでした/);
+    assert.match(f.notice ?? '', /スクリプトを確かめられませんでした/);
   });
 
   await test('204: [debug] enabled hint plus only the OnPastaSceneAt: warn lines appended to pasta.log (4.10)', async () => {

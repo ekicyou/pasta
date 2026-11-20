@@ -51,9 +51,12 @@
 
 1. The 更新の置き場所 shall `https://ekicyou.github.io/pasta/hello-pasta/` とし、直下に `updates.txt` を、`ghost/master/`・`shell/master/` などを nar のフォルダ構造のままで置く。
 2. The 更新の置き場所の中身 shall 最新の GitHub Release の `hello-pasta.nar` を展開したものと、ファイルの一覧・内容とも同じである。
+   - 置き換わった: `hello-pasta-book-sync` で、`main` のリポジトリのファイルに nar にだけ在るファイルを重ねたものになった。
 3. The 更新の置き場所 shall `.dll`・`.pasta`・`.png`・`.txt`・`.toml`・`.csv` など nar に含まれる種類のファイルを、変換せずそのままの内容で返す。
 4. When 新しいリリースが公開される, the 更新の置き場所 shall 公開後に、その版の `hello-pasta.nar` の中身へ入れ替わる。
+   - 置き換わった: `hello-pasta-book-sync` で、nar の側だけが入れ替わり、辞書などは `main` への push で変わる。
 5. Where nar に `bal/`（同梱バルーン）が含まれる, the 更新の置き場所 shall `bal/` を含めて nar 全体を展開したものにし、除外の規則を持たない。（現在の hello-pasta は `bal/` を含まない。）
+   - 置き換わった: `hello-pasta-book-sync` で、リポジトリのファイルに nar にだけ在るファイルを重ね、`updates.txt`・`updates2.dau`・`developer_options.txt` は除外する。
 
 ### Requirement 2: ゴースト側の設定（`homeurl`）
 
@@ -73,8 +76,11 @@
 #### Acceptance Criteria
 
 1. When 置き場所の中身を作る, the マニュアル公開 CI shall 展開した各ファイルの md5 と大きさを、`updates.txt` の対応する行と照らす。
+   - 置き換わった: `hello-pasta-book-sync` で、重ねた一式を最新 Release の `pasta_check release` で検査し、`updates.txt` を作り直して照らす。
 2. If `updates.txt` の行が指すファイルが展開結果に無い、または md5・大きさが合わない, then the マニュアル公開 CI shall どのファイルが合わないかを表示して失敗し、公開しない。
+   - 置き換わった: `hello-pasta-book-sync` で、照らす相手は Release の nar の展開結果でなく、`pasta_check release` が重ねて作った nar になった。
 3. If 展開した `updates.txt` が無い、または読めない, then the マニュアル公開 CI shall 失敗し、公開しない。
+   - 置き換わった: `hello-pasta-book-sync` で、`updates.txt` は `pasta_check release` が作り直したものになった。
 4. While PR またはブランチで実行されている, the マニュアル公開 CI shall 公開を行わずに、置き場所の中身の作成と整合の検査までを実行する。
 5. The マニュアル公開 CI shall 置き場所の中身を、マニュアルの静的性・検索・コンテンツの検査の対象に入れず、それらの検査の後で公開物に足す。
 6. If マニュアルの検査または置き場所の整合の検査が失敗する, then the マニュアル公開 CI shall サイトを公開しない。
@@ -89,11 +95,13 @@
 1. When リリース CI が GitHub Release を公開する, the リリース CI shall マニュアル公開 CI を `main` で起動し、その完了を待つ。
 2. The 公開サイトへの公開 shall マニュアル公開 CI の 1 か所だけで行い、リリース CI は公開サイトへ直接公開しない。
 3. When 置き場所の更新と無関係なマニュアルの変更が `main` へ入り、マニュアルが再公開される, the マニュアル公開 CI shall その時点の最新 Release の `hello-pasta.nar` から置き場所の中身も作り直して公開し、置き場所をサイトから消さない。
+   - 置き換わった: `hello-pasta-book-sync` で、`main` のリポジトリのファイルに最新 Release の nar にだけ在るファイルを重ねて作り直す。
 4. If 最新の Release が無い、または最新の Release に `hello-pasta.nar` が無い、または取得できない、または取得した nar に `updates.txt` が無い, then the マニュアル公開 CI shall 失敗し、置き場所を欠いたサイトを公開しない。PR・ブランチでの実行でも同じく失敗にし、警告にとどめない。（欠いたままの公開は、すでに配られた利用者の更新確認を壊すので止める。再実行で直せる。）
 5. The リリース CI shall 置き場所を最新にするための追加の権限を、その処理を行うジョブにだけ最小限で与え、既存のジョブの権限を広げない。
 6. The マニュアル公開 CI shall 公開サイトの公開に必要な権限を、既存どおり公開を行うジョブにだけ与える。
 7. If マニュアル公開 CI の起動または完了の待ち合わせが失敗する, then the リリース CI shall 失敗を報告の表に出し、公開済みの Release の状態を変えない。
 8. While `homeurl` を足した版がまだ公開されていない, the マニュアル公開 CI shall 最新の Release の（前の版の）`hello-pasta.nar` を置き場所に置く。
+   - 置き換わった: `hello-pasta-book-sync` で、辞書などは `main` のもの、nar にだけ在るファイルは最新の Release のものを置く。
 
 ### Requirement 5: 公開後の検証と報告
 
@@ -102,8 +110,10 @@
 #### Acceptance Criteria
 
 1. When マニュアル公開 CI の公開が完了する, the リリース CI shall 実際の URL（`https://ekicyou.github.io/pasta/hello-pasta/updates.txt`）を取り、その Release の `hello-pasta.nar` が含む `updates.txt` と内容が同じであることを確かめる。
+   - 置き換わった: `hello-pasta-book-sync` で、`updates.txt` の nar の側の行だけを、Release の nar の `updates.txt` の行と md5・大きさで比べる見比べになった。
 2. The リリース CI shall 結果を、公開先ごとの結果を並べる報告の表に 1 行（置き場所）として加え、status と、失敗のときは reason を出す。
 3. If 実際の URL の `updates.txt` が Release 版と違う、または取れない, then the リリース CI shall 結果を `failed` として報告の表に出す。
+   - 置き換わった: `hello-pasta-book-sync` で、「違う」は nar の側の行の md5・大きさが Release の nar の `updates.txt` と合わないことになった。
 4. While 公開の反映が遅れている（公開サイトの配信に時間がかかる）, the リリース CI shall 一定の回数・時間の範囲で取り直してから結果を決める。回数・間隔・上限は設計で決める。見比べるのは `updates.txt` 1 本とし、全ファイルの md5 の取り直しは行わない（公開前に全ファイルを照合済みで、無変換配信の確認は実機確認 Requirement 10.4 で行う）。
 5. If 置き場所の更新が失敗する, then the リリース CI shall 他の公開先（crates.io・Marketplace・GitHub Release）の status を、その失敗で変えない。
 6. The 報告の表の置き場所の行 shall 他の公開先の行と同じ書式（公開先・status・reason）で並ぶ。
@@ -157,6 +167,7 @@
 4. The マニュアルのダウンロードのページ shall サンプルゴーストの節に、hello-pasta がネットワーク更新に対応していることを書く。
 5. The マニュアル shall 章立て・見た目を変えず、触れる範囲をダウンロードのページへの案内と、派生ゴーストの注意の 1 節に限る。
 6. The `crates/pasta_sample_ghost/RELEASE.md` shall ファイルを消す・改名する版を出すときは（SSP の更新が古いファイルを消さないため）別途検討することを 1 行で書く。
+   - 置き換わった: `hello-pasta-book-sync` の手順書の「hello-pasta の更新の置き場所」に、置き場所の作りの変更に合わせて書き直した。
 
 ### Requirement 10: 実機（SSP）での確認
 
