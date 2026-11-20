@@ -207,3 +207,51 @@
   - `[logging]` の `level`・`filter`・`PASTA_LOG` を変えたとき、`Debug enabled …` が pasta.log に残るかを実機かテストで確かめる。
   - 開発機の `PASTA_DEBUG=1` を外した状態での実機の確かめ（brief の申し送り。外さないと「無効にする」が必ず効かない）。
   - `tests/common/mod.rs` の `#[ctor]` を使う結合テストで、一時フォルダの `profile/pasta/save/save.toml`（と `obfuscate = true` の `.dat`）に `デバッグ = true` を置いて読み込みを確かめる形。
+
+## 9. 設計フェーズの記録（2026-11-21・kiro-spec-design）
+
+### 9.1 要約
+
+- **調べの種類**: 軽い調べ（Extension）。外の依存は増えない（Rust は `toml`・`tracing`、道具は今の `editors/shared/` の部品だけ）。Web の調べは行っていない。
+- **使ったスキル・決まり**: `kiro-spec-design` の `design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`・`design-principles.md`。`CLAUDE.md` のコメントの決まり（コードのコメントに spec・要件の番号を書かない）を設計の注に反映した。
+- **主な分かったこと**:
+  - 読み込みの終わりの印の target `pasta::load_entry`（`LOAD_ENTRY_TARGET`）は、`build_filter_from` が最後に `pasta::load_entry=info` の指示を足すので、`[logging]` の `level`・`filter`・`PASTA_LOG` のどれでも通る（`tracing_init.rs` の試験 `test_load_entry_info_passes_*`）。有効・無効の行をこの target で出せば、道具はログの設定に左右されずに読める（Req 5.4）。
+  - 有効・無効の行はローダ（アクターのスレッド・`LoadDirGuard` の中）で出るので、FFI の入口が出す印の行（`spawn_actor` の後）より必ず前に pasta.log に並ぶ。`reloadAndWait` は印で読むのを止めるので、印より前の行として拾える。
+  - `persistence::register` の場所の確かめ（絶対パス・`..`・根を断る）は `register` の中に直に書かれている。Phase 5.5 で同じ場所を読むには、この確かめを関数に出して両方から使うのが重ならない。
+  - `SceneOutcome` はどの種類も `reload: ReloadOutcome` を持つ。▶・「値を入れて実行」の後のボタンの向き（Req 7.4）は、そこから読める。
+  - VSCode のコマンドは `package.json` の `menus.commandPalette` を書いていないので、足したコマンドはそのままパレットに出る。右クリックに出さないには `editor/context` に足さないだけでよい（Req 6.1）。
+
+### 9.2 判断の時期（§4 の案 A を採る）
+
+- **Context**: §8 の 1。
+- **Alternatives**: 案 A（Rust が Phase 5.5 の前に読む）・案 B（Lua が起きた後へ移す）・案 C（読んだ表を Lua へ渡す）。
+- **Selected**: 案 A。`resolve_enabled` に「保存ファイルを読む閉包」を渡し、`PASTA_DEBUG` が読めないときだけ呼ぶ。読んだ `toml::Table` の根のキー `デバッグ`・`debug` だけを見る。
+- **Rationale**: 判断の時期・シーンマップの門・`@pasta_debug` の閉じ込め・Lua の起動順が変わらない。Req 1.9（前に下ろしたときに保存された値）と Req 3.2（読み込みの途中の書き換えは効かない）を、Lua を起こす前に読むことでそのまま満たす。`shiori4-v4-host` と重なる `factory.rs`・`module_registry.rs` に触れない。
+- **Trade-offs**: 保存ファイルを 2 回読む（`PASTA_DEBUG` で決まるときは 1 回）。保存ファイルは小さいので費用は小さい。壊れたファイルは Rust の側では黙って「書いていない」にし、退避と警告は今までどおり Lua の `load` に任せる。
+- **層**: `debug/config.rs` は `toml::Table` を受け取る純粋な関数のまま（ファイルを読まない）。ファイルを読むのはローダで、`runtime::persistence` の `load_from_file` と、新しく出す場所の関数を呼ぶ。
+
+### 9.3 道具が状態を読む手段（§5 の穴 1）
+
+- **Alternatives**:
+  1. 今の `Debug enabled …` の行だけを読み、無ければ無効 — `[logging] level = "warn"` などで行が消えると「無効」と誤る。採らない。
+  2. 印の行（`SHIORI load entry completed`）に `debug=true|false` の欄を足す — 印は `pasta_shiori` の FFI の入口（`windows.rs`・`v3.rs`）が出し、有効・無効はアクターの中のランタイムが知っている。アクターから入口へ値を運ぶ口（`spawn_actor` の戻り値・`ActorInstance`）を足すことになり、`pasta_shiori` の 3 ファイル以上に手が入る。
+  3. ローダが有効・無効のどちらでも 1 行を `LOAD_ENTRY_TARGET` で出す — 有効は今と同じ文（Req 3.3）、無効は新しい文 `Debug disabled: development events are refused`。`pasta_lua` の `loader/mod.rs` だけで済む。
+- **Selected**: 3（OPEN QUESTION 1 として設計のディスカッションへ）。
+- **Trade-offs**: 無効のゴーストの pasta.log にも、読み込みのたびに info の 1 行が増える（`level = "warn"` でも出る）。古い pasta.dll（この行を出さない）のゴーストでは、印はあるのに行が無いので「確かめられなかった」になる（Req 5.5 の向きに合う）。表示の target が `pasta_lua::loader` から `pasta::load_entry` に変わるので、`reference/pasta-toml.md` の pasta.log の例の行を直す。
+
+### 9.4 合成（design-synthesis）
+
+- **一般化**: 「読み込み直す操作の後の有効・無効」は、トグル・リロード・▶・「値を入れて実行」のどれも同じ `ReloadOutcome` から決まる。`debugStateOf(ReloadOutcome)` 1 つを置き、トグルの結果の文と recipe のボタンの向きの両方がそれを使う。
+- **作るか使うか**: 新しい依存は無い。保存ファイルの読みは `persistence::load_from_file`、書き込みは `setSaveVariable`、リロードは `reloadAndWait`、重なりの止め・見出し・保存は `DevSession` をそのまま使う。
+- **削ったもの**: トグル専用の `DevCommand` の工場（VSCode と recipe で包み方が違い、各 3 行で済む）、状態を持つ共有のクラス（状態を持つのは recipe だけ）、`pasta.toml` に戻す 3 つ目の操作（Req 5.12）、204 のときに `debug=false` を見て案内を変える分かれ（Req 8.1 は文の書き換えだけ）。
+
+### 9.5 設計で決めた小さなこと（推奨のまま。ディスカッションで確かめる）
+
+- `noResponse`（書き換えの頼みに応答が無い）は「頼めなかった」に入れ、リロードしない（OPEN QUESTION 2）。
+- 頼んだ状態と違うときの知らせは、読み込みの誤りの知らせより先に採る（OPEN QUESTION 3）。
+- recipe のボタンは、読み込み直しを頼んだ操作のあとは、頼めなかったときも含めて `debugStateOf` で改める（頼めなかったら「まだ確かめていない」と同じ向き）。トグルで書き込みを断られたときは改めない（OPEN QUESTION 4）。
+
+### 9.6 危うさ
+
+- `.claude/skills/*/references/` の作り直しは、ハーネスの分類器が `.claude/skills` の書き込みを断ることがある（メモリの記録）。断られたら回り道を探さず、作り直せた分と残りを開発者に示して許しを得る。
+- 開発機の `PASTA_DEBUG=1` を外さないと、実機の確かめで「無効にする」が必ず効かない（brief の申し送り）。自動テストは `#[ctor]` で中和済み。
