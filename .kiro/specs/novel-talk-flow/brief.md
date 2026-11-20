@@ -459,3 +459,11 @@ areka へ返す形: `\![parallel,1]\p[0]\s[12]\_w[200]\s[10]\_w[200]\s[12]\![par
 
 - **舞台の台詞の箱を押した時も、`OnMouseClick` が pasta に届く。** areka は、シェルの中の箱・舞台の箱のクリックを、今のまま SHIORI へ送る（areka が自分で使うのは、選択肢とアンカーの行だけ）。pasta は、拾わなかったクリックに、早送りの 1 本（並走）を返す。ふつうの吹き出しを押したら早送りになる動きは、areka が命令なしで足す（正典には無い動き。areka の `talk-fast-forward`）。
 - 高速再生が「入」の間は、主の 1 本の中の並走の区間も、待ちを飛ばして一度に配る。先頭に並走の印の在る 1 本は、速く進めない。
+
+## `shell-element-click` から引き継いだ物（2026-11-20）
+
+`shell-element-click` は、この spec に入れて閉じた（roadmap の「統合して閉じたもの（2026-11-20）」）。元の brief と暫定の設計は、このフォルダの `merged-shell-element-click/` に在る（経緯として読む。決定は、骨子とこの brief が正）。
+
+- 絵の中の当たり判定を押した時のイベント（`OnMouseClick`。Reference4 が当たり判定の名前）を受けるシーンの探し方を、この spec が持つ。今の場面のローカルシーンを先に探し、無ければグローバルを探す。条件（`＆＄ｒ４＝「ドア」`）で場面を選ぶ。
+- 選択肢の振り分け（`shiori/event/choice_select.lua`）を、関数として取り出す。`scene-anchor-link` と共有する。
+- シェルの側の決まり（当たり判定の名前の付け方）は、取り決め（`novel-areka-contract`）と見本（`hello-novel-sample`）に書く。

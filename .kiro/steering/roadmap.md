@@ -122,6 +122,10 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
 - `novel-variable-scope`（変数の保存の範囲を、セーブごとと全セーブ共通に書き分ける文法）— 2026-11-19 の discovery（ノベルゲームの深掘り）で閉じた（開発者の決定）。変数はローカルとグローバルの 2 種類のままにし、文法を足さない。**名前が「スロット」か `slot_` で始まるグローバル変数（`＄＊スロット好感度`）だけが、セーブのスロットに出し入れされ、ロードと巻き戻しで戻る。** ほかのグローバル変数は今のまま（終了しても残り、ロードしても戻らない。これが全セーブ共通の変数になる）。エンジン予約の `pasta_` で始まる名前も、戻らない側に入る。今のゴーストの辞書と `save.toml` は、そのまま動く。「スロット」は、作者向けの言葉としては初出である（マニュアルに無い。立ち位置の「スポット」と 1 字違い）。残った仕事（「スロット」で始まる変数を写し取る・表を取り替えずに戻す口。1〜2 タスク）は `novel-checkpoint-rollback` が持つ。2 つの頭は印が 2 種類あるだけで、`スロット好感度` と `slot_好感度` は別の変数である。英字の頭は下線まで含める。スロットの出し入れは、場面から呼ぶ関数で行う（`スロット保存`／`slot_save` など 4 つ。日本語と英字の名前を対で持つ。`novel-save-slots` の「決定（2026-11-19）」。開発者の決定）。保存できない値は `toml-serialization` の決まり（キーごとに外して警告）のままで、控えにも同じ物差しを当てる。スロットは `save.toml` の中の予約の表（仮に `pasta_slots`）に持ち、別ファイルを作らない。`スロット保存` のときだけ、その場で `save.toml` を書く（ほかの保存の時機は変えない）。スロットに入れる「続きの場所」は、何らかのマーキング文字列を保存するとだけ決め、中身はバックログの取り方と一緒に決める。旧 brief は git の `ecf45714` で読める。この roadmap と各 brief の古い節に残る `novel-variable-scope` は、この節と読み替える（文法・`element_gen.rs`・LSP・VSCode の着色とのファイルの重なりは無くなった）。
 
+### 統合して閉じたもの（2026-11-20）
+
+- `shell-element-click`（絵の中の当たり判定のクリックを、選択肢と同じ振り分けで場面へ届ける）— `novel-talk-flow` に入れて閉じた（開発者の承認。2026-11-19 の暫定設計の議論の議題 14）。暫定の設計に降りたら、中身のほとんど（今の場面のローカルシーンを先に探す・どのシーンも拾わないクリックは進める・画面の場面の決め方）が、`novel-talk-flow` と、今の条件の属性（`＆＄ｒ４＝「…」`）に吸収されていた。残る物（イベントのシーンを探す所を 1 つの関数にする・選択肢の振り分けを関数として取り出す）は、`novel-talk-flow` が持つ。元の brief と暫定の設計は、`.kiro/specs/novel-talk-flow/merged-shell-element-click/` に移した。
+
 ## 0.6.1 の範囲：時報の後のトーク時刻の直しと、祝日・行事の日時変数（2026-11-14 開発者の決定）
 
 不具合なので、即時の版（開発者「バグなので即時リリース版」）。spec は `onhour-talk-recount` と `date-var-calendar`（同じ日に開発者「版は0.6.1」）の 2 本（台帳の行にある）。2 本とも入ったら `/release 0.6.1`。
@@ -296,7 +300,7 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
   - `crates/pasta_lua/pasta_scripts/pasta/act.lua` は、1 つのウェーブに 1 つの spec だけが持つ。`cue-command-runtime`・`novel-talk-flow` が触る。Phase 11 の `scene-anchor-link`・`scene-exact-match` も触る。
   - 出力の組み立て（`pasta_scripts/pasta/shiori/sakura_builder.lua`）は、`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` が触る。`scene-anchor-link` も触る。690 行あり（2026-11-12。`actor-line-newlines` が行の継ぎ目を足した）、3 本が足すと 870〜1,000 行になる。`BUILDER.build` は込み入っているので、クリック待ちや `\x` の処理は、`actor_style.lua` のように別のモジュールに分ける。
   - 台詞の切り出し・自動ウェイト・budoux（`sakura_script/` の `tokenizer.rs`・`wait_inserter.rs`・`line_breaker.rs`）は、`novel-talk-flow` が触る（2026-10-23 の再測定では、`\x` で列を動かす `line_breaker.rs` の `column_move` だけ）。`scene-anchor-link` も、Rust の側を触るなら加わる。`line_breaker.rs` は 1,155 行だが、本体は 310 行までで、残りはファイルの中のテストである。テストを足す spec は `tests/sakura_script/` に置く。
-  - 選択肢の振り分け（`shiori/event/choice_select.lua`）は、`shell-element-click` と `scene-anchor-link` が共有する。先に入る側が、振り分けを関数として取り出す。
+  - 選択肢の振り分け（`shiori/event/choice_select.lua`）は、`novel-talk-flow`（2026-11-20 に `shell-element-click` を入れた）と `scene-anchor-link` が共有する。先に入る側が、振り分けを関数として取り出す。
   - 場面の関数を出すコード生成（`code_gen/scope_gen.rs`）は、`scene-attribute-store`・`cue-command-runtime`（2026-10-17 に `scene-stage-attributes` をまとめた）が触る。この順に置く。場面の関数の頭は `act:init_scene(SCENE, 書いたグローバル名, 書いたローカル名, 行の表)` で、行の表は最後の引数である（`runtime-error-balloon` が入れた。`transpiler.rs` の `fill_line_maps` が後から差し込む）。引数を足す spec は、この形を保つ。
   - `act.lua` は 857 行あり（2026-11-12）、1,000 行に近い。`cue-command-runtime`・`scene-exact-match`・`scene-anchor-link`・`novel-talk-flow` が足すので、足す側が分け方を考える。ト書きの新しい入口は、別のファイルに置く。
   - 変数の書き方（`grammar.pest`・`code_gen/element_gen.rs` の `save.x`）は、どの spec も触らない（2026-11-19 に `novel-variable-scope` を閉じた。文法を足さない）。
@@ -316,7 +320,6 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 | -- | ---- | -------- | ---- | ------------ |
 | 1 | novel-areka-contract | Opus | 6〜9（文書だけ） | なし。**0.7.0 のゴールの先頭**（areka の側が早く動けるよう、最初に始める） |
 | 4 | cue-command-runtime（ト書きと柱。2026-10-17 に `scene-stage-attributes` をまとめた） | Opus（2026-11-19 に Fable から替えた） | 17〜21（超えるならト書きと柱に分け直す） | `scene-attribute-store`（柱の分。2026-11-03 に入った）。語彙の名前は `novel-areka-contract` から引く |
-| 5 | shell-element-click（**2026-11-19: `novel-talk-flow` に入れて閉じる、と決まった。行とフォルダの片付けは、PR をまとめる時**） | Opus | 5〜8 | `novel-areka-contract`（完全一致の場面選びは `touch-poke-shortcuts` が入れてある）。`scene-anchor-link` とは `choice_select.lua` を共有する |
 | 6 | novel-talk-flow | Opus（2026-11-19 に Fable から替えた） | 17〜21（超えるなら出力の分と場面の流れの分に分ける） | `cue-command-runtime`、`novel-areka-contract` |
 | 8 | novel-checkpoint-rollback | Opus（2026-11-19 に Fable から替えた） | 14〜17 | `novel-talk-flow`（2026-11-19 に `novel-variable-scope` を閉じ、「スロット」で始まる変数を写し取る・戻す口をこちらが持つ） |
 | 9 | novel-save-slots | Opus | 8〜12 | `novel-checkpoint-rollback` |
@@ -392,7 +395,6 @@ Wave 3（見込み）リリース（0.6.0 の spec は 0 本）
 - [x] manual-download-page -- マニュアルに「ダウンロード」のページ（`book/src/download.md`）を足す。目次の「はじめに」の次と扉の案内の先頭に置き、「やりたいこと → 取るファイル」の表と各ファイルの短い説明にする。トップページ（`introduction.md`）は削り込み、「AI にゴーストを書かせるとき」をこのページへ移し、「このマニュアルの歩き方」を消す。ほかの章と README の入手の説明はこのページへのリンクに寄せる（2026-11-14 起票。方針は discovery の推奨案のまま開発者が承認）。版は未定。`pasta-dll-multiarch` と同じウェーブに置くなら、このページの節を持ち場分けする。Dependencies: none
 - [ ] novel-areka-contract -- pasta と areka の取り決め（さくらスクリプトに載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票）。Dependencies: none
 - [ ] cue-command-runtime -- キューコマンド行 `！命令＠対象（引数）` を、実行時に `\![…]` としてさくらスクリプトへ流す。日本語の名前の別名表、引数の穴（数字で始まる引数など）の手当て。柱に書いた `＆属性` とアクター指定行も、場面に入ったときにさくらスクリプトへ流す（受け継ぎと、Call から戻ったときの打ち直し）。2026-10-17 に `scene-stage-attributes` をまとめた。Dependencies: none（`scene-attribute-store` は入った）
-- [ ] shell-element-click -- エレメントのクリック（名前つき）を、選択肢と同じ振り分けで場面へ届ける。シェルとして組んだシステム画面を、場面が動かせるようにする。Dependencies: novel-areka-contract（`scene-anchor-link` と `choice_select.lua` を触る順番に注意）
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアル、`pasta_check validate` の飛び先の検査まで揃える（2026-10-08 起票）。版は未定。Dependencies: none（先に置いた `scene-condition-attributes` は 2026-11-05 に入った。`scene-exact-match` とは文法・`act.lua`・`choice_select.lua`・`references.rs` を共有するので、同じウェーブに置かない）
 - [ ] novel-talk-flow -- ノベル向けの出力に切り替える設定。台詞ごとのクリック待ち、話者名と声と変わらない行 ID、ランダムトークと時報の停止、起動時の場面、「次の場面へ」、完全一致の場面選びの切り替え（2026-10-21 に仕組みを `scene-exact-match` へ移した。こちらは設定を入れるだけ）。Dependencies: novel-areka-contract, cue-command-runtime, scene-exact-match
 - [ ] novel-checkpoint-rollback -- さくらスクリプトに目印の ID を埋め、演劇の 1 本ごとに、再生位置・変数・アクター状態を控える（さくらスクリプトは控えない）。ベースウェアが知らせた ID の時点へ戻す（「スロット」で始まるグローバル変数を写し取る・戻す口も持つ。2026-11-19 に `novel-variable-scope` を閉じた）。Dependencies: novel-talk-flow
