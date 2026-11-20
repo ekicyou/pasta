@@ -1,6 +1,6 @@
 # 設計レビュー: recipe-demo-video
 
-- 対象: `.kiro/specs/recipe-demo-video/design.md`（`requirements.md`・`research.md`・`direction.md` 13 節・steering と照合）
+- 対象: `.kiro/specs/completed/recipe-demo-video/design.md`（`requirements.md`・`research.md`・`direction.md` 13 節・steering と照合）
 - 実施日: 2026-11-15
 - 方式: kiro-validate-design（非対話。Analysis → Critical Issues → Strengths → GO/NO-GO）
 - 調べ方: 読み取りだけ。`editors/recipe/` のソース・`book/` の章と道具・`.github/workflows/`・Openscreen の道具の定義・プロジェクトのメモ（試験用の SSP の立て方）を読んだ。アプリは動かしていない。録画も試験の実行もしていない。

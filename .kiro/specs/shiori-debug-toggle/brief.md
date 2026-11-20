@@ -108,3 +108,15 @@ discovery の議案（2026-11-19 開発者が推奨案で承認）:
 - ゴーストが返したさくらスクリプトの呼び名を「台本」から「スクリプト」に改めた。エディタの文言（`editors/shared/runSceneAtCursor.ts` の `NO_SCRIPT_GUIDE` ほか）も「スクリプト」になっている。`DEBUG_HINT` を直すときは同じ語にそろえる。
 - hello-pasta と入門用のスターター（`pasta-starter.nar`・`my-ghost`）は、`pasta.toml` に `[debug] enabled = true` を入れて配る。入門は、配る前に 14 段目で `false` にする手順である。トグルを足すなら、入門の「▶ が効かないとき」（`getting-started/01-boot.md`・`debug/recipe.md` の「3 手で最初の ▶」）と 14 段目の手順も見直す。
 - 実機で分かったこと: 開発者の機械には環境変数 `PASTA_DEBUG=1` が入っているので、`[debug] enabled` だけの効き目は実機で見られなかった。この spec の確かめでは環境変数を外して立てる。
+
+## 2026-11-20 棚卸の再測定（main 58aba27c）
+
+- **前提の変化**: 起票（2026-11-19）の後、持ち場のファイルは動いていない。brief の事実は main と合う: `DEBUG_HINT` は `editors/shared/ghostFiles.ts` 67 行（使うのは `dumpVariables.ts` 60・63 行と `runSceneAtCursor.ts` 96 行、試験は `flows.test.ts` 184・244・259 行）。判断は `pasta_lua/src/debug/config.rs`（69 行）の `resolve_enabled` で、呼ぶのは `loader/mod.rs`（337 行）228 行の Phase 5.5、「Debug enabled …」の行は 253 行。シーンマップは `runtime/factory.rs`（199 行）58 行の引数で渡り、`@pasta_debug.enabled()` はその有無を返す（`runtime/module_registry.rs` 203〜251 行・`exec.rs` 48 行の `debug_enabled`）。保存変数は、Lua の `pasta/save.lua` が最初の `require` で `@pasta_persistence.load()` から読む（Phase 5.5 より後）。
+- **触るファイル**: `debug/config.rs`・`loader/mod.rs`・`runtime/factory.rs`・要れば `module_registry.rs`（Rust の側で保存を先に読むなら `runtime/persistence.rs` の読み出しを呼ぶだけ）。`editors/shared/` の新しいトグルの流れと試験（`ghostFiles.ts` 220・`reloadShiori.ts` 141・`dumpVariables.ts` 115・`flows.test.ts`）。`editors/vscode/package.json`（249）・`src/devCommands.ts`（142）。`editors/recipe/src/devActions.ts`（252。リロードは 46〜49 行）・`devPanels.ts`（159）。マニュアルの `debug/index.md`（「デバッグの有効化」63 行）・`dev-actions.md`・`recipe.md`（「3 手で最初の ▶」11 行）・`troubleshooting.md`、入門の `01-boot.md`（「うまくいかないときは」62 行）・`14-nar.md`（42 行の `enabled = false`）、スキルの references。1,000 行に近いものは無い。
+- **規模**: 12〜15。
+- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `shiori4-v4-host`（下回りの口を `module_registry.rs`・`factory.rs` に足すなら）。`pasta.tmLanguage.json` を触る `scene-anchor-link`・`scene-exact-match`・`cue-command-runtime`・`novel-talk-flow` とは、別のファイル。`debug/validate.md` を触る `novel-save-slots` とは、同じ部の別の章。
+- **フェーズ**: ノベルではない。
+- **種別**: 機能（開発者「グローバル変数「デバッグ」に true を設定する方法も」が起票の元）。
+- **要件定義のモデル**: Opus（判断の時期を Lua が起きた後へ移すのは、内側の作りの選び方。優先の順・型・英語名は、推奨のまま承認済み）。
+- **分割の案**: 要らない。
+- **見つけた穴・古くなった記述**: 申し送りの「入門の『▶ が効かないとき』（`getting-started/01-boot.md`）」は、今の見出しでは「うまくいかないときは」（62 行）。`loader/mod.rs` 219 行のコメントの「(task 4.4)」と、`module_registry.rs` 203 行の「（scene-play-event 2.1/4.1/4.2）」は、タスクの番号と spec の名前を指している（直すなら `/comment-cleanup`）。

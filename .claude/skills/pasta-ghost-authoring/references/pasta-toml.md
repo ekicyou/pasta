@@ -897,7 +897,7 @@ enabled = true
 - `enabled` は、SHIORI の読み込みのたびに読み直す。ベースウェアを起動し直さなくても、リロードで有効・無効が切り替わる。
 - 環境変数 `PASTA_DEBUG` が設定されていると、`enabled` より優先される。`1`・`true`・`yes`・`on` で有効、`0`・`false`・`no`・`off`・空の文字列で無効になる（大文字・小文字と前後の空白は区別しない）。それ以外の値は、設定されていないのと同じに扱う。
 - `[debug]` で読まれるキーは `enabled` だけである。ほかのキーは読み飛ばす。
-- 有効化の手順は [デバッグ概要](https://ekicyou.github.io/pasta/debug/index.html#pastatoml-による有効化) を参照する。
+- 有効化の手順は [編集ツールとデバッグの概要](https://ekicyou.github.io/pasta/debug/index.html#pastatoml-による有効化) を参照する。
 
 ---
 

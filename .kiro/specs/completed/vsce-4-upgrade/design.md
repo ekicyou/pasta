@@ -110,7 +110,7 @@ graph TB
 
 - `editors/vscode/package.json` — 241 行 `"@vscode/vsce": "^3.0.0"` → `"^4.1.1"`。他の行は変えない（要件 1.1・1.5・1.6）
 - `editors/vscode/package-lock.json` — `npm install --save-dev @vscode/vsce@^4.1.1` で作り直す。差分は vsce の配下だけ（測った結果: 消える 174・増える 17・版が変わる 3 = `@vscode/vsce`・`parse5`・`entities`）（要件 1.1・1.6）
-- `.kiro/specs/vsce-4-upgrade/research.md` — VSIX の比べの結果・`npm audit` の結果と残る勧告の理由・手元の `show` の結果・公開の道の確かめの記録（11 節の表）を書く（要件 1.4・2.3・4.3・4.6）
+- `.kiro/specs/completed/vsce-4-upgrade/research.md` — VSIX の比べの結果・`npm audit` の結果と残る勧告の理由・手元の `show` の結果・公開の道の確かめの記録（11 節の表）を書く（要件 1.4・2.3・4.3・4.6）
 - `.kiro/steering/roadmap.md` — 完了のとき、`vsce-4-upgrade` の項（10・206・210・343・350・352・382 行あたり）を「版の決まっていないもの」「依存の更新」から完了へ移す（要件 6.3）
 
 ### 条件つきで触るファイル（今の測りでは触らない）

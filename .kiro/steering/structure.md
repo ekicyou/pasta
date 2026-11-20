@@ -215,7 +215,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── lib.rs              # テスト用モジュールの宣言だけ
 │       │   └── scripts.rs          # ghosts/hello-pasta 辞書(.pasta)の検証テスト
 │       ├── ghosts/           # サンプルゴースト本体（SSOT・配布物一式）
-│       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/NN-*.pasta 12 段/install/shell/master の立ち絵 18 枚・surfaces.txt)＋生成物(dll/ライセンス表示/scripts は .gitignore 済み)
+│       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/NN-*.pasta 13 段/calendar.csv/install/shell/master の立ち絵 18 枚・surfaces.txt)＋生成物(dll/ライセンス表示/scripts は .gitignore 済み)
 │       └── tests/            # 統合テスト・配布ファイル構成検証・全段階の検証（tutorial_stages_test.rs）・立ち絵と当たり判定の検証（shell_assets_test.rs）
 ├── editors/                  # エディタ拡張
 │   ├── shared/              # 拡張とアプリの共有の実行の流れ（vscode・Node・Tauri を読み込まない・"type": "module"）。ghostIO（入出力の面の型）・mcpClient・ghostFiles・reloadShiori・runSceneAtCursor・dumpVariables・devSession（相手の覚えと選び・重なりの止め・見出し・保存の手順）と、偽の入出力 fakeGhostIO による *.test.ts（アプリの npm test が拾う）
@@ -247,7 +247,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   ├── AUTHORING.md         # マニュアルの執筆規約（第 8 節は入門ガイドの章の決まり・画像の行）
 │   ├── SCREENSHOTS.md       # 入門ガイドの絵の撮影の手順の記録（撮る環境・16 枚の一覧・後片付け・撮り直す決まり。手作業で撮る）
 │   ├── package.json         # book ツールの npm 依存（vscode-textmate/oniguruma/jsdom・lockfile コミット・node_modules 非コミット）
-│   ├── src/                 # 章ソース（grammar/lua/getting-started/reference/debug）
+│   ├── src/                 # 章ソース（入口の introduction・download・hello-pasta と getting-started/grammar/lua/debug/reference/internals/notes）
 │   │   ├── img/claudia/     # 台詞部品の顔アイコン 16 枚＋LICENSE.txt（ponapalt/claudia・Unlicense）
 │   │   ├── img/getting-started/ # 入門ガイドの絵 16 枚（実機の SSP で写した PNG。撮り方は SCREENSHOTS.md）
 │   │   └── internals/       # 内部設計パート（コントリビュータ向け・末尾パート）

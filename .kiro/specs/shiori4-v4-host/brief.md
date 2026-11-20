@@ -196,13 +196,14 @@ shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shio
 - キックの経路は消えた。`spawn_actor_thread_with` の引数は `(load_dir, rx, claim)` の 3 つになり、スレッドは既定の `PastaShiori` と既定の `RuntimeConfig` を使う。`RuntimeConfig` に残る欄は `libs`・`scene_aliases` だけ（`kick_sink`・`debug` は無い）。版 4 の口で `RuntimeConfig` に差し込みを足すなら、ここから足す。
 - `ActorMsg` は Get・Notify・Stop の 3 つだけ。参照先は `.kiro/specs/completed/debug-mcp-runtime/design.md` の Revalidation Triggers。
 
-## 2026-11-12 棚卸の再測定（main 2381bf52）
+## 2026-11-20 棚卸の再測定（main 58aba27c）
 
-- **前提の変化**（前回 2026-11-03・`c575febd` から）: `debug-mcp-runtime` が入った（#233）。キックの道は `actor/` と `shiori.rs` から消え、上の申し送り（`debug-mcp-runtime` より）は main と合っている。`actor/instance.rs` は 271・`mailbox.rs` は 332・`thread.rs` は 263 行に縮んだ。`v3.rs`（207 行）の読み込みのログは `pasta_lua::logging::LOAD_ENTRY_TARGET` を的にした（どのフィルターでも通る info。試験は新しい `tests/v3_load_entry_log_test.rs`）。`shiori_get_api` は 25 行、版 4 が NULL の試験は 185〜190 行、`hinst` に 0 を渡すのは `shiori.rs` 247 行。`act:get_property` は `shiori/act.lua` 322 行（`actor-line-newlines` が `_line_newlines` を足してずれた）。`GET_TIMEOUT`（`marshaling.rs` 559 行）・`build.yml`・`res.lua`・`tests/shiori4_v3_entry_test.rs` は動いていない。#251 は `src/windows_tests.rs` の leak probe の試験に `lock_global_state` を取らせただけで、持ち場に掛からない。
-- **触るファイル**: `actor/{instance,thread,mailbox,marshaling,lifecycle,teardown,module_ref}.rs`（271・263・332・559・190・144・123 行）、`v3.rs` か隣の新しい版 4 の口、`shiori.rs`（338）、`lua_request.rs`（151）・`util/parsers/{req_parser.pest,req_parser.rs}`（51・456）・`error.rs`（388）・`pasta_lua/pasta_scripts/pasta/shiori/res.lua`（154）、`pasta_lua` の下回りの口、`.github/workflows/build.yml`（225。版 4 の 1 往復）・`tests/shiori4_v3_entry_test.rs`（283。版 4 が NULL の試験）。1,000 行に近いものは無い。
+- **前提の変化**（前回 2026-11-12・`2381bf52` から）: `pasta_shiori/src` は動いていない（`actor/`・`v3.rs`・`shiori.rs`・`lua_request.rs`・`error.rs`・`util/parsers/`、`marshaling.rs` 71 行の `GET_TIMEOUT`）。`res.lua` もそのまま。周りだけ動いた: `shiori/act.lua` は 386 行で、`get_property` は 333 行。`build.yml` は 411 行（job `recipe`・arm64 の 2 本・`vscode-test` が増えた）で、版 3 の 1 往復は 66〜80 行（x64）と 121〜129 行（Linux・macOS）。
+- **ノベルとの関係**: ノベルの骨子（2026-11-19）は SHIORI とさくらスクリプトのまま作り、areka はさくらスクリプトのプレイヤーのまま（2026-11-20 の決定）。版 4 に頼るノベルの spec は無い。この spec も、ノベルの spec に依らない。ノベルと同じ版に置く理由は無くなったので、版は単独で決められる。
+- **触るファイル**: 前回のまま（`actor/{instance,thread,mailbox,marshaling,lifecycle,teardown,module_ref}.rs`・`v3.rs` か隣の版 4 の口・`shiori.rs`・`lua_request.rs`・`util/parsers/`・`error.rs`・`res.lua`・`pasta_lua` の下回りの口・`build.yml`・`tests/shiori4_v3_entry_test.rs`）。1,000 行に近いものは無い。
 - **規模**: 14〜17 のまま。
-- **先に要るもの**: 働きの上では実機の areka v0.2.0 だけ。ファイルの重なり（未完了）: `novel-checkpoint-rollback`・`novel-areka-contract`（`marshaling.rs`）、`novel-save-slots`・`novel-variable-scope`（`actor/lifecycle.rs`）、`pasta-dll-multiarch`・`pasta-recipe`（`build.yml`）。`debug-mcp-runtime` は入ったので外れた。
-- **種別**: 機能（版 4 に本格対応。開発者の方針）。
-- **要件定義のモデル**: Opus のまま（スレッドと ABI の決まりは shiori4 の正本が決めていて、`req.version` を入口の印に変える案も 1 つに絞れている）。
-- **分割の案**: 要らない。20 を超えるなら、中の表現の作り直しを先の spec に分ける（前のまま）。
-- **見つけた穴・古くなった記述**: 版 4 の口の読み込みのログも `LOAD_ENTRY_TARGET` を的にする（`entry = "v4"`。しないとログのフィルターで消える）。前から残るもの: Current State の「`shiori4-v3-portable` が入れる（予定）」・基準の `c360adb2`・「キックは…次の要求の応答で台本を出す（`actor/thread.rs` の KICK）」は古い（入った・消えた）。Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`（完了。芯の型）が無い。旧来の口で SHIORI/2.x の開始行を受け続けるかは残る議題（`classify_request` の `Shiori2`）。roadmap の台帳の行の「キックの即時化」は対象が無い。
+- **先に要るもの**: 働きの上では、実機の areka v0.2.0 だけ（前回のまま）。ファイルの重なり（未完了）: `pasta-dll-multiarch`（`build.yml`。arm64 の行や版 4 の 1 往復を足すとき）、`shiori-debug-toggle`（下回りの口を `pasta_lua` の `runtime/module_registry.rs`・`factory.rs` に足すなら。あちらはデバッグの判断の時期を動かす）。前回の `novel-checkpoint-rollback`・`novel-areka-contract`（`marshaling.rs`）は、どちらも 5 秒を引くだけで直さない（暫定設計）ので、重ならない。`novel-save-slots`（`actor/lifecycle.rs`）も外れた（あちらの暫定設計は `pasta_lua` の `runtime/lifecycle.rs` も触らない）。`novel-variable-scope` は閉じた。
+- **種別**: 機能（版 4 に本格対応する。開発者の方針）。
+- **要件定義のモデル**: Opus のまま（スレッドと ABI の決まりは shiori4 の正本が決めていて、`req.version` を入口の印にする案も 1 つに絞れている）。
+- **分割の案**: 要らない（20 を超えるなら、中の表現の作り直しを先の spec に分ける。前のまま）。
+- **見つけた穴・古くなった記述**: ステータスの行の「0.5.0（ノベルゲームと同じリリース）」と、roadmap の台帳の「ノベルゲームと同じリリース」は、上の理由で根拠が無い。前回から残るもの: 版 4 の口の読み込みのログも `LOAD_ENTRY_TARGET` を的にする。Current State の「`shiori4-v3-portable` が入れる（予定）」・基準の `c360adb2`・キックの行は古い。Adjacent に `shiori4-v3-portable`（完了。芯の型）が無い。旧来の口で SHIORI/2.x の開始行を受け続けるかは、残る議題。台帳の「キックの即時化」は対象が無い。

@@ -1,6 +1,6 @@
 # 設計検証レポート: onhour-talk-recount
 
-- 対象: `.kiro/specs/onhour-talk-recount/design.md`（requirements.md・research.md・steering と突き合わせ）
+- 対象: `.kiro/specs/completed/onhour-talk-recount/design.md`（requirements.md・research.md・steering と突き合わせ）
 - 実施: 2026-11-14（kiro-validate-design・非対話）
 - 照合したコード: `crates/pasta_lua/pasta_scripts/pasta/shiori/clock.lua`・`event/virtual_dispatcher.lua`・`event/init.lua`・`event/boot.lua`・`event/second_change.lua`・`pasta/scene.lua`、テスト `virtual_dispatcher_spec.lua`（L978〜991）・`virtual_clock_test.lua`（L383〜445）・`event_clock_hook_test.lua`・`reg_handler_chain_test.lua`、マニュアル `book/src/lua/shiori-events.md`（L117〜119・L1436〜1447）・`book/src/internals/shiori.md`（L505・L530）
 

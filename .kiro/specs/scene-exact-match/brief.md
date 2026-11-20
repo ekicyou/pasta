@@ -157,20 +157,19 @@
 - 選んだ後に `take_pick_warning()` を読み、順番の有る・無いの混ざりや番号の重なりで戻ったときは `pasta_lua::search` の warn を出す（`search/context.rs` の `warn_pick_fallback`）。新しい入口を足すなら、ここも呼ぶ。
 - 参照: `.kiro/specs/completed/scene-pick-modes/design.md`（SceneTable・Finalize・SearchContext の節）。
 
-## 2026-11-12 棚卸の再測定（main 2381bf52）
-
-- **前提の変化**: `scene-condition-attributes`（#237）と `scene-pick-modes`（#238）が入り、上の 2 つの申し送りは main と合っている。完全一致の部品は残っている（`scene_table.rs` の `resolve_scene_id_exact` 205 行は述語 `cond` を受ける・控えのキーの `exact` 44 行・`resolve_global_owning_local_exact` 246 行・`select_from_cache` 299 行・`take_pick_warning` 499 行。`search/context.rs` の `search_scene_exact` 153 行・`search_scene_where(…, exact, cond)` 166 行・`search_local_scene_exact` 289 行・`warn_pick_fallback` 356 行）。Lua の検索の道は `act.lua` の `search_dictionary` 367 行・`find_act_handler` 396 行（`unmet` でも次の段へ進む）・`ACT_IMPL.call` 725 行、`scene.lua` の `SCENE.search` 182 行（act の `var`・`save` を渡す）・`co_exec` 238 行・`co_exec_exact` 284 行・`co_exec_registered` 297 行。イベントの受け口は今も前方一致（`init.lua` 224 行の `EVENT.no_entry` → `SCENE.co_exec(act, act.req.id, nil, nil)`。ほかに `virtual_dispatcher.lua` 136 行・`mouse.lua` 128 行・`choice_select.lua` 28 行の `＊OnChoiceSelectEx`）。`[scene]` の読み取りは今も `alias` だけ（`sections.rs` 303 行）。`＞＞` は今も構文エラー（`call_marker` 52 行・`call_scene` 183 行）。「イベント名で始まる名前のシーンも候補」は `lua/shiori-events.md` 1223 行。
-- **触るファイル**: `grammar.pest` 285・`parse_action.rs` 499・`ast/action.rs` 371・`element_gen.rs` 570、`act.lua` 857、`scene.lua` 305、`init.lua` 351、`virtual_dispatcher.lua` 315、`choice_select.lua` 73、`mouse.lua` 176、`OnPastaCallFunction` をモードに従わせるなら `external_control.lua` 131、`loader/config/`（`mod.rs` 359・`sections.rs` 324）、英大文字の規則をシーン表で作るなら `scene_table.rs` 538 と `search/context.rs` 1,155（1,000 行を超えている。試験は別のファイルに置く）、`visit_action.rs` 463、VSCode の文法定義 408（Call の規則は 218 行）、`validate/references.rs` 197、マニュアル 3 章。
-- **規模**: 9〜11 タスクのまま。
-- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `scene-anchor-link`（文法・`parse_action.rs`・`element_gen.rs`・`act.lua`・`choice_select.lua`・`references.rs`・VSCode の文法定義）、`shell-element-click`（`choice_select.lua`・`init.lua`・`scene.lua`）、`cue-command-runtime`（`act.lua`・`loader/config/`・文法）、`novel-variable-scope`（文法・`element_gen.rs`・`virtual_dispatcher.lua`）、`novel-talk-flow`（`act.lua`・`scene.lua`・`init.lua`・`virtual_dispatcher.lua`・`mouse.lua`・`loader/config/`）、`novel-checkpoint-rollback`（`init.lua`・`virtual_dispatcher.lua`）。属性の 3 本・`scene-count`・`debug-mcp-runtime` は入ったので外れた。
-- **種別**: 機能（`＞＞` とモードの設定が無い）。ghost_dev の聞き取りから、開発者が承認して広げた。
-- **要件定義のモデル**: Opus（前のまま。残る問い（検査の知らせ・完全一致のモードでの 9 段目・別名の置き換えとの順・`シーン数` を合わせるか・`OnPastaCallFunction`）は互いに絡まず、それぞれ推奨を付けられる）。
-- **分割の案**: 不要。
-- **見つけた穴・古くなった記述**
-  - 英大文字の続きの規則は、条件の述語（`CondFn`。`SceneInfo` を受ける）に混ぜない。述語で落とすと、`＊OnInstallCompleteAll` しか無いときに「名前が無い」でなく `unmet`（条件漏れ）になり、Call の道では止まるエラー（`SCENE_UNMET`）の扱いに入る。候補を集める段で外し、外した並びには別の `SceneCacheKey` を使う（今の鍵は 名前・`exact`・持ち主のローカル だけなので、同じ `OnInstallComplete` の `＞` と受け口の並びが混ざる）。
-  - 「Current State」の行番号と「使っているのはデバッグのキックと撫で・つつきの 1〜8 段目だけ」は古い。完全一致の今の使い手は、撫で・つつき（`mouse.lua` 120 行）・`OnPastaScene`（`scene_play.lua` 110 行）・チェイントーク中断（`init.lua` 189 行）。
-  - 前回から残る: 「Approach」2 の「今の 5 段」は 4 つしか挙げていない（1 段目の「実行中のシーンの表の完全一致」が抜けている）。`＞＞` に要るのは 2 段目と 5 段目の完全一致で、`search_scene_where(…, exact = true, cond)` を通せば条件・`＆優先`・`＆重み`・`＆順番` まで揃う。`OnPastaScene`・`OnPastaSceneAt` は既定のハンドラが常にあるので、英大文字の規則の例にならない。撫で・つつきの「止めている間は、つつきは 9 段目だけ」も、完全一致のモードでの 9 段目の論点に含める。
-
 ## 申し送り（onhour-talk-recount より、2026-11-15）
 
 - **前方一致で探すイベントの入口が 1 つ増えた**: 新しい `event/sys_resume.lua` 19 行の `SCENE.co_exec(act, act.req.id, nil, nil)`（`REG.OnSysResume` の既定。`＊OnSysResume` や `GLOBAL.OnSysResume` を探す）。完全一致・モードを入口に従わせるなら、ここも数える。`virtual_dispatcher.lua` は 335 行になった（時報の候補と OnTalk を探す `create_scene_thread` は今も前方一致）。
+
+## 2026-11-20 棚卸の再測定（main 58aba27c）
+
+- **前提の変化**: この spec のソースは、ほぼ動いていない。`act.lua`（857 行）・文法・`element_gen.rs`・`choice_select.lua`・`loader/config/`・`references.rs` は前回のまま。`onhour-talk-recount` で、前方一致で探す入口に `event/sys_resume.lua` 19 行が増え（上の申し送り）、`init.lua` は 352 行で、`EVENT.no_entry` の `SCENE.co_exec` は 225 行に動いた。`virtual_dispatcher.lua` は 335 行（OnTalk と時報を探す `create_scene_thread` 130 行は今も前方一致）。`date-var-calendar` が触ったのは `shiori/act.lua`（日時の転記）で、`act.lua` ではない。`shell-element-click` は `novel-talk-flow` に入り、`novel-variable-scope` は閉じた。
+- **触るファイル**: 文法 `grammar.pest` 285・`parse_action.rs`・`ast/action.rs`・`element_gen.rs` 570、`act.lua` 857（`find_act_handler` 396 行・`ACT_IMPL.call` 725 行）、`scene.lua` 305、イベントの入口（`init.lua` 225 行・`boot.lua` 19 行・`recommend.lua` 281 行・`sys_resume.lua` 19 行・`virtual_dispatcher.lua` 137 行・`choice_select.lua` 28 行・`mouse.lua` 128 行）、`OnPastaCallFunction` をモードに従わせるなら `external_control.lua`、`loader/config/`（`sections.rs` 303 行の `[scene]` は今も `alias` だけ）、英大文字の規則をシーン表で作るなら `scene_table.rs` 538・`search/context.rs` 1,155（試験は別のファイル）、`visit_action.rs`、VSCode の文法定義、`validate/references.rs` 197、マニュアル 3 章。
+- **規模**: 9〜11 のまま（入口が増えても、モードの反映のタスクに入る）。
+- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `scene-anchor-link`（文法・`act.lua`・`choice_select.lua`・`references.rs`・VSCode の文法定義）、`cue-command-runtime`（`grammar.pest`・`act.lua`・`loader/config/`・VSCode の文法定義）、`novel-talk-flow`（文法・`act.lua`・`scene.lua`・`init.lua`・`virtual_dispatcher.lua`・`mouse.lua`・`choice_select.lua`・`search/context.rs`・`references.rs`）、`novel-checkpoint-rollback`（`init.lua`・`virtual_dispatcher.lua`）。
+- **`cue-command-runtime` とは同じウェーブに置けない**: `act.lua`（1 ウェーブに 1 本）・`grammar.pest`・`loader/config/`・VSCode の文法定義を共有する。`＞＞` は `act:call` の道を通すので、`act.lua` を触らずには作れない。並べられるのは、文書だけの `novel-areka-contract` のように、`act.lua` と文法を触らない spec。
+- **フェーズ**: ノベルの spec ではない（今の SSP で全部動く）。`novel-talk-flow` より先に入れば、演劇の `OnMouseClick` の受け口が `＊OnMouseClickEx` を拾わない（英大文字の規則）。
+- **種別**: 機能（`＞＞` とモードの設定が無い）。ghost_dev の聞き取りから、開発者が承認して広げた。
+- **要件定義のモデル**: Opus（前のまま。残る問いは互いに絡まず、それぞれ推奨を付けられる）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: 前回の入口の一覧から、`boot.lua` 19 行（`REG.OnBoot` の既定）と `recommend.lua` 281 行（選んだ項目が無いときの前方一致）が漏れていた。「Current State」の `shiori-events.md` L635 の文は、今 1262 行。前回から残る: 英大文字の続きの規則は、条件の述語（`CondFn`）に混ぜない（`＊OnInstallCompleteAll` しか無いと `unmet` になり、Call の道で止まるエラーになる。候補を集める段で外し、外した並びには別の `SceneCacheKey` を使う）。「Approach」2 の「今の 5 段」は 4 つしか挙げていない（1 段目の「実行中のシーンの表の完全一致」が抜けている）。「Current State」の「使っているのはデバッグのキックと撫で・つつきの 1〜8 段目だけ」は古い（今は撫で・つつき・`OnPastaScene`・チェイントーク中断・おすすめメニュー）。`OnPastaScene`・`OnPastaSceneAt` は既定のハンドラが常にあるので、英大文字の規則の例にならない。
