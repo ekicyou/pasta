@@ -47,14 +47,14 @@
 
 ### Allowed Dependencies
 
-- Rust: `loader/mod.rs` → `debug::resolve_enabled`（純粋）・`runtime::persistence::{load_from_file, save_file_path}`・`logging::LOAD_ENTRY_TARGET`。`debug/config.rs` は `toml` と `tracing` だけを使い、ファイルも Lua も触らない。
+- Rust: `loader/mod.rs` → `debug::resolve_enabled`（純粋）・`runtime::persistence::{load_from_file, save_file_path}`・`logging::DEBUG_STATE_TARGET`。`debug/config.rs` は `toml` と `tracing` だけを使い、ファイルも Lua も触らない。
 - 道具: `debugToggle.ts` → `dumpVariables.ts`（`setSaveVariable`・`formatSet`）・`reloadShiori.ts`（`reloadAndWait`・`formatReload`）・`devSession.ts`（`Report` の型）。`vscode/src/devCommands.ts`・`recipe/src/devActions.ts` → `debugToggle.ts`。共有のモジュールは vscode・Tauri に触らない。
 - 依存の向き（左が下）: `ghostFiles` → `reloadShiori` → `dumpVariables` → `debugToggle` → `devCommands`（VSCode）／`devActions` → `main.ts`（recipe）。逆向きの import は違反とする。
 
 ### Revalidation Triggers
 
 - 有効・無効の 2 つの行の文か target を変える（道具の `debugDecision` が読めなくなる）。
-- `LOAD_ENTRY_TARGET` がログの設定に左右されるようになる。
+- `DEBUG_STATE_TARGET`（`pasta::debug_state`）か `LOAD_ENTRY_TARGET` が、ログの設定に左右されるようになる。
 - 保存ファイルの場所の決まり（`[persistence]`・`effective_file_path`・`save_file_path`）か書式を変える。
 - グローバル変数の保存の時期（ランタイムの Drop）か、リロードで古いランタイムを先に落とす順を変える（「書く → リロード → 読む」が崩れる）。
 - `ReloadOutcome` の形を変える（▶・リロード・トグル・recipe のボタンが使う）。
@@ -67,7 +67,7 @@
 - 判断は `crates/pasta_lua/src/debug/config.rs` の `resolve_enabled(file)`（中は純粋な `pick(env, file)`）1 か所で、ローダの Phase 5.5 が 1 回だけ呼ぶ。真のときだけ `build_source_map` を呼び、`Some(SourceMap)` をランタイムへ渡す。`runtime.debug_enabled()` は `source_map.is_some()`。
 - グローバル変数は Lua の `pasta/save.lua` が最初の `require` で `@pasta_persistence.load()` から読む（Phase 5.5 より後）。保存はランタイムの Drop。リロードは古いランタイムを先に落として（保存してから）新しく読み込む。
 - 道具の読み込み直しは `reloadAndWait` が pasta.log を印 `SHIORI load entry completed … loaded=…` まで読み、ERROR・WARN を集める。info の行は捨てている。
-- 印の target `pasta::load_entry` は、`build_filter_from` が最後に足す指示によって、`[logging]` の `level`・`filter`・`PASTA_LOG` のどれでも info が通る。
+- 印の target `pasta::load_entry` は、`build_filter_from` が最後に足す指示によって、`[logging]` の `level`・`filter`・`PASTA_LOG` のどれでも info が通る。判断の行には専用の target `pasta::debug_state`（`DEBUG_STATE_TARGET`）を新しく置き、同じ仕組みで必ず通す。印の target には相乗りしない（名前と中身を合わせ、「印の行だけ」に絞られても判断の行が黙って消えないようにする）。
 
 ### Architecture Pattern & Boundary Map
 
@@ -77,7 +77,7 @@ graph TB
         Loader[loader mod Phase 5.5]
         Resolve[debug config resolve_enabled]
         Persist[runtime persistence load_from_file save_file_path]
-        Log[pasta log LOAD_ENTRY_TARGET]
+        Log[logging DEBUG_STATE_TARGET]
     end
     subgraph editors_shared
         GhostFiles[ghostFiles debugDecision DEBUG_HINT]
@@ -132,7 +132,9 @@ editors/shared/
 Rust:
 - `crates/pasta_lua/src/debug/config.rs` — `resolve_enabled` に保存ファイルの表を返す閉包を足す。純粋な `decide(env, save, file)` と `save_switch(doc)`（`デバッグ` → `debug`・真偽値だけ・見た名前の警告）。表の単体テスト。
 - `crates/pasta_lua/src/debug/mod.rs` — 入口の doc comment を 4 段に直す。
-- `crates/pasta_lua/src/loader/mod.rs` — Phase 5.5 で保存ファイルを読む閉包を渡す。有効・無効の 1 行を `LOAD_ENTRY_TARGET` で出す（無効の文を足す）。Phase 5.5 のコメントの task 番号・要件番号を消す。
+- `crates/pasta_lua/src/loader/mod.rs` — Phase 5.5 で保存ファイルを読む閉包を渡す。有効・無効の 1 行を `DEBUG_STATE_TARGET` で出す（無効の文を足す）。Phase 5.5 のコメントの task 番号・要件番号を消す。
+- `crates/pasta_lua/src/logging/tracing_init.rs` — `pub const DEBUG_STATE_TARGET: &str = "pasta::debug_state"` を置き、`build_filter_from` の最後に足す指示に `{DEBUG_STATE_TARGET}=info` を加える（`LOAD_ENTRY_TARGET` と並べる）。`level = "warn"`・`PASTA_LOG`・作者の `pasta::debug_state=off` でも info が通る試験を、今の `LOAD_ENTRY_TARGET` の試験に並べて足す。
+- `crates/pasta_lua/src/logging/mod.rs` — `DEBUG_STATE_TARGET` を `pub use` に足す。
 - `crates/pasta_lua/src/runtime/persistence.rs` — `register` の中の場所の確かめを `pub(crate) fn save_file_path(config, base_dir)` に出し、`register` とローダの両方が使う。振る舞いは変えない。
 - `crates/pasta_lua/src/loader/config/sections.rs` — `DebugFileConfig` の doc comment の優先の順を 4 段に直す。
 
@@ -185,7 +187,7 @@ sequenceDiagram
     Session-->>Author: 出力の欄に見出しと結果 知らせ
 ```
 
-- 書き込みが `set` のときだけリロードする（5.7）。`noResponse` も「頼めなかった」に入れる（**仮定**。OPEN QUESTION 2）。
+- 書き込みが `set` のときだけリロードする（5.7）。`noResponse` も「頼めなかった」に入れる（届いたか分からないまま読み込み直すと、結果の理由が読めなくなるため）。
 - 状態は `debugStateOf(reload)` で決める。頼んだ状態と違えば警告の知らせ（5.6）。
 
 ### 読み込みのときの判断（Phase 5.5）
@@ -217,7 +219,7 @@ stateDiagram-v2
     ShowEnable --> ShowEnable: 別のゴーストを開いた
 ```
 
-- 「読み込み直しの後」は、トグル（書けてリロードを頼んだとき）・「SHIORI をリロード」・▶・「値を入れて実行」の 4 つ（7.4）。リロードを頼めなかったときも `debugStateOf` が `unconfirmed` を返すので「有効にする」へ戻る（**仮定**。OPEN QUESTION 4）。
+- 「読み込み直しの後」は、トグル（書けてリロードを頼んだとき）・「SHIORI をリロード」・▶・「値を入れて実行」の 4 つ（7.4）。リロードを頼めなかったときも `debugStateOf` が `unconfirmed` を返すので「有効にする」へ戻る（確かめていない状態を確かめたように見せない）。トグルの書き込みを断られたときは何も読み込んでいないので、向きを改めない。
 - 操作の間に別のゴーストを開いていたら、前のゴーストの結果で向きを改めない（今の `#readTable` と同じ守り）。
 - 「別のゴーストを開いた」は、確かめたゴーストと今のゴーストの master が違うこと。切り替えの途中の `setGhost(null)` や、開けずに同じゴーストへ戻ったことでは戻さない。
 - 開いたときに前の pasta.log から状態を読まない（7.3）。
@@ -242,7 +244,7 @@ stateDiagram-v2
 | 4.2 | `OnPastaSetSaveVariable` を変えない | （触らない） | — | — |
 | 5.1・5.2 | 有効・無効にする流れ | DebugToggleFlow | `toggleDebug`・`formatToggle` | トグルの流れ |
 | 5.3 | 書くのは `デバッグ` だけ | DebugToggleFlow | `DEBUG_SAVE_NAME` | 同上 |
-| 5.4 | ログの設定に左右されずに読む | LoaderPhase55・ReloadDebugField | `LOAD_ENTRY_TARGET`・`debugDecision` | 同上 |
+| 5.4 | ログの設定に左右されずに読む | LoaderPhase55・ReloadDebugField | `DEBUG_STATE_TARGET`・`debugDecision` | 同上 |
 | 5.5 | 読めなければ「確かめられなかった」 | DebugToggleFlow | `debugStateOf` | 同上 |
 | 5.6 | 頼んだ状態と違えば警告・`PASTA_DEBUG` を名指し | DebugToggleFlow | `mismatchNotice` | 同上 |
 | 5.7 | 書き込みを断られたらリロードしない | DebugToggleFlow | `ToggleOutcome.notWritten`・`formatSet` | 同上 |
@@ -320,7 +322,7 @@ pub(super) const SAVE_SWITCH_NAMES: [&str; 2] = ["デバッグ", "debug"];
 
 - Preconditions: なし（どの表でも動く）。
 - Postconditions: `save_switch` が `Some(b)` を返すのは、見た順で最初の真偽値のキーがあるときだけ。
-- 警告の文（**仮定**。OPEN QUESTION 5）: `warn!(name = "＄＊デバッグ", value_type = "string", "save variable is not a boolean; ignored when deciding debug")` の形で、名前に `＄＊` を付けて出す。`value_type` は `toml::Value::type_str()`。
+- 警告の文（pasta.log の今の文に合わせて英語）: `warn!(name = "＄＊デバッグ", value_type = "string", "save variable is not a boolean; ignored when deciding debug")` の形で、名前に `＄＊` を付けて出す。`value_type` は `toml::Value::type_str()`。
 
 **Implementation Notes**
 - 単体テスト（10.1・10.2）: `decide` の表（`env` が `Some(true)`・`Some(false)`・`None` × 保存の段 `Some(true)`・`Some(false)`・`None` × `file` の 3 つ）と、`save_switch` の表（`デバッグ`・`debug` のそれぞれが `true`・`false`・無い・真偽値でない（`"true"`・`1`）の 16 通り）。`decide` に渡す閉包が `env` が `Some` のときに呼ばれないことも確かめる。環境変数を読まないので開発機の `PASTA_DEBUG` に左右されない。
@@ -337,12 +339,12 @@ pub(super) const SAVE_SWITCH_NAMES: [&str; 2] = ["デバッグ", "debug"];
 - 閉包の中身: `config.persistence().unwrap_or_default()` と `loader_context.base_dir` から `save_file_path` で場所を決め、`load_from_file` で読む。場所が不正・無い・読めない・TOML でないは、どれも `None`（何も出さない。退避と警告は後で Lua の `load` が今までどおり行う）。
 - 読む時期は今の Phase 5.5（Lua のランタイムを作る前）。`main.lua` やシーンが読み込みの途中で `SAVE.デバッグ` を書いても、その読み込みの判断には効かない（1.9・3.2）。
 - 真のときだけ `build_source_map` を呼ぶ今の門は変えない（3.4・4.1）。
-- ランタイムを作った後、`LOAD_ENTRY_TARGET` で次のどちらか 1 行を出す（5.4）。
+- ランタイムを作った後、`DEBUG_STATE_TARGET`（`pasta::debug_state`）で次のどちらか 1 行を出す（5.4）。
 
 | 状態 | 行の文 | 備考 |
 |------|--------|------|
-| 有効 | `Debug enabled: development events are allowed` | 今の文のまま（3.3）。target は `pasta_lua::loader` から `pasta::load_entry` に変わる |
-| 無効 | `Debug disabled: development events are refused` | 新しい行（**仮定**。OPEN QUESTION 1） |
+| 有効 | `Debug enabled: development events are allowed` | 今の文のまま（3.3）。target は `pasta_lua::loader` から `pasta::debug_state` に変わる |
+| 無効 | `Debug disabled: development events are refused` | 新しい行。無効のゴーストの pasta.log にも読み込みごとに 1 行増える |
 
 - この行はアクターのスレッドの `LoadDirGuard` の中で出るので、FFI の入口が出す印の行より前に pasta.log に並ぶ。
 
@@ -455,10 +457,10 @@ export function formatToggle(enable: boolean, outcome: ToggleOutcome): Report;
 |------|-------|--------|---------|
 | `notWritten` | `formatSet(DEBUG_SAVE_NAME, change, set)` の行 | `formatSet` の知らせ | `set.kind === 'failed'` なら `set.result` |
 | `reloaded`・頼んだ状態 | `formatSet` の成功の行 ＋ `formatReload` の行 ＋ 状態の行 | `formatReload` の知らせ（誤りがあれば） | — |
-| `reloaded`・頼んだ状態と違う | 同上 ＋ 違いの文 | 違いの文（読み込みの誤りの知らせより先。**仮定**。OPEN QUESTION 3） | — |
+| `reloaded`・頼んだ状態と違う | 同上 ＋ 違いの文 | 違いの文（読み込みの誤りの知らせより先。頼んだことの成否をいちばんに知らせる。誤りの数は行に出る） | — |
 | `reloaded`・`unconfirmed` | 同上 ＋ 未確認の行 | `formatReload` の知らせ、無ければ未確認の文 | `reload.kind === 'refused'` なら `reload.result` |
 
-状態の行と知らせの文（**仮定**。OPEN QUESTION 6）:
+状態の行と知らせの文:
 
 | 名前 | 文 |
 |------|----|
@@ -479,7 +481,7 @@ export function formatToggle(enable: boolean, outcome: ToggleOutcome): Report;
 | Intent | 無効なときの案内を `pasta.toml` の書き換えからトグルへ向ける |
 | Requirements | 8.1, 8.2 |
 
-新しい文（**仮定**。OPEN QUESTION 6）:
+新しい文:
 
 | 定数 | 新しい文 |
 |------|----------|
@@ -564,6 +566,7 @@ class DevActions {
 - `save_switch` の表: `デバッグ`・`debug` のそれぞれ `true`・`false`・無い・真偽値でない の 16 通り（1.1〜1.5・1.8・10.1）。`Debug`・`DEBUG`・`dbg` は見ない。
 - `save_switch` は `"true"`・`1` を読み替えない（2.5）。
 - `save_file_path` は今の `register` と同じ形（絶対パス・`..`）を断る。
+- `tracing_init.rs`: `pasta::debug_state` の info が、`level = "warn"`・`PASTA_LOG`・作者の `pasta::debug_state=off` のどれでも通る（今の `LOAD_ENTRY_TARGET` の試験と並べる。5.4）。
 
 ### Integration Tests（Rust）
 
@@ -609,9 +612,9 @@ class DevActions {
 | `debug/recipe.md` | 「3 手で最初の ▶」を `pasta.toml` の書き足しからボタンへ。ツールバーの表にボタン | 9.6 |
 | `debug/vscode-setup.md` | `pasta.toml` に 2 行の手順をコマンドへ。「3 つのコマンドの出る場所」の数と、2 つはパレットだけであること | 9.6 |
 | `debug/troubleshooting.md` | 案内の文の表と引用を新しい文に。トグルが効かないときの理由（`PASTA_DEBUG`・保存できない状態・差し替え・書き戻し・場所）。優先の順 | 9.6 |
-| `reference/pasta-toml.md` | `[debug]` の優先の 1 文を 4 段に。pasta.log の例の行の target を `pasta::load_entry` に。`[logging]` の「絞っても出る行」に有効・無効の行を足す | 9.6 |
+| `reference/pasta-toml.md` | `[debug]` の優先の 1 文を 4 段に。pasta.log の例の行の target を `pasta::debug_state` に。`[logging]` の「絞っても出る行」に有効・無効の行（`pasta::debug_state`）を足す | 9.6 |
 | `lua/shiori-events.md` | 開発用のイベントの共通の決まり（有効にする口に保存変数を足す）。外の道具の `reload` の待ち方の節に、印の前に有効・無効の行が出ること | 9.6 |
-| `internals/logging-encoding.md` | `pasta::load_entry` の target で出る行に、ローダの有効・無効の行を足す | 9.6（ローダの章に付く内部の説明） |
+| `internals/logging-encoding.md` | 絞りを越えて必ず通る target に `pasta::debug_state`（ローダの有効・無効の行）を足す | 9.6（ローダの章に付く内部の説明） |
 | `internals/debug.md` | 有効化の判定の 4 段・`decide`・`save_switch`・Phase 5.5 で保存ファイルを読むこと・2 つの行の target。テストの環境 | 9.6 |
 | `internals/loader.md` | 5.5 の要否の判定に保存変数を足す | 9.6 |
 | `getting-started/01-boot.md` | 「うまくいかないときは」に、▶ が断られたときのトグルの案内 | 9.6・9.7 |
@@ -621,12 +624,12 @@ class DevActions {
 - マニュアルを直したら、同じ変更で `node book/tools/gen-skill-refs.mjs` を走らせ、スキルの `references/` を作り直す（9.9。CI の `--check` が鮮度を照合する）。
 - `editors/vscode/README.md` の開発支援コマンドの数と名前も直す（マニュアルの外だが、同じ文の取り残しを作らない）。
 
-## OPEN QUESTIONS（設計のディスカッションで決める）
+## 設計の決定（2026-11-21 の設計ディスカッションで確定）
 
-1. **有効・無効の読み方**: ローダが有効の今の文と、無効の新しい文 `Debug disabled: development events are refused` を、`pasta::load_entry` の target で出す（仮定）。別の案は、印の行 `SHIORI load entry completed` に `debug=true|false` の欄を足すこと（`pasta_shiori` の入口へアクターから値を運ぶ口が要る）。仮定の案では、無効のゴーストの pasta.log にも読み込みごとに 1 行増え、表示の target が変わる。
-2. **`noResponse` の扱い**: 書き換えの頼みに応答が無いときは「頼めなかった」に入れ、リロードしない（仮定）。
-3. **知らせの先後**: 頼んだ状態と違うときの知らせを、読み込みの誤りの知らせより先に採る（仮定）。誤りの数は行に出る。
-4. **recipe のボタンとリロードの失敗**: 読み込み直しを頼んだ操作の後は、頼めなかったときも含めて改める（頼めなければ「有効にする」の向き）。トグルで書き込みを断られたときは改めない（仮定）。
-5. **警告の文**: `save variable is not a boolean; ignored when deciding debug` に `name`（`＄＊デバッグ`・`＄＊debug`）と `value_type` の欄を付ける（仮定）。pasta.log の今の文に合わせて英語。
-6. **道具の文**: 状態の行・違いの文・`DEBUG_HINT`・`NO_SCRIPT_GUIDE` の新しい文（DebugToggleFlow・HintTexts の表の文。仮定）。
-7. **場所の確かめの切り出し**: `persistence::register` の中の場所の確かめを `save_file_path` に出して、ローダと共有する（仮定）。保存の仕組みの振る舞いは変えないが、`persistence.rs` に手が入る。
+1. **判断の行の出し方**: 有効の今の文と無効の新しい文 `Debug disabled: development events are refused` を、専用の target `pasta::debug_state`（`DEBUG_STATE_TARGET`）で出す。`build_filter_from` が `LOAD_ENTRY_TARGET` と同じく必ず通し、`tracing_init.rs` の試験で守る。印の target への相乗り（名前と中身が食い違う）と、印の行に `debug=` の欄を足す案（`pasta_shiori` へ値を運ぶ口が要る）は採らない。無効のゴーストの pasta.log にも読み込みごとに 1 行増える。
+2. **`noResponse` の扱い**: 書き換えの頼みに応答が無いときは「頼めなかった」に入れ、リロードしない。
+3. **知らせの先後**: 頼んだ状態と違うときの知らせを、読み込みの誤りの知らせより先に採る。誤りの数は行に出る。
+4. **recipe のボタンとリロードの失敗**: 読み込み直しを頼んだ操作の後は、頼めなかったときも含めて改める（頼めなければ「有効にする」の向き）。トグルで書き込みを断られたときは改めない。
+5. **警告の文**: `save variable is not a boolean; ignored when deciding debug` に `name`（`＄＊デバッグ`・`＄＊debug`）と `value_type` の欄を付ける。pasta.log の今の文に合わせて英語。
+6. **道具の文**: 状態の行・違いの文・`DEBUG_HINT`・`NO_SCRIPT_GUIDE` は DebugToggleFlow・HintTexts の表の文のとおり。
+7. **場所の確かめの切り出し**: `persistence::register` の中の場所の確かめを `save_file_path` に出して、ローダと共有する。保存の仕組みの振る舞いは変えない（ローダが Lua と違うファイルを読む事故を作りの上で起こさない）。

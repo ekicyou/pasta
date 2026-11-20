@@ -255,3 +255,17 @@
 
 - `.claude/skills/*/references/` の作り直しは、ハーネスの分類器が `.claude/skills` の書き込みを断ることがある（メモリの記録）。断られたら回り道を探さず、作り直せた分と残りを開発者に示して許しを得る。
 - 開発機の `PASTA_DEBUG=1` を外さないと、実機の確かめで「無効にする」が必ず効かない（brief の申し送り）。自動テストは `#[ctor]` で中和済み。
+
+## 10. 設計ディスカッションの決定（2026-11-21）
+
+設計の議題 7 件は、開発者がすべて推奨案で承認した。
+
+- **判断の行の target（§9.3 を改める）**: 選んだのは §9.3 の案 3 の変形で、ローダが有効・無効のどちらでも 1 行を出し、target は専用の `pasta::debug_state`（`DEBUG_STATE_TARGET`）とする。`build_filter_from` が `LOAD_ENTRY_TARGET` と同じく必ず通し、`tracing_init.rs` の試験で `level = "warn"`・`PASTA_LOG`・作者の `=off` を守る。
+  - 理由: `pasta::load_entry` は、コードの説明・`pasta_shiori` の試験・マニュアルの `[logging]` で「読み込み完了の印の target」と書かれている（設計の検証の指摘 1）。相乗りすると名前と中身が食い違い、後で「印の行だけ」に絞られたとき、道具が黙って「確かめられなかった」に落ちる。専用の target なら、足す物は定数 1 つと指示 1 行で済み、`pasta_shiori` にも触れない。
+  - 表示の target は `pasta_lua::loader` から `pasta::debug_state` に変わる。`reference/pasta-toml.md` の pasta.log の例の行と、`internals/logging-encoding.md` の「必ず通る target」を直す。
+- **§9.5 の 3 件**: 推奨のまま確定した。
+  - `noResponse` は「頼めなかった」に入れる。
+  - 違いの知らせは誤りの知らせより先に出す。
+  - recipe は、読み込み直しを頼んだ後は改め、書き込みを断られたときは改めない。
+- **警告の文・道具の文**: design.md の表のとおり確定した。警告は英語で、`name` と `value_type` の欄を付ける。
+- **`save_file_path` の切り出し**: 確定した。場所の確かめを 1 か所にし、ローダが Lua と違うファイルを読む事故を作りの上で防ぐ。
