@@ -77,7 +77,7 @@ PASTA_DEBUG ＞ ＄＊デバッグ／＄＊debug ＞ pasta.toml の [debug] enab
 6. When SHIORI を読み込み、`PASTA_DEBUG` が読める値で設定されている, the pasta shall `PASTA_DEBUG` の値で決め、保存変数と `pasta.toml` の値には左右されない。
 7. The pasta shall 優先の順を `PASTA_DEBUG` ＞ `＄＊デバッグ`／`＄＊debug` ＞ `pasta.toml` の `[debug] enabled` ＞ 無効、の 4 段とする。
 8. The pasta shall 判断に `＄＊デバッグ` と `＄＊debug` の 2 つの名前だけを見て、ほかの名前（`Debug`・`DEBUG`・`dbg` など）は見ない。
-9. The pasta shall 判断に、シーンから `＄＊デバッグ`（Lua では `SAVE.デバッグ`）として見える値と同じもの、つまり前に SHIORI を下ろしたときに保存されて読み込みで戻る値を使う。
+9. The pasta shall 判断に、前に SHIORI を下ろしたときに保存された値（シーンからは `＄＊デバッグ`、Lua では `SAVE.デバッグ` として見える値）を使う。読み込みの途中（`main.lua` やシーン）で書き換えた値は、その読み込みの判断に使わない。
 
 ### Requirement 2: 真偽値でない値の扱い
 
@@ -108,7 +108,7 @@ PASTA_DEBUG ＞ ＄＊デバッグ／＄＊debug ＞ pasta.toml の [debug] enab
 
 #### Acceptance Criteria
 
-1. When 保存変数でデバッグが有効になった, the pasta shall `PASTA_DEBUG` か `pasta.toml` で有効にしたときと同じ働き（開発用のイベントと、127.0.0.1 だけで受ける待ち受け）だけを有効にする。
+1. When 保存変数でデバッグが有効になった, the pasta shall `PASTA_DEBUG` か `pasta.toml` で有効にしたときと同じ働き（開発用のイベント `OnPastaScene`・`OnPastaSceneAt`・`OnPastaDumpVariables`）だけを有効にし、待ち受けなど外からの新しい口を開かない。
 2. The pasta shall `OnPastaSetSaveVariable` の振る舞い（いつでも効くこと、型と応答）を変えない。
 
 ### Requirement 5: 道具のトグルの共通の流れ
@@ -120,8 +120,8 @@ PASTA_DEBUG ＞ ＄＊デバッグ／＄＊debug ＞ pasta.toml の [debug] enab
 1. When 作者が「SHIORI デバッグを有効にする」を選んだ, the 開発の道具 shall `＄＊デバッグ` に真偽値の `true` を書き、続けて SHIORI をリロードし、読み込みの後の有効・無効を結果に出す。
 2. When 作者が「SHIORI デバッグを無効にする」を選んだ, the 開発の道具 shall `＄＊デバッグ` に真偽値の `false` を書き（変数を消すのではない）、続けて SHIORI をリロードし、読み込みの後の有効・無効を結果に出す。
 3. The 開発の道具 shall 書くのを `＄＊デバッグ` だけにし、`＄＊debug` は書きも消しもしない。
-4. When リロードの後の読み込みが終わり、その読み込みで `Debug enabled: development events are allowed` の行が出た, the 開発の道具 shall デバッグが有効になったと結果に出す。
-5. When リロードの後の読み込みが終わり、その読み込みで `Debug enabled …` の行が出なかった, the 開発の道具 shall デバッグが無効になったと結果に出す。
+4. When リロードの後の読み込みが終わった, the 開発の道具 shall その読み込みで有効・無効のどちらに決まったかを、pasta.log のログの設定（`[logging]` の `level`・`filter`、環境変数 `PASTA_LOG`）に左右されずに読み取り、結果に出す。
+5. If 読み込みは終わったが有効・無効を読み取れなかった, the 開発の道具 shall 「無効になった」とは出さず、有効・無効は確かめられなかったと出す。
 6. If 読み込みの後の状態が頼んだ状態と違う, the 開発の道具 shall 効かなかったことと、より優先の環境変数 `PASTA_DEBUG` で決まっている見込みがあることを、知らせとして出す。〔仮定: OPEN QUESTION 4〕
 7. If 保存変数の書き込みをゴーストが断ったか、頼めなかった, the 開発の道具 shall リロードをせず、今の「保存変数の書き換え」と同じ理由の文を出す。
 8. If リロードを頼めなかったか、読み込みの終わりを確かめられなかったか、読み込みが失敗した, the 開発の道具 shall 今の「SHIORI をリロード」と同じ要約を出し、有効・無効は確かめられなかったと出す。
@@ -148,7 +148,7 @@ PASTA_DEBUG ＞ ＄＊デバッグ／＄＊debug ＞ pasta.toml の [debug] enab
 1. The pasta-recipe shall 「SHIORI をリロード」の隣に、デバッグのトグルのボタンを 1 つ置く。
 2. While 最後に確かめた状態が有効である, the pasta-recipe shall ボタンを「SHIORI デバッグを無効にする」として示し、押すと Requirement 5 の無効にする流れを行う。
 3. While 最後に確かめた状態が無効であるか、まだ確かめていない, the pasta-recipe shall ボタンを「SHIORI デバッグを有効にする」として示し、押すと Requirement 5 の有効にする流れを行う。〔仮定: OPEN QUESTION 3〕
-4. When トグルか「SHIORI をリロード」で読み込みの後の状態を確かめた, the pasta-recipe shall ボタンの示し方を、確かめた状態に合わせて改める。
+4. When トグル・「SHIORI をリロード」・▶・「値を入れて実行」など、読み込み直す操作で読み込みの後の状態を確かめた, the pasta-recipe shall ボタンの示し方を、確かめた状態に合わせて改める。
 5. When 別のゴーストを開いた, the pasta-recipe shall 状態を「まだ確かめていない」に戻す。〔仮定: OPEN QUESTION 3〕
 6. When ボタンを押した, the pasta-recipe shall 結果を、ほかの開発の操作と同じ出力の欄に出す。
 
@@ -158,7 +158,7 @@ PASTA_DEBUG ＞ ＄＊デバッグ／＄＊debug ＞ pasta.toml の [debug] enab
 
 #### Acceptance Criteria
 
-1. When デバッグが無効なゴーストにシーンの再生か保存変数の表示を頼んで断られた, the 開発の道具 shall `pasta.toml` の書き換えでなく、「SHIORI デバッグを有効にする」の操作を案内する。
+1. When デバッグが無効なゴーストにシーンの再生か保存変数の表示を頼んで断られたか、シーンの再生でスクリプトが返らなかった（204）, the 開発の道具 shall `pasta.toml` の書き換えでなく、「SHIORI デバッグを有効にする」の操作を案内する（`DEBUG_HINT` と `NO_SCRIPT_GUIDE` の 2 つの文）。204 のときは、デバッグ以外の理由を確かめる道も今までどおり示す。
 2. The 開発の道具 shall 案内の文を VSCode 拡張と pasta-recipe で同じにし、ゴーストが返したさくらスクリプトを今のエディタの文言と同じく「スクリプト」と呼ぶ。
 
 ### Requirement 9: マニュアルとスキルの参照
@@ -171,8 +171,8 @@ PASTA_DEBUG ＞ ＄＊デバッグ／＄＊debug ＞ pasta.toml の [debug] enab
 2. The マニュアル shall 「デバッグの有効化」に、道具のトグル（VSCode 拡張の 2 つのコマンドと、pasta-recipe のボタン）の使い方を載せる。
 3. The マニュアル shall 優先の順を 4 段（`PASTA_DEBUG` ＞ `＄＊デバッグ`／`＄＊debug` ＞ `[debug] enabled` ＞ 無効）に直す。
 4. The マニュアル shall 「`debug` という名前は pasta のものとして読む」ことを 1 行書く。
-5. The マニュアル shall 保存変数はゴーストの `profile/` に保存されて配布物に入らないこと、一度入れると消すまで次の起動からも効き続けること、`pasta.toml` の設定へ戻すには変数を消せばよいことを書く。
-6. The マニュアル shall トグルに触れる章（デバッグの部の「▶・リロード・保存変数」「pasta-recipe で書く」「うまく動かないとき」、入門の 1 段目の「うまくいかないときは」と 14 段目の「デバッグを切る」）を、トグルと 4 段の優先の順に合わせて直す。〔仮定: OPEN QUESTION 5〕
+5. The マニュアル shall 保存変数は既定の場所ではゴーストの `profile/` に保存されて配布物に入らないこと、一度入れると消すまで次の起動からも効き続けること、`pasta.toml` の設定へ戻すには変数を消せばよいことを書く。
+6. The マニュアル shall デバッグの有効化か優先の順に触れる章を、トグルと 4 段の優先の順に合わせて直す。対象は、デバッグの部の「編集ツールとデバッグの概要」（章の表の操作の数を含む）・「▶・リロード・保存変数」（操作の表を含む）・「pasta-recipe で書く」・「VS Code で書く」（コマンドの数と出る場所を含む）・「うまく動かないとき」、リファレンスの `pasta.toml` の `[debug]`、Lua の SHIORI イベントの開発用のイベントの共通の決まり、内部の章のデバッグとローダ、入門の 1 段目の「うまくいかないときは」と 14 段目の「デバッグを切る」。〔仮定: OPEN QUESTION 5〕
 7. When マニュアルを直した, the マニュアルの作り手 shall 同じ変更で、スキルの `references/` を作り直す。
 
 ### Requirement 10: 自動テスト
@@ -183,4 +183,4 @@ PASTA_DEBUG ＞ ＄＊デバッグ／＄＊debug ＞ pasta.toml の [debug] enab
 
 1. The pasta の自動テスト shall `＄＊デバッグ` と `＄＊debug` のそれぞれが `true`・`false`・無い・真偽値でない、の組み合わせを表で確かめ、`PASTA_DEBUG` と `[debug] enabled` との優先の順も確かめる。
 2. The pasta の自動テスト shall 開発機の環境変数 `PASTA_DEBUG` と、テストを置いた場所に左右されずに通る。
-3. The 開発の道具の自動テスト shall トグルの流れ（有効にする・無効にする・書き込みを断られた・リロードできない・頼んだ状態と違う）と、pasta-recipe のボタンの示し方の移り変わりを確かめる。
+3. The 開発の道具の自動テスト shall トグルの流れ（有効にする・無効にする・書き込みを断られた・リロードできない・有効・無効を読み取れない・頼んだ状態と違う）と、pasta-recipe のボタンの示し方の移り変わりを確かめる。
