@@ -1,4 +1,4 @@
-//! リポジトリのファイル同士の一致を固定する（1.6・6.3・13.4）。
+//! リポジトリのファイル同士の一致を固定する。
 //! アプリの lock の版・拡張の凡例と色の写し・版の置き場がルートとずれたら落とす。
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -147,7 +147,7 @@ fn ts_string_array(source: &str, name: &str) -> Vec<String> {
         .collect()
 }
 
-/// (2) 拡張の凡例の並びが解析器の凡例と同じ（6.3）。
+/// (2) 拡張の凡例の並びが解析器の凡例と同じ。
 #[test]
 fn extension_legend_matches_analyzer_legend() {
     let ts = read(&repo_root().join("editors/vscode/src/semanticTokensProvider.ts"));
@@ -178,7 +178,7 @@ fn extension_scope_keys_match_analyzer_token_types() {
     assert_eq!(keys, types);
 }
 
-/// (4) tauri.conf.json の version が指す package.json の版がルートの [workspace.package].version と同じ（1.6）。
+/// (4) tauri.conf.json の version が指す package.json の版がルートの [workspace.package].version と同じ。
 #[test]
 fn app_version_source_matches_workspace_version() {
     let conf = read_json(&app_dir().join("tauri.conf.json"));

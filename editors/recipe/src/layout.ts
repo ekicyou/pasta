@@ -1,5 +1,5 @@
-// 窓の中の並び（仕切り 3 本と出力・保存変数の左右）。上は数を決める純粋な決まり（11.1〜11.6・11.8）、
-// 下の mountLayout はそれを DOM に当てる取り付け（11.1〜11.5・11.7・11.8）。どちらも何も import しない（Panels は形で受ける）。
+// 窓の中の並び（仕切り 3 本と出力・保存変数の左右）。上は数を決める純粋な決まり、
+// 下の mountLayout はそれを DOM に当てる取り付け。どちらも何も import しない（Panels は形で受ける）。
 // 覚えた並びは作者の操作でだけ変わる。窓に収めるときは新しい値を返すだけで、覚えた値は書き換えない。
 
 /** 覚える並び（layout.toml と 1 対 1。layout.ts に置き、ipc.ts は型だけを借りる） */
@@ -68,7 +68,7 @@ export function fitLayout(prefs: LayoutPrefs, space: LayoutSpace): LayoutPrefs {
 export function dragLayout(prefs: LayoutPrefs, id: SplitterId, offset: number, space: LayoutSpace): LayoutPrefs {
   const fit = fitLayout(prefs, space);
   const width = size(space.width);
-  // 動かした仕切りのキーだけを替え、ほかは覚えた値のまま返す（11.8）
+  // 動かした仕切りのキーだけを替え、ほかは覚えた値のまま返す
   switch (id) {
     case "tree":
       return { ...prefs, treeWidth: fitTree(num(offset, fit.treeWidth), width) };
@@ -226,7 +226,7 @@ export function mountLayout(t: LayoutTargets, initial: LayoutPrefs): void {
     apply();
     commit();
   };
-  // 窓の大きさが変わった・開始の画面から部品が出たとき。覚えた値は変えず、書かない（11.8）
+  // 窓の大きさが変わった・開始の画面から部品が出たとき。覚えた値は変えず、書かない
   new ResizeObserver(() => apply()).observe(t.workspace);
   apply();
 }

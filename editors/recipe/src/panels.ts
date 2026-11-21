@@ -1,5 +1,5 @@
-// 下の欄。帯の 2 つのボタンで、書く面（診断｜検査）と動かす面（出力｜保存変数）を切り替える（4.2・11.1）。
-// 書く面の 2 つの一覧（診断 7.3・7.4・7.6／ゴースト全体の検査 9.6〜9.8・9.10）。行と件数は mapping.ts、ここは描いて押下を Documents へ渡すだけ。
+// 下の欄。帯の 2 つのボタンで、書く面（診断｜検査）と動かす面（出力｜保存変数）を切り替える。
+// 書く面の 2 つの一覧（診断／ゴースト全体の検査）。行と件数は mapping.ts、ここは描いて押下を Documents へ渡すだけ。
 // 名前・メッセージはディスクから来るので textContent だけで書く。描き直しは行の位置ごとにボタンを使い回し、焦点と読み上げを保つ。
 import type { AnalysisResult, Report } from "./ipc.ts";
 import { checkRows, diagnosticRows, writeFaceLabel, type PanelRow } from "./mapping.ts";
@@ -33,13 +33,13 @@ export class Panels {
   /** 動かす面の 2 つの `.panel`。中身は devPanels.ts が満たす */
   readonly output: PanelSection;
   readonly variables: PanelSection;
-  /** 最後の検査の結果。文字列は検査できない理由（9.10）。まだ検査していなければ null */
+  /** 最後の検査の結果。文字列は検査できない理由。まだ検査していなければ null */
   #report: Report | string | null = null;
-  /** 2 つの面の左右の欄の間の仕切り（書く面・動かす面の順。11.3）。ドラッグとキーは layoutMount が受ける */
+  /** 2 つの面の左右の欄の間の仕切り（書く面・動かす面の順）。ドラッグとキーは layoutMount が受ける */
   readonly splitters: readonly HTMLElement[];
   /** 下の欄（#panels） */
   readonly area: HTMLElement;
-  /** 入れ替えのボタンが押されたとき（11.4）。layoutMount が差し替える */
+  /** 入れ替えのボタンが押されたとき。layoutMount が差し替える */
   onSwap: () => void = () => {};
 
   constructor(el: HTMLElement, docs: PanelsDocs) {
@@ -79,7 +79,7 @@ export class Panels {
     this.update();
   }
 
-  /** 面を切り替える。焦点は動かさない（4.2） */
+  /** 面を切り替える。焦点は動かさない */
   show(face: Face): void {
     for (const f of ["write", "run"] as const) {
       const { button, body } = this.#faces[f];
@@ -92,7 +92,7 @@ export class Panels {
     this.#swap.hidden = face !== "run";
   }
 
-  /** 左の欄の幅の割合を 2 つの面に当て、動かす面の 2 つの欄の順を見た目の順にする（11.3・11.4） */
+  /** 左の欄の幅の割合を 2 つの面に当て、動かす面の 2 つの欄の順を見た目の順にする */
   setSplit(leftShare: number, swapped: boolean): void {
     const run = this.#faces.run.body;
     const [left, right] = swapped ? [this.variables.section, this.output.section] : [this.output.section, this.variables.section];
@@ -110,13 +110,13 @@ export class Panels {
     }
   }
 
-  /** 検査の結果か、検査できない理由を出す。理由のときは古い結果を残さない（9.10） */
+  /** 検査の結果か、検査できない理由を出す。理由のときは古い結果を残さない */
   setReport(report: Report | string): void {
     this.#report = report;
     this.update();
   }
 
-  /** タブの解析・開け閉めの後に呼ぶ（6.3 の onAnalyzed・onClosed）。閉じたタブの診断はここで消える（7.6） */
+  /** タブの解析・開け閉めの後に呼ぶ（onAnalyzed・onClosed）。閉じたタブの診断はここで消える */
   update(): void {
     const tabs = this.#docs.tabs;
     // 言語が pasta でなくなったタブ（名前の変更）は波線と同じく出さない

@@ -1,4 +1,4 @@
-// DevSession - 拡張とアプリの「1 つの開発の操作」の共通の手順（pasta-recipe-dev-actions の設計の DevSession。要件 1.5・1.6・3.1・3.3〜3.5・4.1・4.3・4.6・5.1・10.1）
+// DevSession - 拡張とアプリの「1 つの開発の操作」の共通の手順
 //
 // 相手の覚えと確かめ・探し直し・2 つ以上の選び・同じゴーストの重なりの止め・見出しの行・保存と失敗での止め・
 // 誤りと警告の分け・文言を持つ。画面と保存は DevHost で差し込む（vscode にも Tauri にも触らない）。
@@ -45,7 +45,7 @@ export function clock(d = new Date()): string {
 }
 
 export class DevSession {
-  // この窓・アプリの間だけ（保存しない。3.5）
+  // この窓・アプリの間だけ（保存しない）
   private readonly remembered = new Map<string, Endpoint>();
   private readonly busy = new Map<string, GhostTarget>();
   private readonly host: DevHost;
@@ -73,7 +73,7 @@ export class DevSession {
   /** 1 つの操作。相手が無い・選ばずに閉じた・保存の失敗では cmd.run を呼ばない */
   async execute(cmd: DevCommand, ghost: GhostTarget): Promise<void> {
     const host = this.host;
-    // 確かめと足し込みの間に await を挟まないので、同じゴーストの 2 本目はここで止まる（5.1）
+    // 確かめと足し込みの間に await を挟まないので、同じゴーストの 2 本目はここで止まる
     if (this.busy.has(ghost.key)) {
       this.refuseBusy(cmd.title, ghost);
       return;
@@ -85,7 +85,7 @@ export class DevSession {
         return;
       }
       host.write([`${clock()} ${cmd.title} — ${ghost.displayName}（${ghost.root}）→ ${endpoint.basewareName} ${HOST}:${endpoint.port}`]);
-      // 古い辞書を読ませない（1.5）。確かめずに保存し、1 つでも保存できなければ送らない（1.6）
+      // 古い辞書を読ませない。確かめずに保存し、1 つでも保存できなければ送らない
       const unsaved = cmd.saves ? await host.save(ghost) : [];
       if (unsaved.length > 0) {
         this.stop([SAVE_FAILED, ...unsaved.map((f) => `  ${f}`)], `${SAVE_FAILED}: ${unsaved.join('、')}`);
@@ -103,7 +103,7 @@ export class DevSession {
     }
   }
 
-  /** 覚えた相手を 1 回で確かめ、外れたら探し直す（3.5）。0 個・閉じたら undefined */
+  /** 覚えた相手を 1 回で確かめ、外れたら探し直す。0 個・閉じたら undefined */
   private async chooseEndpoint(cmd: DevCommand, ghost: GhostTarget): Promise<Endpoint | undefined> {
     const host = this.host;
     const head = `${clock()} ${cmd.title} — ${ghost.displayName}（${ghost.root}）`;
@@ -128,7 +128,7 @@ export class DevSession {
       const items = found.map((e) => ({ label: `${e.basewareName}（${HOST}:${e.port}）`, endpoint: e }));
       const picked = await host.pick(ghost, items, pickPlaceHolder(ghost));
       if (!picked) {
-        return undefined; // 閉じたら何も送らない（3.4）
+        return undefined; // 閉じたら何も送らない
       }
       chosen = picked;
     }

@@ -66,12 +66,12 @@ function hasScope(tokens: vsctm.IToken[], scope: string): boolean {
 }
 
 // ============================================================================
-// Injection-aware Test Infrastructure (task 1.2)
+// Injection-aware Test Infrastructure
 //
 // The existing single-grammar path above (initGrammar / tokenizeLine) is kept
 // intact for the existing tests. The wiring below adds a SECOND, injection-aware
 // registry so that a ```lua block body actually receives source.lua scopes via
-// a TextMate injection grammar — the prerequisite for tasks 2.1/2.2 to validate
+// a TextMate injection grammar — the prerequisite for validating
 // real Lua colouring.
 //
 // vscode-textmate v9 only consults an injection grammar's `injectionSelector`
@@ -85,7 +85,7 @@ const PASTA_SCOPE = 'source.pasta';
 const INJECTION_SCOPE = 'pasta-lua.injection';
 const LUA_SCOPE = 'source.lua';
 
-// Vendored Lua fixture from task 1.1 (read-only). Registered as `source.lua`
+// Vendored Lua fixture (read-only). Registered as `source.lua`
 // to stand in for VS Code's built-in Lua grammar, which is absent in the
 // esbuild+node test environment.
 // At runtime __dirname is the bundled `out/test`; the fixture lives in the source
@@ -95,7 +95,7 @@ const LUA_FIXTURE_PATH = path.resolve(__dirname, '..', '..', 'src', 'test', 'fix
 // Resolve the REAL shipped injection grammar so the tests exercise the actual
 // grammar that ships in the VSIX, not an inline stand-in.
 //
-// Task 2.1 created `editors/vscode/syntaxes/pasta-lua-injection.tmLanguage.json`
+// The shipped injection grammar `editors/vscode/syntaxes/pasta-lua-injection.tmLanguage.json`
 // (scopeName `pasta-lua.injection`, injectionSelector
 // `meta.embedded.block.lua.content`, include source.lua). At runtime __dirname is
 // the esbuild bundle dir `out/test`, so resolve from the editors/vscode root the
@@ -333,7 +333,7 @@ async function runTests(): Promise<void> {
     );
   });
 
-  // --- Dynamic Word Reference Tests (dynamic-word-reference 6.1, 6.2, 7.10) ---
+  // --- Dynamic Word Reference Tests ---
   const WORD_SCOPE = 'markup.inline.raw.string.pasta';
   const VAR_REF_SCOPE = 'variable.other.reference.pasta';
 
@@ -374,7 +374,7 @@ async function runTests(): Promise<void> {
     expect(!hasScope(tokenizeLine(line).tokens, WORD_SCOPE), '＠＠＄x must not get word-ref scope');
   });
 
-  // --- 台詞の中の単語参照・エスケープ・変数参照の範囲（ponytail-editor-tooling 5.2・5.4〜5.6） ---
+  // --- 台詞の中の単語参照・エスケープ・変数参照の範囲 ---
   const SAKURA_SCOPE = 'string.other.sakura-script.pasta';
   const ESCAPE_SCOPE = 'constant.character.escape.pasta';
 
@@ -432,7 +432,7 @@ async function runTests(): Promise<void> {
     expect(!('inline-fn-call' in json.repository), 'inline-fn-call must be removed');
   });
 
-  // --- Sakura Script / Escape Tests (paragraph-break-tag-only-talk 10.6) ---
+  // --- Sakura Script / Escape Tests ---
 
   test('さくらスクリプト \\nHello は \\n だけがタグ', () => {
     expect(scopeCoversExactly('　さくら：\\nHello', '\\n', SAKURA_SCOPE), '\\n only should be sakura-script');
@@ -467,7 +467,7 @@ async function runTests(): Promise<void> {
     expect(!hasScope(tokenizeLine(line).tokens, WORD_SCOPE), 'assignment line must not get inline word-ref scope');
   });
 
-  // --- String Concat Operator Tests (string-concat-operator 7.6, 7.7) ---
+  // --- String Concat Operator Tests ---
   // The grammar has no operator scopes and is NOT changed: the expression `＆`
   // must get exactly the scopes `＋` gets in the same position, and the
   // line-head attribute `＆` / talk-line `＆` keep their pre-existing scopes.
@@ -541,7 +541,7 @@ async function runTests(): Promise<void> {
     expect(hasScope(result.tokens, 'entity.name.class.pasta'), 'should have class scope for actor names');
   });
 
-  // --- 宣言・属性・アクター・単語定義・変数・Call・キュー・選択肢の行（ponytail-editor-tooling 4.6・5.7） ---
+  // --- 宣言・属性・アクター・単語定義・変数・Call・キュー・選択肢の行 ---
   const SCENE_SCOPE = 'keyword.control.scene.pasta';
   const ATTR_SCOPE = 'entity.other.attribute-name.pasta';
   const COMMENT_SCOPE = 'comment.line.pasta';
@@ -568,7 +568,7 @@ async function runTests(): Promise<void> {
     expect(scopeCoversExactly(l, '＃c', COMMENT_SCOPE), 'trailing comment after attributes');
   });
 
-  // 条件の形・旗・名前なしの ＊ の属性（scene-attribute-store 7.5）
+  // 条件の形・旗・名前なしの ＊ の属性
   test('属性の条件の形と旗は宣言の属性と同じ色', () => {
     const c = '＊雑談＆＄＊変数＞１００';
     expect(scopeCoversExactly(c, '雑談', SCENE_SCOPE), 'scene name stops before the condition');
@@ -667,7 +667,7 @@ async function runTests(): Promise<void> {
     }
   });
 
-  // 単語の重み（scene-pick-modes 7.1〜7.3）。文法の word_weight は値の終わり（空白のあと 、・行末）の直前の ＠数 だけ
+  // 単語の重み。文法の word_weight は値の終わり（空白のあと 、・行末）の直前の ＠数 だけ
   test('単語定義の行: 値の後ろの重みの ＠数 は数の色・途中の ＠ は値の色', () => {
     const NUM_SCOPE = 'constant.numeric.pasta';
     const u = '　＠w：あ＠３、い＠２';
@@ -841,7 +841,7 @@ async function runTests(): Promise<void> {
     );
   });
 
-  // --- Injection Wiring Tests (task 1.2) ---
+  // --- Injection Wiring Tests ---
   // Minimal confirmation that the getInjections + 3-grammar registry resolves the
   // injection and vendored lua, producing source.lua scopes inside a ```lua body
   // that the non-injected path never yields. This is the GREEN counterpart to the
@@ -881,11 +881,11 @@ async function runTests(): Promise<void> {
     );
   });
 
-  // --- Injection Observation Points (task 2.2) ---
-  // Four observation points validated through the injection-aware harness, now
+  // --- Injection Observation Points ---
+  // Four observation points validated through the injection-aware harness,
   // resolving the REAL shipped grammar (editors/vscode/syntaxes/
   // pasta-lua-injection.tmLanguage.json) via loadInjectionGrammar(). State is
-  // threaded across lines with tokenizeLinesInjected() (the 1.2 multi-line path).
+  // threaded across lines with tokenizeLinesInjected() (the multi-line path).
 
   // (1) ```lua ブロック本文の print("hello") に source.lua 系スコープが付与される。
   test('観点1: ```lua ブロック本文の print("hello") に source.lua 系スコープが注入される', () => {
@@ -986,7 +986,7 @@ async function runTests(): Promise<void> {
     );
   });
 
-  // --- 箱と単語参照の scope の範囲が同じ（要件 5.1〜5.4） ---
+  // --- 箱と単語参照の scope の範囲が同じ ---
   // findWordRefRanges の読み込み（文法の規則の JS での compile）も、ここで確かめる。
   for (const c of WORD_REF_CASES) {
     test(`箱と単語参照の scope の範囲が同じ: ${c.name}`, () => {

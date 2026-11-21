@@ -1,5 +1,5 @@
-//! 開発の門。送る先は 127.0.0.1 の候補のポートの決まったパスだけで、画面は URL を渡せない（9.1・9.2）。
-//! 読むのは進んでいる操作の master の決まったファイルだけで、書くコマンドは無い（9.4・9.6・7.9）。
+//! 開発の門。送る先は 127.0.0.1 の候補のポートの決まったパスだけで、画面は URL を渡せない。
+//! 読むのは進んでいる操作の master の決まったファイルだけで、書くコマンドは無い。
 
 use crate::commands::{AppState, run_blocking};
 use crate::paths::{self, Want};
@@ -32,7 +32,7 @@ pub fn dev_url(port: u16) -> String {
     format!("http://127.0.0.1:{port}/api/mcp/v1")
 }
 
-/// 候補のポートへ 1 回だけ POST する。失敗も PostOutcome で返す（3.1・3.9・9.3）
+/// 候補のポートへ 1 回だけ POST する。失敗も PostOutcome で返す
 #[tauri::command]
 pub async fn dev_post(port: u16, body: String, timeout_ms: u64) -> PostOutcome {
     if !check_port(port) {
@@ -108,7 +108,7 @@ pub struct FileStat {
     pub is_file: bool,
 }
 
-/// 操作の始め。今開いている master を覚える（前の覚えは上書きする。5.2）
+/// 操作の始め。今開いている master を覚える（前の覚えは上書きする）
 #[tauri::command]
 pub async fn dev_begin(state: State<'_, AppState>) -> Result<(), String> {
     do_begin(&state)

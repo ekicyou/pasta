@@ -1,11 +1,5 @@
-// Unit tests for GhostFiles (task 4.1). Plain node in a temp folder:
+// Unit tests for GhostFiles. Plain node in a temp folder:
 //   npx esbuild src/test/ghostFiles.test.ts --bundle --platform=node --format=cjs --outfile=out/test/ghostFiles.test.js && node out/test/ghostFiles.test.js
-//
-// Requirements: 2.1 (root = two above ghost/master within 3 levels up, with descript.txt),
-// 2.3 (display name = descript name, else the root folder name),
-// 5.6 (pasta.log location from pasta.toml [logging] file_path, default + note when unusable),
-// 4.3 / 5.7 (pasta.log tail: only complete appended lines, levels, loaded=true|false, unreadable),
-// 6.2 / 6.3 (variables.toml location, mtime, contents; a missing file has no mtime).
 
 import * as assert from 'assert';
 import * as fs from 'fs';

@@ -1,9 +1,5 @@
-// E2E tests for DevCommands (tasks 6.1 / 6.2): the 3 commands, against the mock vscode
+// E2E tests for DevCommands: the 3 commands, against the mock vscode
 // (bundled with --alias:vscode=./src/test/mock/vscode.ts), fakeMcpServer and temp ghosts.
-//
-// Requirements: 2.4 / 2.5 (document and ghost), 3.2–3.7 (choosing and remembering the endpoint),
-// 7.1–7.5 (output, notifications, progress, one command per ghost), 4.2–4.11 / 5.2–5.8 / 6.2–6.4
-// (saving, then the reload / play / dump flows).
 
 import * as assert from 'assert';
 import * as fs from 'fs';
@@ -260,7 +256,7 @@ async function main() {
     assert.ok(outputSince(o).some((l) => l.includes('読み込み直しを頼めませんでした')), outputSince(o).join('\n'));
   });
 
-  // --- 6.2: the 3 flows ---------------------------------------------------------
+  // --- the 3 flows ---------------------------------------------------------
 
   const resetServer = (s: FakeMcpServer) => {
     s.state.reloadLog = ['loadedTrue'];

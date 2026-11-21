@@ -1,4 +1,4 @@
-// アプリの開発の操作の糊（DevActions）を、偽の invoke（中身は偽の入出力）と偽の画面で確かめる（1.5・1.6・2.1・3.6・5.1・5.2）
+// アプリの開発の操作の糊（DevActions）を、偽の invoke（中身は偽の入出力）と偽の画面で確かめる
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createFakeGhostIO, type FakeGhostIO, type PostRequest } from "../../shared/fakeGhostIO.ts";

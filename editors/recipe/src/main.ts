@@ -20,23 +20,23 @@ import { DISABLE_DEBUG, ENABLE_DEBUG } from "../../shared/debugToggle.ts";
 
 const editor = await createEditor(document.getElementById("editor")!);
 const docs = new Documents(editor, document.getElementById("tabs")!, document.getElementById("notices")!, {
-  // 書き換え中の .pasta はその解析にシーンを追わせる（4.10）
+  // 書き換え中の .pasta はその解析にシーンを追わせる
   onAnalyzed: (tab) => {
     tree.setScenes(tab.rel, scenesToItems(tab.rel, tab.analysis!.scenes));
-    panels.update(); // 診断の一覧（7.3）と、開いたファイルの syntax を検査の一覧から除く（9.8）
+    panels.update(); // 診断の一覧と、開いたファイルの syntax を検査の一覧から除く
   },
-  // 閉じたら未保存の書き換えのシーンを捨て、ディスクの中身から作り直す。診断の一覧からも消す（7.6）
+  // 閉じたら未保存の書き換えのシーンを捨て、ディスクの中身から作り直す。診断の一覧からも消す
   onClosed: (tab) => {
     void loadScenes(tab.rel);
     panels.update();
   },
   onRenamed: () => panels.update(),
-  // .pasta・直下の pasta.toml の保存で検査し直す（9.2）。見張りの知らせの求めと同じ checker で 1 回にまとまる（9.9）
+  // .pasta・直下の pasta.toml の保存で検査し直す。見張りの知らせの求めと同じ checker で 1 回にまとまる
   onSaved: (tab) => {
     if (tab.rel.toLowerCase().endsWith(".pasta") || tab.rel.toLowerCase() === "pasta.toml") checker.request();
   },
 });
-// 並びは下の欄を作る前に読む（既定の並びが一瞬見えるのを避ける）。読めなければ既定（11.7）
+// 並びは下の欄を作る前に読む（既定の並びが一瞬見えるのを避ける）。読めなければ既定
 const layout = await layoutLoad().catch(() => DEFAULT_LAYOUT);
 const panels = new Panels(document.getElementById("panels")!, docs);
 mountLayout(
@@ -65,10 +65,10 @@ const devActions = new DevActions({
 });
 const tree = new TreeView(document.getElementById("tree")!, docs, devActions);
 registerSceneLens(docs, devActions);
-// 保存の後と見張りの知らせの検査の求めを 300 ms で 1 回にまとめる（9.9）
+// 保存の後と見張りの知らせの検査の求めを 300 ms で 1 回にまとめる
 const checker = new CoalescingRunner(async () => panels.setReport(await checkGhost().catch((reason: unknown) => String(reason))), 300, globalThis);
 
-/** ディスクの中身からシーンを作る。開いているタブはその解析が正なので触らない。読めない（UTF-8 でない等）ものはシーン無し（4.8） */
+/** ディスクの中身からシーンを作る。開いているタブはその解析が正なので触らない。読めない（UTF-8 でない等）ものはシーン無し */
 async function loadScenes(rel: string): Promise<void> {
   if (!rel.toLowerCase().endsWith(".pasta") || findSame(docs.tabs, rel)) return;
   const gen = generation;
@@ -87,7 +87,7 @@ saveButton.className = "primary";
 saveButton.addEventListener("click", () => {
   if (docs.active) void docs.save(docs.active);
 });
-// 開始の画面では今の CSS がツールバーごと隠す（2.5）
+// 開始の画面では今の CSS がツールバーごと隠す
 const reloadButton = document.createElement("button");
 reloadButton.textContent = "SHIORI をリロード";
 reloadButton.addEventListener("click", () => void devActions.reload());
@@ -119,7 +119,7 @@ let files: string[] = [];
 /** 見張りの知らせを 1 つずつ */
 let changes: Promise<void> = Promise.resolve();
 
-/** 5 つの入口が入る 1 本の開く流れ（2.1・2.2・2.3・2.6〜2.8・2.11） */
+/** 5 つの入口が入る 1 本の開く流れ */
 function openPath(path: string, origin: OpenOrigin | "arg" | "second" | "drop"): Promise<void> {
   const run = () => openNow(path, origin);
   opening = opening.then(run, run);
@@ -131,7 +131,7 @@ async function openNow(path: string, origin: string): Promise<void> {
   try {
     found = await resolveGhost(path);
   } catch (reason) {
-    // 見つからなければ理由を出し、開いているゴーストは変えない（2.7）。最近開いたものからなら一覧から消す（3.5）
+    // 見つからなければ理由を出し、開いているゴーストは変えない。最近開いたものからなら一覧から消す
     if (origin === "recent") {
       await recentRemove(path).catch(() => {});
       notify(`${reason}（最近開いたものから消しました）`);
@@ -145,7 +145,7 @@ async function openNow(path: string, origin: string): Promise<void> {
     // 開けなかったときはタブを閉じたまま今のゴーストに留まる（保存する／しないは選び終えている）
     switching = true;
     generation++;
-    // 進んでいる開発の操作に、Rust の master が替わり始めたことを先に知らせる（新しいゴーストのファイルを読ませない。5.2）
+    // 進んでいる開発の操作に、Rust の master が替わり始めたことを先に知らせる（新しいゴーストのファイルを読ませない）
     const before = devActions.current;
     devActions.setGhost(null);
     await docs.beginSwitch();
@@ -165,7 +165,7 @@ async function openNow(path: string, origin: string): Promise<void> {
     devActions.setGhost(info);
     panels.show("write"); // 開いた直後は書く面
     start.hide();
-    // すべての .pasta のシーンを作る（4.8）。一覧が読めなければ tree.reset が理由を出している
+    // すべての .pasta のシーンを作る。一覧が読めなければ tree.reset が理由を出している
     files = (await tree.reset())?.files ?? [];
     await eachLimit(files, 8, loadScenes);
     checker.request(); // 9.1
@@ -176,7 +176,7 @@ async function openNow(path: string, origin: string): Promise<void> {
 // shortcut: 開発の窓で CDP からタブの状態を見るための口。開発のビルドだけ
 if (import.meta.env.DEV) Object.assign(globalThis, { recipeDocs: docs, recipePanels: panels });
 
-/** 見張りの知らせ: ツリー → シーン（10.1・10.5）→ 開いているタブ（10.2〜10.4）→ 検査（9.3） */
+/** 見張りの知らせ: ツリー → シーン→ 開いているタブ→ 検査 */
 async function ghostChanged(paths: string[], gen: number): Promise<void> {
   const listing = await tree.refresh();
   if (gen !== generation) return;
@@ -196,8 +196,8 @@ await onGhostChanged((e) => {
   changes = changes.then(run, run);
 });
 
-// 窓を閉じる: 未保存があれば 1 回の 3 択。取り消し・保存の失敗では閉じない（5.10）。
-// handler の後で preventDefault が無ければ @tauri-apps/api が destroy() する（2.12 の onCloseRequested）
+// 窓を閉じる: 未保存があれば 1 回の 3 択。取り消し・保存の失敗では閉じない。
+// handler の後で preventDefault が無ければ @tauri-apps/api が destroy() する（onCloseRequested）
 let closing = false;
 await getCurrentWindow().onCloseRequested(async (e) => {
   if (closing) return e.preventDefault(); // 3 択の途中にもう一度閉じようとしても 2 つ目の 3 択は出さない
@@ -211,7 +211,7 @@ await getCurrentWindow().onCloseRequested(async (e) => {
   }
 });
 
-// 2 つ目の起動（2.11。パスが無ければ Rust が窓を前に出すだけ）・窓へのドロップ（2.2。複数なら最初の 1 つ）
+// 2 つ目の起動（パスが無ければ Rust が窓を前に出すだけ）・窓へのドロップ（複数なら最初の 1 つ）
 await onOpenRequest((e) => {
   if (e.path) void openPath(e.path, "second");
 });
@@ -219,7 +219,7 @@ await getCurrentWebview().onDragDropEvent((e) => {
   if (e.payload.type === "drop" && e.payload.paths.length > 0) void openPath(e.payload.paths[0], "drop");
 });
 
-// 起動の引数（2.1）。無いか開けなければ開始の画面（1.5）
+// 起動の引数。無いか開けなければ開始の画面
 const path = await initialPath();
 if (path) await openPath(path, "arg");
 if (current === null) await start.show();

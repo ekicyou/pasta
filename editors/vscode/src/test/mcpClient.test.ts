@@ -1,9 +1,5 @@
-// Unit tests for the MCP client (task 3.1). Plain node against the fake endpoint:
+// Unit tests for the MCP client. Plain node against the fake endpoint:
 //   npx esbuild src/test/mcpClient.test.ts --bundle --platform=node --format=cjs --outfile=out/test/mcpClient.test.js && node out/test/mcpClient.test.js
-//
-// Requirements: 2.2 (ghost_name is the root path), 3.9 (127.0.0.1 only), 7.3 (errors come back typed),
-// 3.1 / 3.2 / 3.6 / 3.8 (finding and re-checking the baseware, task 3.2),
-// 4.7 / 4.8 (reading get_log and the raise_event answer, task 3.3).
 
 import * as assert from 'assert';
 import * as http from 'http';

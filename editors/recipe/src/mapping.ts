@@ -33,7 +33,7 @@ export interface TreeNode {
   children: TreeNode[];
 }
 
-/** 5 つずつ並べるだけ（6.2） */
+/** 5 つずつ並べるだけ */
 export function tokensToData(tokens: readonly SemanticToken[]): Uint32Array {
   const data = new Uint32Array(tokens.length * 5);
   tokens.forEach((t, i) =>
@@ -42,7 +42,7 @@ export function tokensToData(tokens: readonly SemanticToken[]): Uint32Array {
   return data;
 }
 
-/** 行・列（どちらも UTF-16 の 0 始まり）を +1 するだけ。拡張と同じ位置になる（7.1・7.5） */
+/** 行・列（どちらも UTF-16 の 0 始まり）を +1 するだけ。拡張と同じ位置になる */
 export function diagnosticsToMarkers(d: readonly Diagnostic[]): MarkerData[] {
   return d.map(({ range: { start, end }, message }) => ({
     severity: MARKER_SEVERITY_ERROR,
@@ -54,7 +54,7 @@ export function diagnosticsToMarkers(d: readonly Diagnostic[]): MarkerData[] {
   }));
 }
 
-/** 解析器の返す並びをそのまま 2 階層に写す（4.4・4.5・4.11〜4.13） */
+/** 解析器の返す並びをそのまま 2 階層に写す */
 export function scenesToItems(rel: string, scenes: readonly SceneNode[]): TreeItem[] {
   const item = (s: SceneNode, children: TreeItem[]): TreeItem => ({
     kind: "scene",
@@ -74,7 +74,7 @@ const byName = (a: TreeNode, b: TreeNode): number => {
   return x < y ? -1 : x > y ? 1 : a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
 };
 
-/** フォルダが先・それぞれ大文字・小文字を区別しない名前の順（4.1・4.2） */
+/** フォルダが先・それぞれ大文字・小文字を区別しない名前の順 */
 export function buildTree(listing: TreeListing): TreeNode {
   const root: TreeNode = { kind: "dir", name: "", rel: "", children: [] };
   const dirs = new Map<string, TreeNode>([["", root]]);
@@ -100,7 +100,7 @@ export function buildTree(listing: TreeListing): TreeNode {
 }
 
 /**
- * 開いているファイルの code 'syntax' を除く（9.8・パスは大文字・小文字を区別しない）。
+ * 開いているファイルの code 'syntax' を除く（パスは大文字・小文字を区別しない）。
  * 同じファイルかの判定なので Rust の to_uppercase と同じく大文字に揃える（ı と I・ſ と S も同じに。小文字では揃わない）
  */
 export function visibleFindings(report: Report, openRels: ReadonlySet<string>): Finding[] {
@@ -108,7 +108,7 @@ export function visibleFindings(report: Report, openRels: ReadonlySet<string>): 
   return report.findings.filter((f) => !(f.code === "syntax" && open.has(f.path.toUpperCase())));
 }
 
-/** 行・列は既に 1 始まり。行の無い項目はファイルの先頭（9.7） */
+/** 行・列は既に 1 始まり。行の無い項目はファイルの先頭 */
 export function findingPosition(f: Finding): { lineNumber: number; column: number } {
   return { lineNumber: f.line ?? 1, column: f.line === null ? 1 : (f.column ?? 1) };
 }
@@ -120,7 +120,7 @@ export interface PanelRow {
   pos: { lineNumber: number; column: number };
 }
 
-/** 診断の一覧の行。行・列は diagnosticsToMarkers と同じ 1 始まり（7.3・7.5） */
+/** 診断の一覧の行。行・列は diagnosticsToMarkers と同じ 1 始まり */
 export function diagnosticRows(rel: string, d: readonly Diagnostic[]): PanelRow[] {
   return diagnosticsToMarkers(d).map((m) => ({
     label: `${rel}:${m.startLineNumber}:${m.startColumn} ${m.message}`,
@@ -129,7 +129,7 @@ export function diagnosticRows(rel: string, d: readonly Diagnostic[]): PanelRow[
   }));
 }
 
-/** 検査の一覧の行と件数。件数は一覧に見える項目だけを数える（9.6・9.8）。色だけに頼らず「誤り」「警告」を文字で出す */
+/** 検査の一覧の行と件数。件数は一覧に見える項目だけを数える。色だけに頼らず「誤り」「警告」を文字で出す */
 export function checkRows(report: Report, openRels: ReadonlySet<string>): { rows: PanelRow[]; errors: number; warnings: number } {
   const shown = visibleFindings(report, openRels);
   const rows = shown.map((f) => {
@@ -140,22 +140,22 @@ export function checkRows(report: Report, openRels: ReadonlySet<string>): { rows
   return { rows, errors, warnings: shown.length - errors };
 }
 
-/** 下の欄の帯の、書く面のボタンの名前。検査がまだ・できないときは診断の件数だけ（4.2・11.4） */
+/** 下の欄の帯の、書く面のボタンの名前。検査がまだ・できないときは診断の件数だけ */
 export function writeFaceLabel(diagnostics: number, check: { errors: number; warnings: number } | null): string {
   const tail = check ? `・誤り ${check.errors} 件・警告 ${check.warnings} 件` : "";
   return `診断・検査（${diagnostics} 件${tail}）`;
 }
 
-/** タブの言語は拡張子で決める。.pasta・.lua 以外は色なし（5.2） */
+/** タブの言語は拡張子で決める。.pasta・.lua 以外は色なし */
 export function languageOf(rel: string): "pasta" | "lua" | "plaintext" {
   const ext = rel.slice(rel.lastIndexOf("/") + 1).match(/\.([^.]+)$/)?.[1].toLowerCase();
   return ext === "pasta" || ext === "lua" ? ext : "plaintext";
 }
 
-/** シーンの道: グローバルなら 1 つ、ローカルなら 2 つ。n は同じ名前の中の順（ツリーの行のキーと同じ数え方・1.4） */
+/** シーンの道: グローバルなら 1 つ、ローカルなら 2 つ。n は同じ名前の中の順（ツリーの行のキーと同じ数え方） */
 export type ScenePath = readonly { readonly name: string; readonly n: number }[];
 
-/** 見出しの行（1 始まり）と道の組を文書の順に平らに並べる（1.4） */
+/** 見出しの行（1 始まり）と道の組を文書の順に平らに並べる */
 export function scenePaths(scenes: readonly SceneNode[]): { line: number; path: ScenePath }[] {
   const out: { line: number; path: ScenePath }[] = [];
   const walk = (list: readonly SceneNode[], parent: ScenePath): void => {
@@ -172,7 +172,7 @@ export function scenePaths(scenes: readonly SceneNode[]): { line: number; path: 
   return out;
 }
 
-/** 保存した中身の解析から道の今の行（1 始まり）を引く。無ければ undefined（1.4） */
+/** 保存した中身の解析から道の今の行（1 始まり）を引く。無ければ undefined */
 export function sceneLine(scenes: readonly SceneNode[], path: ScenePath): number | undefined {
   return scenePaths(scenes).find(
     (p) => p.path.length === path.length && p.path.every((s, i) => s.name === path[i].name && s.n === path[i].n),
@@ -191,7 +191,7 @@ export interface SceneTarget {
 /** ＊グローバル、ローカルなら ＊グローバル・ローカル */
 export const sceneLabel = (path: ScenePath): string => "＊" + path.map((p) => p.name).join("・");
 
-/** 見出しの上の操作の並び（1.2）。行は 1 始まり */
+/** 見出しの上の操作の並び。行は 1 始まり */
 export function sceneTargets(rel: string, scenes: readonly SceneNode[]): { line: number; target: SceneTarget }[] {
   return scenePaths(scenes).map(({ line, path }) => ({ line, target: { rel, path, label: sceneLabel(path) } }));
 }

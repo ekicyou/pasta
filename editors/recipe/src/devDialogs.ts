@@ -1,5 +1,5 @@
-// 開発の操作の 4 つの窓（相手を選ぶ 3.4／値の書き換え・追加 7.2・7.4・7.5・7.10／削除の確かめ 7.3／ローカル変数 8.1・8.2・8.6〜8.8）。
-// 名前・値・理由はディスクやゴーストから来るので textContent だけで書く。部品には読み上げの名前を付ける（11.4）。
+// 開発の操作の 4 つの窓（相手を選ぶ／値の書き換え・追加／削除の確かめ／ローカル変数）。
+// 名前・値・理由はディスクやゴーストから来るので textContent だけで書く。部品には読み上げの名前を付ける。
 import type { Endpoint } from "../../shared/mcpClient.ts";
 import type { PickItem } from "../../shared/devSession.ts";
 import { choose, confirm, open } from "./dialog.ts";
@@ -8,11 +8,11 @@ import { buildLocals, type LocalPair, type LocalsOutcome, type VarRow } from "./
 type Kind = LocalPair["kind"];
 const KINDS: [Kind, string][] = [["string", "文字列"], ["number", "数"], ["boolean", "真偽"]];
 
-/** 選ぶ窓の番号を相手へ。閉じた（null）なら何も選ばない（3.4） */
+/** 選ぶ窓の番号を相手へ。閉じた（null）なら何も選ばない */
 export const pickedEndpoint = (items: readonly PickItem[], index: number | null): Endpoint | undefined =>
   index === null ? undefined : items[index]?.endpoint;
 
-/** 追加の名前の確かめ（7.5）。空なら閉じずに理由を出す */
+/** 追加の名前の確かめ。空なら閉じずに理由を出す */
 export const nameRequired = (name: string): true | string => (name === "" ? "名前が要ります" : true);
 
 export const deleteMessage = (name: string): string => `＄＊${name} をゴーストの保存変数から消します`;
@@ -20,7 +20,7 @@ export const deleteMessage = (name: string): string => `＄＊${name} をゴー�
 /** 真偽の select の初めの値。今の値が false のときだけ false */
 export const boolValue = (value: string): "true" | "false" => (value === "false" ? "false" : "true");
 
-/** 弾きの理由（index は 0 始まり）を組の行ごとの文へ。並びの外は捨てる（8.6〜8.8） */
+/** 弾きの理由（index は 0 始まり）を組の行ごとの文へ。並びの外は捨てる */
 export function problemsByRow(problems: (LocalsOutcome & { kind: "invalid" })["problems"], count: number): string[] {
   const rows: string[][] = Array.from({ length: count }, () => []);
   for (const p of problems) rows[p.index]?.push(p.message);
@@ -43,7 +43,7 @@ function field(text: string, ...controls: HTMLElement[]): HTMLLabelElement {
   return label;
 }
 
-/** 型の 3 択と値（真偽は true・false の 2 択、ほかは 1 行の入力 7.10）。型を変えると値の部品を差し替える */
+/** 型の 3 択と値（真偽は true・false の 2 択、ほかは 1 行の入力）。型を変えると値の部品を差し替える */
 function kindValue(kind: Kind, value: string) {
   const kindSel = document.createElement("select");
   kindSel.setAttribute("aria-label", "型");
@@ -73,7 +73,7 @@ function kindValue(kind: Kind, value: string) {
   return { parts: [field("型", kindSel), field("値", text, bool)], read };
 }
 
-/** 書き換え（row）・追加（null）の窓。決めたら送る名前・型・値、閉じたら null（7.2・7.4・7.5） */
+/** 書き換え（row）・追加（null）の窓。決めたら送る名前・型・値、閉じたら null */
 export async function editVariable(
   row: (VarRow & { kind: Kind }) | null,
 ): Promise<{ name: string; kind: Kind; value: string } | null> {
@@ -89,7 +89,7 @@ export async function editVariable(
   return rv === "ok" ? { name: row?.name ?? name.value, ...kv.read() } : null;
 }
 
-/** ローカル変数を入れて鳴らす窓（8.1・8.2）。鳴らすなら組とインライン表（組が 0 なら表なし 8.5）、閉じたら null */
+/** ローカル変数を入れて鳴らす窓。鳴らすなら組とインライン表（組が 0 なら表なし）、閉じたら null */
 export async function localsDialog(
   label: string,
   initial: readonly LocalPair[],

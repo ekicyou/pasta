@@ -1,8 +1,5 @@
-// Unit tests for DumpVariables (task 5.3). Plain node against fakeMcpServer and a temp ghost; the waits are
+// Unit tests for DumpVariables. Plain node against fakeMcpServer and a temp ghost; the waits are
 // counted through the injected sleep, never the real clock.
-//
-// Requirements: 6.2 (OnPastaDumpVariables sent, the freshly written variables.toml shown),
-// 6.3 (missing or not rewritten → old contents not shown, the 4.10 hint plus the OnPastaDumpVariables: lines).
 
 import * as assert from 'assert';
 import * as fs from 'fs';

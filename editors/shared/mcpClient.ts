@@ -1,15 +1,15 @@
 // MCP client for the SSP / areka endpoint (POST http://127.0.0.1:{port}/api/mcp/v1).
-// 拡張とアプリの共有: 外へ出るのは io.post だけ。Wire shapes: .kiro/specs/completed/vscode-mcp-client/research.md.
+// 拡張とアプリの共有: 外へ出るのは io.post だけ。
 
 import type { GhostIO } from './ghostIO.ts';
 
-/** The only destination host. There is no setting to change host or port (requirement 3.9). 入出力の実装（拡張・アプリ）が固定する */
+/** The only destination host. There is no setting to change host or port. 入出力の実装（拡張・アプリ）が固定する */
 export const HOST = '127.0.0.1';
 export const MCP_PATH = '/api/mcp/v1';
 export const CALL_TIMEOUT_MS = 15000;
 /** 9801, 9821, 9802, 9822, …, 9810, 9830 (same order as areka's port.rs). */
 export const CANDIDATE_PORTS: readonly number[] = Array.from({ length: 10 }, (_, i) => [9801 + i, 9821 + i]).flat();
-/** Cut-off for one candidate during a scan; all candidates are asked at once (requirement 3.8). */
+/** Cut-off for one candidate during a scan; all candidates are asked at once. */
 export const SCAN_TIMEOUT_MS = 2000;
 
 export interface ToolArgsMap {

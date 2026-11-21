@@ -1,4 +1,4 @@
-// E2E and build verification tests (Phase 5, Tasks 5.1-5.3)
+// E2E and build verification tests
 //
 // Tests extension manifest integrity, activation lifecycle,
 // TextMate grammar completeness, and build configuration.
@@ -29,7 +29,7 @@ function test(name: string, fn: () => void) {
 const ROOT = path.resolve(__dirname, '..', '..');
 
 // =============================================================================
-// Package.json Manifest Verification (Task 5.3)
+// Package.json Manifest Verification
 // =============================================================================
 
 console.log('\n[Package.json Manifest Tests]');
@@ -135,7 +135,7 @@ test('npm scripts include compile and package', () => {
 });
 
 // =============================================================================
-// TextMate Grammar Verification (Task 5.1)
+// TextMate Grammar Verification
 // =============================================================================
 
 console.log('\n[TextMate Grammar Verification]');

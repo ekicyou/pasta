@@ -1,9 +1,9 @@
-// GhostValidator - ゴースト全体の検査の診断（Requirement 11）
+// GhostValidator - ゴースト全体の検査の診断
 //
 // ghost/master の一覧と中身を workspace.fs で集め、選び出しと検査は WASM の核に任せる
-// （TypeScript はパターンを見ない。11.8）。集め方は pasta_check の validate の殻
+// （TypeScript はパターンを見ない）。集め方は pasta_check の validate の殻
 // （crates/pasta_check/src/validate_cmd.rs）と同じ: 最上位の profile に入らず、
-// シンボリックリンクを含めず、中身はディスクのものを厳格な UTF-8 で読む（11.2・3.4）。
+// シンボリックリンクを含めず、中身はディスクのものを厳格な UTF-8 で読む。
 
 import * as vscode from 'vscode';
 import type { FileText, GhostInput, GhostReport, TomlSource, WasmBridge } from './wasmBridge';
@@ -11,12 +11,12 @@ import type { FileText, GhostInput, GhostReport, TomlSource, WasmBridge } from '
 /** 核の文言（pasta_check::validate::msg::file_not_utf8）と同じ */
 const NOT_UTF8_REASON = 'UTF-8 として読めません';
 
-/** 入力のたびの構文の診断（DocumentSync）と重なる code（11.9） */
+/** 入力のたびの構文の診断（DocumentSync）と重なる code */
 const SYNTAX_CODE = 'syntax';
 
 /**
  * fileUri の祖先の ".../ghost/master"（いちばん近いもの）。無ければ undefined。
- * 大文字・小文字は区別しない（Windows の規則。3.1・3.5）。返す URI は届いた綴りのまま
+ * 大文字・小文字は区別しない（Windows の規則）。返す URI は届いた綴りのまま
  */
 export function findGhostMaster(fileUri: vscode.Uri): vscode.Uri | undefined {
   const segments = fileUri.path.split('/');
@@ -30,7 +30,7 @@ export function findGhostMaster(fileUri: vscode.Uri): vscode.Uri | undefined {
 }
 
 /**
- * ゴーストの鍵（パスを小文字にした URI の文字列）。綴りの違う同じゴーストを 1 つにまとめる（3.6）。
+ * ゴーストの鍵（パスを小文字にした URI の文字列）。綴りの違う同じゴーストを 1 つにまとめる。
  * 診断の URI と開いている文書の照らし合わせにも使う
  */
 export function ghostKey(master: vscode.Uri): string {
@@ -81,10 +81,10 @@ export class GhostValidator implements vscode.Disposable {
 
   /**
    * 保存（.pasta・master の直下の pasta.toml・calendar.csv）と、配下の .pasta・.lua・master の直下の calendar.csv の作成・削除で検査を起動する
-   * （11.3・11.6。名前の変更は削除と作成として届く）。ghost/master の外なら何もしない（11.10）。
-   * 大文字・小文字はどれも区別しない（3.1〜3.4）。見張りはすべてのファイルに張って関数で絞る:
-   * 1.106 までの VSCode はパターンを大文字・小文字を区別して照らすため（OQ-6）。
-   * 開く・閉じるは syntax の出し分けをやり直すだけ（11.9）。起動直後の全体検査はしない
+   * （名前の変更は削除と作成として届く）。ghost/master の外なら何もしない。
+   * 大文字・小文字はどれも区別しない。見張りはすべてのファイルに張って関数で絞る:
+   * 1.106 までの VSCode はパターンを大文字・小文字を区別して照らすため。
+   * 開く・閉じるは syntax の出し分けをやり直すだけ。起動直後の全体検査はしない
    */
   register(): void {
     const watcher = vscode.workspace.createFileSystemWatcher('**/*');
@@ -251,7 +251,7 @@ export class GhostValidator implements vscode.Disposable {
   /**
    * 前回の報告から診断を出し直す。change は開いた・閉じたばかりの文書で、
    * textDocuments の更新と通知の順に頼らずその状態として扱う。
-   * 作った URI と大文字・小文字だけ違う文書が開いていれば、その文書の URI に付ける（3.6）
+   * 作った URI と大文字・小文字だけ違う文書が開いていれば、その文書の URI に付ける
    */
   private render(state: GhostState, change?: OpenChange): void {
     // キーは ghostKey、値は開いている文書の URI

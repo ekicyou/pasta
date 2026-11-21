@@ -1,7 +1,7 @@
 // DumpVariables - OnPastaDumpVariables を送り、書き出したばかりの variables.toml だけを読む
-// （vscode-mcp-client の設計の DumpVariables。要件 6.2・6.3）。OnPastaSetSaveVariable の書き換えの頼みも持つ（pasta-recipe-dev-actions の 7.1・7.7・7.8）
+// OnPastaSetSaveVariable の書き換えの頼みも持つ
 //
-// vscode に触らない純粋なモジュール。読み込み直しも保存もしない（6.4）。時計を持たず、待ちは ctx.sleep の回数で数える。
+// vscode に触らない純粋なモジュール。読み込み直しも保存もしない。時計を持たず、待ちは ctx.sleep の回数で数える。
 
 import { type CallResult, callTool, describeResult, readRaiseEvent } from './mcpClient.ts';
 import { DEBUG_HINT, mtimeOf, openLogCursor, pastaLogPath, readNewLines, readText, variablesPath } from './ghostFiles.ts';
@@ -10,8 +10,8 @@ import type { Report } from './devSession.ts';
 
 export type DumpOutcome =
   | { kind: 'shown'; text: string; path: string; mtime: number }
-  | { kind: 'stale'; path: string; reasons: readonly string[] } // 無い・書き換わらない（6.3）
-  | { kind: 'unreadable'; path: string } // 書き出されたのに読めない（6.5）
+  | { kind: 'stale'; path: string; reasons: readonly string[] } // 無い・書き換わらない
+  | { kind: 'unreadable'; path: string } // 書き出されたのに読めない
   | { kind: 'failed'; result: CallResult };
 
 export async function dumpVariables(ctx: FlowContext): Promise<DumpOutcome> {
@@ -26,7 +26,7 @@ export async function dumpVariables(ctx: FlowContext): Promise<DumpOutcome> {
     return { kind: 'failed', result: reply.result };
   }
 
-  // スクリプト・スクリプトなし・応答が無い のどれでも、上限まで更新時刻を見る（6.2・6.3）
+  // スクリプト・スクリプトなし・応答が無い のどれでも、上限まで更新時刻を見る
   const maxSleeps = Math.ceil(timing.dumpWaitMs / timing.pollIntervalMs);
   let writtenButUnreadable = false;
   for (let slept = 0; ; slept++) {
@@ -78,11 +78,11 @@ export type SaveVariableChange = { type: SaveVariableType; value: string } | { t
 
 export type SetOutcome =
   | { kind: 'set' }                                   // 204（OnPastaSetSaveVariable は成功でスクリプトを返さない）
-  | { kind: 'refusedByGhost'; script: string }        // 失敗の表記（【数にできない値：…】 など。7.7）
+  | { kind: 'refusedByGhost'; script: string }        // 失敗の表記（【数にできない値：…】 など）
   | { kind: 'noResponse'; detail: string }            // 送り直さない
-  | { kind: 'failed'; result: CallResult };           // 届かない・形が違う（7.8）
+  | { kind: 'failed'; result: CallResult };           // 届かない・形が違う
 
-/** OnPastaSetSaveVariable を 1 回送る。Reference0=名前・Reference1=値・Reference2=型。削除は [名前, "", "delete"]（7.1・7.3）。ファイルは書かない（7.9） */
+/** OnPastaSetSaveVariable を 1 回送る。Reference0=名前・Reference1=値・Reference2=型。削除は [名前, "", "delete"]。ファイルは書かない */
 export async function setSaveVariable(ctx: FlowContext, name: string, change: SaveVariableChange): Promise<SetOutcome> {
   const { io, endpoint: { port }, ghost: { root }, timing } = ctx;
   const references = change.type === 'delete' ? [name, '', 'delete'] : [name, change.value, change.type];

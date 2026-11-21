@@ -1,4 +1,4 @@
-// tauriGhostIO が GhostIO を Rust のコマンドへ写すこと（3.9・9.4）。invoke は window.__TAURI_INTERNALS__ を差し替えて受ける
+// tauriGhostIO が GhostIO を Rust のコマンドへ写すこと。invoke は window.__TAURI_INTERNALS__ を差し替えて受ける
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { tauriGhostIO } from "./ipc.ts";

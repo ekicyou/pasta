@@ -47,7 +47,7 @@ pub enum LocalsOutcome {
     Invalid { problems: Vec<LocalsProblem> },
 }
 
-/// `variables.toml` の文を、最上位のキーごとの行（名前の順）にする。TOML でなければ理由（6.5）
+/// `variables.toml` の文を、最上位のキーごとの行（名前の順）にする。TOML でなければ理由
 pub fn variable_rows(text: &str) -> Result<Vec<VarRow>, String> {
     let table: toml::Table = toml::from_str(text).map_err(|e| e.message().to_string())?;
     let mut rows: Vec<VarRow> = table
@@ -68,7 +68,7 @@ pub fn variable_rows(text: &str) -> Result<Vec<VarRow>, String> {
     Ok(rows)
 }
 
-/// 組を全部見て、問題が無ければ `{ "キー" = 値, … }` のインライン表を組む（8.3・8.4・8.6〜8.8）
+/// 組を全部見て、問題が無ければ `{ "キー" = 値, … }` のインライン表を組む
 pub fn build_locals(pairs: &[LocalPair]) -> LocalsOutcome {
     let mut problems = Vec::new();
     let mut seen = HashSet::new();

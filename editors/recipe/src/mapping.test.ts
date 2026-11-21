@@ -227,7 +227,7 @@ test("ツリーの見える行: 開いた所だけ・階層・親・シーンは
   assert.equal(rows[3].line, null);
   assert.equal(rows[3].scene, null);
   assert.deepEqual(rows[5].scene, [{ name: "挨拶", n: 0 }, { name: "朝", n: 0 }]);
-  // シーンのキーは名前と同じ名前の中の順。前にシーンを足しても開いた所がずれない（4.5・4.10）
+  // シーンのキーは名前と同じ名前の中の順。前にシーンを足しても開いた所がずれない
   const two = { kind: "scene" as const, rel: "x", name: "挨拶", sceneKind: "global" as const, line: 9, children: [] };
   const more = new Map([["DIC/挨拶.PASTA", [{ ...two, name: "前", line: 1 }, two, two]]]);
   assert.deepEqual(treeRows(root, more, new Set(["", "dic", "dic/挨拶.pasta"])).filter((r) => r.kind === "scene").map((r) => r.key), [

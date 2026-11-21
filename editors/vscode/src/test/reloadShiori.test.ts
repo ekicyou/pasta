@@ -1,8 +1,7 @@
-// Unit tests for ReloadShiori (task 5.1). Plain node against fakeMcpServer and a temp ghost; the real clock
+// Unit tests for ReloadShiori. Plain node against fakeMcpServer and a temp ghost; the real clock
 // is never used (sleep is injected and appends pasta.log lines on chosen polls).
 //
-// Requirements: 4.3 / 5.3 (reload then wait for the marker), 4.4 / 5.8 (timeout), 4.5 / 5.4 / 5.5 (errors vs
-// warnings, loaded=false), 5.7 (pasta.log unreadable), 5.9 (never plays). Contract: pasta.dll writes the marker.
+// Contract: pasta.dll writes the marker.
 
 import * as assert from 'assert';
 import * as fs from 'fs';

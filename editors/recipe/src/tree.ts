@@ -1,4 +1,4 @@
-// ファイルとシーンのツリー（4.1〜4.7・4.14〜4.17）。並びは mapping.ts の treeRows、ここは描いて操作を Documents と Rust へ渡すだけ。
+// ファイルとシーンのツリー。並びは mapping.ts の treeRows、ここは描いて操作を Documents と Rust へ渡すだけ。
 // 名前はディスクから来るので textContent だけで書く。描き直しは行のキーで差分にし、焦点と開いた所を保つ。
 import { createEntry, listTree, renameEntry, type EntryKind, type TreeListing } from "./ipc.ts";
 import { buildTree, sceneLabel, treeRows, type TreeItem, type TreeNode, type TreeRow } from "./mapping.ts";
@@ -78,7 +78,7 @@ export class TreeView {
     return this.refresh();
   }
 
-  /** そのファイルのシーンの項目を置き換える（書き換え中は 6.3 の onAnalyzed、ほかは開く流れ 7.1 が読んで渡す） */
+  /** そのファイルのシーンの項目を置き換える（書き換え中は onAnalyzed、ほかは開く流れが読んで渡す） */
   setScenes(rel: string, items: TreeItem[]): void {
     this.#scenes.set(rel.toUpperCase(), items);
     this.#render();
@@ -147,7 +147,7 @@ export class TreeView {
     this.#render();
   }
 
-  /** ファイルはタブで、シーンは見出しの行で開く（4.6・4.7）。フォルダは開け閉め */
+  /** ファイルはタブで、シーンは見出しの行で開く。フォルダは開け閉め */
   #activate(row: TreeRow): void {
     if (row.kind === "dir") return this.#toggle(row);
     void this.#docs.open(row.rel, row.line === null ? undefined : { lineNumber: row.line, column: 1 });
@@ -177,7 +177,7 @@ export class TreeView {
     e.preventDefault();
   }
 
-  /** フォルダ（最上位を含む）は作成、ファイル・フォルダは名前の変更。削除は置かない（4.17）。シーンは ▶ と値を入れて実行（1.1・8.1・11.3） */
+  /** フォルダ（最上位を含む）は作成、ファイル・フォルダは名前の変更。削除は置かない。シーンは ▶ と値を入れて実行 */
   #openMenu(row: TreeRow, x: number, y: number): void {
     this.#closeMenu(false);
     const actions: [string, () => Promise<void>][] = [];
@@ -235,7 +235,7 @@ export class TreeView {
     if (refocus) this.#els.get(this.#current)?.focus();
   }
 
-  /** 空のファイル・フォルダを作り、ツリーに出し、ファイルならタブで開く（4.14）。名前の誤りは Rust の理由を出す（4.16） */
+  /** 空のファイル・フォルダを作り、ツリーに出し、ファイルならタブで開く。名前の誤りは Rust の理由を出す */
   async #create(row: TreeRow, kind: EntryKind): Promise<void> {
     const name = await prompt(kind === "file" ? "新しいファイルの名前" : "新しいフォルダの名前", "");
     if (name === null) return this.#focus(row.key);
@@ -252,7 +252,7 @@ export class TreeView {
     else this.#focus(rel);
   }
 
-  /** 名前を変え、タブ・シーン・開いた所を新しい rel へ付け替える（4.15・4.16） */
+  /** 名前を変え、タブ・シーン・開いた所を新しい rel へ付け替える */
   async #rename(row: TreeRow): Promise<void> {
     const name = await prompt(`${row.name} の新しい名前`, row.name);
     if (name === null || name === row.name) return this.#focus(row.key);
@@ -270,7 +270,7 @@ export class TreeView {
       const to = retargetTabs([{ id: 0, rel: key.slice(0, cut), dirty: false }], row.rel, rel).get(0);
       return to === undefined ? key : to + key.slice(cut);
     };
-    // .pasta でなくなったファイルのシーンは捨てる（4.4）
+    // .pasta でなくなったファイルのシーンは捨てる
     this.#scenes = new Map(
       [...this.#scenes].map(([k, v]) => [moved(k).toUpperCase(), v] as const).filter(([k]) => k.endsWith(".PASTA")),
     );

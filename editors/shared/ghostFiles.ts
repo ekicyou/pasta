@@ -1,7 +1,7 @@
-// GhostFiles - ゴーストのディスクの上のこと（vscode-mcp-client の設計の GhostFiles）
+// GhostFiles - ゴーストのディスクの上のこと
 //
-// 拡張とアプリの共有。descript の name（2.1・2.3）と pasta.log の場所（5.6）を決め、
-// pasta.log の増えた分（4.3・5.7）と variables.toml（6.2・6.3）を読む。ディスクには io を通してだけ触る。
+// 拡張とアプリの共有。descript の nameと pasta.log の場所を決め、
+// pasta.log の増えた分と variables.tomlを読む。ディスクには io を通してだけ触る。
 // 書き込まない（読むだけ）。
 
 import type { GhostIO } from './ghostIO.ts';
@@ -26,7 +26,7 @@ export async function ghostTarget(io: GhostIO, root: string, master: string, fol
 
 /**
  * descript.txt の name の値。charset が UTF-8（大文字・小文字を問わない）なら UTF-8、ほかは Shift_JIS で読み、
- * BOM を外す。読めない・name が無い・空なら undefined（2.3）
+ * BOM を外す。読めない・name が無い・空なら undefined
  */
 export function decodeDescriptName(bytes: Uint8Array): string | undefined {
   let b = bytes;
@@ -63,10 +63,10 @@ export interface PastaLogLocation {
 }
 
 export const DEFAULT_PASTA_LOG = 'profile/pasta/logs/pasta.log';
-/** デバッグを有効にする案内の通知（RunScene の 4.10・DumpVariables の 6.3 が同じ文を使う） */
+/** デバッグを有効にする案内の通知（RunScene・DumpVariables が同じ文を使う） */
 export const DEBUG_HINT = '「SHIORI デバッグを有効にする」でデバッグを有効にしてください';
 /**
- * pasta.log の場所（5.6）。pasta.toml の [logging] file_path を 3 つの書き方で読み、pasta の logger.rs と同じ条件
+ * pasta.log の場所。pasta.toml の [logging] file_path を 3 つの書き方で読み、pasta の logger.rs と同じ条件
  * （最初の部品が profile で後に部品がある・`..` 無し・絶対パスでない）に合えば使う。書かれていなければ既定。書かれているのに読めない・外れるときは既定と note
  */
 export function pastaLogPath(io: GhostIO, master: string, pastaTomlText: string | undefined): PastaLogLocation {
@@ -170,7 +170,7 @@ export async function openLogCursor(io: GhostIO, p: string): Promise<LogCursor> 
   return { path: p, offset: (await io.stat(p))?.size ?? 0 };
 }
 
-/** offset から増えた分の完全な行（最後の改行より後は次の回に残す）。読めなければ undefined（5.7） */
+/** offset から増えた分の完全な行（最後の改行より後は次の回に残す）。読めなければ undefined */
 export async function readNewLines(io: GhostIO, cursor: LogCursor): Promise<{ lines: string[]; next: LogCursor } | undefined> {
   const st = await io.stat(cursor.path);
   if (st === undefined || !st.isFile) {

@@ -74,12 +74,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(documentSync);
     documentSync.activate(context);
 
-    // ゴースト全体の検査（保存・ファイルの増減で起動。WASM が読めないときは作らない。11.12）
+    // ゴースト全体の検査（保存・ファイルの増減で起動。WASM が読めないときは作らない）
     const ghostValidator = new GhostValidator(wasmBridge, outputChannel);
     ghostValidator.register();
     context.subscriptions.push(ghostValidator);
 
-    // シーンの並びをアウトラインと見出しの上の ▶ に写す（WASM が読めないときは登録しない。5.1）
+    // シーンの並びをアウトラインと見出しの上の ▶ に写す（WASM が読めないときは登録しない）
     const sceneOutline = new SceneOutlineProvider(wasmBridge);
     context.subscriptions.push(
       vscode.languages.registerDocumentSymbolProvider({ language: 'pasta' }, sceneOutline),

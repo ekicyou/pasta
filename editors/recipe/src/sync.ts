@@ -20,12 +20,12 @@ export type ExternalAction = "none" | "reload" | "ask" | "deleted";
 export function decideExternal(tab: TabSnapshot, disk: DiskState): ExternalAction {
   if (disk.kind === "missing") return tab.deleted ? "none" : "deleted"; // 10.4
   if (disk.kind === "unreadable") return "none"; // 次の知らせで決める
-  if (disk.text === tab.diskText && disk.bom === tab.diskBom) return "none"; // 自分の保存（10.6）
+  if (disk.text === tab.diskText && disk.bom === tab.diskBom) return "none"; // 自分の保存
   if (tab.deleted) return disk.text === tab.editorText ? "none" : "ask"; // 消えた後に戻ってきた
-  return tab.dirty ? "ask" : "reload"; // 10.3・10.2
+  return tab.dirty ? "ask" : "reload";
 }
 
-/** read_text の失敗を DiskState へ。理由の文では消えたか分からないので、ツリーの一覧に無ければ消えた（10.4） */
+/** read_text の失敗を DiskState へ。理由の文では消えたか分からないので、ツリーの一覧に無ければ消えた */
 export function failedRead(rel: string, files: readonly string[], reason: string): DiskState {
   const key = rel.toUpperCase();
   return files.some((f) => f.toUpperCase() === key) ? { kind: "unreadable", reason } : { kind: "missing" };
@@ -33,7 +33,7 @@ export function failedRead(rel: string, files: readonly string[], reason: string
 
 /**
  * 見張りの知らせ（paths はフォルダの名前や名前の変更の新旧も入る）を、前と今のツリーの一覧と合わせて決める。
- * scenes: 読み直す .pasta（消えた・知らせに含まれる・新しく出た。10.1・10.5）。check: ゴースト全体の検査を求めるか（9.3）
+ * scenes: 読み直す .pasta（消えた・知らせに含まれる・新しく出た）。check: ゴースト全体の検査を求めるか
  */
 export function planGhostChanged(prev: readonly string[], now: readonly string[], paths: readonly string[]): { scenes: string[]; check: boolean } {
   const keys = (files: readonly string[]) => new Set(files.map((f) => f.toUpperCase()));

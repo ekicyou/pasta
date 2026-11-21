@@ -34,7 +34,7 @@ export function semanticRules(theme: TmTheme, scopes: SemanticTokenScopes): TmTh
 
 /**
  * `keep` が偽の種類のトークンを落とし、残りの差分を付け直す。
- * Monaco はテーマに規則の無い種類も既定の文字の色で塗り、下地の色を消すので、規則の無い種類は渡さない（拡張と同じ見た目・6.6）
+ * Monaco はテーマに規則の無い種類も既定の文字の色で塗り、下地の色を消すので、規則の無い種類は渡さない（拡張と同じ見た目）
  */
 export function keepTokens(tokens: readonly SemanticToken[], keep: (tokenType: number) => boolean): SemanticToken[] {
   const out: SemanticToken[] = [];
