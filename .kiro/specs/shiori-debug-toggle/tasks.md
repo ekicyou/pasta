@@ -140,7 +140,7 @@
   - _Requirements: 9.9_
 
 - [ ] 6. 全体の確かめ
-- [ ] 6.1 全部の自動テストと検査を通す
+- [x] 6.1 全部の自動テストと検査を通す
   - cargo の試験の前に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す。`pasta_lua` の試験が書き換える `sample.generated.lua` の改行だけの差分は戻す
   - `pasta_lua`・`pasta_shiori` の試験と clippy、`editors/shared` の `node --test`、VSCode 拡張と pasta-recipe の試験、マニュアルの検査と `gen-skill-refs.mjs --check` を走らせる
   - すべてが通り、要件の 10.1〜10.3 の試験が揃っていることを確かめた記録が残る
@@ -153,3 +153,4 @@
 - 保存ファイル（TOML 1.0）では日本語のキーは裸で書けない。試験の保存ファイルは `"デバッグ" = true` と引用符で書く（裸だと読めずに Lua の load が `.broken` へ退避する）。マニュアルで保存ファイルの中身を例に出すときも同じ。
 - VSCode 拡張の `npm test` は、wasm/ を作っていない作業木では `PASTA_VSCODE_NO_WASM=1` を付ける（付けないと vscodeModules の real WASM の 3 本が落ちる。CI も同じ変数を使う）。
 - VSCode の操作中に断る e2e は、ロックがゴーストの決定の後に取られるので、2 本を Promise.all で同時に走らせると勝ち負けで揺れる。先の操作の reload が偽のサーバーに届くのを待ってから後の操作を走らせる（余裕は偽のサーバーの reloadDelayMs の約 100ms）。
+- 6.1 の全体検査（2026-11-21）: pasta_lua・pasta_shiori の試験（x64、i686 は読み込みの印の 2 本）・clippy・fmt、editors/shared 43・recipe 158・VSCode（e2e 31）・両方の tsc と eslint、gen-skill-refs --check・link-check・tutorial-check・verify-content・book の自己テストがすべて通った。10.1 は config.rs の decide_table・save_switch_table、10.2 は debug_save_switch_test.rs の 10 本と pasta_shiori の 2 本、10.3 は debugToggle.test.ts・devActions.test.ts・VSCode の contributions と devCommands e2e。external_control.lua は main から変わっていない（4.2）。
