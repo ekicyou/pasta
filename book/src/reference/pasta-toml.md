@@ -448,7 +448,7 @@ talk_interval_max = 240
 
 この例では、前のトークから 2〜4 分後に次のランダムトークが出る。
 
-- 実行中は、予約グローバル変数 `＄＊pasta_talk_interval_min`・`＄＊pasta_talk_interval_max` に入れた値が `pasta.toml` の値より優先される（[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前)）。
+- 実行中は、予約グローバル変数 `＄＊pasta_talk_interval_min`・`＄＊pasta_talk_interval_max` に入れた値が `pasta.toml` の値より優先される（[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前とデバッグdebug)）。
 - 数値でない値の扱い、下限（10 秒）、最小間隔が最大間隔を上回ったときの扱いは [SHIORI イベントとハンドラの pasta.toml 設定](../lua/shiori-events.md#pastatoml-設定) を参照する。
 
 #### spot_newlines
@@ -846,7 +846,7 @@ filter = "debug,pasta_shiori=info"
 - `file_path` に書けるのは、`profile/` フォルダの下を指す相対パスだけである（`profile/` の後にファイル名が要る。`..` を含むパスと絶対パスは不可。`profile` の大文字・小文字は区別する）。条件を満たさない値（例: `logs/pasta.log`）のときは、既定のログファイルへ書き、warn（`Cannot use [logging] file_path; logging to the default log file instead`）をログに出す。ゴーストの起動は続く。
 - `filter`・`level` として解釈できない値のときは `info` になる。
 - 環境変数 `PASTA_LOG` が設定されていると、`filter`・`level` より優先される。
-- 読み込みの終わりの行（`SHIORI load entry completed`）は、`level`・`filter`・`PASTA_LOG` によらず、読み込み（リロードを含む）のたびに必ず書く。
+- 読み込みの終わりの行（`SHIORI load entry completed`）と、デバッグの有効・無効の行（`Debug enabled`・`Debug disabled`）は、`level`・`filter`・`PASTA_LOG` によらず、読み込み（リロードを含む）のたびに必ず書く。有効・無効の行は、終わりの行より前に出る。
 - Lua からのログ出力は [@pasta_log](../lua/modules/pasta-log.md)、起動に失敗したときのログの読み方は [ゴーストが起動しない・喋らないとき](../reference/startup.md#4-ゴーストが起動しない喋らないとき) を参照する。
 
 #### balloon_warning
@@ -892,15 +892,16 @@ balloon_warning = false
 enabled = true
 ```
 
-有効な状態で読み込むと、`pasta.log` に次の行が 1 回出る。
+読み込みのたびに、`pasta.log` に有効か無効かを知らせる行が 1 回出る。有効のときは次の行である。無効のときは `Debug disabled: development events are refused` と出る。
 
 ```text
-2026-11-19T03:15:42.239874Z  INFO pasta_lua::loader: Debug enabled: development events are allowed
+2026-11-19T03:15:42.239874Z  INFO pasta::debug_state: Debug enabled: development events are allowed
 ```
 
 - 開発用のイベントは [OnPastaScene](../lua/shiori-events.md#onpastascene名前でシーンを再生)・[OnPastaSceneAt](../lua/shiori-events.md#onpastasceneat位置でシーンを再生)・[OnPastaDumpVariables](../lua/shiori-events.md#onpastadumpvariablesグローバル変数を書き出す) の 3 つである。無効のときは、何もせずに 204 No Content を返す。
 - `enabled` は、SHIORI の読み込みのたびに読み直す。ベースウェアを起動し直さなくても、リロードで有効・無効が切り替わる。
-- 環境変数 `PASTA_DEBUG` が設定されていると、`enabled` より優先される。`1`・`true`・`yes`・`on` で有効、`0`・`false`・`no`・`off`・空の文字列で無効になる（大文字・小文字と前後の空白は区別しない）。それ以外の値は、設定されていないのと同じに扱う。
+- 有効か無効かは、環境変数 `PASTA_DEBUG`、保存変数 `＄＊デバッグ`・`＄＊debug`、`enabled`、無効の 4 段の順で決まり、上の段で決まれば下の段は見ない（[優先の順](../debug/index.md#優先の順)・[保存変数による有効化](../debug/index.md#保存変数による有効化)）。
+- 環境変数 `PASTA_DEBUG` が設定されていると、保存変数と `enabled` より優先される。`1`・`true`・`yes`・`on` で有効、`0`・`false`・`no`・`off`・空の文字列で無効になる（大文字・小文字と前後の空白は区別しない）。それ以外の値は、設定されていないのと同じに扱う。
 - `[debug]` で読まれるキーは `enabled` だけである。ほかのキーは読み飛ばす。
 - 有効化の手順は [編集ツールとデバッグの概要](../debug/index.md#pastatoml-による有効化) を参照する。
 

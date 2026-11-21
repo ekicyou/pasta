@@ -18,6 +18,7 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
+import { DISABLE_DEBUG, ENABLE_DEBUG } from '../../../shared/debugToggle.ts';
 
 const ROOT = path.resolve(__dirname, '..', '..');
 
@@ -121,16 +122,20 @@ test('editor/context runSceneAtCursor is shown for .pasta and is NOT debug-gated
 // =============================================================================
 
 const DUMP_COMMAND = 'pasta.showSaveVariables';
+const ENABLE_COMMAND = 'pasta.enableShioriDebug';
+const DISABLE_COMMAND = 'pasta.disableShioriDebug';
 const GHOST_SOURCE_WHEN =
   'resourceLangId == pasta || resourceLangId == lua || resourceFilename =~ /^pasta\\.toml$/i';
 
-test('contributes.commands is exactly the 3 dev commands, all in category Pasta', () => {
+test('contributes.commands is exactly the 5 dev commands, all in category Pasta', () => {
   assert.deepStrictEqual(
     pkg.contributes.commands.map((c) => [c.command, c.title, (c as { category?: string }).category]),
     [
       [RUN_COMMAND, '▶ シーンを実行', 'Pasta'],
       [RELOAD_COMMAND, 'SHIORI をリロード', 'Pasta'],
       [DUMP_COMMAND, '保存変数を表示', 'Pasta'],
+      [ENABLE_COMMAND, ENABLE_DEBUG, 'Pasta'],
+      [DISABLE_COMMAND, DISABLE_DEBUG, 'Pasta'],
     ],
   );
 });
@@ -146,9 +151,9 @@ test('editor/context lists the 3 commands in order with their when-clauses (R4.1
   );
 });
 
-test('the 3 commands show in the command palette with no condition', () => {
-  const gated = menu('commandPalette').filter((c) => [RUN_COMMAND, RELOAD_COMMAND, DUMP_COMMAND].includes(c.command));
-  assert.deepStrictEqual(gated, [], 'no commandPalette entry may hide or gate the 3 commands');
+test('the 5 commands show in the command palette with no condition', () => {
+  const gated = menu('commandPalette').filter((c) => [RUN_COMMAND, RELOAD_COMMAND, DUMP_COMMAND, ENABLE_COMMAND, DISABLE_COMMAND].includes(c.command));
+  assert.deepStrictEqual(gated, [], 'no commandPalette entry may hide or gate the 5 commands');
 });
 
 test('activationEvents is only onLanguage:pasta', () => {

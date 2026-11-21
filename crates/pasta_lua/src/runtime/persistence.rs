@@ -94,6 +94,29 @@ struct PersistenceState {
     debug_mode: bool,
 }
 
+/// Resolve the save file location under `base_dir`.
+///
+/// Returns `Err(effective_path)` when the configured path is absolute or
+/// contains `..`, a root or a drive prefix.
+pub(crate) fn save_file_path(
+    config: &PersistenceConfig,
+    base_dir: &Path,
+) -> Result<PathBuf, String> {
+    let effective_path = config.effective_file_path();
+    let relative = Path::new(&effective_path);
+    if relative.is_absolute()
+        || relative.components().any(|c| {
+            matches!(
+                c,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err(effective_path);
+    }
+    Ok(base_dir.join(effective_path))
+}
+
 /// Register the @pasta_persistence module with the Lua state.
 ///
 /// Creates a module table with:
@@ -117,25 +140,14 @@ pub fn register(lua: &Lua, config: &PersistenceConfig, base_dir: &Path) -> LuaRe
     module.set("_VERSION", VERSION)?;
     module.set("_DESCRIPTION", DESCRIPTION)?;
 
-    // Validate file path to prevent directory traversal
-    let effective_path = config.effective_file_path();
-    let relative = Path::new(&effective_path);
-    if relative.is_absolute()
-        || relative.components().any(|c| {
-            matches!(
-                c,
-                Component::ParentDir | Component::RootDir | Component::Prefix(_)
-            )
-        })
-    {
-        return Err(mlua::Error::RuntimeError(format!(
+    let file_path = save_file_path(config, base_dir).map_err(|effective_path| {
+        mlua::Error::RuntimeError(format!(
             "Invalid persistence file path (directory traversal detected): {}",
             effective_path
-        )));
-    }
+        ))
+    })?;
 
     // Create state for closures
-    let file_path = base_dir.join(&effective_path);
     let state = PersistenceState {
         file_path: file_path.clone(),
         obfuscate: config.obfuscate,

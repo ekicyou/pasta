@@ -46,6 +46,7 @@ pub use discovery::discover_files;
 pub use error::{CollidingFile, LoaderError, TranspileFailure};
 
 use crate::config::TranspilerConfig;
+use crate::logging::DEBUG_STATE_TARGET;
 pub use crate::runtime::default_libs;
 use crate::runtime::{PastaLuaRuntime, RuntimeConfig};
 use crate::transpiler::LuaTranspiler;
@@ -216,16 +217,18 @@ impl PastaLoader {
         debug!("Phase 5: Generating scene_dic.lua");
         cache_manager.generate_scene_dic(&module_names)?;
 
-        // Phase 5.5: Build the aggregated `.pasta`↔`.lua` source map (task 4.4).
-        //
-        // Gate on the single resolved debug decision
-        // (`resolve_enabled`: `PASTA_DEBUG` > pasta.toml `[debug] enabled` > false),
-        // so the build happens iff debugging is enabled. On the disabled (default) path we do NOT call
-        // `build_source_map`: no sink is attached, no `SourceMap` is allocated, and
-        // the generated `.lua` from Phase 4 stays byte-invariant (requirements 3.1
-        // / 7.1). The map is built AFTER transpile (Phase 4) so the ordering is
-        // transpile → build map → enable-with-map (requirement 3.1).
-        let debug_enabled = crate::debug::resolve_enabled(config.debug().as_ref());
+        // Phase 5.5: Decide debug before the Lua runtime exists, so a save written
+        // during this load cannot change it. Build the source map only when enabled.
+        // A bad, missing or unreadable save file counts as unset here; Lua's `load`
+        // reports and quarantines it later.
+        let debug_enabled = crate::debug::resolve_enabled(config.debug().as_ref(), || {
+            let path = crate::runtime::persistence::save_file_path(
+                &config.persistence().unwrap_or_default(),
+                &loader_context.base_dir,
+            )
+            .ok()?;
+            crate::runtime::persistence::load_from_file(&path).ok()
+        });
         let source_map = if debug_enabled {
             let map = Self::build_source_map(&pasta_files, &transpiler);
             debug!("Phase 5.5: Built source map for debug session");
@@ -249,8 +252,10 @@ impl PastaLoader {
             source_map,
         )?;
 
-        if runtime.debug_enabled() {
-            info!("Debug enabled: development events are allowed");
+        if debug_enabled {
+            info!(target: DEBUG_STATE_TARGET, "Debug enabled: development events are allowed");
+        } else {
+            info!(target: DEBUG_STATE_TARGET, "Debug disabled: development events are refused");
         }
         info!(path = %base_dir.display(), "Startup sequence completed");
         Ok(runtime)

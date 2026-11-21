@@ -202,7 +202,7 @@ debug_mode = false                            # デバッグログを出す
 
 ## セーブキーの命名規約
 
-`pasta_` で始まるキーはエンジンの予約領域である（[予約グローバル変数](../../grammar/variables.md#予約グローバル変数pasta_-で始まる名前)）。ゴースト固有のキーには `pasta_` を付けず、`talk_count` や `my_flag` のような任意の名前を使う。
+`pasta_` で始まるキーはエンジンの予約領域である（[予約グローバル変数](../../grammar/variables.md#予約グローバル変数pasta_-で始まる名前とデバッグdebug)）。ゴースト固有のキーには `pasta_` を付けず、`talk_count` や `my_flag` のような任意の名前を使う。
 
 ---
 

@@ -78,7 +78,7 @@ export async function runScene(ctx: FlowContext, fileFsPath: string, line1: numb
   }
 }
 
-const NO_SCRIPT_GUIDE = 'ゴーストはスクリプトを返しませんでした（204）。pasta.toml に [debug] enabled = true を書いて、SHIORI をリロードしてください。';
+export const NO_SCRIPT_GUIDE = 'ゴーストはスクリプトを返しませんでした（204）。デバッグが無効なら、「SHIORI デバッグを有効にする」を選んでください。';
 const UNCONFIRMED = 'スクリプトを確かめられませんでした';
 
 export function formatScene(outcome: SceneOutcome): { lines: string[]; notice?: string } {

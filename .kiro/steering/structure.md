@@ -58,9 +58,9 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   ├── element_gen.rs  # 要素生成（分割impl）
 │       │   │   ├── expr_gen.rs     # 式生成（分割impl。値・関数呼び出し・引数・算術/連結の連鎖の組み直し）
 │       │   │   └── source_map.rs   # 記録のシーム（SourceMapSink。行の記録とシーンの宣言）
-│       │   ├── debug/      # 開発用のイベントの部品（`[debug] enabled` のときだけ働く・SHIORI非依存。DAP は 2026-11-03 に撤去）
+│       │   ├── debug/      # 開発用のイベントの部品（有効のときだけ働く・SHIORI非依存。DAP は 2026-11-03 に撤去）
 │       │   │   ├── mod.rs          # 入口（resolve_enabled・source_map の再輸出）
-│       │   │   ├── config.rs       # 有効の解決（PASTA_DEBUG ＞ [debug] enabled ＞ false）
+│       │   │   ├── config.rs       # 有効の解決（PASTA_DEBUG ＞ 保存変数 デバッグ・debug ＞ [debug] enabled ＞ false）
 │       │   │   ├── playscene.rs    # OnPastaSceneAt の位置の引き（@pasta_debug.scene_at）
 │       │   │   └── source_map/     # シーンマップ（mod/scene_index/scene_join。シーンの宣言の記録と索引）
 │       │   │   # 注: 対応する src 内テスト（*_tests.rs）を併置（後述「src/ 内テスト配置方針」）
@@ -218,7 +218,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/NN-*.pasta 13 段/calendar.csv/install/shell/master の立ち絵 18 枚・surfaces.txt)＋生成物(dll/ライセンス表示/scripts は .gitignore 済み)
 │       └── tests/            # 統合テスト・配布ファイル構成検証・全段階の検証（tutorial_stages_test.rs）・立ち絵と当たり判定の検証（shell_assets_test.rs）
 ├── editors/                  # エディタ拡張
-│   ├── shared/              # 拡張とアプリの共有の実行の流れ（vscode・Node・Tauri を読み込まない・"type": "module"）。ghostIO（入出力の面の型）・mcpClient・ghostFiles・reloadShiori・runSceneAtCursor・dumpVariables・devSession（相手の覚えと選び・重なりの止め・見出し・保存の手順）と、偽の入出力 fakeGhostIO による *.test.ts（アプリの npm test が拾う）
+│   ├── shared/              # 拡張とアプリの共有の実行の流れ（vscode・Node・Tauri を読み込まない・"type": "module"）。ghostIO（入出力の面の型）・mcpClient・ghostFiles・reloadShiori・runSceneAtCursor・dumpVariables・debugToggle（SHIORI デバッグの有効・無効の流れ）・devSession（相手の覚えと選び・重なりの止め・見出し・保存の手順）と、偽の入出力 fakeGhostIO による *.test.ts（アプリの npm test が拾う）
 │   ├── recipe/              # pasta-recipe（VS Code を使わずに書く Windows（x64・arm64）のアプリ・Tauri 2 ＋ Vite ＋ Monaco。別の Cargo ワークスペース）
 │   │   ├── src/             # 画面（TypeScript）。純粋な判断（mapping・sync・tabs・scheduler・theme・layout（仕切りと左右の並び））は *.test.ts を node --test で
 │   │   ├── src-tauri/       # Rust の殻（自前の Cargo.lock・deny.toml・about.toml）。paths（ghost/master の探し方と範囲の門・開発の読み取りの門 dev_path）・files・recent・check・watch・commands・dev（127.0.0.1 の候補のポートへだけ送る POST と、進んでいる操作の master の下だけを読む門）・variables（保存変数の表の行・ローカル変数のインライン表）・layout（窓の中の並びの layout.toml）
@@ -236,7 +236,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── sceneOutline.ts         # シーンの並びをアウトライン（DocumentSymbol）と見出しの上の「▶ シーンを実行」（CodeLens）に写す（WASM が読めたときだけ登録）
 │       │   ├── diagnosticsManager.ts   # 診断情報管理
 │       │   ├── documentSync.ts         # ドキュメント同期（200msデバウンス）
-│       │   ├── devCommands.ts          # 開発の 3 コマンド（▶ シーンを実行・SHIORI をリロード・保存変数を表示）の入口（引数 (uri, 0 始まりの行) でも呼べる）。相手の確かめと覚え・保存・出力のパネル「Pasta 開発」
+│       │   ├── devCommands.ts          # 開発の 5 コマンド（▶ シーンを実行・SHIORI をリロード・保存変数を表示・SHIORI デバッグを有効にする・無効にする）の入口（引数 (uri, 0 始まりの行) でも呼べる）。相手の確かめと覚え・保存・出力のパネル「Pasta 開発」
 │       │   ├── nodeGhostIO.ts          # 共有の入出力の面（GhostIO）の Node の実装（HTTP・fs・path）と、ファイルから上ってゴーストを見つける resolveGhost
 │       │   └── test/                   # テスト（mock/vscode.ts と MCP の窓口を真似る fakeMcpServer.ts）
 │       ├── syntaxes/         # TextMate文法（全角/半角マーカー対応）

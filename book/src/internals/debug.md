@@ -16,7 +16,7 @@
 
 この章が責務を持つのは次の事項である。
 
-- 有効化の判定（`resolve_enabled`）と、ランタイムが有効を持つ形
+- 有効化の判定（`resolve_enabled`・`decide`・`save_switch`）と、ランタイムが有効を持つ形
 - 開発用のイベントの門（`pasta.shiori.event.scene_play` の `allowed`）と既定のハンドラ
 - 内部モジュール `@pasta_debug` の 4 つの関数（`enabled`・`scene_at`・`dump_variables`・`is_local_var_name`）
 - シーンマップ: シーンの宣言の記録の作り方と、位置からシーンを引くシーン identity 索引
@@ -25,7 +25,7 @@
 
 次の事項は他の章が権威を持ち、この章では再記述しない。
 
-- 開発用のイベントの引数・応答・失敗の出方は、利用者向けの [OnPastaScene](../lua/shiori-events.md#onpastascene名前でシーンを再生)・[OnPastaSceneAt](../lua/shiori-events.md#onpastasceneat位置でシーンを再生)・[OnPastaDumpVariables](../lua/shiori-events.md#onpastadumpvariablesグローバル変数を書き出す)・[開発用のイベントの共通の決まり](../lua/shiori-events.md#開発用のイベントの共通の決まり) が正である。`[debug]` の書き方は [pasta.toml リファレンス](../reference/pasta-toml.md) が正である。
+- 開発用のイベントの引数・応答・失敗の出方は、利用者向けの [OnPastaScene](../lua/shiori-events.md#onpastascene名前でシーンを再生)・[OnPastaSceneAt](../lua/shiori-events.md#onpastasceneat位置でシーンを再生)・[OnPastaDumpVariables](../lua/shiori-events.md#onpastadumpvariablesグローバル変数を書き出す)・[開発用のイベントの共通の決まり](../lua/shiori-events.md#開発用のイベントの共通の決まり) が正である。`[debug]` の書き方は [pasta.toml リファレンス](../reference/pasta-toml.md)、保存変数による有効化と優先の順は [デバッグの有効化](../debug/index.md#デバッグの有効化) が正である。
 - 止まるエラーの表記の形と、場所が出る・出ない場合の一覧は [止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記) が正である。表記を作って応答にするまでは [止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答) で扱う。
 - 生成器がシンクへ対応を記録する入口（`transpile_with_source_map`・`SourceMapSink`）は [ソースマップ生成の出入口](transpiler.md#ソースマップ生成の出入口) で扱う。
 - ローダの段階構成の中でシーンマップを作る位置（段階 5.5）は [起動の段階構成](loader.md#起動の段階構成) で、`@pasta_chunks` を書き足す searcher は [require の解決（searcher）](loader.md#require-の解決searcher) で扱う。
@@ -40,7 +40,7 @@
 | 要素 | 所在 | 役割 |
 | ---- | ---- | ---- |
 | 入口 | `crates/pasta_lua/src/debug/mod.rs` | `resolve_enabled` の再輸出と、`source_map`・`playscene` のモジュール。`pasta_shiori` を参照しない |
-| 有効化の判定 | `crates/pasta_lua/src/debug/config.rs` | `resolve_enabled`（`PASTA_DEBUG` ＞ `[debug] enabled` ＞ false）と、純粋な部分 `pick`・`parse_env_bool` |
+| 有効化の判定 | `crates/pasta_lua/src/debug/config.rs` | `resolve_enabled`（`PASTA_DEBUG` ＞ 保存変数 `デバッグ`・`debug` ＞ `[debug] enabled` ＞ false）と、純粋な部分 `decide`・`save_switch`・`parse_env_bool` |
 | `[debug]` の型 | `crates/pasta_lua/src/loader/config/sections.rs` | `DebugFileConfig { enabled }`（`#[serde(default)]`。既定は false） |
 | 位置の引き | `crates/pasta_lua/src/debug/playscene.rs` | `resolve_position`。`OnPastaSceneAt` の位置を登録名の組にする |
 | シーンマップ | `crates/pasta_lua/src/debug/source_map/mod.rs` | `SourceMap`（シーンの宣言の記録と索引）・`MapBuilderSink`（シーンだけを控えるシンク）・`canonicalize_pasta_file` |
@@ -64,17 +64,26 @@
 
 ### 有効化の判定
 
-有効化の判定は `resolve_enabled(config.debug())` の 1 回だけで、ローダが段階 5.5 で呼ぶ。読む環境変数は `PASTA_DEBUG` だけである。値は `parse_env_bool` で読み、`1`・`true`・`yes`・`on` を真、`0`・`false`・`no`・`off`・空を偽とし（大小と前後の空白は問わない）、ほかの値は設定されていないのと同じに扱う。環境変数が読めれば `[debug] enabled` より優先し、どちらも無ければ偽である。
+有効化の判定は `resolve_enabled(config.debug(), 保存ファイルを読む閉包)` の 1 回だけで、ローダが段階 5.5 で呼ぶ。Lua が起動する前なので、読み込みの間に Lua が書いた保存変数は、この判定を変えない。4 段の判断は純粋な `decide(env, save, file)` で、`env.or_else(save).or(file).unwrap_or(false)` である。
 
+1. 環境変数 `PASTA_DEBUG`。読む環境変数はこれだけである。値は `parse_env_bool` で読み、`1`・`true`・`yes`・`on` を真、`0`・`false`・`no`・`off`・空を偽とし（大小と前後の空白は問わない）、ほかの値は設定されていないのと同じに扱う。
+2. 保存変数。`PASTA_DEBUG` で決まらないときだけ閉包を呼び、保存ファイルを読む。場所は `runtime/persistence.rs` の `save_file_path` が `[persistence]` と `base_dir` から決める。`save_switch` が根のキー `デバッグ` → `debug` の順に見て、最初の真偽値を採る。真偽値でない値があれば、見た名前を `name`、型を `value_type` に載せた warn を 1 行出し（`save variable is not a boolean; ignored when deciding debug`）、その名前は無いものとして次へ進む。無いキーは警告しない。
+3. `[debug] enabled`。
+4. どれも無ければ偽。
+
+- 保存ファイルが無い・読めない・壊れているときは、保存変数が無いものとして扱う。読み込みは失敗にならず、壊れたファイルの報告と退避は、あとで Lua の `load` が行う。判定は表もファイルも書き換えない。
 - `DebugFileConfig` の欄は `enabled` だけで、`deny_unknown_fields` を付けない。`[debug]` の知らないキーは、`pasta.toml` のほかの節と同じく黙って読み飛ばす。
-- SHIORI の読み込み（リロードを含む）のたびに、ローダが `pasta.toml` を読み直して判定する。
+- SHIORI の読み込み（リロードを含む）のたびに、ローダが `pasta.toml` と保存ファイルを読み直して判定する。
 - 判定が真のときだけ、ローダはシーンマップを作り、`Some(Arc<SourceMap>)` をランタイムに渡す。ランタイムの `source_map: Option<Arc<SourceMap>>` の有無が「デバッグが有効か」の唯一の値であり、別の真偽値は持たない。`PastaLuaRuntime::debug_enabled()` は `source_map.is_some()` を返し、`@pasta_debug.enabled()` も同じ値を返す。
 - ローダを通らない VM（`PastaLuaRuntime::new`・`with_config`）は、いつも無効である。
-- 有効なときは、読み込みの最後（`Startup sequence completed` の直前）に info のログを 1 行出す。
+- ランタイムを作った後、読み込みの最後（`Startup sequence completed` の直前）に、判定の結果を info のログで 1 行出す。有効でも無効でも出す。
 
 ```text
 Debug enabled: development events are allowed
+Debug disabled: development events are refused
 ```
+
+この行の target は `pasta::debug_state`（`DEBUG_STATE_TARGET`）である。読み込みの終わりの行（`SHIORI load entry completed`）の target `pasta::load_entry`（`LOAD_ENTRY_TARGET`）と同じく、ログの絞りを越えて必ず通る（[ログフィルタ](logging-encoding.md#ログフィルタ)）。外の道具（`reload` を待つ VSCode 拡張・pasta-recipe）は、印の行より前のこの行から、読み込み直した結果の有効・無効を知る。
 
 ### 開発用のイベントの門
 
@@ -240,7 +249,7 @@ STOP.location(chunk, line, chunks, line_map)
 - `SourceMap` は構築後に変わらない。シーン identity 索引だけが 1 回書き込まれる。
 - 止まるエラーの場所の決め方は、デバッグの有無で変わらない。
 - `dump_variables` は表を変えず、セーブの門を通らない。書けないときも 204 で、前のファイルを消さない。
-- テストの環境: 開発環境で `PASTA_DEBUG=1` が設定されていると、`PastaLoader::load` を呼ぶテストのデバッグが有効になり、「無効なら 204」を確かめるテストなどの結果が変わる。そのため、読み込みを伴う結合テストは `#[ctor]` で `main` の前に `PASTA_DEBUG`・`PASTA_LOG` を消している（`crates/pasta_lua/tests/common/mod.rs` など）。読み込みを伴うテストを足すときは同じ処置が要る。クレート内の単体テストは、環境変数を読まない `pick` を確かめる。
+- テストの環境: 開発環境で `PASTA_DEBUG=1` が設定されていると、`PastaLoader::load` を呼ぶテストのデバッグが有効になり、「無効なら 204」を確かめるテストなどの結果が変わる。そのため、読み込みを伴う結合テストは `#[ctor]` で `main` の前に `PASTA_DEBUG`・`PASTA_LOG` を消している（`crates/pasta_lua/tests/common/mod.rs` など）。読み込みを伴うテストを足すときは同じ処置が要る。クレート内の単体テストは、環境変数を読まない `decide`・`save_switch` を確かめる。
 
 ## ソースの所在
 

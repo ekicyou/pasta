@@ -286,7 +286,7 @@ pub const fn default_line_newlines() -> f64 {
 
 /// pasta.toml の `[debug]` 節。
 ///
-/// 有効の解決は [`crate::debug::resolve_enabled`]（`PASTA_DEBUG` ＞ `enabled` ＞ false）。
+/// 有効の解決は [`crate::debug::resolve_enabled`]（`PASTA_DEBUG` ＞ 保存変数 `デバッグ`／`debug` ＞ `enabled` ＞ false）。
 /// 知らないキー（古い `port`・`present_as`・`source_map_sidecar` など）は黙って読み飛ばす。
 ///
 /// ```toml

@@ -21,12 +21,15 @@ use crate::loader::LoggingConfig;
 /// SHIORI の読み込みの終わりの行の target。ログの設定によらず info を通す。
 pub const LOAD_ENTRY_TARGET: &str = "pasta::load_entry";
 
+/// デバッグの有効・無効の行の target。ログの設定によらず info を通す。
+pub const DEBUG_STATE_TARGET: &str = "pasta::debug_state";
+
 /// Build an `EnvFilter` from `LoggingConfig`.
 ///
 /// Priority: PASTA_LOG env var > config.filter > config.level.
 /// A `PASTA_LOG` that is unset or unparsable is skipped; an unparsable
 /// config directive falls back to "info".
-/// どの枝でも [`LOAD_ENTRY_TARGET`] の info は通す。
+/// どの枝でも [`LOAD_ENTRY_TARGET`] と [`DEBUG_STATE_TARGET`] の info は通す。
 pub(super) fn build_filter(config: &LoggingConfig) -> EnvFilter {
     build_filter_from(std::env::var("PASTA_LOG").ok().as_deref(), config)
 }
@@ -48,6 +51,11 @@ fn build_filter_from(pasta_log: Option<&str>, config: &LoggingConfig) -> EnvFilt
         // 後から足した指示が作者の同じ target の指示に勝つ
         .add_directive(
             format!("{LOAD_ENTRY_TARGET}=info")
+                .parse()
+                .expect("固定の指示"),
+        )
+        .add_directive(
+            format!("{DEBUG_STATE_TARGET}=info")
                 .parse()
                 .expect("固定の指示"),
         )
@@ -113,15 +121,27 @@ mod tests {
 
     /// `filter` で（読み込みの終わりの行の info, ほかの target の info）が通るか
     fn info_passes(filter: EnvFilter) -> (bool, bool) {
+        info_passes_for(
+            || tracing::info!(target: LOAD_ENTRY_TARGET, "probe"),
+            filter,
+        )
+    }
+
+    /// `filter` で（`emit` の info, ほかの target の info）が通るか
+    fn info_passes_for(emit: fn(), filter: EnvFilter) -> (bool, bool) {
         let count = Arc::new(AtomicUsize::new(0));
         let subscriber =
             tracing_subscriber::registry().with(CountLayer(count.clone()).with_filter(filter));
         tracing::subscriber::with_default(subscriber, || {
-            tracing::info!(target: LOAD_ENTRY_TARGET, "probe");
+            emit();
             let entry = count.swap(0, Ordering::SeqCst) == 1;
             tracing::info!(target: "pasta_lua::other", "probe");
             (entry, count.load(Ordering::SeqCst) == 1)
         })
+    }
+
+    fn emit_debug_state() {
+        tracing::info!(target: DEBUG_STATE_TARGET, "probe");
     }
 
     fn level(level: &str) -> LoggingConfig {
@@ -164,6 +184,28 @@ mod tests {
         };
         // 既定の info に落ちるので、ほかの target の info も通る
         assert_eq!(info_passes(build_filter_from(None, &config)), (true, true));
+    }
+
+    #[test]
+    fn test_debug_state_info_passes_level_warn() {
+        let f = build_filter_from(None, &level("warn"));
+        assert_eq!(info_passes_for(emit_debug_state, f), (true, false));
+    }
+
+    #[test]
+    fn test_debug_state_info_passes_pasta_log() {
+        let f = build_filter_from(Some("error"), &level("info"));
+        assert_eq!(info_passes_for(emit_debug_state, f), (true, false));
+    }
+
+    #[test]
+    fn test_debug_state_info_passes_author_off() {
+        let config = LoggingConfig {
+            filter: Some(format!("{DEBUG_STATE_TARGET}=off,warn")),
+            ..LoggingConfig::default()
+        };
+        let f = build_filter_from(None, &config);
+        assert_eq!(info_passes_for(emit_debug_state, f), (true, false));
     }
 
     #[test]

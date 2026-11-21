@@ -49,6 +49,16 @@
                 "command": "pasta.showSaveVariables",
                 "title": "保存変数を表示",
                 "category": "Pasta"
+            },
+            {
+                "command": "pasta.enableShioriDebug",
+                "title": "SHIORI デバッグを有効にする",
+                "category": "Pasta"
+            },
+            {
+                "command": "pasta.disableShioriDebug",
+                "title": "SHIORI デバッグを無効にする",
+                "category": "Pasta"
             }
         ],
         "menus": {

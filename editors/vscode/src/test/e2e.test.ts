@@ -69,11 +69,11 @@ test('declares no DAP parts: debuggers, breakpoints, onDebug, debug/toolBar, deb
   );
 });
 
-test('declares the 3 dev commands (category Pasta) and their right-click order and conditions (R4.1/R5.1/R6.1)', () => {
+test('declares the 5 dev commands (category Pasta) and their right-click order and conditions (R4.1/R5.1/R6.1)', () => {
   const ghostSource = 'resourceLangId == pasta || resourceLangId == lua || resourceFilename =~ /^pasta\\.toml$/i';
   assert.deepStrictEqual(
     pkg.contributes.commands.map((c: any) => [c.command, c.category]),
-    [['pasta.runSceneAtCursor', 'Pasta'], ['pasta.reloadShiori', 'Pasta'], ['pasta.showSaveVariables', 'Pasta']]
+    [['pasta.runSceneAtCursor', 'Pasta'], ['pasta.reloadShiori', 'Pasta'], ['pasta.showSaveVariables', 'Pasta'], ['pasta.enableShioriDebug', 'Pasta'], ['pasta.disableShioriDebug', 'Pasta']]
   );
   assert.deepStrictEqual(
     pkg.contributes.menus['editor/context'].map((c: any) => [c.command, c.group, c.when]),

@@ -4,7 +4,8 @@
 // 操作はアプリ全体で 1 つずつ（5.1）。始めたときのゴーストのまま、devBegin → execute → devEnd で包む（5.2）。
 import { CANDIDATE_PORTS } from "../../shared/mcpClient.ts";
 import { ghostTarget } from "../../shared/ghostFiles.ts";
-import { DEFAULT_TIMING, type FlowContext, formatReload, reloadAndWait } from "../../shared/reloadShiori.ts";
+import { DEFAULT_TIMING, type FlowContext, type ReloadOutcome, formatReload, reloadAndWait } from "../../shared/reloadShiori.ts";
+import { DISABLE_DEBUG, ENABLE_DEBUG, debugStateOf, formatToggle, toggleDebug } from "../../shared/debugToggle.ts";
 import { BUSY, type DevCommand, type DevHost, DevSession, type Report, clock } from "../../shared/devSession.ts";
 import type { GhostTarget } from "../../shared/ghostFiles.ts";
 import { formatScene, runScene } from "../../shared/runSceneAtCursor.ts";
@@ -34,6 +35,8 @@ export interface DevActionsDeps {
   readonly panels: Pick<Panels, "show">;
   /** 窓（試験で差し替える） */
   readonly dialogs?: { editVariable: typeof editVariable; confirmDelete: typeof confirmDelete; localsDialog: typeof localsDialog };
+  /** 最後に確かめた状態が有効か（ボタンの文を替える） */
+  readonly onDebugState?: (enabled: boolean) => void;
 }
 
 /** 2 つの報告を 1 つの操作の行に。知らせは先のものを採る。ただし後だけが失敗なら、誤りを警告へ下げないよう後を採る */
@@ -41,15 +44,6 @@ export const merge = (a: Report, b: Report): Report =>
   a.notice !== undefined && (a.failure !== undefined || b.failure === undefined)
     ? { ...a, lines: [...a.lines, ...b.lines] }
     : { ...b, lines: [...a.lines, ...b.lines] };
-
-const RELOAD: DevCommand = {
-  title: "SHIORI をリロード",
-  saves: true,
-  run: async (ctx) => {
-    const o = await reloadAndWait(ctx);
-    return { ...formatReload(o), failure: o.kind === "refused" ? o.result : undefined };
-  },
-};
 
 export class DevActions {
   #deps: DevActionsDeps;
@@ -60,6 +54,8 @@ export class DevActions {
   #dialogs: NonNullable<DevActionsDeps["dialogs"]>;
   /** シーンごとに最後に鳴らした組（鍵は ghost.key|rel を大文字|道。ファイルに残さない 8.10） */
   #locals = new Map<string, LocalPair[]>();
+  /** 最後に読み込み直しの後で確かめたゴーストと有効・無効。ファイルに残さず、開いたときに前の pasta.log も読まない */
+  #debugOn: { master: string; on: boolean } | undefined;
 
   constructor(deps: DevActionsDeps) {
     this.#deps = deps;
@@ -89,6 +85,21 @@ export class DevActions {
   setGhost(info: GhostInfo | null): void {
     if (info?.master !== this.#current?.master) this.#deps.vars.clear();
     this.#current = info;
+    // null は切り替えの途中か開けずに戻る前なので、向きを保つ
+    if (info === null) return;
+    if (info.master !== this.#debugOn?.master) this.#debugOn = undefined;
+    this.#deps.onDebugState?.(this.#debugEnabled());
+  }
+
+  #debugEnabled(): boolean {
+    return this.#debugOn !== undefined && this.#debugOn.master === this.#current?.master && this.#debugOn.on;
+  }
+
+  /** 操作のゴーストが今のゴーストのときだけ、読み込み直しの後の有効・無効を覚える */
+  #observe(ctx: FlowContext, reload: ReloadOutcome): void {
+    if (this.#current?.master !== ctx.ghost.master) return;
+    this.#debugOn = { master: ctx.ghost.master, on: debugStateOf(reload) === "enabled" };
+    this.#deps.onDebugState?.(this.#debugOn.on);
   }
 
   get current(): GhostInfo | null {
@@ -96,7 +107,29 @@ export class DevActions {
   }
 
   reload(): Promise<void> {
-    return this.#execute(RELOAD);
+    return this.#execute({
+      title: "SHIORI をリロード",
+      saves: true,
+      run: async (ctx) => {
+        const o = await reloadAndWait(ctx);
+        this.#observe(ctx, o);
+        return { ...formatReload(o), failure: o.kind === "refused" ? o.result : undefined };
+      },
+    });
+  }
+
+  /** 最後に確かめた状態が有効なら無効にし、でなければ有効にする */
+  toggleDebug(): Promise<void> {
+    const enable = !this.#debugEnabled();
+    return this.#execute({
+      title: enable ? ENABLE_DEBUG : DISABLE_DEBUG,
+      saves: true,
+      run: async (ctx) => {
+        const o = await toggleDebug(ctx, enable);
+        if (o.kind === "reloaded") this.#observe(ctx, o.reload);
+        return formatToggle(enable, o);
+      },
+    });
   }
 
   /** ▶: 保存の後の中身を解析し直し、道から今の行を引いて鳴らす（1.1・1.2・1.4）。ローカル変数は送らない（8.11） */
@@ -134,6 +167,7 @@ export class DevActions {
           return { lines: [msg], notice: msg };
         }
         const o = await runScene(ctx, io.join(ctx.ghost.master, ...target.rel.split("/")), line, locals);
+        this.#observe(ctx, o.reload);
         const failure = o.kind === "failed" ? o.result : o.reload.kind === "refused" ? o.reload.result : undefined;
         const report = { ...formatScene(o), failure };
         // 表を読めている間は、鳴らした後に読み直す（6.9）

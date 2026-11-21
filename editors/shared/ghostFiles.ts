@@ -64,7 +64,7 @@ export interface PastaLogLocation {
 
 export const DEFAULT_PASTA_LOG = 'profile/pasta/logs/pasta.log';
 /** デバッグを有効にする案内の通知（RunScene の 4.10・DumpVariables の 6.3 が同じ文を使う） */
-export const DEBUG_HINT = 'pasta.toml に [debug] enabled = true を書いてリロードしてください';
+export const DEBUG_HINT = '「SHIORI デバッグを有効にする」でデバッグを有効にしてください';
 /**
  * pasta.log の場所（5.6）。pasta.toml の [logging] file_path を 3 つの書き方で読み、pasta の logger.rs と同じ条件
  * （最初の部品が profile で後に部品がある・`..` 無し・絶対パスでない）に合えば使う。書かれていなければ既定。書かれているのに読めない・外れるときは既定と note
@@ -193,6 +193,14 @@ export interface PastaLogLine { readonly level: PastaLogLevel | undefined; reado
 export function parsePastaLogLine(line: string): PastaLogLine {
   const m = /^\S+\s+(ERROR|WARN|INFO|DEBUG|TRACE)\s/.exec(line);
   return { level: m ? (m[1] as PastaLogLevel) : undefined, text: line };
+}
+
+export const DEBUG_ENABLED_LINE = 'Debug enabled: development events are allowed';
+export const DEBUG_DISABLED_LINE = 'Debug disabled: development events are refused';
+
+/** pasta.log の 1 行が有効・無効の行なら true・false、ほかは undefined */
+export function debugDecision(line: string): boolean | undefined {
+  return line.includes(DEBUG_ENABLED_LINE) ? true : line.includes(DEBUG_DISABLED_LINE) ? false : undefined;
 }
 
 /** `SHIORI load entry completed` の行なら loaded の値（true・false だけ）、ほかは undefined */

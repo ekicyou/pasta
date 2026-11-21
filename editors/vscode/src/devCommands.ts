@@ -1,7 +1,7 @@
-// DevCommands - 3 つのコマンドの vscode の糊（vscode-mcp-client の設計の DevCommands）
+// DevCommands - 5 つのコマンドの vscode の糊（vscode-mcp-client の設計の DevCommands）
 //
 // 対象の文書（2.5）・ゴースト（2.4）を決め、画面（出力・通知・選ぶ窓・進み具合）と保存を DevHost として DevSession へ渡す。
-// 相手の選び方と覚え・重なりの止め・見出し・保存の手順・通知の分けは共有の devSession。流れの中身は reloadShiori・runSceneAtCursor・dumpVariables。
+// 相手の選び方と覚え・重なりの止め・見出し・保存の手順・通知の分けは共有の devSession。流れの中身は reloadShiori・runSceneAtCursor・dumpVariables・debugToggle。
 
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -11,6 +11,7 @@ import { findGhostMaster } from './ghostValidator';
 import { DEFAULT_TIMING, type FlowContext, type Timing, formatReload, reloadAndWait } from '../../shared/reloadShiori.ts';
 import { formatScene, runScene } from '../../shared/runSceneAtCursor.ts';
 import { dumpVariables, formatDump } from '../../shared/dumpVariables.ts';
+import { DISABLE_DEBUG, ENABLE_DEBUG, formatToggle, toggleDebug } from '../../shared/debugToggle.ts';
 import { type DevHost, DevSession, type Report, clock } from '../../shared/devSession.ts';
 
 export interface DevCommandDeps {
@@ -34,7 +35,7 @@ interface Command {
   readonly id: string;
   readonly title: string;
   readonly accepts: (doc: vscode.TextDocument) => boolean;
-  readonly saves: boolean; // 読み込み直す 2 つだけが保存する（4.2・5.2・6.4）
+  readonly saves: boolean; // 保存変数を表示だけが保存しない
   readonly run: (ctx: FlowContext, target: Target) => Promise<Report>;
 }
 
@@ -52,7 +53,12 @@ const isPasta = (doc: vscode.TextDocument) => doc.languageId === 'pasta';
 const isGhostSource = (doc: vscode.TextDocument) =>
   isPasta(doc) || doc.languageId === 'lua' || path.basename(doc.uri.fsPath).toLowerCase() === 'pasta.toml';
 
-// 拡張はローカル変数も書き換えも送らない（3 つのコマンドだけ）
+// 拡張はローカル変数を送らず、書き換えも ＄＊デバッグ だけ（トグルの 2 つ）
+const toggleCommand = (id: string, title: string, enable: boolean): Command => ({
+  id, title, accepts: isGhostSource, saves: true,
+  run: async (ctx) => formatToggle(enable, await toggleDebug(ctx, enable)),
+});
+
 const COMMANDS: readonly Command[] = [
   {
     id: 'pasta.runSceneAtCursor', title: '▶ シーンを実行', accepts: isPasta, saves: true,
@@ -76,6 +82,8 @@ const COMMANDS: readonly Command[] = [
       return { ...formatDump(o), failure: o.kind === 'failed' ? o.result : undefined };
     },
   },
+  toggleCommand('pasta.enableShioriDebug', ENABLE_DEBUG, true),
+  toggleCommand('pasta.disableShioriDebug', DISABLE_DEBUG, false),
 ];
 
 /** ルートの下（大文字・小文字を問わない）の未保存の .pasta・.lua・pasta.toml を全部保存し、保存できなかったパスを返す */

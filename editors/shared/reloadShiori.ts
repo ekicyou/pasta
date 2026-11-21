@@ -6,7 +6,7 @@
 import { CALL_TIMEOUT_MS, type CallResult, type Endpoint, callTool, describeResult, lastLogId, parseLogEntries } from './mcpClient.ts';
 import type { GhostIO } from './ghostIO.ts';
 import {
-  type GhostTarget, type PastaLogLocation, loadCompletion, openLogCursor, parsePastaLogLine, pastaLogPath, readNewLines, readText,
+  type GhostTarget, debugDecision, type PastaLogLocation, loadCompletion, openLogCursor, parsePastaLogLine, pastaLogPath, readNewLines, readText,
 } from './ghostFiles.ts';
 
 export interface Timing {
@@ -36,6 +36,7 @@ export type ReloadOutcome =
       kind: 'done';
       finished: boolean;              // 印を見たか（false＝時間切れ）
       loaded: boolean | undefined;    // 印の loaded の値
+      debug: boolean | undefined;     // 印より前の有効・無効の行のうち最後のもの（無ければ分からない）
       errors: readonly LoadIssue[];
       warnings: readonly LoadIssue[];
       pastaLogReadable: boolean;
@@ -59,6 +60,7 @@ export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
   const warnings: LoadIssue[] = [];
   let finished = false;
   let loaded: boolean | undefined;
+  let debug: boolean | undefined;
   let pastaLogReadable = false;
   const maxSleeps = Math.ceil(timing.loadTimeoutMs / timing.pollIntervalMs);
   for (let slept = 0; ; slept++) {
@@ -66,6 +68,7 @@ export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
     pastaLogReadable = read !== undefined;
     for (const line of read?.lines ?? []) {
       const mark = loadCompletion(line);
+      debug = debugDecision(line) ?? debug;
       const level = parsePastaLogLine(line).level;
       if (level === 'ERROR' || mark?.loaded === false) {
         errors.push({ source: 'pasta.log', text: line });
@@ -96,7 +99,7 @@ export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
     // 読めなければ誤りが無いとは言えないので、誤りに数えて再生を止める
     errors.push({ source: 'baseware', text: `誤りの記録を読めませんでした: ${describeResult(after)}` });
   }
-  return { kind: 'done', finished, loaded, errors, warnings, pastaLogReadable, pastaLog };
+  return { kind: 'done', finished, loaded, debug, errors, warnings, pastaLogReadable, pastaLog };
 }
 
 /** 再生してよくない（頼めなかった・時間切れ・loaded=false・誤りが 1 つ以上） */
