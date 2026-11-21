@@ -394,7 +394,7 @@ if ($a[0] -eq 'run' -and $a[1] -eq 'view') {
 
     # 起動から見比べまでを偽の gh・node で通す。$Fake は FAKE_* の値（既定は「id を返す起動・success・見比べ 3 回目で一致」）。
     function Invoke-Ghost([hashtable]$Fake = @{}, [string[]]$Extra = @(), [string]$Descript = $descript) {
-        $vals = @{ DISPATCH = '{"workflow_run_id":4242}'; DISPATCH_EXIT = '0'; RUNS = ''; STATUS = 'completed'; CONCLUSION = 'success'; DOWNLOAD = ''; NODE_OUT = 'OK updates.txt: 3 回目で nar の側の 5 行が一致'; NODE_EXIT = '0' }
+        $vals = @{ DISPATCH = '{"workflow_run_id":4242}'; DISPATCH_EXIT = '0'; RUNS = ''; STATUS = 'completed'; CONCLUSION = 'success'; DOWNLOAD = ''; NODE_OUT = 'OK updates.txt: 3 回目で一致'; NODE_EXIT = '0' }
         foreach ($k in $Fake.Keys) { $vals[$k] = $Fake[$k] }
         foreach ($p in $ghLog, $nodeLog) { Set-Content -LiteralPath $p -Value '' }
         $env:FAKE_GH_LOG = $ghLog; $env:FAKE_NODE_LOG = $nodeLog
@@ -426,7 +426,7 @@ if ($a[0] -eq 'run' -and $a[1] -eq 'view') {
         if ($r.Gh -notmatch 'actions/workflows/manual\.yml/dispatches .*ref=main.*return_run_details=true') { "起動の引数が違う: $($r.Gh)" }
         if ($r.Gh -match 'run list') { "workflow_run_id があるのに run list を呼んだ: $($r.Gh)" }
         if ($r.Gh -notmatch 'run view 4242') { "応答の run（4242）を待っていない: $($r.Gh)" }
-        if ($r.Node -notmatch 'verify-live --nar .*hello-pasta\.nar --base https://example\.invalid/hello-pasta/ --attempts 30 --interval 0 --tree v0.0.2:crates/pasta_sample_ghost/ghosts/hello-pasta') { "verify-live の引数が違う: $($r.Node)" }
+        if ($r.Node -notmatch 'verify-live --nar .*hello-pasta\.nar --base https://example\.invalid/hello-pasta/ --attempts 30 --interval 0') { "verify-live の引数が違う: $($r.Node)" }
         if (-not $r.Output.Contains('https://example.invalid/runs/4242')) { "summary に run の URL が無い: $($r.Output)" }
         if (-not $r.Output.Contains('見比べ 3 回')) { "summary に見比べの回数が無い: $($r.Output)" }
     }

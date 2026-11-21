@@ -110,7 +110,6 @@ Settings →「Environments」→「New environment」で作り、「Deployment 
 - `release.yml` の publish-ghost-site は、job の `permissions` に `actions: write` と `contents: read` だけを与えている。ワークフローを起動する（`workflow_dispatch`）ために `actions: write` を使い、リポジトリの読み取りに `contents: read` を使う。
 - 認証は自動で渡される `GITHUB_TOKEN` だけで足りる。Settings の変更・新しい secrets・variables・environment は要らない。
 - 起動される側の `manual.yml` の deploy job は environment `github-pages` を使う。この environment は main のブランチだけに公開を許す設定で、すでに入っている（上の表。変更なし）。
-- 置き場所は、`manual.yml` が `book/tools/ghost-site/assemble-site.sh` で組み立てる。`main` のリポジトリの hello-pasta のファイルに、最新の Release の nar にだけ在るファイルを重ね、最新の Release の `pasta_check release` で検査して `updates.txt` を作り直す。公開は `main` への push と、リリース CI の起動の 2 つで行う。リリース CI の publish-ghost-site の見比べ（verify-live）は、実 URL の `updates.txt` のうち nar の側の行だけを、Release の nar の `updates.txt` の行と md5・大きさで比べる。この組み立てと見比べに、設定の変更は要らない。
 
 ### リポジトリ variables を 3 つ登録する
 

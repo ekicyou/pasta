@@ -10,7 +10,7 @@
   応答に workflow_run_id が無い・API が拒否したときは、起動前の時刻より後に作られた最新の run を gh run list（--branch は -Ref）から探す。無ければ dispatch。
   run の完了を -RunPollSeconds おきに待ち（上限 -RunTimeoutMinutes。過ぎたら transient）、結論が success・cancelled なら見比べへ、それ以外は build。
   -DescriptPath の homeurl は、古いタグの判定と run の完了を終えた後・見比べの直前にだけ読む（無いときは publish）。
-  見比べは ghost-site.mjs verify-live に --tree "<タグ>:crates/pasta_sample_ghost/ghosts/hello-pasta" を渡し、公開した updates.txt が Release の nar の側の行と一致するかを見る（一致で published、合わなければ verify）。Release には触れない（読むだけ）。再実行は最初からやり直す。
+  見比べは ghost-site.mjs verify-live（一致で published、合わなければ verify）。Release には触れない（読むだけ）。再実行は最初からやり直す。
   -Ref が main 以外（リハーサル）では、deploy が main 限定なので見比べず、結論の判定までで終える（status を書かない）。
   -DryRun では判定だけを行い、起動の手前で行うはずの操作を表示して終える。
   skipped のときも reason を出す（置き場所の行に理由を表に出すため）。summary にはタグ・最新タグ・run の URL・見比べの回数を出す。
@@ -115,7 +115,7 @@ try {
         Write-Output "  POST repos/$env:GITHUB_REPOSITORY/actions/workflows/manual.yml/dispatches ref=$Ref return_run_details=true"
         Write-Output "  run の完了を待つ（$RunPollSeconds 秒おき・最大 $RunTimeoutMinutes 分）"
         if ($Ref -ne 'main') { Write-Output "  リハーサル（ref $Ref）なので結論の判定までで終え、見比べない" }
-        else { Write-Output "  ``$DescriptPath`` の homeurl を読み、verify-live で updates.txt を Release の nar の側の行と見比べる（--tree）（$VerifyIntervalSeconds 秒 × $VerifyAttempts 回）" }
+        else { Write-Output "  ``$DescriptPath`` の homeurl を読み、verify-live で updates.txt を見比べる（$VerifyIntervalSeconds 秒 × $VerifyAttempts 回）" }
         exit 0
     }
 
@@ -174,13 +174,13 @@ try {
     $siteBase = if ($homeLine) { $homeLine.Substring('homeurl,'.Length).Trim() }
     if (-not $siteBase) { Complete failed publish "``$DescriptPath`` に homeurl が無い（読めない）" }
     $mjs = Join-Path $PSScriptRoot '../../../book/tools/ghost-site/ghost-site.mjs'
-    $out = @(& $NodeCommand $mjs verify-live --nar $nar --base $siteBase --attempts $VerifyAttempts --interval $VerifyIntervalSeconds --tree "${Tag}:crates/pasta_sample_ghost/ghosts/hello-pasta" 2>&1 | ForEach-Object { "$_" })
+    $out = @(& $NodeCommand $mjs verify-live --nar $nar --base $siteBase --attempts $VerifyAttempts --interval $VerifyIntervalSeconds 2>&1 | ForEach-Object { "$_" })
     $code = $LASTEXITCODE
     $out | ForEach-Object { Write-Host $_ }
     if ($code -ne 0) { Complete failed verify "$siteBase の updates.txt が Release ``$Tag`` の nar と合わない・取れない（$VerifyIntervalSeconds 秒 × $VerifyAttempts 回）" }
-    $m = [regex]::Match($out -join "`n", 'OK updates\.txt: (\d+) 回目で')
+    $m = [regex]::Match($out -join "`n", 'OK updates\.txt: (\d+) 回目で一致')
     if ($m.Success) { $verifyCount = $m.Groups[1].Value }
-    Complete published '' "$siteBase の updates.txt が Release の nar の側の行と一致"
+    Complete published '' "$siteBase の updates.txt が Release の nar と一致"
 }
 catch {
     Complete failed publish "予期しないエラー: $($_.Exception.Message)"
