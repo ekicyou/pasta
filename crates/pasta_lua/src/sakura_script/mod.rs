@@ -62,28 +62,23 @@ struct SakuraScriptState {
 pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table> {
     let config = config.cloned().unwrap_or_default();
 
-    // Initialize tokenizer with regex (compile once at registration time)
     let tokenizer = Tokenizer::new(&config).map_err(|e| {
         mlua::Error::external(format!("Failed to compile sakura script regex: {}", e))
     })?;
 
     let default_wait_values = WaitValues::from_config(&config);
 
-    // Store state in Arc for sharing with closure
     let state = Arc::new(SakuraScriptState {
         tokenizer,
         default_wait_values,
         budoux_parser: budouy::model::load_default_japanese_parser(),
     });
 
-    // Create module table
     let module = lua.create_table()?;
 
-    // Add metadata
     module.set("_VERSION", VERSION)?;
     module.set("_DESCRIPTION", DESCRIPTION)?;
 
-    // Create talk_to_script function
     let state_clone = Arc::clone(&state);
     let talk_to_script = lua.create_function(
         move |_lua, (actor, talk, column): (Value, Option<String>, Option<Table>)| {
@@ -93,7 +88,6 @@ pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table> {
 
     module.set("talk_to_script", talk_to_script)?;
 
-    // Create break_lines function
     let state_clone = Arc::clone(&state);
     let break_lines =
         lua.create_function(move |_lua, (text, widths): (Option<String>, Value)| {
@@ -112,19 +106,16 @@ fn talk_to_script_impl(
     talk: Option<String>,
     column: Option<Table>,
 ) -> LuaResult<String> {
-    // Requirement 6.1: Return empty string for nil or empty input
+    // Return empty string for nil or empty input
     let talk = match talk {
         Some(s) if !s.is_empty() => s,
         _ => return Ok(String::new()),
     };
 
-    // Resolve wait values from actor table or use defaults
     let wait_values = resolve_wait_values(&actor, &state.default_wait_values)?;
 
-    // Tokenize the input
     let tokens = state.tokenizer.tokenize(&talk);
 
-    // Insert waits
     let result = wait_inserter::insert_waits(&tokens, &wait_values);
 
     // budoux の改行（列の状態を受け取ったら、budoux が無くても状態は進める）
@@ -248,13 +239,11 @@ fn table_to_widths(t: &Table) -> LuaResult<Vec<usize>> {
 ///
 /// 3-level fallback: actor -> config -> hardcoded
 fn resolve_wait_values(actor: &Value, defaults: &WaitValues) -> LuaResult<WaitValues> {
-    // If actor is nil or not a table, use defaults
     let actor_table = match actor {
         Value::Table(t) => t,
         _ => return Ok(defaults.clone()),
     };
 
-    // Helper to get i64 from actor table with fallback
     let get_wait =
         |key: &str, default: i64| -> i64 { actor_table.get::<i64>(key).ok().unwrap_or(default) };
 
@@ -278,7 +267,6 @@ fn break_lines_lua_impl(
         _ => return Ok(String::new()),
     };
 
-    // Convert Lua table to Vec<usize>
     let widths_vec: Vec<usize> = match widths {
         Value::Table(t) => table_to_widths(&t)?,
         _ => return Ok(text),

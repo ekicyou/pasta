@@ -46,26 +46,17 @@ pub enum DicSource {
 impl LoaderContext {
     /// Create LoaderContext from PastaConfig.
     ///
-    /// Makes `base_dir` absolute **without resolving 8.3 short names or
-    /// symlinks**, so the form is preserved exactly.
+    /// Makes `base_dir` absolute **without resolving 8.3 short names or symlinks**.
     ///
     /// # Why not `canonicalize()`
     ///
-    /// `base_dir` flows into `package.path`, which determines the chunk name Lua
-    /// reports for every `require`d scene (`@<package.path with ? filled>`). The
-    /// scene map keys `.pasta` paths with separator + case normalization only
-    /// (it does NOT resolve 8.3 short names). The cache paths and the scene map
-    /// all derive from the **raw** `base_dir` the loader was given.
-    ///
-    /// `std::fs::canonicalize()` resolves Windows 8.3 short names to their long
-    /// form (e.g. a temp dir handed in as `C:\Users\RUNNER~1\...` becomes
-    /// `C:\Users\runneradmin\...`) and symlinks, so `package.path` (→ runtime
-    /// chunk names) would diverge from the cache paths and the scene map keys when
-    /// the base path differs from its canonical form — e.g. on CI, whose `%TEMP%`
-    /// is an 8.3 short name. `std::path::absolute` makes the path absolute
-    /// (resolving `.`/`..`) while preserving the exact short/long form, keeping
-    /// every path identity consistent. It also never emits the `\\?\`
-    /// extended-length prefix, so no stripping is needed.
+    /// `base_dir` flows into `package.path`, which fixes the chunk name Lua
+    /// reports for every `require`d scene; the cache paths and scene-map keys also
+    /// derive from the **raw** `base_dir`. `std::fs::canonicalize()` rewrites
+    /// Windows 8.3 short names (CI's `%TEMP%` is one, e.g. `RUNNER~1`) and
+    /// symlinks, so those would diverge from the cache paths and scene-map keys.
+    /// `std::path::absolute` makes the path absolute while preserving its exact
+    /// form, and never emits the extended-length path prefix.
     pub fn from_config(base_dir: &Path, config: &PastaConfig) -> Self {
         let abs_base = std::path::absolute(base_dir).unwrap_or_else(|_| base_dir.to_path_buf());
 
@@ -124,9 +115,7 @@ impl LoaderContext {
             .iter()
             .flat_map(|p| {
                 let abs_path = self.base_dir.join(p);
-                // Normalize path separators to forward slashes for Lua
                 let path_str = abs_path.to_string_lossy().replace('\\', "/");
-                // Return both patterns for each search path
                 vec![
                     format!("{}/?.lua", path_str),
                     format!("{}/?/init.lua", path_str),

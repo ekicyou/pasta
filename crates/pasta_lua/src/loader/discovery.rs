@@ -57,7 +57,6 @@ fn has_symlink_component(base_dir: &Path, path: &Path) -> std::io::Result<bool> 
 /// * `Ok(Vec<PathBuf>)` - List of discovered files (may be empty)
 /// * `Err(LoaderError)` - Directory not found or pattern error
 pub fn discover_files(base_dir: &Path, patterns: &[String]) -> Result<Vec<PathBuf>, LoaderError> {
-    // Verify base directory exists
     if !base_dir.exists() {
         return Err(LoaderError::directory_not_found(base_dir));
     }
@@ -69,7 +68,6 @@ pub fn discover_files(base_dir: &Path, patterns: &[String]) -> Result<Vec<PathBu
     let mut files = Vec::new();
 
     for pattern in patterns {
-        // Reject patterns with directory traversal components
         if contains_traversal(pattern) {
             tracing::warn!(
                 pattern = %pattern,
@@ -113,7 +111,6 @@ pub fn discover_files(base_dir: &Path, patterns: &[String]) -> Result<Vec<PathBu
                 Ok(false) => {}
             }
 
-            // Skip files in profile/ directory
             if is_in_profile_dir(base_dir, &path) {
                 tracing::debug!(path = %path.display(), "Skipping profile file");
                 continue;

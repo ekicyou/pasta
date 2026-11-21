@@ -4,7 +4,7 @@
 //! cargo ディレクティブ（`cargo:` 出力）や `OUT_DIR` への依存は **一切持たない**。
 //! ここにあるのは、ソースツリーのパスからバイト決定論的な zip blob を生成する純関数のみ。
 //!
-//! 決定論の担保（pasta-scripts-self-deploy Req 4.3）:
+//! 決定論の担保:
 //! - エントリ名（相対パス・常に `/` 区切り）でソート（BTreeMap）
 //! - `last_modified_time` を固定値（DateTime::default）に
 //! - Unix 権限を固定（0o644）に
@@ -22,8 +22,8 @@ const FIXED_COMPRESSION_LEVEL: i64 = 6;
 
 /// `root` ツリー全体から決定論的（byte-deterministic）な zip blob を生成する。
 ///
-/// 同一内容のソースからは常にバイト同一の blob を返す（Req 4.3/4.4）。
-/// 内容が1ファイルでも変化すれば blob が変化し、MD5 も変化する（Req 4.5）。
+/// 同一内容のソースからは常にバイト同一の blob を返す。
+/// 内容が1ファイルでも変化すれば blob が変化し、MD5 も変化する。
 pub fn build_deterministic_zip(root: &Path) -> Vec<u8> {
     let mut files: BTreeMap<String, PathBuf> = BTreeMap::new();
     let mut dirs: Vec<PathBuf> = Vec::new();
@@ -71,7 +71,7 @@ pub fn collect(
                 .strip_prefix(root)
                 .unwrap_or_else(|e| panic!("strip_prefix failed for {}: {e}", path.display()))
                 .to_string_lossy()
-                // Windows の `\` を `/` に正規化し、OS 間でエントリ名を安定化（4.3）。
+                // Windows の `\` を `/` に正規化し、OS 間でエントリ名を安定化。
                 .replace('\\', "/");
             files.insert(rel, path);
         }
@@ -91,7 +91,7 @@ fn pack(files: &BTreeMap<String, PathBuf>) -> Vec<u8> {
         .last_modified_time(DateTime::default())
         .unix_permissions(0o644);
 
-    // BTreeMap のイテレーションはキー（entry_name）昇順 = ソート済み（4.3）。
+    // BTreeMap のイテレーションはキー（entry_name）昇順 = ソート済み。
     for (entry_name, abs_path) in files {
         let bytes = std::fs::read(abs_path)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", abs_path.display()));

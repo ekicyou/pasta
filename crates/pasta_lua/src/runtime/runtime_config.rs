@@ -70,12 +70,11 @@ pub struct RuntimeConfig {
     /// (e.g. `attempt to index global 'os' (a nil value)`).
     pub libs: Vec<String>,
 
-    /// Global scene name alias table (scene-name-alias).
+    /// Global scene name alias table.
     ///
     /// The runtime hands this ONE table to both `@pasta_search` registration
     /// points: the initial registration at VM init and the re-registration by
-    /// `finalize_scene`. Defaults to the **empty** table (no aliases), so every
-    /// existing constructor keeps the pre-alias search behavior. It must match
+    /// `finalize_scene`. Defaults to the **empty** table (no aliases). It must match
     /// the table the transpiler used for the same dictionary (the loader
     /// guarantees this).
     pub scene_aliases: SceneAliasTable,
@@ -188,9 +187,7 @@ impl RuntimeConfig {
                 (false, lib.as_str())
             };
 
-            // Only process std_* prefixed names for StdLib
             if !name.starts_with("std_") {
-                // Non-std_ names are silently ignored
                 continue;
             }
 
@@ -203,8 +200,6 @@ impl RuntimeConfig {
             }
         }
 
-        // Remove subtractions from additions using XOR on the intersection
-        // First find bits that are in both, then XOR them out of additions
         let intersection = additions & subtractions;
         Ok(additions ^ intersection)
     }
@@ -255,7 +250,6 @@ impl RuntimeConfig {
     ///
     /// Emits `tracing::debug` for enabled libraries list.
     pub fn validate_and_warn(&self) {
-        // Check for security-sensitive Lua libraries
         let has_std_debug = self.libs.iter().any(|lib| lib == "std_debug");
         let has_std_all_unsafe = self.libs.iter().any(|lib| lib == "std_all_unsafe");
         let debug_subtracted = self
@@ -279,7 +273,6 @@ impl RuntimeConfig {
             }
         }
 
-        // Log enabled libraries at debug level
         tracing::debug!(libs = ?self.libs, "Lua library configuration");
     }
 }
@@ -354,14 +347,14 @@ mod with_ffi_tests {
     use crate::context::TranspileContext;
     use crate::runtime::PastaLuaRuntime;
 
-    /// 偽なら何もしない（1.3・8.1）。既定のライブラリの組み合わせも変えない（8.4）。
+    /// 偽なら何もしない。既定のライブラリの組み合わせも変えない。
     #[test]
     fn with_ffi_false_leaves_libs_unchanged() {
         assert_eq!(RuntimeConfig::new().with_ffi(false).libs, default_libs());
         assert!(!default_libs().iter().any(|l| l == "std_ffi"));
     }
 
-    /// 真なら `std_ffi` を足し、StdLib の FFI が立つ（1.2）。
+    /// 真なら `std_ffi` を足し、StdLib の FFI が立つ。
     #[test]
     fn with_ffi_true_adds_std_ffi() {
         let config = RuntimeConfig::new().with_ffi(true);
@@ -369,8 +362,7 @@ mod with_ffi_tests {
         assert!(config.to_stdlib().unwrap().contains(StdLib::FFI));
     }
 
-    /// 真で作った VM はグローバルの `ffi` と `require "ffi"` が同じ表、
-    /// 偽なら今までどおり `nil`（1.2・1.3）。
+    /// 真で作った VM はグローバルの `ffi` と `require "ffi"` が同じ表、偽なら `nil`。
     #[test]
     fn vm_has_ffi_global_only_when_enabled() {
         let on = PastaLuaRuntime::with_config(

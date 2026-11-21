@@ -98,19 +98,16 @@ end
 --- @param skip_methods boolean|nil true で継承したメソッドに届かせない。nil/false は既存どおり
 --- @return any|nil 見つかったハンドラー、またはnil
 function PROXY_IMPL.find_actor_handler(self, mode, key, skip_methods)
-    -- アクター検索は word モードのみ
     if mode ~= "word" then
         return nil
     end
 
-    -- A1: proxy.actor[key] 完全一致（skip_methods 時は表自身のフィールドだけ）
     local actor_value
     if skip_methods then actor_value = rawget(self.actor, key) else actor_value = self.actor[key] end
     if actor_value ~= nil then
         return actor_value
     end
 
-    -- A2: アクター辞書前方一致（@pasta_search 利用可能時のみ）
     local ok, SEARCH = pcall(require, "@pasta_search")
     if ok and SEARCH then
         local actor_scope = "__actor_" .. self.actor.name .. "__"
@@ -132,12 +129,10 @@ end
 --- @param skip_methods boolean|nil find_actor_handler・act:find_act_handler の両方へ渡す
 --- @return any|nil
 function PROXY_IMPL.find_handler(self, mode, key, skip_methods)
-    -- まずアクターレベル検索
     local handler = self:find_actor_handler(mode, key, skip_methods)
     if handler ~= nil then
         return handler
     end
-    -- マッチしなければ act:find_act_handler に委譲
     return self.act:find_act_handler(mode, key, skip_methods)
 end
 
@@ -240,10 +235,8 @@ function PROXY_IMPL.word(self, name, var_path)
 end
 
 -- CONFIG 由来アクターへのメタテーブル設定
--- STORE.actors の各テーブル要素に ACTOR_IMPL メタテーブルを設定し、name を補完
 for name, actor in pairs(STORE.actors) do
     if type(actor) == "table" then
-        -- name フィールドがなければ辞書キーから補完
         if actor.name == nil then
             actor.name = name
         end

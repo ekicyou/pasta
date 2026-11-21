@@ -1,15 +1,13 @@
 //! Output normalization for Pasta Lua transpiler.
 //!
-//! This module provides output buffer normalization to remove trailing blank lines
-//! and ensure consistent EOF markers.
+//! Removes trailing blank lines and ends the output with exactly one newline.
 
 /// Old-line → new-line shift map produced by output normalization.
 ///
 /// Normalization is **deletion-only** (it removes only the trailing blank lines /
-/// trailing whitespace). This map
-/// records which pre-normalize line numbers were deleted so a consumer can rebase
-/// recorded pre-normalize line positions onto the final `.lua` line numbers
-/// (Requirement 2.1).
+/// trailing whitespace). This map records which pre-normalize line numbers were
+/// deleted so a consumer can rebase recorded pre-normalize line positions onto the
+/// final `.lua` line numbers.
 ///
 /// # Line-number domain
 /// Both the input (`pre_line`) and the output of [`map`](LineShift::map) are
@@ -35,12 +33,9 @@ impl LineShift {
     /// its 1-based line number in the final output. The result is monotonically
     /// increasing in `pre_line`.
     pub fn map(&self, pre_line: u32) -> Option<u32> {
-        // Deleted lines have no final position.
         if self.deleted.binary_search(&pre_line).is_ok() {
             return None;
         }
-        // The final line number is the pre-normalize number minus the count of
-        // deleted lines strictly before it.
         let deleted_before = self.deleted.partition_point(|&d| d < pre_line) as u32;
         Some(pre_line - deleted_before)
     }
@@ -54,7 +49,7 @@ impl LineShift {
 /// 2. Removes trailing whitespace (spaces, tabs, newlines)
 /// 3. Appends exactly one newline
 ///
-/// See [`LineShift`] for the line-number domain and invariants (Requirement 2.1).
+/// See [`LineShift`] for the line-number domain and invariants.
 ///
 /// # Preconditions
 /// - `input` is the full intermediate code-generation buffer (valid UTF-8).
@@ -75,28 +70,22 @@ impl LineShift {
 /// assert_eq!(normalize_output_with_shift("    end\n\nend\n").0, "    end\n\nend\n");
 /// ```
 pub fn normalize_output_with_shift(input: &str) -> (String, LineShift) {
-    // Normalize CRLF to LF first
     let input_lf = input.replace("\r\n", "\n");
 
-    // Split into lines (preserving the content, not the line endings).
     // `lines[idx]` is pre-normalize line number `idx + 1` (1-based, == out_line).
     let lines: Vec<&str> = input_lf.lines().collect();
 
-    // Every line survives except the trailing whitespace-only lines: the last line
-    // that contains any non-whitespace character is kept, everything after it is
-    // deleted (all lines when none is kept). Ascending by construction.
+    // Only the whitespace-only lines after the last content line are deleted.
     let kept = lines
         .iter()
         .rposition(|l| !l.trim().is_empty())
         .map_or(0, |k| k + 1);
     let deleted: Vec<u32> = (kept + 1..=lines.len()).map(|n| n as u32).collect();
 
-    // Trim trailing whitespace (spaces, tabs, carriage returns, newlines). This
-    // removes the trailing blank lines and trims in-line trailing whitespace on
-    // the last kept line (NOT a line deletion — it does not change the count).
+    // Also trims in-line trailing whitespace on the last kept line, which is not a
+    // line deletion.
     let trimmed = input_lf.trim_end_matches([' ', '\t', '\r', '\n']);
 
-    // Return with exactly one newline at end
     (format!("{}\n", trimmed), LineShift { deleted })
 }
 
@@ -104,62 +93,51 @@ pub fn normalize_output_with_shift(input: &str) -> (String, LineShift) {
 mod tests {
     use super::*;
 
-    /// Test 1: Empty input should return single newline
     #[test]
     fn test_normalize_empty_input() {
         assert_eq!(normalize_output_with_shift("").0, "\n");
     }
 
-    /// Test 2: Input already ending with single newline should remain unchanged
     #[test]
     fn test_normalize_existing_single_newline() {
         assert_eq!(normalize_output_with_shift("code\n").0, "code\n");
     }
 
-    /// Test 3: Single extra trailing blank line should be removed
     #[test]
     fn test_normalize_single_extra_blank_line() {
         assert_eq!(normalize_output_with_shift("code\n\n").0, "code\n");
     }
 
-    /// Test 4: Multiple extra trailing blank lines should be removed
     #[test]
     fn test_normalize_multiple_extra_blank_lines() {
         assert_eq!(normalize_output_with_shift("code\n\n\n").0, "code\n");
     }
 
-    /// Test 5: Intermediate blank lines should be preserved
     #[test]
     fn test_normalize_preserves_intermediate_blank_lines() {
         assert_eq!(normalize_output_with_shift("a\n\nb\n\n").0, "a\n\nb\n");
     }
 
-    /// Test 6: CRLF input should be normalized to LF only
     #[test]
     fn test_normalize_crlf_input() {
         assert_eq!(normalize_output_with_shift("code\r\n\r\n").0, "code\n");
     }
 
-    /// Test 7: Mixed CRLF and LF - all normalized to LF
     #[test]
     fn test_normalize_mixed_line_endings() {
-        // CRLF is normalized to LF
         assert_eq!(normalize_output_with_shift("a\r\nb\n\r\n\n").0, "a\nb\n");
     }
 
-    /// Test 8: Trailing whitespace only
     #[test]
     fn test_normalize_trailing_whitespace_only() {
         assert_eq!(normalize_output_with_shift("code\n  \t\n").0, "code\n");
     }
 
-    /// Test 9: No trailing newline in input
     #[test]
     fn test_normalize_no_trailing_newline() {
         assert_eq!(normalize_output_with_shift("code").0, "code\n");
     }
 
-    /// Test 10: Multiple content lines with trailing blanks
     #[test]
     fn test_normalize_multi_line_content() {
         let input = "line1\nline2\nline3\n\n\n";
@@ -169,7 +147,7 @@ mod tests {
         );
     }
 
-    /// Test 11: Blank lines before `end` are kept (they may be Lua block
+    /// Blank lines before `end` are kept (they may be Lua block
     /// content, e.g. inside a long string); every line maps to itself.
     #[test]
     fn test_normalize_keeps_blank_lines_before_end() {
@@ -182,7 +160,7 @@ mod tests {
         );
     }
 
-    // --- LineShift tests (Requirement 2.1) ---
+    // --- LineShift ---
 
     /// Trailing blank lines are deleted (whole-line) and map to None; in-line
     /// trailing whitespace trim on the last content line is NOT a line deletion.
@@ -203,8 +181,7 @@ mod tests {
         assert_eq!(shift.map(4), None);
     }
 
-    /// In-line trailing whitespace on a content line trims characters but does NOT
-    /// remove the line, so the line number is unchanged (no deletion recorded).
+    /// A whitespace-only trailing line is deleted; the content line keeps its number.
     #[test]
     fn test_shift_inline_trailing_whitespace_not_a_deletion() {
         // pre-normalize (1-based):
@@ -241,8 +218,6 @@ mod tests {
 
     /// Empty input: the producer emits no lines, so there are zero recorded
     /// pre-normalize lines and nothing is deleted. Output is a lone newline.
-    /// (`map` is only defined over recorded pre-lines `1..=lines.len()`; for empty
-    /// input that range is empty, so no `map` query is in-domain.)
     #[test]
     fn test_shift_empty_input() {
         let (s, shift) = normalize_output_with_shift("");

@@ -1,7 +1,7 @@
 //! Loader file discovery and incremental processing.
 //!
 //! Sibling submodule of [`super`] holding the discovery + incremental
-//! transpile/copy responsibilities split out of `loader/mod.rs` (C3).
+//! transpile/copy responsibilities.
 
 use super::discovery;
 use super::{CacheManager, CollidingFile, LoaderError, PastaLoader, TranspileFailure};
@@ -50,7 +50,6 @@ impl PastaLoader {
         pasta_patterns: &[String],
         cache_manager: &CacheManager,
     ) -> Result<(Vec<std::path::PathBuf>, Vec<std::path::PathBuf>), LoaderError> {
-        // Discover .pasta files
         let pasta_files = discovery::discover_files(base_dir, pasta_patterns)?;
         if pasta_files.is_empty() {
             // 空の警告は `.pasta` 側だけで出す。下の `.lua` 探索は `.pasta` パターンから
@@ -62,7 +61,6 @@ impl PastaLoader {
             );
         }
 
-        // Generate .lua patterns from .pasta patterns
         let lua_patterns: Vec<String> = pasta_patterns
             .iter()
             .filter_map(|p| {
@@ -75,7 +73,6 @@ impl PastaLoader {
             })
             .collect();
 
-        // Discover .lua files
         let lua_files = if lua_patterns.is_empty() {
             Vec::new()
         } else {
@@ -103,13 +100,11 @@ impl PastaLoader {
             return Err(LoaderError::ModuleNameCollision { groups });
         }
 
-        // Build HashSet of folded .pasta module names for conflict detection
         let pasta_module_names: std::collections::HashSet<String> = pasta_files
             .iter()
             .map(|f| cache_manager.source_to_module_name(f).to_lowercase())
             .collect();
 
-        // Filter out conflicting .lua files
         let mut filtered_lua_files = Vec::new();
         for lua_file in &lua_files {
             let module_name = cache_manager.source_to_module_name(lua_file);
@@ -147,9 +142,7 @@ impl PastaLoader {
             copied: 0,
         };
 
-        // Process .pasta files (transpile)
         for file_path in pasta_files {
-            // Check if transpilation is needed
             let needs_transpile = cache_manager.needs_transpile(file_path).unwrap_or(true);
 
             // Always collect module name for scene_dic.lua
@@ -165,7 +158,6 @@ impl PastaLoader {
             // 元の時刻は内容を読む前に取る（読んだ後の書き換えを次の起動で拾うため）
             let source_mtime = source_mtime(file_path);
 
-            // Read and parse
             let content = match fs::read_to_string(file_path) {
                 Ok(c) => c,
                 Err(e) => {
@@ -192,11 +184,11 @@ impl PastaLoader {
             };
 
             // 生成コードの行の対応には、ゴーストのフォルダーから見た形のファイルを載せる
-            // （runtime-error-balloon 2.5。例 `dic\天気.pasta`）
+            // （例 `dic\天気.pasta`）
             pasta_file.path = cache_manager.get_relative_path(file_path).into();
 
             // Transpile (the per-file context is dropped: before finalize
-            // @pasta_search always starts from an empty registry, 3.1)
+            // @pasta_search always starts from an empty registry)
             let mut output = Vec::new();
             if let Err(e) = transpiler.transpile(&pasta_file, &mut output) {
                 failures.push(TranspileFailure {
@@ -219,7 +211,6 @@ impl PastaLoader {
                 }
             };
 
-            // Save to cache (a failure fails the load, same as the .lua copy)
             if let Err(e) = cache_manager.save_cache(file_path, &lua_code) {
                 failures.push(TranspileFailure {
                     source_path: file_path.clone(),
@@ -234,7 +225,6 @@ impl PastaLoader {
             debug!(file = %file_path.display(), module = %module_name, "Transpiled");
         }
 
-        // Process .lua files (copy passthrough)
         for file_path in lua_files {
             let needs_copy = cache_manager.needs_transpile(file_path).unwrap_or(true);
 
@@ -250,7 +240,6 @@ impl PastaLoader {
 
             let source_mtime = source_mtime(file_path);
 
-            // Read .lua file content directly (no parse/transpile)
             let content = match fs::read_to_string(file_path) {
                 Ok(c) => c,
                 Err(e) => {
@@ -268,7 +257,6 @@ impl PastaLoader {
                 }
             };
 
-            // Save to cache (direct copy)
             if let Err(e) = cache_manager.save_cache(file_path, &content) {
                 error!(
                     file = %file_path.display(),
@@ -288,7 +276,6 @@ impl PastaLoader {
             debug!(file = %file_path.display(), module = %module_name, "Copied .lua");
         }
 
-        // Abort on any failures
         if !failures.is_empty() {
             for failure in &failures {
                 error!(
@@ -314,7 +301,7 @@ fn source_mtime(file_path: &Path) -> Option<SystemTime> {
     fs::metadata(file_path).and_then(|m| m.modified()).ok()
 }
 
-/// 書いたキャッシュの時刻を元にそろえる。失敗しても読み込みは続ける（1.7）。
+/// 書いたキャッシュの時刻を元にそろえる。失敗しても読み込みは続ける。
 fn stamp_cache(cache_manager: &CacheManager, file_path: &Path, source_mtime: Option<SystemTime>) {
     let Some(mtime) = source_mtime else {
         debug!(file = %file_path.display(), "Source mtime unavailable; cache mtime not aligned");

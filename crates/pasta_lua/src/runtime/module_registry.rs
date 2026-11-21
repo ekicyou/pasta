@@ -1,7 +1,4 @@
 //! Module registration functions for PastaLuaRuntime.
-//!
-//! This file contains the `impl PastaLuaRuntime` methods that register
-//! various Lua modules (split impl pattern).
 
 use super::PastaLuaRuntime;
 use super::calendar;
@@ -18,10 +15,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// Register a module into `package.loaded` under the given name.
-///
-/// This is the shared helper that eliminates the repeated
-/// `package` → `loaded` → `set` → `tracing::debug!` boilerplate
-/// found in every `register_*_module` function.
 fn set_loaded_module(lua: &Lua, name: &str, module: impl IntoLua) -> LuaResult<()> {
     let package: Table = lua.globals().get("package")?;
     let loaded: Table = package.get("loaded")?;
@@ -37,14 +30,12 @@ impl PastaLuaRuntime {
     /// in priority order (first path has highest priority).
     ///
     /// 検索パス設定は [`LoaderContext::generate_package_path`] の UTF-8 文字列を
-    /// **無変換で**設定する（要件 2.1・設計 PackagePathSetup）。ANSI 変換は行わない
-    /// ため、非 ANSI の設置パスで設定が失敗する経路を持たない。ASCII パスでは
-    /// 変更前とバイト同一である。設定は従来どおり上書きで、`package.cpath` は
-    /// 変更しない。
+    /// **無変換で**設定する。ANSI 変換をしないので、非 ANSI の設置パスでも失敗しない。
+    /// 上書きで設定し、`package.cpath` は変更しない。
     ///
     /// あわせて [`install_module_searcher`] を設置し、`require` のファイル解決を
-    /// narrow `fopen` から Rust std（wide API）へ移す。これにより長パス（要件 1.4）と
-    /// 非 ASCII のモジュール名・設置パス（要件 3.8）が解決できるようになる。
+    /// narrow `fopen` から Rust std（wide API）へ移す。長パスと非 ASCII のモジュール名・
+    /// 設置パスを解決するため。
     ///
     /// Windows では、FFI を開いた VM（`[loader] ffi = true`）に限り `ffi.load` を
     /// 包むラッパを設置する（`ffi_load::install`）。DLL をゴーストの探索のフォルダから
@@ -132,7 +123,6 @@ impl PastaLuaRuntime {
         config: &Option<PastaConfig>,
         base_dir: &Option<PathBuf>,
     ) -> LuaResult<()> {
-        // Get persistence config, use defaults if not specified
         let persistence_config = config
             .as_ref()
             .and_then(|c| c.persistence())
@@ -149,7 +139,6 @@ impl PastaLuaRuntime {
         lua: &Lua,
         config: &Option<PastaConfig>,
     ) -> LuaResult<()> {
-        // Get talk config, use defaults if not specified
         let talk_config = config.as_ref().and_then(|c| c.talk());
         let sakura_module = crate::sakura_script::register(lua, talk_config.as_ref())?;
         set_loaded_module(lua, "@pasta_sakura_script", sakura_module)
@@ -180,7 +169,7 @@ impl PastaLuaRuntime {
     /// argument is a Lua error. Always available, independent of RuntimeConfig.libs.
     pub(crate) fn register_toml_module(lua: &Lua) -> LuaResult<()> {
         let table = lua.create_table()?;
-        // Value で受ける: mlua の String は数を文字列へ変えてしまう（要件 2.7）。
+        // Value で受ける: mlua の String は数を文字列へ変えてしまう。
         let decode = lua.create_function(|lua, text: Value| {
             let Value::String(text) = text else {
                 return Err(mlua::Error::runtime(format!(
@@ -200,14 +189,14 @@ impl PastaLuaRuntime {
         set_loaded_module(lua, "@toml", table)
     }
 
-    /// Register the internal `@pasta_debug` module（scene-play-event 2.1/4.1/4.2）。
+    /// Register the internal `@pasta_debug` module.
     ///
     /// 関数は 4 つ: `enabled()` はシーンマップの有無（`debug_enabled()` と同じ値）、
     /// `scene_at(file, line)` は位置を登録名の組 `(大域, ローカル)` に引く。マップが無い、
     /// 行が `1..=u32::MAX` の整数でない、見つからないときはエラーにせず nil を返す。
     /// `dump_variables(save)` は表を `profile/pasta/debug/variables.toml` にテキストの TOML で書く。
     /// 書けなければ警告を 1 行書くだけでエラーを上げない。
-    /// `is_local_var_name(s)` は `s` の全体が `＄名前` のローカル変数名の決まりに当たるか（scene-play-locals 4.2）。
+    /// `is_local_var_name(s)` は `s` の全体が `＄名前` のローカル変数名の決まりに当たるか。
     /// 有効かは見ない（門は scene_play.lua）。
     /// 本番の入口（`from_loader_with_scene_dic`）だけが呼ぶ。
     pub(crate) fn register_debug_module(

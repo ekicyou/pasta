@@ -32,7 +32,6 @@ impl SourceMapSink for MapBuilderSink {
             .push((scene_join_key.to_string(), span.start_line as u32));
     }
 
-    // 行の記録は使わない。
     fn record_line(&mut self, _lua_line: u32, _pasta_line: u32) {}
 }
 

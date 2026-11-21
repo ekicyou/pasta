@@ -54,8 +54,7 @@ fn escape_with_single_char_sequence_emits_nothing() {
 }
 
 /// `\\` and `\%` escapes talk both characters (`[[\\]]`/`[[\%]]` evaluate to the 2-char
-/// strings), while `＠＠`/`＄＄`/`@@`/`$$` keep talking only the second character
-/// (Req 4.1/4.6/4.7; paragraph-break-tag-only-talk Req 8.4).
+/// strings), while `＠＠`/`＄＄`/`@@`/`$$` keep talking only the second character.
 #[test]
 fn escape_backslash_talks_two_chars_others_talk_one() {
     let cases = [
@@ -176,7 +175,7 @@ fn continue_action_inherits_actor_from_preceding_action_line() {
 }
 
 /// The marker line of an action line / continuation line is recorded against
-/// that line's own `.pasta` span (actor-line-newlines 2.2, 6.4).
+/// that line's own `.pasta` span.
 #[test]
 fn line_marker_is_recorded_with_its_line_span() {
     let mut sink = CapturingSink::default();
@@ -295,7 +294,7 @@ fn var_ref(name: &str, scope: VarScope) -> Expr {
     }
 }
 
-/// Tail static call is unchanged: `return act:call(...)` (Lua TCO, Req 4.9).
+/// Tail static call is unchanged: `return act:call(...)` (Lua TCO).
 #[test]
 fn call_scene_tail_call_prepends_return() {
     let text = gen_to_string(|cg| {
@@ -310,9 +309,8 @@ fn call_scene_tail_call_prepends_return() {
     );
 }
 
-/// The 4 forms: tail/mid × static/dynamic (Req 1.8, 4.9). The key expression
-/// sits left of the args (evaluation order unchanged, Req 5.9, 6.5) and no
-/// `tostring(...)` is generated.
+/// The 4 forms: tail/mid × static/dynamic. The key expression sits left of the
+/// args (evaluation order unchanged) and no `tostring(...)` is generated.
 #[test]
 fn call_scene_dynamic_tail_and_mid_forms() {
     let args = || {
@@ -483,7 +481,7 @@ fn word_definition_actor_form() {
 }
 
 /// 値が 200 個までなら `:entry(…)` は 1 回（今までと同じ出力）。300 個なら
-/// 200 個と 100 個の 2 回の `:entry` に分かれ、同じ 1 行に続く（Requirement 5.1）。
+/// 200 個と 100 個の 2 回の `:entry` に分かれ、同じ 1 行に続く。
 #[test]
 fn word_definition_splits_entry_every_200_values() {
     let values = |n: usize| -> Vec<String> { (0..n).map(|i| format!("v{i}")).collect() };
@@ -597,7 +595,7 @@ fn code_block_is_not_indented_and_keeps_blank_lines_before_end() {
 /// Every action arm emits ONE line that obtains the actor through
 /// `act:actor_proxy("名前")` (name passed as a string literal), keeping the
 /// arguments unchanged. Actor names colliding with act members / Lua
-/// keywords (`talk`, `var`, `end`) produce the same form (Req 2.1, 2.2, 5.3, 5.4).
+/// keywords (`talk`, `var`, `end`) produce the same form.
 #[test]
 fn action_arms_use_actor_proxy_with_string_name_for_any_actor() {
     let one = || Args {
@@ -689,7 +687,7 @@ fn action_arms_use_actor_proxy_with_string_name_for_any_actor() {
 }
 
 // ------------------------------------------------------------------
-// 式文 `＄＝式`（VarSet name=None）の生成形（expr-nil-coercion 1.4・2.4）
+// 式文 `＄＝式`（VarSet name=None）の生成形
 // ------------------------------------------------------------------
 
 /// 式が関数呼び出しそのもの（`FnCall`・`DynamicFnCall`）なら現行どおり 1 行に書き、
@@ -713,7 +711,6 @@ fn expr_statement_wraps_non_call_expressions_in_discard_block() {
         scope: FnScope::Local,
     };
     let cases: Vec<(Expr, &str)> = vec![
-        // 関数呼び出し・動的関数呼び出しは 1 行のまま
         (f_call(), "act:expr_fn(\"f\")"),
         (
             Expr::FnCall {
@@ -731,7 +728,6 @@ fn expr_statement_wraps_non_call_expressions_in_discard_block() {
             },
             "act:expr_fn_var(var.h, \"var.h\")",
         ),
-        // 二項演算
         (
             Expr::Binary {
                 op: BinOp::Concat,
@@ -745,10 +741,8 @@ fn expr_statement_wraps_non_call_expressions_in_discard_block() {
             Expr::Paren(Box::new(f_call())),
             "do local _ = (act:expr_fn(\"f\")) end",
         ),
-        // リテラル
         (Expr::Integer(1), "do local _ = 1 end"),
         (Expr::String("s".to_string()), "do local _ = \"s\" end"),
-        // 変数参照
         (var_ref("x", VarScope::Local), "do local _ = var.x end"),
         (var_ref("g", VarScope::Global), "do local _ = save.g end"),
     ];
@@ -758,7 +752,7 @@ fn expr_statement_wraps_non_call_expressions_in_discard_block() {
     }
 }
 
-/// The highest scene argument `＄２５５` maps to `args[256]` without overflowing (9.1).
+/// The highest scene argument `＄２５５` maps to `args[256]` without overflowing.
 #[test]
 fn resolve_var_path_args_255_is_args_256() {
     assert_eq!(

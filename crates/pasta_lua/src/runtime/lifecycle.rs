@@ -1,7 +1,4 @@
 //! Drop-time lifecycle and persistence save for PastaLuaRuntime.
-//!
-//! This file contains the `impl PastaLuaRuntime` persistence-save method and
-//! the `impl Drop` that invokes it on teardown (split impl pattern).
 
 use super::PastaLuaRuntime;
 use super::persistence;
@@ -13,7 +10,6 @@ impl PastaLuaRuntime {
     ///
     /// Called automatically on Drop to save any modified persistent data.
     fn save_persistence_data(&self) -> Result<(), persistence::PersistenceError> {
-        // Get persistence config
         let persistence_config = self
             .config
             .as_ref()
@@ -23,7 +19,6 @@ impl PastaLuaRuntime {
         let base_dir = self.base_dir.as_deref().unwrap_or(Path::new("."));
         let file_path = base_dir.join(persistence_config.effective_file_path());
 
-        // Try to get save from Lua
         // SAFETY(injection): Module name is a compile-time string literal.
         // The match handles the error case gracefully (early return Ok).
         let save_table: Table = match self.lua.load(r#"require("pasta.save")"#).eval() {
@@ -53,7 +48,6 @@ impl PastaLuaRuntime {
 
 impl Drop for PastaLuaRuntime {
     fn drop(&mut self) {
-        // Save persistence data (errors are logged, not propagated)
         if let Err(e) = self.save_persistence_data() {
             tracing::error!(error = %e, "Failed to save persistence data on drop");
         }

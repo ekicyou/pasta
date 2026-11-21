@@ -53,7 +53,7 @@ enum ColumnMove {
 /// 単位の文字列から列の動きを決める。列を動かさない単位は None。
 ///
 /// 単位は `SAKURA_TAG_PATTERN` の一致 1 つ。囲み（`\_?…\_?`・`\_!…\_!`）と
-/// エスケープ（`\\`）は先頭が違うので、中に `\n` などがあっても動かない（2.9）。
+/// エスケープ（`\\`）は先頭が違うので、中に `\n` などがあっても動かない。
 fn column_move(unit: &str) -> Option<ColumnMove> {
     if unit == r"\n" || unit.starts_with(r"\n[") {
         Some(ColumnMove::Next)
@@ -135,7 +135,6 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
     let mut leading_set = false;
     let mut leading_moves = Vec::new();
 
-    // Collect all tag match ranges
     let tag_ranges: Vec<(usize, usize)> = tag_regex
         .find_iter(input)
         .map(|m| (m.start(), m.end()))
@@ -143,7 +142,6 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
     let mut tag_idx = 0;
 
     while pos < input.len() {
-        // Check if current position is inside a tag
         if tag_idx < tag_ranges.len() && pos == tag_ranges[tag_idx].0 {
             leading_moves.extend(column_move(&input[pos..tag_ranges[tag_idx].1]));
             pos = tag_ranges[tag_idx].1;
@@ -151,7 +149,6 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
             continue;
         }
 
-        // Plain cluster
         let c = next_cluster(&input[pos..]);
         if !c.is_empty() {
             if !leading_set {
@@ -162,10 +159,8 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
 
             let char_end = pos + c.len();
 
-            // Find trailing: from char_end to the next plain char (or end)
             let mut trailing_end = char_end;
             let mut moves = Vec::new();
-            // Skip over any tags immediately after this char
             loop {
                 if tag_idx < tag_ranges.len() && trailing_end == tag_ranges[tag_idx].0 {
                     moves.extend(column_move(&input[trailing_end..tag_ranges[tag_idx].1]));
@@ -262,7 +257,7 @@ pub fn break_lines_impl(
             // タグの後ろのかけらは字数 0 の列の頭なので、足すだけ
             if head && column.width > 0 && column.width + frag_width > column.threshold(rule) {
                 // 単独の `\` の直後に入れると `\\` に化けるので、`\` と語を 1 語として
-                // `\` の前で割る（決定 9）。`\` は今の列に数えてあるので新しい列へ移す。
+                // `\` の前で割る。`\` は今の列に数えてあるので新しい列へ移す。
                 // `\` が列の頭（その前に字が無い）なら、割ると字の無い列ができるので割らない
                 let lone = char_idx
                     .checked_sub(1)
@@ -341,7 +336,7 @@ mod tests {
         break_lines_impl(input, &rule, column, re, p)
     }
 
-    // --- 列の状態を受け取って返す (Requirement 1.4, 2.1, 2.2, 2.3, 3.2, 6.1) ---
+    // --- 列の状態を受け取って返す ---
 
     fn col(line: usize, width: usize) -> Column {
         Column {
@@ -435,7 +430,7 @@ mod tests {
         break_lines_impl(input, &rule, column, &tag_regex(), &parser())
     }
 
-    // --- 語の途中のタグ・持ち越し・飛んだ後の並び・改行の文字列 (Requirement 1.1, 2.5, 2.6, 3.1, 3.3, 3.4, 4.6, 4.7) ---
+    // --- 語の途中のタグ・持ち越し・飛んだ後の並び・改行の文字列 ---
 
     #[test]
     fn test_tag_inside_word_splits_into_fragments() {
@@ -655,7 +650,7 @@ mod tests {
     fn test_tags_excluded_from_width_and_preserved() {
         let re = tag_regex();
         let p = parser();
-        // Example from requirements: こ\_w[50]れ\_w[50]は\_w[50]テ\_w[50]ス\_w[50]ト
+        // Example: こ\_w[50]れ\_w[50]は\_w[50]テ\_w[50]ス\_w[50]ト
         // Plain text: これはテスト (6 CJK chars = width 12), threshold 6 → break after ~3 chars
         let input = r"こ\_w[50]れ\_w[50]は\_w[50]テ\_w[50]ス\_w[50]ト";
         let result = break_fresh(input, &[6], &re, &p);
@@ -833,7 +828,7 @@ mod tests {
         assert_eq!(tokens.chars.len(), 0);
     }
 
-    // --- `\\`（エスケープされた `\`）は割れない (Requirement 4.5) ---
+    // --- `\\`（エスケープされた `\`）は割れない ---
 
     /// `talk_to_script` と同じ順（トークナイズ → ウェイト挿入 → 改行推定）で組み立てる
     fn pipeline(input: &str, widths: &[usize]) -> String {
@@ -900,7 +895,7 @@ mod tests {
         assert_ne!(pipeline(input, &[1]), pipeline(input, &[]));
     }
 
-    // --- 特性化: 列を動かすタグを含まない入力の今の改行の位置 (Requirement 6.2・6.4・7.2) ---
+    // --- 特性化: 列を動かすタグを含まない入力の今の改行の位置 ---
 
     /// 特性化テストで使う幅。期待値の並びはこの順。
     const CHARACTERIZATION_WIDTHS: [&[usize]; 4] = [&[4], &[4, 8], &[6], &[10, 12]];
@@ -909,7 +904,7 @@ mod tests {
         break_fresh(input, widths, &tag_regex(), &parser())
     }
 
-    /// 数え方を直す前の出力を文字列のまま固定する。直した後も同じ文字列になること。
+    /// 出力を文字列のまま固定する。
     /// 入力は今の単体テストの入力・ウェイトつき（`pipeline`）・囲み（`\_?…\_?`・`\_!…\_!`）と
     /// エスケープ（`\\`）つき。囲みの中の `\n`・`\c`・`\_l` は列を動かすタグではない。
     #[test]
@@ -1041,7 +1036,7 @@ mod tests {
         }
     }
 
-    // --- 列を動かす単位の見分け (Requirement 2.1, 2.2, 2.8, 2.9) ---
+    // --- 列を動かす単位の見分け ---
 
     #[test]
     fn test_column_move_classification() {

@@ -24,14 +24,12 @@ mod tests {
 
     #[test]
     fn test_ansi_to_bytes_ascii() {
-        // ASCII should pass through unchanged on all platforms
         let result = utf8_to_ansi("test/path/file.lua").unwrap();
         assert_eq!(result, b"test/path/file.lua");
     }
 
     #[test]
     fn test_ansi_to_bytes_empty() {
-        // Empty string should return empty bytes
         let result = utf8_to_ansi("").unwrap();
         assert!(result.is_empty());
     }

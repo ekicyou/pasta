@@ -1,7 +1,7 @@
 use super::*;
 
 /// 既定の探索パターンは慣例 dic 配置（直下・一階層・多階層）を網羅する
-/// 再帰形 glob を返す（Requirement 2.5）。
+/// 再帰形 glob を返す。
 #[test]
 fn default_pasta_patterns_is_recursive() {
     assert_eq!(default_pasta_patterns(), vec!["dic/**/*.pasta".to_string()]);
@@ -26,14 +26,11 @@ fn ghost_table(config: &PastaConfig) -> &toml::Table {
 }
 
 /// `[ghost]` セクションを完全に省略した場合、補完後に全5キーが
-/// SSOT 既定値（180/300/30/1.5/1.5）で埋まる（Requirement 3.1/3.2/3.3）。
+/// SSOT 既定値（180/300/30/1.5/1.5）で埋まる。
 #[test]
 fn apply_shiori_defaults_fills_all_ghost_keys_when_section_omitted() {
-    // Construct a ghost-absent config WITHOUT routing through `from_str`,
-    // because `parse`/`from_str` now applies `apply_shiori_defaults` once and
-    // would materialize `[ghost]` before this test could observe its absence.
-    // Building `custom_fields` directly lets us exercise the function in
-    // isolation on a genuinely ghost-absent input.
+    // `from_str` は `apply_shiori_defaults` を適用して `[ghost]` を作ってしまうので、
+    // 経由せず `custom_fields` を直接組み、`[ghost]` が無い入力で関数だけを試す。
     let mut config = PastaConfig::default();
     config.custom_fields.insert("actor".to_string(), {
         let mut actor = toml::Table::new();
@@ -69,7 +66,7 @@ fn apply_shiori_defaults_fills_all_ghost_keys_when_section_omitted() {
 }
 
 /// 部分的に書かれた `[ghost]`（明示値 `talk_interval_min=120`）は不変で、
-/// 欠落キーのみ既定で補完される（Requirement 3.4: 明示値を上書きしない）。
+/// 欠落キーのみ既定で補完される（明示値を上書きしない）。
 #[test]
 fn apply_shiori_defaults_preserves_explicit_ghost_values() {
     let mut config = PastaConfig::from_str("[ghost]\ntalk_interval_min = 120\n").unwrap();
@@ -96,7 +93,7 @@ fn apply_shiori_defaults_preserves_explicit_ghost_values() {
     );
 }
 
-/// 補完は冪等: 二重適用しても結果が変わらない（Service Interface invariant）。
+/// 補完は冪等: 二重適用しても結果が変わらない。
 #[test]
 fn apply_shiori_defaults_is_idempotent() {
     let mut once = PastaConfig::from_str("[ghost]\ntalk_interval_min = 120\n").unwrap();
@@ -110,7 +107,7 @@ fn apply_shiori_defaults_is_idempotent() {
 }
 
 /// `[package]`（エンジンプロファイル専用）は補完対象外であり、
-/// 補完後も追加・削除・変更されない（Design: [package] は補完しない）。
+/// 補完後も追加・削除・変更されない。
 #[test]
 fn apply_shiori_defaults_does_not_touch_package_section() {
     let mut config =
@@ -128,7 +125,7 @@ fn apply_shiori_defaults_does_not_touch_package_section() {
 
 /// `[actor]` セクションが存在しない補完時は、起動を妨げない軽量な警告
 /// （warn レベルのログ）を1回発し、かつ補完処理は正常終了する
-/// （Requirement 2.3: 起動継続・判別可能化）。
+/// （起動継続・判別可能化）。
 #[tracing_test::traced_test]
 #[test]
 fn apply_shiori_defaults_warns_when_actor_section_absent() {
@@ -139,7 +136,6 @@ fn apply_shiori_defaults_warns_when_actor_section_absent() {
         "precondition: actor section absent before apply"
     );
 
-    // 補完はエラーや panic を起こさず正常終了する（起動継続）。
     config.apply_shiori_defaults();
 
     // actor 不在の警告が発火している（判別可能化）。
@@ -160,7 +156,6 @@ fn apply_shiori_defaults_does_not_warn_when_actor_section_present() {
 
     config.apply_shiori_defaults();
 
-    // actor が存在するので不在警告は出ない。
     assert!(
         !logs_contain("No [actor] section is defined"),
         "no actor-absence warning should be emitted when [actor] is present"
@@ -170,7 +165,7 @@ fn apply_shiori_defaults_does_not_warn_when_actor_section_present() {
 /// `[ghost]` を一切書かない設定を `parse`（`from_str`）するだけで、補完
 /// チョークポイント（`apply_shiori_defaults`）が経路上で1回適用され、結果の
 /// `custom_fields` に `ghost` セクションが実体化し既定値（180/300/30/1.5/1.5）が
-/// 入る（Requirement 3.1/3.3, Design: parse 戻り直前の単一補完）。
+/// 入る。
 #[test]
 fn parse_materializes_ghost_section_with_defaults() {
     // `[ghost]` を含まない最小構成（`[actor]` のみ）。
@@ -195,7 +190,7 @@ fn parse_materializes_ghost_section_with_defaults() {
 }
 
 // ---------------------------------------------------------------------------
-// [scene.alias]（scene-name-alias task 2.1）
+// [scene.alias]
 // ---------------------------------------------------------------------------
 
 /// テスト補助: 読み込みエラーの文言を取り出す。
@@ -205,7 +200,7 @@ fn scene_alias_err(toml: &str) -> String {
         .to_string()
 }
 
-/// `[scene]` が無ければ内蔵の既定表（1.1・6.3）。`default()` と同じ表になる。
+/// `[scene]` が無ければ内蔵の既定表。`default()` と同じ表になる。
 #[test]
 fn scene_alias_absent_uses_builtin_default() {
     let config = PastaConfig::from_str("[actor]\nname = \"sakura\"\n").unwrap();
@@ -217,7 +212,7 @@ fn scene_alias_absent_uses_builtin_default() {
     assert_eq!(default.scene_alias_source, config.scene_alias_source);
 }
 
-/// `[scene]` に `alias` が無いときも既定表（1.1）。
+/// `[scene]` に `alias` が無いときも既定表。
 #[test]
 fn scene_section_without_alias_uses_builtin_default() {
     let config = PastaConfig::from_str("[scene]\nother = 1\n").unwrap();
@@ -225,7 +220,7 @@ fn scene_section_without_alias_uses_builtin_default() {
     assert_eq!(config.scene_alias_source, SceneAliasSource::BuiltinDefault);
 }
 
-/// `[scene.alias]` の見出しだけなら既定の表で、出どころは内蔵の既定（recommend-menu-scenes 2.3）。
+/// `[scene.alias]` の見出しだけなら既定の表で、出どころは内蔵の既定。
 #[test]
 fn scene_alias_header_only_is_builtin_default() {
     let config = PastaConfig::from_str("[scene.alias]\n").unwrap();
@@ -233,7 +228,7 @@ fn scene_alias_header_only_is_builtin_default() {
     assert_eq!(config.scene_alias_source, SceneAliasSource::BuiltinDefault);
 }
 
-/// 書いたキーだけ既定を置き換え、書かなかったキーの既定は残る（recommend-menu-scenes 2.1・2.2）。
+/// 書いたキーだけ既定を置き換え、書かなかったキーの既定は残る。
 #[test]
 fn scene_alias_written_rows_overlay_default() {
     let config = PastaConfig::from_str(
@@ -265,7 +260,7 @@ fn scene_alias_written_rows_overlay_default() {
     );
 }
 
-/// 既定の別名とぶつかると読み込みエラー。相手（既定の OnTalk）・直し方・書いた行の行番号を含む（2.4）。
+/// 既定の別名とぶつかると読み込みエラー。相手（既定の OnTalk）・直し方・書いた行の行番号を含む。
 #[test]
 fn scene_alias_conflict_with_default_is_error_with_line() {
     let msg = scene_alias_err("[scene.alias]\nOnBoot = [\"起動\", \"会話\"]\n");
@@ -280,7 +275,7 @@ fn scene_alias_conflict_with_default_is_error_with_line() {
     assert_eq!(config.scene_aliases.resolve("会話"), Some("OnBoot"));
 }
 
-/// 置き換え先が既定の別名なら読み込みエラー。相手・直し方・書いた行の行番号を含む（2.4）。
+/// 置き換え先が既定の別名なら読み込みエラー。相手・直し方・書いた行の行番号を含む。
 #[test]
 fn scene_alias_target_is_default_alias_is_error_with_line() {
     let msg = scene_alias_err("[scene.alias]\nOnBoot = [\"起動\"]\n\"会話\" = [\"雑談\"]\n");
@@ -289,7 +284,7 @@ fn scene_alias_target_is_default_alias_is_error_with_line() {
     assert!(msg.contains("会話 = \"雑談\" (line 3)"), "{msg}");
 }
 
-/// 残った既定の置き換え先を別名に書くと、今の連鎖のエラーと行番号のまま（2.5）。
+/// 残った既定の置き換え先を別名に書くと、今の連鎖のエラーと行番号のまま。
 #[test]
 fn scene_alias_alias_equal_to_default_target_is_chain_with_line() {
     let msg = scene_alias_err("[scene.alias]\nOnBoot = [\"OnTalk\"]\n");
@@ -297,21 +292,21 @@ fn scene_alias_alias_equal_to_default_target_is_chain_with_line() {
     assert!(msg.contains("line 2"), "{msg}");
 }
 
-/// 配列でない値は型不一致の読み込みエラー（toml の行・列つき。2.5）。
+/// 配列でない値は型不一致の読み込みエラー（toml の行・列つき）。
 #[test]
 fn scene_alias_non_array_value_is_error_with_line() {
     let msg = scene_alias_err("[actor]\nname = \"a\"\n\n[scene.alias]\nOnTalk = \"会話\"\n");
     assert!(msg.contains("line 5"), "{msg}");
 }
 
-/// 配列の中の文字列でない要素は読み込みエラー（2.5）。
+/// 配列の中の文字列でない要素は読み込みエラー。
 #[test]
 fn scene_alias_non_string_element_is_error_with_line() {
     let msg = scene_alias_err("[scene.alias]\nOnTalk = [\"会話\", 1]\n");
     assert!(msg.contains("line 2"), "{msg}");
 }
 
-/// 空文字列の別名・キーは読み込みエラー。キー名と行番号を含む（2.5）。
+/// 空文字列の別名・キーは読み込みエラー。キー名と行番号を含む。
 #[test]
 fn scene_alias_empty_name_is_error() {
     let msg = scene_alias_err("[scene.alias]\nOnBoot = [\"起動\"]\nOnTalk = [\"\"]\n");
@@ -324,7 +319,7 @@ fn scene_alias_empty_name_is_error() {
     assert!(msg.contains("line 2"), "{msg}");
 }
 
-/// 重複（配列間・配列内）は読み込みエラー。別名・両方の置き換え先・行番号を含む（2.6）。
+/// 重複（配列間・配列内）は読み込みエラー。別名・両方の置き換え先・行番号を含む。
 #[test]
 fn scene_alias_duplicate_is_error() {
     let msg = scene_alias_err("[scene.alias]\nOnTalk = [\"会話\"]\nOnBoot = [\"会話\"]\n");
@@ -342,7 +337,7 @@ fn scene_alias_duplicate_is_error() {
     assert!(msg.contains("line 4"), "{msg}");
 }
 
-/// 連鎖（自己参照を含む）は読み込みエラー。連鎖した名前と行番号を含む（3.5 / 10.3）。
+/// 連鎖（自己参照を含む）は読み込みエラー。連鎖した名前と行番号を含む。
 #[test]
 fn scene_alias_chain_is_error() {
     // 日本語のキーは toml の裸のキーにできないため引用符で書く。
@@ -394,7 +389,7 @@ fn scene_alias_or_scene_not_table_is_error() {
     assert!(msg.contains("line 1"), "{msg}");
 }
 
-/// `[loader] ffi` は書かなければ `false`（1.1・1.3）。`[loader]` が無くても、
+/// `[loader] ffi` は書かなければ `false`。`[loader]` が無くても、
 /// ほかのキーだけを書いた `[loader]` でも同じ。
 #[test]
 fn loader_ffi_defaults_to_false() {
@@ -408,7 +403,7 @@ fn loader_ffi_defaults_to_false() {
     );
 }
 
-/// `ffi = true` を読む（1.1・1.2）。`@pasta_config` には載らない（1.5）。
+/// `ffi = true` を読む。`@pasta_config` には載らない。
 #[test]
 fn loader_ffi_true_is_read_and_not_in_custom_fields() {
     let config = PastaConfig::from_str("[loader]\nffi = true\n").unwrap();
@@ -416,7 +411,7 @@ fn loader_ffi_true_is_read_and_not_in_custom_fields() {
     assert!(!config.custom_fields.contains_key("loader"));
 }
 
-/// 真偽値でない値は、ほかの `[loader]` のキーと同じく読み込みの失敗（1.4）。
+/// 真偽値でない値は、ほかの `[loader]` のキーと同じく読み込みの失敗。
 #[test]
 fn loader_ffi_non_bool_is_error() {
     for toml in ["[loader]\nffi = \"yes\"\n", "[loader]\nffi = 1\n"] {

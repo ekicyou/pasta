@@ -3,8 +3,6 @@
 //! These typed sections back the `PastaConfig` accessor methods
 //! (`logging()`, `persistence()`, `talk()`, `debug()`) and the
 //! SHIORI-profile `[ghost]` defaults applied at config-construction time.
-//! They are split out of `config/mod.rs` purely to keep each file small;
-//! the public surface is unchanged (re-exported via `pub use sections::*`).
 
 use serde::Deserialize;
 
@@ -190,16 +188,11 @@ impl Default for TalkConfig {
 /// the `[ghost]` section. The defaults (`talk_interval_min = 180`,
 /// `talk_interval_max = 300`, `hour_margin = 30`, `spot_newlines = 1.5`,
 /// `choice_newlines = 1.5`, `after_choice_newlines = 1.0`, `line_newlines = 0.0`) match the current
-/// Lua literal fallbacks so that
-/// omitting `[ghost]` keeps the historical behavior (requirements 1.2 / 1.3 /
-/// 3.3).
+/// Lua literal fallbacks so that omitting `[ghost]` keeps the historical behavior.
 ///
-/// This struct is a **value supply source only**: it provides the default
-/// values for the later `apply_shiori_defaults` completion step. It is
-/// intentionally NOT wired into `PastaConfig::parse` and does not extract
-/// `[ghost]` out of `custom_fields` — the `[ghost]` section keeps flowing
-/// through to Lua via `custom_fields` (the `@pasta_config` exposure path stays
-/// unchanged).
+/// A **value supply source only**: it feeds the `apply_shiori_defaults`
+/// completion step and is NOT wired into `PastaConfig::parse` or extracted from
+/// `custom_fields` — `[ghost]` keeps flowing to Lua via `custom_fields`.
 #[derive(Debug, Clone)]
 pub struct GhostConfig {
     /// Minimum interval between random talks, in seconds.

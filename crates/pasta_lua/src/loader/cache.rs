@@ -20,12 +20,6 @@ const SCENE_ALIAS_MARKER_FILE: &str = ".scene_alias";
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Cache Manager for incremental transpilation.
-///
-/// Manages the lifecycle of transpiled Lua cache files:
-/// - Version checking and cache invalidation
-/// - Timestamp comparison for change detection
-/// - Cache file saving with directory structure
-/// - scene_dic.lua generation
 pub struct CacheManager {
     /// Project base directory (ghost/master/).
     base_dir: PathBuf,
@@ -36,11 +30,8 @@ pub struct CacheManager {
 }
 
 impl CacheManager {
-    /// Create a new CacheManager.
-    ///
-    /// # Arguments
-    /// * `base_dir` - Project root directory
-    /// * `output_dir` - Cache output directory relative to base_dir (e.g., "profile/pasta/cache/lua")
+    /// Create a new CacheManager. `output_dir` is relative to `base_dir`
+    /// (e.g. "profile/pasta/cache/lua").
     pub fn new(base_dir: PathBuf, output_dir: &str) -> Self {
         let cache_dir = base_dir.join(output_dir);
         Self {
@@ -67,7 +58,6 @@ impl CacheManager {
         let version_file = self.cache_dir.join(CACHE_VERSION_FILE);
         let marker_file = self.cache_dir.join(SCENE_ALIAS_MARKER_FILE);
 
-        // Check version and alias fingerprint if cache directory exists
         if version_file.exists() {
             let cached_version = fs::read_to_string(&version_file)
                 .map_err(|e| LoaderError::cache_directory(&version_file, e))?;
@@ -83,7 +73,6 @@ impl CacheManager {
                 info!(reason = "scene alias table changed", "Clearing all cache");
             } else {
                 debug!(version = %CURRENT_VERSION, "Cache version and scene alias table match, preserving cache");
-                // Ensure scene directory exists (idempotent)
                 let scene_dir = self.cache_dir.join("pasta/scene");
                 fs::create_dir_all(&scene_dir)
                     .map_err(|e| LoaderError::cache_directory(&scene_dir, e))?;
@@ -96,11 +85,9 @@ impl CacheManager {
             }
         }
 
-        // Create directory structure (idempotent)
         let scene_dir = self.cache_dir.join("pasta/scene");
         fs::create_dir_all(&scene_dir).map_err(|e| LoaderError::cache_directory(&scene_dir, e))?;
 
-        // Write version file and scene alias marker
         fs::write(&version_file, CURRENT_VERSION)
             .map_err(|e| LoaderError::cache_directory(&version_file, e))?;
         fs::write(&marker_file, alias_fingerprint)
@@ -137,16 +124,13 @@ impl CacheManager {
     pub fn needs_transpile(&self, source_path: &Path) -> Result<bool, LoaderError> {
         let cache_path = self.source_to_cache_path(source_path);
 
-        // If cache doesn't exist, need transpile
         if !cache_path.exists() {
             debug!(source = %source_path.display(), "Cache not found, needs transpile");
             return Ok(true);
         }
 
-        // Get source modification time
         let source_mtime = Self::get_mtime(source_path)?;
 
-        // Get cache modification time
         let cache_mtime = Self::get_mtime(&cache_path)?;
 
         // 新旧を問わず、時刻が違えば変換し直す（前日の版に戻したときも拾う）
@@ -224,12 +208,10 @@ impl CacheManager {
             ));
         }
 
-        // Create parent directories if needed (idempotent)
         if let Some(parent) = cache_path.parent() {
             fs::create_dir_all(parent).map_err(|e| LoaderError::cache_write(&cache_path, e))?;
         }
 
-        // Write UTF-8 encoded Lua code
         fs::write(&cache_path, lua_code).map_err(|e| LoaderError::cache_write(&cache_path, e))?;
 
         debug!(
@@ -249,7 +231,6 @@ impl CacheManager {
     pub fn source_to_module_name(&self, source_path: &Path) -> String {
         let relative = self.get_relative_path(source_path);
 
-        // Remove dic/ prefix and .pasta extension
         let without_prefix = Self::strip_component_prefix(&relative, &self.dic_prefix);
 
         let stem = Path::new(without_prefix).with_extension("");
@@ -302,7 +283,6 @@ impl CacheManager {
             .strip_prefix(&self.base_dir)
             .unwrap_or(source_path);
 
-        // Warn if relative path contains traversal components
         if relative.components().any(|c| {
             matches!(
                 c,
@@ -333,26 +313,21 @@ impl CacheManager {
     /// * `Ok(path)` - Path to generated scene_dic.lua
     /// * `Err(LoaderError::SceneDicGenerationError)` - Generation failed
     pub fn generate_scene_dic(&self, module_names: &[String]) -> Result<PathBuf, LoaderError> {
-        // Create pasta subdirectory in cache (lua-module-path-resolution spec)
         let pasta_dir = self.cache_dir.join("pasta");
         fs::create_dir_all(&pasta_dir).map_err(|e| {
             LoaderError::scene_dic_generation("Failed to create pasta directory", Some(e))
         })?;
 
-        // New location: cache_dir/pasta/scene_dic.lua
         let scene_dic_path = pasta_dir.join("scene_dic.lua");
 
-        // Sort module names alphabetically
         let mut sorted_modules = module_names.to_vec();
         sorted_modules.sort();
 
-        // Generate timestamp using SystemTime
         let timestamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
-        // Generate content
         let mut content = String::new();
         content.push_str("-- Auto-generated by pasta_lua CacheManager\n");
         content.push_str("-- Do not edit manually\n");
@@ -367,7 +342,6 @@ impl CacheManager {
 
         content.push_str("\nrequire(\"pasta\").finalize_scene()\n");
 
-        // Write file
         fs::write(&scene_dic_path, &content).map_err(|e| {
             LoaderError::scene_dic_generation("Failed to write scene_dic.lua", Some(e))
         })?;
@@ -396,13 +370,11 @@ impl CacheManager {
             return Vec::new();
         }
 
-        // Build set of expected cache paths
         let expected_caches: std::collections::HashSet<PathBuf> = source_paths
             .iter()
             .map(|p| self.source_to_cache_path(p))
             .collect();
 
-        // Walk cache directory and find orphans
         let mut orphans = Vec::new();
         Self::walk_lua_files(&scene_dir, &expected_caches, &mut orphans);
 
@@ -439,7 +411,6 @@ impl CacheManager {
                 if file_type.is_dir() {
                     Self::walk_lua_files(&path, expected, orphans);
                 } else if file_type.is_file() && path.extension().is_some_and(|e| e == "lua") {
-                    // Skip scene_dic.lua
                     if path.file_name().is_some_and(|n| n == "scene_dic.lua") {
                         continue;
                     }

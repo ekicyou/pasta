@@ -1,5 +1,5 @@
 --- @module pasta.shiori.appearance
---- 外見状態（サーフェス・着せ替え）の観測・復旧モジュール（actor-surface-restore）
+--- 外見状態（サーフェス・着せ替え）の観測・復旧モジュール
 ---
 --- 出力済みさくらスクリプト文字列からサーフェス変更・スコープ切替タグを検出し（observe）、
 --- アクター切替時の復旧タグ列を返す（restore）。
@@ -189,7 +189,7 @@ local function spot_effective(t, part)
     return v or nil
 end
 
---- bind の結果値（0|1）。トグルはスポット側の実効値の反転（3.12）。確定できなければ nil
+--- bind の結果値（0|1）。トグルはスポット側の実効値の反転。確定できなければ nil
 local function bind_value(sp, cat, part, val)
     if part ~= "" and val == "" then
         local cur = spot_effective(sp and sp.binds[cat], part)
@@ -198,7 +198,7 @@ local function bind_value(sp, cat, part, val)
     return BIND_VALUES[val]
 end
 
---- 数値1の明示 bind 後のスポット側カテゴリ（3.13）。他パーツは不明、"" = 0 は残す。
+--- 数値1の明示 bind 後のスポット側カテゴリ。他パーツは不明、"" = 0 は残す。
 --- "" があるとき着衣（1）・不明（false）だった他パーツは false にして "" へ落とさない
 local function spot_after_wear(t)
     local out = { [""] = t[""] }
@@ -212,7 +212,7 @@ local function spot_after_wear(t)
     return out
 end
 
---- 明示 bind を記録する（3.1, 3.13）
+--- 明示 bind を記録する
 local function record_bind(sp, ac, cat, part, v)
     if sp then
         local t = sp.binds[cat] or {}
@@ -237,13 +237,13 @@ local function record_bind(sp, ac, cat, part, v)
     end
 end
 
---- カテゴリを置き換える。strip = true は全脱衣 { [""] = 0 }（3.11）、false は不明（3.4）
+--- カテゴリを置き換える。strip = true は全脱衣 { [""] = 0 }、false は不明
 local function reset_category(sp, ac, cat, strip)
     if sp then
         sp.binds[cat] = strip and { [""] = 0 } or nil
     end
     if ac then
-        -- 3.4: 不明は false（既定着せ替えも使わない）
+        -- 不明は false（既定着せ替えも使わない）
         ac.binds[cat] = strip and { [""] = 0 } or false
         ac.order[cat] = strip and {} or nil
     end
@@ -275,7 +275,7 @@ local function observe_bind(state, actor, spot, arg)
     end
 end
 
---- アクター未指定の生スクリプト: 外見タグを含めば全スポット不明化（1.8）
+--- アクター未指定の生スクリプト: 外見タグを含めば全スポット不明化
 local function observe_raw(state, text)
     local name, arg, pos = next_tag(text, 1)
     while name do
@@ -296,7 +296,7 @@ function APPEARANCE.observe(state, actor, spot, text)
     if not text:find("\\", 1, true) then
         return
     end
-    -- 1.7: スコープ切替後は次の restore（\p[spot]）までアクター未指定として扱う
+    -- スコープ切替後は次の restore（\p[spot]）までアクター未指定として扱う
     if actor == nil or state.detached then
         observe_raw(state, text)
         return
@@ -305,13 +305,13 @@ function APPEARANCE.observe(state, actor, spot, text)
     while name do
         local kind, value = classify(name, arg)
         if kind == "scope" then
-            -- 1.7: 全スポット不明化し、残りは記録しない（owners・last_spots は保持）。
+            -- 全スポット不明化し、残りは記録しない（owners・last_spots は保持）。
             -- DSL はタグごとに別トークンのため、後続の observe 呼び出しも detached で止める
             state.spots = {}
             state.detached = true
             return
         elseif kind == "surface" then
-            -- 1.2〜1.5: 出現順に上書き（最後が残る）。ID は文字列のまま
+            -- 出現順に上書き（最後が残る）。ID は文字列のまま
             if actor.name ~= nil then
                 entry(state.actors, actor.name).surface = value
             end
@@ -382,7 +382,7 @@ local function default_surface(actor)
     return nil
 end
 
---- サーフェス復旧タグを返し、スポットの表示中サーフェスを更新する（2.1〜2.4, 2.8〜2.10, 4.4）
+--- サーフェス復旧タグを返し、スポットの表示中サーフェスを更新する
 local function restore_surface(state, actor, spot, leading)
     local rec = state.actors[actor.name]
     local known = (rec and rec.surface) or default_surface(actor)
@@ -402,7 +402,7 @@ local function restore_surface(state, actor, spot, leading)
     return "\\s[" .. known .. "]"
 end
 
---- 先頭タグ列の明示 bind（カテゴリ・パーツ・数値 0/1 が明示）の集合 cat → part → true（3.10）。
+--- 先頭タグ列の明示 bind（カテゴリ・パーツ・数値 0/1 が明示）の集合 cat → part → true。
 --- トグル・カテゴリ単位 bind は含めない（抑止しない）
 local function leading_explicit_binds(leading)
     local set = {}
@@ -455,7 +455,7 @@ end
 
 --- カテゴリの既知着せ替えを出力順の { part, value } 列で返す:
 --- 全脱衣（part = ""）→ 既定パーツ（パーツ名昇順・記録で上書きされたものを除く）→ 記録パーツ（記録順）。
---- アクター側が不明（false）なら空、全脱衣済みなら既定を使わない（3.4, 3.8, 3.11）
+--- アクター側が不明（false）なら空、全脱衣済みなら既定を使わない
 local function known_dressup(dressup, ac, cat)
     local rec = ac and ac.binds[cat]
     if rec == false then
@@ -495,7 +495,7 @@ local function dressup_differs(spot_cat, list)
 end
 
 --- 全脱衣したアクター（rec[""] == 0）では、スポット側の他パーツもアクターの実効値と比較する
---- （3.11。他者が着けたパーツ・不明パーツを残さない）。全脱衣でないカテゴリは走査しない（3.5）
+--- （他者が着けたパーツ・不明パーツを残さない）。全脱衣でないカテゴリは走査しない
 local function stripped_differs(rec, spot_cat)
     if not (rec and rec[""] == 0 and spot_cat) then
         return false
@@ -508,7 +508,7 @@ local function stripped_differs(rec, spot_cat)
     return false
 end
 
---- カテゴリを丸ごと bind-noevent で返し、スポット側を観測と同じ規則で更新する（3.2, 3.7, 3.10, 3.11）。
+--- カテゴリを丸ごと bind-noevent で返し、スポット側を観測と同じ規則で更新する。
 --- skip のパーツ（先頭タグ列の明示 bind）は出力しない。アクター側は変えない
 local function emit_dressup(sp, cat, list, skip)
     local out = {}
@@ -525,7 +525,7 @@ local function emit_dressup(sp, cat, list, skip)
     return table.concat(out)
 end
 
---- 着せ替え復旧タグ列を返し、スポットの適用中着せ替え状態を更新する（3.2, 3.3, 3.5, 3.8〜3.11）。
+--- 着せ替え復旧タグ列を返し、スポットの適用中着せ替え状態を更新する。
 --- 走査はアクター側の集合のみ（スポット側にのみあるパーツには触れない。全脱衣カテゴリを除く）
 local function restore_dressup(state, actor, spot, leading)
     local ac = state.actors[actor.name]
@@ -549,10 +549,10 @@ end
 --- @param tokens table[] 切替先グループの内側トークン列（先頭タグ列の走査用・読み取りのみ）
 --- @return string 復旧タグ列（復旧不要なら空文字列）
 function APPEARANCE.restore(state, actor, spot, tokens)
-    -- 1.7: \p[spot] 出力でスコープ切替の影響は終わる（継続でも解除する）
+    -- \p[spot] 出力でスコープ切替の影響は終わる（継続でも解除する）
     state.detached = nil
     local name = actor.name
-    -- 2.11: 同一アクターの継続（スポットの直前発話者が自分で、前回も同じスポット）なら復旧しない
+    -- 同一アクターの継続（スポットの直前発話者が自分で、前回も同じスポット）なら復旧しない
     local continuing = name ~= nil and state.owners[spot] == name and state.last_spots[name] == spot
     state.owners[spot] = name
     if name == nil or continuing then
@@ -560,7 +560,7 @@ function APPEARANCE.restore(state, actor, spot, tokens)
     end
     state.last_spots[name] = spot
     local leading = leading_tags(tokens)
-    -- サーフェス復旧が先、着せ替え復旧が後（3.2）
+    -- サーフェス復旧が先、着せ替え復旧が後
     return restore_surface(state, actor, spot, leading) .. restore_dressup(state, actor, spot, leading)
 end
 

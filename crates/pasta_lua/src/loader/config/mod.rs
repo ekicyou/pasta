@@ -67,10 +67,8 @@ impl PastaConfig {
 
     /// Parse configuration from TOML string.
     fn parse(content: &str) -> Result<Self, toml::de::Error> {
-        // Parse as a raw TOML table first
         let mut table: toml::Table = toml::from_str(content)?;
 
-        // Extract and deserialize [loader] section
         let loader = if let Some(loader_value) = table.remove("loader") {
             loader_value.try_into()?
         } else {
@@ -81,7 +79,6 @@ impl PastaConfig {
         // [scene] itself stays in custom_fields as written.
         let (scene_aliases, scene_alias_source) = Self::parse_scene_aliases(content)?;
 
-        // Everything else becomes custom_fields
         let mut custom_fields = table;
 
         // `[actor."name"].font` → checked tag string (written order from spans).
@@ -96,9 +93,8 @@ impl PastaConfig {
         };
 
         // Single SHIORI-defaults completion choke point: applied exactly once,
-        // here at the sole config-construction site, so both the Rust consumers
-        // and the Lua exposure path (`@pasta_config` via `custom_fields`) observe
-        // the same post-completion state (requirements 3.1/3.3). Do NOT call
+        // here, so Rust consumers and the Lua exposure path (`@pasta_config` via
+        // `custom_fields`) see the same post-completion state. Do NOT call
         // `apply_shiori_defaults` anywhere else.
         config.apply_shiori_defaults();
 
@@ -172,22 +168,17 @@ impl PastaConfig {
 
     /// Fill missing SHIORI-profile defaults into `custom_fields`.
     ///
-    /// This is the single post-load completion choke point for SHIORI-profile
-    /// custom-field sections. Currently it normalizes the `[ghost]` section by
-    /// filling **only the missing keys** from [`GhostConfig::default()`] (the
-    /// SSOT) without ever overwriting values the author wrote explicitly
-    /// (requirements 3.1/3.2/3.4). If the `[ghost]` table is absent it is
-    /// created and all five keys are filled (so `@pasta_config.ghost.*` always
-    /// exists — requirement 3.3).
+    /// Normalizes the `[ghost]` section by filling **only the missing keys** from
+    /// [`GhostConfig::default()`] (the SSOT) without overwriting values the author
+    /// wrote. If the `[ghost]` table is absent it is created and all five keys are
+    /// filled (so `@pasta_config.ghost.*` always exists).
     ///
-    /// The operation is **idempotent**: applying it twice yields the same
-    /// result. Engine-profile-only sections (`[package]`) and every non-`[ghost]`
-    /// section are left untouched. The `[ghost]` section keeps flowing through
-    /// `custom_fields` to Lua — it is not extracted into a typed field.
+    /// Idempotent. Engine-profile-only sections (`[package]`) and every
+    /// non-`[ghost]` section are left untouched; `[ghost]` keeps flowing through
+    /// `custom_fields` to Lua.
     ///
-    /// Invoked exactly once from [`PastaConfig::parse`] (the sole config
-    /// construction site), just before returning, so it is the single completion
-    /// choke point. It must not be called from anywhere else.
+    /// Invoked exactly once, from [`PastaConfig::parse`]; it must not be called
+    /// from anywhere else.
     fn apply_shiori_defaults(&mut self) {
         let defaults = GhostConfig::default();
 
@@ -223,12 +214,9 @@ impl PastaConfig {
                 .or_insert_with(|| toml::Value::Float(defaults.line_newlines));
         }
 
-        // `[actor]` is the single SHIORI-required section (requirement 2.1). Its
-        // value (name/spot) is ghost-specific and cannot be defaulted, so we do
-        // NOT block startup when it is missing — we emit ONE lightweight warning
-        // so the author can tell the omission apart (requirement 2.3). Mirrors
-        // `RuntimeConfig::validate_and_warn` in tone. The message is intentionally
-        // generic: no file paths, no secrets (Security Considerations).
+        // `[actor]` is the single SHIORI-required section. Its value (name/spot) is
+        // ghost-specific and cannot be defaulted, so a missing one does not block
+        // startup: emit ONE lightweight warning, generic (no file paths, no secrets).
         let has_actor_table = self
             .custom_fields
             .get("actor")

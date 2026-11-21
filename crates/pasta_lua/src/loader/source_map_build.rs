@@ -69,7 +69,7 @@ mod tests {
         path
     }
 
-    /// 3.5: 2 つの `.pasta` を通すと、ファイルごとにシーンの宣言の記録が入る。
+    /// 2 つの `.pasta` を通すと、ファイルごとにシーンの宣言の記録が入る。
     #[test]
     fn loader_builds_scene_records_per_pasta_file() {
         let temp = tempfile::TempDir::new().unwrap();

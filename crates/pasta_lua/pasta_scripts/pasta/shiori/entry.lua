@@ -12,7 +12,6 @@ local RES = require "pasta.shiori.res"
 local STOP = require "pasta.shiori.stop"
 local FAILURE = require "pasta.failure"
 
--- グローバルシーン関数の登録
 local GLOBAL = require "pasta.global"
 
 function GLOBAL.close_ghost(act, ms)
@@ -23,7 +22,7 @@ function GLOBAL.close_ghost(act, ms)
 end
 
 -- 非ASCII識別子のドット記法は LuaJIT 拡張のため、標準 Lua パーサー
--- （luacheck）互換の等価なブラケット記法で定義する（3.47 global.lua と同方針）
+-- （luacheck）互換の等価なブラケット記法で定義する
 GLOBAL["ゴースト終了"] = GLOBAL.close_ghost
 
 --- 自動トークを止める。出力を積まない。止めていても何もしない（数えない）。
@@ -47,7 +46,6 @@ end
 
 GLOBAL["自動トーク再開"] = GLOBAL.resume_auto_talk
 
--- グローバル SHIORI テーブルを初期化（既存の場合は維持）
 SHIORI = SHIORI or {}
 
 --- xpcall用エラーハンドラ

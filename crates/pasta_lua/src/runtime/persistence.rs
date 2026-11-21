@@ -125,18 +125,10 @@ pub(crate) fn save_file_path(
 /// - `load()` - Load data from persistence file
 /// - `save(data)` - Save data to persistence file
 ///
-/// # Arguments
-/// * `lua` - The Lua state to register the module with
-/// * `config` - Persistence configuration
-/// * `base_dir` - Base directory for resolving relative paths
-///
-/// # Returns
-/// * `Ok(Table)` - The module table
-/// * `Err(e)` - Registration failed
+/// `base_dir` resolves the configured relative save path.
 pub fn register(lua: &Lua, config: &PersistenceConfig, base_dir: &Path) -> LuaResult<Table> {
     let module = lua.create_table()?;
 
-    // Set module metadata
     module.set("_VERSION", VERSION)?;
     module.set("_DESCRIPTION", DESCRIPTION)?;
 
@@ -147,7 +139,6 @@ pub fn register(lua: &Lua, config: &PersistenceConfig, base_dir: &Path) -> LuaRe
         ))
     })?;
 
-    // Create state for closures
     let state = PersistenceState {
         file_path: file_path.clone(),
         obfuscate: config.obfuscate,
@@ -162,14 +153,12 @@ pub fn register(lua: &Lua, config: &PersistenceConfig, base_dir: &Path) -> LuaRe
         );
     }
 
-    // Register load function
     let load_state = state.clone();
     module.set(
         "load",
         lua.create_function(move |lua, ()| load_impl(lua, &load_state))?,
     )?;
 
-    // Register save function
     let save_state = state;
     module.set(
         "save",
@@ -260,13 +249,6 @@ fn to_document_warning_dropped(lua: &Lua, table: &Table) -> toml::Table {
 /// Load data from a persistence file.
 ///
 /// Detects gzip by its magic header, then parses the content as a TOML document.
-///
-/// # Arguments
-/// * `path` - Path to the persistence file
-///
-/// # Returns
-/// * `Ok(Table)` - Loaded TOML document
-/// * `Err(e)` - Load failed
 pub fn load_from_file(path: &Path) -> Result<toml::Table, PersistenceError> {
     let data = fs::read(path)?;
     if data.starts_with(&GZIP_MAGIC) {
@@ -286,16 +268,11 @@ pub fn load_from_file(path: &Path) -> Result<toml::Table, PersistenceError> {
 /// * `data` - TOML document to save
 /// * `path` - Path to the persistence file
 /// * `obfuscate` - Whether to use gzip compression
-///
-/// # Returns
-/// * `Ok(())` - Save successful
-/// * `Err(e)` - Save failed
 pub fn save_to_file(
     data: &toml::Table,
     path: &Path,
     obfuscate: bool,
 ) -> Result<(), PersistenceError> {
-    // Ensure parent directory exists
     if let Some(parent) = path.parent()
         && !parent.exists()
     {
@@ -303,10 +280,8 @@ pub fn save_to_file(
         tracing::debug!(path = %parent.display(), "Created persistence directory");
     }
 
-    // Serialize data
     let text = toml::to_string(data)?;
     let bytes = if obfuscate {
-        // Gzip compressed
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(text.as_bytes())?;
         encoder.finish()?
@@ -314,7 +289,6 @@ pub fn save_to_file(
         text.into_bytes()
     };
 
-    // Atomic write: write to temp file, then rename
     let temp_path = path.with_extension("tmp");
 
     // 書き込み・sync_all・rename のどれで失敗しても書きかけの一時ファイルを残さない

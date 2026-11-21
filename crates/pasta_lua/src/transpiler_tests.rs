@@ -109,7 +109,7 @@ fn test_transpile_actor() {
 
     let lua_code = String::from_utf8(output).unwrap();
     assert!(lua_code.contains("PASTA.create_actor(\"さくら\")"));
-    // Symmetric API: ACTOR:create_word(key):entry(...) (actor-word-dictionary)
+    // Symmetric API: ACTOR:create_word(key):entry(...)
     assert!(lua_code.contains("ACTOR:create_word(\"通常\"):entry([=[\\s[0]]=])"));
 }
 
@@ -124,7 +124,7 @@ fn test_transpile_scene() {
     assert!(result.is_ok());
 
     let lua_code = String::from_utf8(output).unwrap();
-    // Counter is now assigned by Lua runtime, not transpiler (Requirement 8.5)
+    // Counters are assigned by the Lua runtime, not the transpiler
     assert!(lua_code.contains("PASTA.create_scene(\"メイン\")"));
     assert!(lua_code.contains("function SCENE.__start__(act, ...)"));
 }
@@ -143,13 +143,13 @@ fn test_transpile_multiple_scenes() {
     assert!(result.is_ok());
 
     let lua_code = String::from_utf8(output).unwrap();
-    // Counter is now assigned by Lua runtime, not transpiler (Requirement 8.5)
+    // Counters are assigned by the Lua runtime, not the transpiler
     // Both scenes use base name only - Lua will add counters at runtime
     assert!(lua_code.contains("PASTA.create_scene(\"メイン\")"));
     assert!(lua_code.contains("PASTA.create_scene(\"会話分岐\")"));
 }
 
-// Task 3.1: SceneRegistry integration tests
+// SceneRegistry integration tests
 #[test]
 fn test_transpile_registers_global_scene() {
     let transpiler = LuaTranspiler::default();
@@ -179,7 +179,7 @@ fn test_transpile_registers_local_scene() {
     assert_eq!(registered_scenes[1].name, "自己紹介");
 }
 
-// Task 3.2: WordDefRegistry integration tests
+// WordDefRegistry integration tests
 #[test]
 fn test_transpile_registers_local_words() {
     let transpiler = LuaTranspiler::default();
@@ -198,7 +198,7 @@ fn test_transpile_registers_local_words() {
     assert!(entries[0].key.contains("場所"));
 }
 
-// MAJOR-2.2: GlobalWord processing test
+// GlobalWord processing test
 #[test]
 fn test_transpile_with_global_words() {
     let transpiler = LuaTranspiler::default();
@@ -210,7 +210,6 @@ fn test_transpile_with_global_words() {
     };
     let scenes = vec![create_simple_scene("メイン")];
 
-    // Create PastaFile with GlobalWord item
     let file = PastaFile {
         path: PathBuf::from("test.pasta"),
         items: vec![
@@ -228,7 +227,7 @@ fn test_transpile_with_global_words() {
     assert_eq!(entries[0].key, "挨拶");
 }
 
-// Task 2.3: ActorScope word registration test
+// ActorScope word registration test
 #[test]
 fn test_transpile_registers_actor_words() {
     let transpiler = LuaTranspiler::default();
@@ -263,12 +262,11 @@ fn test_transpile_registers_actor_words() {
     // Check key format: :__actor_{name}__:{word}
     assert_eq!(entries[0].key, ":__actor_さくら__:通常");
     assert_eq!(entries[1].key, ":__actor_さくら__:照れ");
-    // Check values
     assert_eq!(entries[0].values, vec!["\\s[0]", "\\s[1]"]);
     assert_eq!(entries[1].values, vec!["\\s[2]"]);
 }
 
-// word-multi-key: 複数キーの統合テスト
+// 複数キーの統合テスト
 #[test]
 fn test_transpile_multi_key_global_word_registration() {
     let transpiler = LuaTranspiler::default();
@@ -414,7 +412,7 @@ fn registered_attrs(src: &str) -> Vec<(String, Vec<String>)> {
 
 #[test]
 fn test_transpile_file_attr_line_replaces_previous_set() {
-    // 後のファイル属性の行は前の組を捨てる（累積しない・要件 3.2）
+    // 後のファイル属性の行は前の組を捨てる（累積しない）
     let got = registered_attrs(
         "＆author：Alice＆version：1\n＊メイン\n　さくら：やあ\n\n＆author：Bob\n＊メイン\n　さくら：ほい\n",
     );
@@ -435,7 +433,7 @@ fn test_transpile_file_attr_line_replaces_previous_set() {
 
 #[test]
 fn test_transpile_same_declared_name_keeps_attrs_per_declaration() {
-    // 同じ宣言名の 2 つの宣言の属性は混ざらない（要件 1.7）。ローカルは受け継がず宣言行の中だけ畳む（要件 3.8）
+    // 同じ宣言名の 2 つの宣言の属性は混ざらない。ローカルは受け継がず宣言行の中だけ畳む
     let got = registered_attrs(
         "＆f：1\n＊会話＆k：1\n　さくら：やあ\n　・選択＆p：3＆p：4\n　さくら：ほい\n＊会話＆＄＊x≧5\n　さくら：よう\n",
     );
@@ -457,7 +455,7 @@ fn test_transpile_same_declared_name_keeps_attrs_per_declaration() {
 
 #[test]
 fn test_transpile_actor_attrs_are_not_registered() {
-    // アクター辞書の配下の属性はどのシーンにも入らない（要件 5.6）
+    // アクター辞書の配下の属性はどのシーンにも入らない
     let got = registered_attrs("％さくら\n　＆x：9\n＊会話\n　さくら：やあ\n");
     assert_eq!(got, vec![("会話_1::__start__".to_string(), vec![])]);
 }
@@ -528,7 +526,7 @@ fn test_transpile_single_key_backward_compat_lua_output() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // 単一キーでも従来と同一の出力
+    // 単一キーの出力
     assert!(
         lua_code.contains("PASTA.create_word(\"挨拶\"):entry(\"こんにちは\")"),
         "単一キーの出力: {lua_code}"

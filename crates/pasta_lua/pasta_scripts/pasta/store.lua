@@ -105,15 +105,13 @@ function STORE.reset()
     STORE.co_preempt = setmetatable({}, { __mode = "k" })
 end
 
--- CONFIG.actor からの初期化
 -- @pasta_config は Rust 組み込みモジュールのため例外扱い（循環参照回避ポリシーの例外）
 -- pcall で保護することで、@pasta_config が無い環境（単体テスト等）でも動作可能にする
 local ok, CONFIG = pcall(require, "@pasta_config")
 if ok and type(CONFIG.actor) == "table" then
     STORE.actors = CONFIG.actor
 
-    -- CONFIG.actor からのspot値転送（persist-spot-position）
-    -- actor.spot が数値型の場合のみ STORE.actor_spots に転送
+    -- actor.spot が数値のときだけ STORE.actor_spots に転送
     for name, actor in pairs(CONFIG.actor) do
         if type(actor) == "table" and type(actor.spot) == "number" then
             STORE.actor_spots[name] = actor.spot

@@ -21,7 +21,6 @@ local STOP = require("pasta.shiori.stop")
 
 local CALLBACK = {}
 
--- Module-local state
 local _next_id = 0
 local _staged = nil
 
@@ -98,10 +97,8 @@ function CALLBACK.try_route(req)
     -- Delete entry before resume (coroutine may re-stage)
     CALLBACK.pending[req.id] = nil
 
-    -- Convert 0-indexed reference to 1-based array
-    -- ハードニング (3.49 G3): Rust 境界（lua_request.rs）は reference を常時生成するが、
-    -- Lua 側から直接呼ばれる経路で reference が欠落しても、pending 削除済みの
-    -- 待機コルーチンを孤児化（nil 添字エラー）させず空 refs で継続する
+    -- Rust 境界は reference を常時生成するが、Lua 側から直接呼ばれて欠落しても、
+    -- pending 削除済みの待機コルーチンを孤児化（nil 添字エラー）させず空 refs で継続する
     local reference = req.reference or {}
     local refs = {}
     local i = 0
@@ -110,7 +107,6 @@ function CALLBACK.try_route(req)
         i = i + 1
     end
 
-    -- 通常のイベントと同じ再開の手順（予約の消費・継続の更新を含む）で再開する
     -- EVENT は呼び出し時に読み込む（読み込み時に require すると循環する）
     local EVENT = require("pasta.shiori.event")
     local ok, value = EVENT.drive(entry.co, entry.act, refs, nil, req)

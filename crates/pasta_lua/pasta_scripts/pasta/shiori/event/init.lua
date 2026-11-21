@@ -72,7 +72,6 @@
 --- }
 --- ```
 
--- 1. require文
 local REG = require("pasta.shiori.event.register")
 local RES = require("pasta.shiori.res")
 local SHIORI_ACT = require("pasta.shiori.act")
@@ -81,7 +80,7 @@ local CALLBACK = require("pasta.shiori.event.callback")
 local STOP = require("pasta.shiori.stop")
 local CLOCK = require("pasta.shiori.clock")
 
--- 1.5. デフォルトイベントハンドラをロード
+-- デフォルトイベントハンドラをロード
 require("pasta.shiori.event.boot")
 require("pasta.shiori.event.choice_select")
 require("pasta.shiori.event.second_change")
@@ -91,11 +90,8 @@ require("pasta.shiori.event.external_control")
 require("pasta.shiori.event.recommend")
 require("pasta.shiori.event.sys_resume")
 
--- 2. モジュールテーブル宣言
 --- @class EVENT
 local EVENT = {}
-
--- 3. 内部関数
 
 --- actオブジェクトを作成し、シーンを選ぶ前に Reference と日時をローカル変数へ 1 回だけ転記する
 --- 本文の代入は後から勝つ。チェイントークの続きは自分の act で再開するので、ここでの転記は届かない
@@ -149,18 +145,14 @@ local NIL_YIELD_MESSAGE = "何も出さない区切りが 10000 回続いた"
 --- @return boolean ok 処理成功フラグ（エラー時false）
 --- @return any value 有効値またはエラーメッセージ
 local function resume_until_valid(co, ...)
-    -- 初回resumeは引数を渡す
     local ok, value = coroutine.resume(co, ...)
     local empty = 0
 
-    -- ループ: nil yieldをスキップ
     while true do
-        -- エラー時は即座に返す
         if not ok then
             return ok, value
         end
 
-        -- 有効値（nil以外）の場合はループ終了
         if value ~= nil then
             return ok, value
         end
@@ -212,15 +204,13 @@ local function run_interrupt_scene(act)
     return groups
 end
 
--- 4. 公開関数
-
 --- デフォルトハンドラ（未登録イベント用）
 --- シーン関数をイベント名で検索し、見つかった場合はthreadを返す。
 --- 見つからない場合はnilを返す（EVENT.fireでRES.no_content()に変換される）。
 --- @param act ShioriAct actオブジェクト
 --- @return thread|nil シーンコルーチン、またはnil
 function EVENT.no_entry(act)
-    -- シーン関数をイベント名で検索（遅延ロードで循環参照回避）
+    -- 遅延ロードで循環参照回避
     local SCENE = require("pasta.scene")
     return SCENE.co_exec(act, act.req.id, nil, nil)
 end
@@ -235,9 +225,9 @@ end
 --- @return any value ok=true: 出力（nil は出力の無いまま終了）／ok=false: エラーの値
 function EVENT.drive(co, act, ...)
     local FAILURE = require("pasta.failure")
-    -- 1. 種類は再開の前に決める（再開の中で続きが変わる前の状態で判断するため）
+    -- 種類は再開の前に決める（再開の中で続きが変わる前の状態で判断するため）
     local kind = drive_kind(co)
-    -- 2. 印を整える（新しいシーンはまだ act が記録されていないので、最初の再開に渡す act に掛ける）
+    -- 印を整える（新しいシーンはまだ act が記録されていないので、最初の再開に渡す act に掛ける）
     local target = FAILURE.act_of(co) or act
     if target then
         target._spoke = nil
@@ -246,9 +236,8 @@ function EVENT.drive(co, act, ...)
             target._on_speech = run_interrupt_scene
         end
     end
-    -- 3. nil yieldをスキップ
     local ok, value = resume_until_valid(co, ...)
-    -- 4. 欄の関数は成否にかかわらずすぐ外す（後で STOP.response が build しても中断を動かさないため）
+    -- 欄の関数は成否にかかわらずすぐ外す（後で STOP.response が build しても中断を動かさないため）
     local scene_act = FAILURE.act_of(co) or act
     if target then target._on_speech = nil end
     if scene_act then scene_act._on_speech = nil end
@@ -257,20 +246,18 @@ function EVENT.drive(co, act, ...)
         STOP.hold(co, value)
         -- 予約の後、中断の前にエラーで終わったシーンの予約を残さない
         CALLBACK.discard_staged()
-        -- 5. 継続を空にする
         set_co_scene(nil, false)
         return false, value
     end
-    -- 6. ステージング消費（待ちに入ったコルーチンは CALLBACK.pending だけが持つ）
+    -- 待ちに入ったコルーチンは CALLBACK.pending だけが持つ
     if CALLBACK.consume_staged(co, act) then
         co = nil
     end
-    -- 7. 台詞の印が無い素のコルーチンは、出力が空でないかで決める
+    -- 台詞の印が無い素のコルーチンは、出力が空でないかで決める
     local spoke = scene_act and scene_act._spoke
     if spoke == nil then
         spoke = value ~= nil and value ~= ""
     end
-    -- 8. 状態保存（set_co_scene内部でstatus判断）
     if scene_act and scene_act._interrupted then
         -- 中断の台詞が出たので、古い続きも co の残りも捨てる
         set_co_scene(nil, false)
@@ -288,7 +275,6 @@ end
 --- @param req table リクエストテーブル（req.id にイベント名）
 --- @return string SHIORI レスポンス
 function EVENT.fire(req)
-    -- (新規) コールバックルーティング
     local cb_response = CALLBACK.try_route(req)
     if cb_response then
         return cb_response
@@ -301,7 +287,6 @@ function EVENT.fire(req)
 
     -- 鎖（REG:register）を新しい順に呼び、真の値を返したものの act と戻り値で応答する
     -- ハンドラごとに新しい act を作り、止まったときの表記のため呼ぶたびに控え直す
-    -- エラーは SHIORI.request の xpcall でキャッチされる
     local act, result
     for _, fn in ipairs(getmetatable(REG).handlers(req.id)) do
         act = create_act(req)
@@ -319,7 +304,6 @@ function EVENT.fire(req)
         result = (rawget(REG, req.id) or EVENT.no_entry)(act)
     end
 
-    -- 型判定
     if type(result) == "thread" then
         local ok, yielded_value = EVENT.drive(result, act, act)
         if not ok then
@@ -328,13 +312,11 @@ function EVENT.fire(req)
         -- シーンの出力は接頭辞にかかわらず常に Value にする
         return RES.ok(yielded_value)
     elseif type(result) == "string" then
-        -- SHIORI/ で始まる文字列は RES で作った応答全体として包まずに返す
         if result:sub(1, 7) == "SHIORI/" then
             return result
         end
         return RES.ok(result)
     else
-        -- nil
         return RES.no_content()
     end
 end
@@ -348,5 +330,4 @@ function EVENT._resume_until_valid(co, ...)
     return resume_until_valid(co, ...)
 end
 
--- 5. 末尾で返却
 return EVENT

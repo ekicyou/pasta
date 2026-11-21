@@ -34,7 +34,7 @@ fn collect_snapshot(
 }
 
 /// FAST PATH: マーカーが `EXPECTED_MD5` と一致 → `Skipped` を返し、
-/// 自己展開先へ一切書き込みが発生しないこと（Req 1.2 / 1.5 / 1.6）。
+/// 自己展開先へ一切書き込みが発生しないこと。
 #[test]
 fn match_skips_without_any_write() {
     let base = tempfile::tempdir().expect("tempdir");
@@ -68,7 +68,7 @@ fn match_skips_without_any_write() {
 }
 
 /// FAST PATH の比較は trim 後の文字列一致: マーカーに前後空白・改行が
-/// 付いていても一致と判定され、無書き込みで `Skipped` を返すこと（Req 1.5）。
+/// 付いていても一致と判定され、無書き込みで `Skipped` を返すこと。
 #[test]
 fn marker_with_surrounding_whitespace_still_skips() {
     let base = tempfile::tempdir().expect("tempdir");
@@ -94,7 +94,7 @@ fn marker_with_surrounding_whitespace_still_skips() {
 }
 
 /// マーカーが一致しない（trim 後に異なる）→ 再展開（`Deployed`）。
-/// 完全な展開検証は Task 5.1。ここでは判定分岐のみ軽く確認する。
+/// ここでは判定分岐のみ軽く確認する。
 #[test]
 fn mismatch_marker_redeploys() {
     let base = tempfile::tempdir().expect("tempdir");
@@ -114,7 +114,7 @@ fn mismatch_marker_redeploys() {
     }
 }
 
-/// マーカー欠落（自己展開先が未生成を含む）→ 再展開（`Deployed`）（Req 1.3 / 5.5）。
+/// マーカー欠落（自己展開先が未生成を含む）→ 再展開（`Deployed`）。
 #[test]
 fn missing_marker_deploys() {
     let base = tempfile::tempdir().expect("tempdir");
@@ -132,7 +132,7 @@ fn missing_marker_deploys() {
     assert_eq!(marker.trim(), EXPECTED_MD5);
 }
 
-/// 展開内容が内蔵正本と一致し、旧版の orphan が残らないこと（Req 2.1 / 2.2）。
+/// 展開内容が内蔵正本と一致し、旧版の orphan が残らないこと。
 /// stale `.md5` と orphan ファイルを事前投入 → sync → orphan 消滅・既知エントリ存在・
 /// `.md5`＝EXPECTED_MD5 を確認する。
 #[test]
@@ -181,7 +181,7 @@ fn deploy_replaces_content_without_orphan() {
     assert_eq!(marker.trim(), EXPECTED_MD5);
 }
 
-/// `.md5` がスワップ成功後に最後に書かれ、基準ダイジェストと一致すること（Req 2.4）。
+/// `.md5` がスワップ成功後に最後に書かれ、基準ダイジェストと一致すること。
 /// （並行して、自己展開先以外に temp/backup シブリングの残骸が残らないことも確認する。）
 #[test]
 fn marker_written_last_equals_digest() {
@@ -209,7 +209,7 @@ fn marker_written_last_equals_digest() {
     }
 }
 
-/// `scripts/`（ユーザーカスタム層）と他のゴーストファイルが同期で不変であること（Req 2.5）。
+/// `scripts/`（ユーザーカスタム層）と他のゴーストファイルが同期で不変であること。
 #[test]
 fn scripts_dir_untouched() {
     let base = tempfile::tempdir().expect("tempdir");
@@ -241,7 +241,7 @@ fn scripts_dir_untouched() {
     );
 }
 
-/// 原子性: 展開／入れ替えが失敗したとき、自己展開先の直前状態を保全すること（Req 2.3）。
+/// 原子性: 展開／入れ替えが失敗したとき、自己展開先の直前状態を保全すること。
 ///
 /// Windows での確実な失敗注入: live 自己展開先内のファイルへ排他（no-share）ハンドルを
 /// 開いたまま `sync_pasta_scripts` を呼ぶと、production の swap 手順
@@ -251,7 +251,7 @@ fn scripts_dir_untouched() {
 /// - live のセンチネルファイル群が元の内容のまま存在すること（直前状態の保全）。
 /// - stale `.md5` が EXPECTED_MD5 へ書き換わっていない（＝マーカーは最後にしか書かれない）。
 /// - `.pasta_scripts.new.` / `.pasta_scripts.old.` の残骸が残っていないこと（エラーパス掃除）。
-/// - 同一 base_dir 下の `scripts/`（ユーザー層）が不変であること（Req 2.5 と整合）。
+/// - 同一 base_dir 下の `scripts/`（ユーザー層）が不変であること。
 #[cfg(windows)]
 #[test]
 fn deploy_failure_preserves_prior_live_state() {
@@ -350,7 +350,7 @@ fn deploy_failure_preserves_prior_live_state() {
         );
     }
 
-    // scripts/（ユーザー層）は不変であること（Req 2.5）。
+    // scripts/（ユーザー層）は不変であること。
     let scripts_after = snapshot(&scripts);
     assert_eq!(
         scripts_before, scripts_after,

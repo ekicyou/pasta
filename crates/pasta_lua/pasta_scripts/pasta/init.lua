@@ -50,12 +50,9 @@ setmetatable(PASTA, {
 
 --- シーン辞書を最終化する（スタブ実装）
 ---
---- scene_dic.lua から呼び出される。現在はスタブ実装。
---- Rust側からregister_finalize_scene()で上書きされる。
+--- scene_dic.lua から呼び出される。Rust側の register_finalize_scene() で上書きされる。
 --- @return nil
 function PASTA.finalize_scene()
-    -- Stub implementation: do nothing
-    -- This function is overwritten by Rust's register_finalize_scene()
 end
 
 return PASTA

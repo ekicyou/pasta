@@ -19,7 +19,7 @@ where
 
 /// Test sink capturing each `record_scene(join_key, span)` notification as
 /// `(join_key, span.start_line)`. Leaves `record_line` as the only required
-/// method; `record_scene` is overridden to observe scene recording (task 2.1).
+/// method; `record_scene` is overridden to observe scene recording.
 #[derive(Default)]
 struct CapturingSceneSink {
     scenes: Vec<(String, u32)>,
@@ -263,7 +263,7 @@ fn tco_return_only_for_trailing_call_scene() {
 }
 
 /// The line marker goes only before action lines and continuation lines:
-/// var sets, calls and choices get none (actor-line-newlines 2.3).
+/// var sets, calls and choices get none.
 #[test]
 fn line_marker_only_on_action_and_continuation_lines() {
     use pasta_dsl::parser::{ContinueAction, Expr, SetValue, VarScope, VarSet};
@@ -359,7 +359,7 @@ fn choice_timeout_keeps_fractional_float_and_defaults_to_nil() {
     assert_eq!(ident_arg, "act:choice_timeout(nil)\n");
 }
 
-/// `!select` float seconds use one format without an i64 cast (9.2, 9.3):
+/// `!select` float seconds use one format without an i64 cast:
 /// no saturation for huge values, and `-0.0` stays `0`.
 #[test]
 fn choice_timeout_float_seconds_do_not_saturate() {
@@ -393,7 +393,7 @@ fn non_select_cue_command_emits_nothing() {
 }
 
 // ------------------------------------------------------------------
-// Scene recording for source-map join (task 2.1)
+// Scene recording for source-map join
 //
 // `generate_global_scene` / `generate_local_scene` must funnel each scene's
 // deterministic join key + `.pasta` span to the sink via `record_scene`,
@@ -401,7 +401,7 @@ fn non_select_cue_command_emits_nothing() {
 // (see scope_gen.rs `record_scene_span` doc) carries: global/local kind + nesting
 // level, the parent-global reference for locals, and per-base occurrence order
 // (globals' occurrence == runtime `create_scene` counter order). The captured
-// (join_key, start_line) pairs let task 2.2 reconstruct end_line/level and join
+// (join_key, start_line) pairs let finalize reconstruct end_line/level and join
 // the runtime identity (e.g. `会話_1`).
 // ------------------------------------------------------------------
 
@@ -450,7 +450,7 @@ fn global_scene_with(
 ///   (the `counter` argument == runtime `create_scene` order).
 /// - Local key encodes kind (`L`), the parent base + parent occurrence, and the
 ///   code_gen-computed local fn name (`{sanitize}_{counter}`), so nesting level
-///   and parent reference are recoverable at finalize (task 2.2).
+///   and parent reference are recoverable at finalize.
 #[test]
 fn global_and_local_scenes_record_join_keys_and_header_lines() {
     let mut sink = CapturingSceneSink::default();
@@ -497,7 +497,7 @@ fn global_and_local_scenes_record_join_keys_and_header_lines() {
 
 /// Two global scenes sharing a base name get distinct per-base occurrence
 /// counters in their join keys, matching the runtime `create_scene` counter
-/// order (会話_1, 会話_2). This is the property task 2.2 relies on to join the
+/// order (会話_1, 会話_2). This is the property finalize relies on to join the
 /// runtime identity back to the recorded span.
 #[test]
 fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
@@ -525,7 +525,7 @@ fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
     );
 }
 
-/// 1.7: 照合用の名前が重なるローカルシーン（`・挨拶・1` と `・挨拶_1`。どちらも `挨拶_1`）は
+/// 照合用の名前が重なるローカルシーン（`・挨拶・1` と `・挨拶_1`。どちらも `挨拶_1`）は
 /// 照合用の名前ごとに数えるので、別々の関数（`挨拶_1_1`・`挨拶_1_2`）になり上書きされない。
 #[test]
 fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
@@ -541,7 +541,7 @@ fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
     let text = gen_to_string(|cg| cg.generate_global_scene(&scene, &scene.name, 1, &attrs));
     assert!(text.contains("function SCENE.挨拶_1_1(act, ...)"), "{text}");
     assert!(text.contains("function SCENE.挨拶_1_2(act, ...)"), "{text}");
-    // init_scene には記号を直す前の書いた名前を渡す（runtime-error-balloon 2.4, 2.7）
+    // init_scene には記号を直す前の書いた名前を渡す
     assert!(
         text.contains(r#"act:init_scene(SCENE, "会話", "挨拶・1")"#),
         "{text}"
@@ -553,8 +553,8 @@ fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
 }
 
 /// 別名で置き換えた宣言名（`OnTalk`）は登録に使い、`init_scene` には書いた名前（`会話`）を
-/// 渡す。`__start__` はローカルシーン名の代わりに `nil` を渡す（runtime-error-balloon 2.4）。
-/// 4 つ目の行の対応はトランスパイラが整形の後に埋めるので、生成器だけでは出ない（2.5）。
+/// 渡す。`__start__` はローカルシーン名の代わりに `nil` を渡す。
+/// 4 つ目の行の対応はトランスパイラが整形の後に埋めるので、生成器だけでは出ない。
 #[test]
 fn init_scene_receives_written_global_name_not_alias() {
     let attrs = Vec::<pasta_dsl::parser::Attr>::new();
@@ -590,7 +590,7 @@ fn init_scene_receives_written_global_name_not_alias() {
 }
 
 // ------------------------------------------------------------------
-// scene-attribute-store 4.3: 属性の文を create_scene の行に続ける
+// 属性の文を create_scene の行に続ける
 
 fn attr(key: &str, body: pasta_dsl::parser::AttrBody) -> pasta_dsl::parser::Attr {
     pasta_dsl::parser::Attr {

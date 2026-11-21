@@ -105,7 +105,7 @@ pub enum LoaderError {
     /// Raised when synchronizing the on-disk self-deploy target with the
     /// dll-embedded canonical scripts fails (e.g. read-only directory or file
     /// lock). The message conveys the fact of the failure, the target path, and
-    /// that the version drift remains unresolved (Req 3.3).
+    /// that the version drift remains unresolved.
     #[error("Self-deploy failed (version drift unresolved): '{path}': {source}")]
     SelfDeploy {
         path: PathBuf,
@@ -324,10 +324,10 @@ mod tests {
             io::Error::new(io::ErrorKind::PermissionDenied, "access denied"),
         );
         let msg = format!("{}", err);
-        // Fact of self-deploy failure + drift unresolved (Req 3.3).
+        // Fact of self-deploy failure + drift unresolved.
         assert!(msg.contains("Self-deploy failed"));
         assert!(msg.contains("version drift unresolved"));
-        // Target path (Req 3.3).
+        // Target path.
         assert!(msg.contains("/ghost/master/profile/pasta/pasta_scripts"));
         // Cause is carried in the source chain.
         assert!(std::error::Error::source(&err).is_some());

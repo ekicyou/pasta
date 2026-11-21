@@ -36,24 +36,12 @@ const DESCRIPTION: &str = "Encoding conversion (UTF-8 <-> ANSI)";
 /// - `_DESCRIPTION` - Module description
 /// - `to_ansi(utf8_str)` - Convert UTF-8 to ANSI bytes
 /// - `to_utf8(ansi_str)` - Convert ANSI bytes to UTF-8
-///
-/// # Arguments
-/// * `lua` - The Lua state to register the module with
-///
-/// # Returns
-/// * `Ok(Table)` - The module table
-/// * `Err(e)` - Registration failed
 pub(crate) fn register(lua: &Lua) -> LuaResult<Table> {
     let enc = lua.create_table()?;
 
-    // Set module metadata
     enc.set("_VERSION", VERSION)?;
     enc.set("_DESCRIPTION", DESCRIPTION)?;
-
-    // Register to_ansi function
     enc.set("to_ansi", lua.create_function(to_ansi_impl)?)?;
-
-    // Register to_utf8 function
     enc.set("to_utf8", lua.create_function(to_utf8_impl)?)?;
 
     Ok(enc)
@@ -67,7 +55,6 @@ pub(crate) fn register(lua: &Lua) -> LuaResult<Table> {
 /// - On success: `(ansi_string, nil)`
 /// - On error: `(nil, error_message)`
 fn to_ansi_impl(lua: &Lua, value: Value) -> LuaResult<(Option<LuaString>, Option<String>)> {
-    // Type check: must be a string
     let utf8_str = match value {
         Value::String(s) => s,
         _ => {
@@ -77,7 +64,6 @@ fn to_ansi_impl(lua: &Lua, value: Value) -> LuaResult<(Option<LuaString>, Option
         }
     };
 
-    // Get the string as bytes first, then interpret as UTF-8
     let utf8_bytes = utf8_str.as_bytes();
     let utf8_str = match std::str::from_utf8(&utf8_bytes) {
         Ok(s) => s,
@@ -88,7 +74,6 @@ fn to_ansi_impl(lua: &Lua, value: Value) -> LuaResult<(Option<LuaString>, Option
         }
     };
 
-    // Convert UTF-8 to ANSI
     match utf8_to_ansi(utf8_str) {
         Ok(ansi_bytes) => {
             let lua_string = lua.create_string(&ansi_bytes)?;
@@ -110,7 +95,6 @@ fn to_ansi_impl(lua: &Lua, value: Value) -> LuaResult<(Option<LuaString>, Option
 /// - On success: `(utf8_string, nil)`
 /// - On error: `(nil, error_message)`
 fn to_utf8_impl(lua: &Lua, value: Value) -> LuaResult<(Option<LuaString>, Option<String>)> {
-    // Type check: must be a string
     let ansi_str = match value {
         Value::String(s) => s,
         _ => {
@@ -120,10 +104,8 @@ fn to_utf8_impl(lua: &Lua, value: Value) -> LuaResult<(Option<LuaString>, Option
         }
     };
 
-    // Get the raw bytes from Lua string
     let ansi_bytes = ansi_str.as_bytes();
 
-    // Convert ANSI to UTF-8
     match ansi_to_utf8(&ansi_bytes) {
         Ok(utf8_string) => {
             let lua_string = lua.create_string(&utf8_string)?;
@@ -155,11 +137,9 @@ mod tests {
         let lua = create_test_lua();
         let enc = register(&lua).unwrap();
 
-        // Check _VERSION exists
         let version: String = enc.get("_VERSION").unwrap();
         assert_eq!(version, VERSION);
 
-        // Check _DESCRIPTION exists
         let desc: String = enc.get("_DESCRIPTION").unwrap();
         assert_eq!(desc, DESCRIPTION);
     }
@@ -169,11 +149,9 @@ mod tests {
         let lua = create_test_lua();
         let enc = register(&lua).unwrap();
 
-        // Register module
         let globals = lua.globals();
         globals.set("enc", enc).unwrap();
 
-        // Test ASCII string
         let result: (Option<LuaString>, Option<String>) =
             lua.load(r#"return enc.to_ansi("hello")"#).eval().unwrap();
 
@@ -190,7 +168,6 @@ mod tests {
         let globals = lua.globals();
         globals.set("enc", enc).unwrap();
 
-        // Test with number instead of string
         let result: (Option<LuaString>, Option<String>) =
             lua.load(r#"return enc.to_ansi(123)"#).eval().unwrap();
 
@@ -207,7 +184,6 @@ mod tests {
         let globals = lua.globals();
         globals.set("enc", enc).unwrap();
 
-        // Test ASCII string
         let result: (Option<LuaString>, Option<String>) =
             lua.load(r#"return enc.to_utf8("hello")"#).eval().unwrap();
 
@@ -224,7 +200,6 @@ mod tests {
         let globals = lua.globals();
         globals.set("enc", enc).unwrap();
 
-        // Test with nil
         let result: (Option<LuaString>, Option<String>) =
             lua.load(r#"return enc.to_utf8(nil)"#).eval().unwrap();
 
@@ -242,7 +217,6 @@ mod tests {
         let globals = lua.globals();
         globals.set("enc", enc).unwrap();
 
-        // Test roundtrip: UTF-8 -> ANSI -> UTF-8
         let script = r#"
             local original = "日本語テスト"
             local ansi, err1 = enc.to_ansi(original)

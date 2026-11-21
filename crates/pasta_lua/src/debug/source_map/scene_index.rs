@@ -1,35 +1,23 @@
-//! シーン同一性索引（[`SceneIdentityIndex`]）— `.pasta` (ファイル, 行範囲) →
-//! シーン識別子の逆引き索引（task 1.1・requirements 2.1/2.2/2.5/2.6/3.2）。
+//! シーン同一性索引（[`SceneIdentityIndex`]）— `.pasta` の (ファイル, 行) から
+//! 所属シーンを引く逆引き索引。
 //!
-//! # 役割
+//! # 行範囲
 //!
-//! 実行中エンジンが保持するロード済みソースマップの一部として、各 `.pasta`
-//! ファイルのシーン宣言を「(宣言行, 終端行, 入れ子レベル, シーン識別子)」として
-//! 保持し、クリック位置 (ファイル, 行) から所属シーンを確定する逆引きを提供する。
+//! シーンの行範囲は「宣言行 〜 次の同レベル以上のシーン宣言の直前（またはファイル末尾）」。
+//! 本索引は構築側が算出した `[start_line, end_line]`（両端 **inclusive**・1 始まり）を
+//! そのまま保持する。
 //!
-//! # 行範囲の定義（requirements 2.1）
+//! # 解決ポリシー
 //!
-//! シーンの行範囲は「宣言行 〜 次の同レベル以上のシーン宣言の直前」であり、本索引は
-//! 既に確定済みの `[start_line, end_line]`（両端 **inclusive**・1 始まり）を投入される。
-//! 終端行の算出（次の同レベル以上宣言の直前 / ファイル末尾）は構築側（loader /
-//! finalize join・task 2.2）が責務を持ち、本索引は確定済み範囲を保持・参照する。
+//! 1. **包含**: クリック行を範囲に含むシーンのうち **最内**（入れ子レベル最大 = local 優先）。
+//!    包含を後方フォールバックに優先する。
+//! 2. **後方フォールバック**: 包含が無ければ、クリック行と同じか **下方**（より大きい
+//!    行番号）の最近接の宣言。
+//! 3. **未検出**: 下方にも無ければ未検出。空ファイル・未登録ファイルも未検出。
 //!
-//! # 解決ポリシー（requirements 2.2 > 2.5 > 2.6）
+//! # 計算量
 //!
-//! 1. **包含**: クリック行を範囲 `[start, end]` に含むシーンが 1 つ以上あれば、その中の
-//!    **最内**（入れ子レベル最大 = local 優先）を選ぶ（2.2）。包含による確定を後方
-//!    フォールバックに優先する。
-//! 2. **後方フォールバック**: 包含が無い場合、クリック行と同じか **下方**（より大きい
-//!    行番号）にある最近接の宣言を持つシーンを選ぶ（2.5）。
-//! 3. **未検出**: 下方にも有効シーンが無ければ未検出（2.6）。空ファイル・未登録
-//!    ファイルも未検出。
-//!
-//! # 計算量（requirements 8.3）
-//!
-//! 1 `.pasta` ファイルの宣言開始行 → [`SceneSpan`] を `BTreeMap` で昇順保持し、
-//! 包含探索は「クリック行以下の開始行」を `range(..=line)` の後方走査で、後方
-//! フォールバックは「クリック行以上の開始行」を `range(line..)` の先頭で引く。いずれも
-//! `BTreeMap` の対数オーダ操作であり、SHIORI GET 処理ブロックを延ばさない（8.3）。
+//! どちらの探索も `BTreeMap` の `range` で対数オーダに収め、SHIORI GET の処理を延ばさない。
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -37,10 +25,8 @@ use super::canonicalize_pasta_file;
 
 /// 確定したシーン同一性（`scene_at` の返り値）。
 ///
-/// ランタイム実 identity を **(scene_id, parent)** で表す（位置からシーンを引いた
-/// 結果）。global は `scene_id=会話_1, parent=None`、local は
-/// `scene_id=挨拶_1, parent=Some(会話_1)`。`OnPastaSceneAt` の再生は parent の
-/// 有無で global / local を選ぶため、両者を一体で返す。
+/// global は `scene_id=会話_1, parent=None`、local は `scene_id=挨拶_1, parent=Some(会話_1)`。
+/// `OnPastaSceneAt` の再生は `parent` の有無で global / local を選ぶ。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SceneIdentity {
     /// シーン識別子（global = `会話_1`、local = `挨拶_1`）。
@@ -51,33 +37,25 @@ pub struct SceneIdentity {
 
 /// 1 シーンの行範囲（両端 inclusive・1 始まり）・入れ子レベル・識別子。
 ///
-/// `level` は入れ子の深さ（global = 0, その直下の local = 1, ...）。包含が複数該当する
-/// とき最内（`level` 最大）を選ぶための判定に用いる（requirements 2.2）。`scene_id` は
-/// `SceneRegistry` 由来のランタイム実 identity（例 `会話_1`）を **そのまま** 保持する。
-/// `parent` は local シーンの親グローバル（例 `会話_1`）で、global は `None`（task 2.2）。
-/// 本索引は識別子の FORMAT に非依存で、投入された文字列を格納・返却するのみ
-/// （design Decision 1「runtime-authoritative capture」）。
+/// `scene_id` は `SceneRegistry` 由来のランタイムの識別子（例 `会話_1`）を **そのまま**
+/// 保持する。索引は識別子の書式に依存しない。
 #[derive(Debug, Clone)]
 struct SceneSpan {
-    /// 宣言行（1 始まり・inclusive）。`BTreeMap` のキーと一致する。
+    /// `BTreeMap` のキーと一致する。
     start_line: u32,
-    /// 終端行（1 始まり・inclusive）。「次の同レベル以上宣言の直前 / ファイル末尾」。
     end_line: u32,
-    /// 入れ子レベル（global = 0, local = 1, ...）。最内優先判定に用いる。
+    /// 入れ子の深さ（global = 0, local = 1, ...）。最内優先の判定に用いる。
     level: u32,
-    /// シーン識別子（`SceneRegistry` 由来・FORMAT 非依存で格納）。
     scene_id: String,
-    /// 親グローバルシーン（local のみ `Some`・global は `None`）。
+    /// 親グローバルシーン（local のみ `Some`）。
     parent: Option<String>,
 }
 
 impl SceneSpan {
-    /// 指定行が本シーンの範囲 `[start_line, end_line]`（両端 inclusive）に含まれるか。
     fn contains(&self, line: u32) -> bool {
         self.start_line <= line && line <= self.end_line
     }
 
-    /// 確定したシーン同一性 `(scene_id, parent)` の所有コピーを返す。
     fn identity(&self) -> SceneIdentity {
         SceneIdentity {
             scene_id: self.scene_id.clone(),
@@ -89,12 +67,10 @@ impl SceneSpan {
 /// シーン同一性索引（イミュータブル・ロード時に [`SceneIdentityIndexBuilder`] から確定）。
 ///
 /// `pasta_file`（正規化キー）→ (`start_line` → [`SceneSpan`]) の二段構造。外側 `HashMap`
-/// でファイル引き O(1)、内側 `BTreeMap` で開始行昇順保持し対数オーダ lookup（8.3）。
-/// ファイルキーは [`canonicalize_pasta_file`] で STORE/QUERY 双方を同一正規形へ落とし、
-/// VSCode 由来パスとの突合を可能にする（既存ソースマップと同一規則）。
+/// でファイル引き、内側 `BTreeMap` で開始行の昇順。ファイルキーは
+/// [`canonicalize_pasta_file`] で登録と問い合わせを同じ正規形へ落とす。
 #[derive(Debug, Clone, Default)]
 pub struct SceneIdentityIndex {
-    /// 正規化 `.pasta` ファイルキー → (宣言開始行 → シーン範囲)。
     files: HashMap<String, BTreeMap<u32, SceneSpan>>,
 }
 
@@ -104,23 +80,17 @@ impl SceneIdentityIndex {
         SceneIdentityIndexBuilder::default()
     }
 
-    /// 位置 (`pasta_file`, `line`) からシーン識別子を確定する（requirements 2.1/2.2/2.5/2.6）。
+    /// 位置 (`pasta_file`, `line`) からシーン識別子を確定する。`line` は 1 始まり。
     ///
     /// 解決順:
-    /// 1. **包含**（2.1/2.2）: `line` を範囲に含むシーン群から最内（`level` 最大）を選ぶ。
-    /// 2. **後方フォールバック**（2.5）: 包含が無ければ `line` と同じか下方の最近接宣言。
-    /// 3. **未検出**（2.6）: 下方にも無ければ `None`。未登録ファイル・空ファイルも `None`。
-    ///
-    /// `line` は 1 始まり。返り値は格納された識別子の所有コピー（[`SceneIdentity`]・
-    /// `(scene_id, parent)`）。
+    /// 1. **包含**: `line` を範囲に含むシーン群から最内（`level` 最大）を選ぶ。
+    /// 2. **後方フォールバック**: 包含が無ければ `line` と同じか下方の最近接宣言。
+    /// 3. **未検出**: 下方にも無ければ `None`。未登録ファイル・空ファイルも `None`。
     pub fn scene_at(&self, pasta_file: &str, line: u32) -> Option<SceneIdentity> {
         let file_key = canonicalize_pasta_file(pasta_file);
         let scenes = self.files.get(&file_key)?;
 
-        // (1) 包含探索: 開始行が `line` 以下のシーンを開始行降順（直近の宣言から）に
-        // 走査し、範囲に含むものの中から最内（level 最大）を選ぶ。開始行が `line` を
-        // 超えるシーンは `line` を範囲に含み得ない（start > line なら contains は偽）
-        // ため `range(..=line)` で枝刈りできる（8.3）。
+        // 開始行が `line` を超えるシーンは `line` を含み得ないので `range(..=line)` で枝刈りする。
         let mut innermost: Option<&SceneSpan> = None;
         for (_, span) in scenes.range(..=line).rev() {
             if span.contains(line) {
@@ -134,13 +104,10 @@ impl SceneIdentityIndex {
             return Some(span.identity());
         }
 
-        // (2) 後方フォールバック（2.5）: 包含が無ければ、`line` と同じか下方（開始行 >=
-        // line）の最近接シーン宣言を採る。`range(line..)` の先頭が最近接（8.3）。
         if let Some((_, span)) = scenes.range(line..).next() {
             return Some(span.identity());
         }
 
-        // (3) 未検出（2.6）: 下方に有効シーンが無い。
         None
     }
 }
@@ -151,18 +118,15 @@ impl SceneIdentityIndex {
 /// 同一ファイル・同一開始行への再投入は last-write-wins（`BTreeMap` キー一意性）。
 #[derive(Debug, Default)]
 pub struct SceneIdentityIndexBuilder {
-    /// 正規化 `.pasta` ファイルキー → (宣言開始行 → シーン範囲)。
     files: HashMap<String, BTreeMap<u32, SceneSpan>>,
 }
 
 impl SceneIdentityIndexBuilder {
     /// 1 シーンの確定済み行範囲・入れ子レベル・識別子・親を投入する。
     ///
-    /// `start_line` / `end_line` は両端 inclusive・1 始まり。`end_line` は「次の同
-    /// レベル以上宣言の直前 / ファイル末尾」を構築側が算出済みで渡す（requirements
-    /// 2.1）。`level` は入れ子の深さ（global = 0, local = 1, ...）。`parent` は local の
-    /// 親グローバル（例 `会話_1`）で、global は `None`（local の再生に渡す）。同一ファイル内で同一 `start_line` を再投入した場合は last-write-wins
-    /// で上書きする。
+    /// `start_line` / `end_line` は両端 inclusive・1 始まり。`level` は入れ子の深さ
+    /// （global = 0, local = 1, ...）。`parent` は local の親グローバル（例 `会話_1`）で、
+    /// global は `None`。
     pub fn add_scene(
         &mut self,
         pasta_file: &str,

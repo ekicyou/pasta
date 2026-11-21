@@ -228,23 +228,18 @@ mod tests {
         // 他の試験と重ならないディレクトリ（終わりに項目を消す）
         let dir = Path::new("/tracing_init/lifecycle");
 
-        // Update before (or regardless of) init: must not panic.
         update_tracing_filter(dir, &config);
 
-        // Stage 1: install subscriber.
         init_tracing();
 
-        // Second init must be safely ignored (try_init contract).
         init_tracing();
 
-        // Stage 1.5: update with a valid custom directive.
         let custom = LoggingConfig {
             filter: Some("warn,pasta_lua=debug".to_string()),
             ..LoggingConfig::default()
         };
         update_tracing_filter(dir, &custom);
 
-        // Update with an unparsable directive: falls back without panicking.
         let invalid = LoggingConfig {
             filter: Some("===not a directive===".to_string()),
             ..LoggingConfig::default()

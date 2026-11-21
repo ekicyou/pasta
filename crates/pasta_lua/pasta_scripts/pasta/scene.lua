@@ -158,7 +158,6 @@ end
 --- @param scene_func function|nil シーン関数
 --- @return SceneTable グローバルシーンテーブル
 function SCENE.create_scene(base_name, local_name, scene_func)
-    -- カウンタからグローバルシーン名を生成
     local counter = SCENE.get_or_increment_counter(base_name)
     local global_name = base_name .. "_" .. counter
 
@@ -180,7 +179,6 @@ end
 --- @return SceneSearchResult|nil 検索結果、またはnil
 --- @return "unmet"|nil miss 結果が nil で、名前に合うシーンはあるが条件を満たす候補が無いとき "unmet"
 function SCENE.search(name, global_scene_name, act)
-    -- 型チェック: name が文字列でない場合は nil を返す
     if type(name) ~= "string" then
         return nil
     end
@@ -188,23 +186,18 @@ function SCENE.search(name, global_scene_name, act)
     -- @pasta_search を遅延ロード（初期化タイミング問題を回避）
     local SEARCH = require("@pasta_search")
 
-    -- @pasta_search を使用してシーンを検索
     local global_name, local_name = SEARCH:search_scene(name, global_scene_name, act and act.var, act and act.save)
 
-    -- 検索結果がなければ nil を返す（条件漏れなら 2 つ目は "unmet"）
     if not global_name then
         return nil, local_name
     end
 
-    -- Lua 側で登録されているシーン関数を取得
     local func = SCENE.get(global_name, local_name)
 
-    -- シーン関数が登録されていなければ nil を返す
     if not func then
         return nil
     end
 
-    -- 呼び出し可能な結果オブジェクトを返す
     return setmetatable({
         global_name = global_name,
         local_name = local_name,

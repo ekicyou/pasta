@@ -110,7 +110,7 @@ fn expr_fn_call_local_and_global_spellings() {
 }
 
 /// `＠＊名前（…）` in expression position calls `act:global_fn("名前", …)`
-/// (first arg stays act, implicitly via the method call) (Req 1.2).
+/// (first arg stays act, implicitly via the method call).
 #[test]
 fn expr_global_fn_call_uses_act_global_fn() {
     let no_args = gen_to_string(|cg| {
@@ -124,7 +124,7 @@ fn expr_global_fn_call_uses_act_global_fn() {
 }
 
 // ------------------------------------------------------------------
-// Arithmetic: precedence regrouping into nested `(L op R)` (Req 1.2, 1.4, 4.5)
+// Arithmetic: precedence regrouping into nested `(L op R)`
 // ------------------------------------------------------------------
 
 /// Build a left-associative chain exactly like the parser's
@@ -299,7 +299,7 @@ fn arith_operand_descriptions() {
 }
 
 /// Arithmetic inside a function argument goes through the same generator
-/// (every expression position shares `generate_expr_to_buffer`, Req 3.6).
+/// (every expression position shares `generate_expr_to_buffer`).
 #[test]
 fn arith_in_function_argument_uses_same_generator() {
     use pasta_dsl::parser::BinOp::{Add, Mul};
@@ -346,7 +346,7 @@ fn arith_right_hand_binary_is_one_term() {
 
 /// Arithmetic wraps every operand that is not statically a number with
 /// `PASTA.num` (string literals, blank strings, concats, variables, calls);
-/// number literals and arithmetic results stay bare (Req 1.2, 4.5).
+/// number literals and arithmetic results stay bare.
 #[test]
 fn arith_wraps_operands_by_static_kind() {
     use pasta_dsl::parser::BinOp::{Add, Concat, Sub};
@@ -377,7 +377,7 @@ fn arith_wraps_operands_by_static_kind() {
 }
 
 // ------------------------------------------------------------------
-// Concatenation: a third, lowest level below arithmetic (Req 1.3, 2.1–2.3, 3.3)
+// Concatenation: a third, lowest level below arithmetic
 // ------------------------------------------------------------------
 
 /// Transpile one line of a `メイン` scene and return its generated Lua line.
@@ -399,7 +399,7 @@ fn scene_line(line: &str) -> String {
         .to_string()
 }
 
-/// The design's generated forms, from DSL text through the parser
+/// The generated forms, from DSL text through the parser
 /// (assignment, Call target, and property-assignment right-hand sides).
 #[test]
 fn concat_generated_forms_from_dsl() {

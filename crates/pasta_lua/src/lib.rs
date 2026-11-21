@@ -45,7 +45,6 @@ pub mod search;
 pub mod string_literalizer;
 pub mod transpiler;
 
-// Re-export main types
 pub use code_gen::LuaCodeGenerator;
 pub use config::TranspilerConfig;
 pub use context::TranspileContext;

@@ -4,12 +4,8 @@
 --- SHIORI/3.0プロトコルに準拠したレスポンス文字列を構築する。
 --- ステータスコード別の便利関数を提供し、標準ヘッダー（Charset, Sender, SecurityLevel）を自動付与する。
 
--- 1. require文（なし - 外部依存ゼロ）
-
--- 2. モジュールテーブル宣言
 local RES = {}
 
--- 3. 定数
 local CRLF = "\r\n"
 local SPLIT = ": "
 
@@ -31,7 +27,6 @@ local function with(dic, k, v)
     return t
 end
 
--- 4. 環境設定テーブル
 --- @class RESEnv 環境設定テーブル
 --- @field charset string 文字セット（デフォルト: "UTF-8"）
 --- @field sender string 送信者名（デフォルト: "Pasta"）
@@ -41,8 +36,6 @@ RES.env = {
     sender = "Pasta",
     security_level = "local",
 }
-
--- 5. 公開関数
 
 --- @alias HeaderDic table<string, string> ヘッダー辞書
 
@@ -58,7 +51,6 @@ RES.env = {
 function RES.build(code, dic)
     dic = dic or {}
 
-    -- Status line
     local rc = "SHIORI/3.0 " .. code .. CRLF
 
     -- Standard headers (always in this order)
@@ -66,14 +58,12 @@ function RES.build(code, dic)
     rc = rc .. header("Sender", RES.env.sender)
     rc = rc .. header("SecurityLevel", RES.env.security_level)
 
-    -- Additional headers from dic
     if type(dic) == 'table' then
         for k, v in pairs(dic) do
             rc = rc .. header(k, v)
         end
     end
 
-    -- Terminate with empty line
     rc = rc .. CRLF
 
     return rc
@@ -87,7 +77,6 @@ end
 --- @param dic HeaderDic|nil 追加ヘッダー辞書
 --- @return string SHIORI/3.0レスポンス文字列
 function RES.ok(value, dic)
-    -- nil または空文字列の場合は 204 No Content を返す
     if value == nil or value == "" then
         return RES.no_content(dic)
     end
@@ -150,5 +139,4 @@ function RES.warn(reason, dic)
     return RES.no_content(with(dic, "X-Warn-Reason", reason))
 end
 
--- 6. 末尾で返却
 return RES

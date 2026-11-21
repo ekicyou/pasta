@@ -59,16 +59,13 @@ player_name = "Bob"
 inventory = ["sword", "shield"]
 "#);
 
-    // Save with obfuscation
     save_to_file(&data, &file_path, true).unwrap();
 
-    // Verify file starts with gzip magic
     let raw = fs::read(&file_path).unwrap();
     assert!(raw.len() >= 2);
     assert_eq!(raw[0], GZIP_MAGIC[0]);
     assert_eq!(raw[1], GZIP_MAGIC[1]);
 
-    // Load
     let loaded = load_from_file(&file_path).unwrap();
     assert_eq!(loaded, data);
 }
@@ -121,7 +118,6 @@ fn test_atomic_write_creates_directory() {
 
     let data = doc("test = true");
 
-    // Should create directories automatically
     save_to_file(&data, &file_path, false).unwrap();
 
     assert!(file_path.exists());
@@ -167,7 +163,6 @@ fn test_empty_file_returns_empty_object() {
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("empty.toml");
 
-    // Create empty file
     fs::write(&file_path, "").unwrap();
 
     let loaded = load_from_file(&file_path).unwrap();
@@ -182,11 +177,9 @@ fn test_lua_module_load() {
     let lua = Lua::new();
     let module = register(&lua, &config, &base_dir).unwrap();
 
-    // Load should return empty table when file doesn't exist
     let load_fn: mlua::Function = module.get("load").unwrap();
     let result: Table = load_fn.call(()).unwrap();
 
-    // Should be an empty table
     assert_eq!(result.len().unwrap(), 0);
 }
 
@@ -198,22 +191,18 @@ fn test_lua_module_save_and_load() {
     let lua = Lua::new();
     let module = register(&lua, &config, &base_dir).unwrap();
 
-    // Create test data
     let data: Table = lua.create_table().unwrap();
     data.set("name", "Test").unwrap();
     data.set("count", 42).unwrap();
 
-    // Save
     let save_fn: mlua::Function = module.get("save").unwrap();
     let (ok, err): (Option<bool>, Option<String>) = save_fn.call(data.clone()).unwrap();
     assert_eq!(ok, Some(true));
     assert!(err.is_none());
 
-    // Load
     let load_fn: mlua::Function = module.get("load").unwrap();
     let result: Table = load_fn.call(()).unwrap();
 
-    // Verify data
     let name: String = result.get("name").unwrap();
     let count: i32 = result.get("count").unwrap();
     assert_eq!(name, "Test");
@@ -699,7 +688,7 @@ nested = { a = { b = { c = "deep" } } }
         let nz = back["nz"].as_float().unwrap();
         assert_eq!(nz.to_bits(), (-0.0f64).to_bits());
         assert!(back["nan"].as_float().unwrap().is_nan());
-        // 表に入った i64::MAX は LuaJIT の倍精度で 2^63 に丸まる（確定した設計判断 6。値そのものの往復は別のテスト）
+        // 表に入った i64::MAX は LuaJIT の倍精度で 2^63 に丸まる（値そのものの往復は別のテスト）
         assert_eq!(back["imax"], toml::Value::Float(9223372036854775808.0));
         // 2^63 は i64 の外なので浮動小数点数のまま
         assert_eq!(back["big"], toml::Value::Float(9223372036854775808.0));
@@ -708,7 +697,7 @@ nested = { a = { b = { c = "deep" } } }
 
 #[test]
 fn test_codec_round_trip_i64_extremes_as_values() {
-    // LuaJIT の表に入れると 2^53 を超える整数は丸まる（マニュアルに書く）。
+    // LuaJIT の表に入れると 2^53 を超える整数は丸まる。
     // 値そのものは Integer で戻り、Integer で書き戻る（x86 の i64::MAX だけは下の別の期待）
     let lua = Lua::new();
     let back = |i: i64| {
@@ -1062,7 +1051,7 @@ fn test_toml_to_lua_integer_never_truncates() {
     assert!(matches!(v, Value::Integer(5)));
 }
 
-/// Lua から作った表を書くと、x86・x64 で同じ TOML の文字になる（Data Models の表）。
+/// Lua から作った表を書くと、x86・x64 で同じ TOML の文字になる。
 #[test]
 fn test_codec_integer_text_same_on_x86_and_x64() {
     let (doc, dropped) = codec_doc(
@@ -1118,12 +1107,12 @@ fn test_read_big_integer_is_lua_number() {
     assert!(ok);
 }
 
-/// 呼ばれたら誤りを起こす `__pairs` を持つ表（3.7）。
+/// 呼ばれたら誤りを起こす `__pairs` を持つ表。
 const PAIRS_TRAP: &str = r#"local function trap() return setmetatable({ a = 1 }, { __pairs = function() error("called") end }) end"#;
 
 #[test]
 fn test_codec_does_not_call_pairs_metamethod() {
-    // 3.7: セーブとログの表は `__pairs` を呼ばず、生の中身だけを読む
+    // セーブとログの表は `__pairs` を呼ばず、生の中身だけを読む
     let (root, dropped) = codec_doc(&format!("{PAIRS_TRAP} return trap()"));
     assert_eq!(root, doc("a = 1"));
     assert!(dropped.is_empty(), "{dropped:?}");
@@ -1140,7 +1129,7 @@ fn test_codec_does_not_call_pairs_metamethod() {
 // 保存変数の書き出し（dump_table）
 // ---------------------------------------------------------------------------
 
-/// 門が閉じていても、テキストの TOML で書き、表を変えない（5.1・5.3・5.6）。
+/// 門が閉じていても、テキストの TOML で書き、表を変えない。
 #[test]
 fn test_dump_table_writes_text_without_gate_and_keeps_table() {
     let temp_dir = TempDir::new().unwrap();
@@ -1165,7 +1154,7 @@ fn test_dump_table_writes_text_without_gate_and_keeps_table() {
     assert!(!path.with_extension("tmp").exists());
 }
 
-/// 書けない値は外してセーブと同じ文言で警告し、残りを書く（5.4）。
+/// 書けない値は外してセーブと同じ文言で警告し、残りを書く。
 #[tracing_test::traced_test]
 #[test]
 fn test_dump_table_drops_function_and_warns() {
@@ -1185,7 +1174,7 @@ fn test_dump_table_drops_function_and_warns() {
     ));
 }
 
-/// 在るファイルを置き換え、無いフォルダを作る（5.1）。
+/// 在るファイルを置き換え、無いフォルダを作る。
 #[test]
 fn test_dump_table_replaces_file_and_creates_folder() {
     let temp_dir = TempDir::new().unwrap();
@@ -1199,7 +1188,7 @@ fn test_dump_table_replaces_file_and_creates_folder() {
     assert_eq!(load_from_file(&path).unwrap(), doc("b = 2"));
 }
 
-/// 一時ファイルを作れないときは Err で、前のファイルが残り、一時ファイルも残らない（5.5）。
+/// 一時ファイルを作れないときは Err で、前のファイルが残り、一時ファイルも残らない。
 #[test]
 fn test_dump_table_unwritable_keeps_previous_file() {
     let temp_dir = TempDir::new().unwrap();

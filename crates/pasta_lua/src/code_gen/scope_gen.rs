@@ -14,7 +14,7 @@ use pasta_dsl::parser::{
 use std::io::Write;
 
 impl<'a, W: Write> LuaCodeGenerator<'a, W> {
-    /// Generate actor definition block (Requirement 3a, actor-word-dictionary).
+    /// Generate actor definition block.
     ///
     /// Generates:
     /// ```lua
@@ -28,14 +28,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// end
     /// ```
     pub fn generate_actor(&mut self, actor: &ActorScope) -> Result<(), TranspileError> {
-        // do block for scope separation (Requirement 1)
         self.writeln("do")?;
         self.indent();
 
-        // Create actor — this is the scope definition HEADER line.
-        // Source-map wiring (Requirements 1.1, 1.4, 1.5): record the actor scope's
-        // `.pasta` span at the header `.lua` line so `span.start_line` (the `.pasta`
-        // `％アクター` definition header line) maps to a `.pasta` position.
+        // Header line: carries the `％アクター` definition's `.pasta` span.
         let out_line_before = self.out_line();
         self.writeln(&format!(
             "local ACTOR = PASTA.create_actor(\"{}\")",
@@ -43,16 +39,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         ))?;
         self.record_span_since(out_line_before, actor.span);
 
-        // Generate word definitions (Requirement 2, actor-word-dictionary Task 3.1)
         // ACTOR:create_word() registers only in the actor word dictionary (STORE.actor_words, searched by
         // the A2 prefix match); it does not set a field on the actor object
         for word_def in &actor.words {
             self.generate_word_definition(word_def, "ACTOR", ":")?;
         }
 
-        // Generate code blocks (Requirement 4.関数定義)
         for code_block in &actor.code_blocks {
-            // Only expand Lua code blocks
             if code_block.language.as_deref() == Some("lua") {
                 self.write_blank_line()?;
                 self.generate_code_block(code_block)?;
@@ -64,7 +57,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Generate global scene block (Requirement 3b, MAJOR-3).
+    /// Generate global scene block.
     ///
     /// Generates:
     /// ```lua
@@ -97,19 +90,14 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         attrs: &[Attr],
     ) -> Result<(), TranspileError> {
         let sanitized_name = SceneRegistry::sanitize_name(declared_name);
-        // Use base name only - counter is assigned by Lua runtime (Requirement 8.5)
+        // Use base name only - the counter is assigned by the Lua runtime
         let base_name = sanitized_name;
 
-        // do block for scope separation (Requirement 1)
         self.writeln("do")?;
         self.indent();
 
-        // Create scene with base name - Lua side assigns counter (Requirement 8.2, 8.5).
-        // This is the global scene definition HEADER line.
-        // Source-map wiring (Requirements 1.1, 1.4, 1.5): record the global scene's
-        // `.pasta` span at the header `.lua` line so `span.start_line` (the `.pasta`
-        // `＊シーン` definition header line) maps to a `.pasta` position.
-        // 属性の文は同じ行の後ろへ続ける。行を足すと init_scene の行の対応がずれる（設計の決定 6）。
+        // Header line: carries the `＊シーン` definition's `.pasta` span.
+        // 属性の文は同じ行の後ろへ続ける。行を足すと init_scene の行の対応がずれる。
         let counters = local_scene_counters(&scene.local_scenes);
         let mut header = format!("local SCENE = PASTA.create_scene(\"{}\")", base_name);
         append_set_scene_attrs(&mut header, "__start__", attrs)?;
@@ -127,18 +115,15 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         self.writeln(&header)?;
         self.record_span_since(out_line_before, scene.span);
 
-        // Source-map scene recording (task 2.1, Requirements 3.1/3.3): flow the
-        // global scene's deterministic join key + `.pasta` header span to the sink
-        // so the finalize side (task 2.2) can reconstruct the scene index and join
-        // the runtime identity (e.g. `会話_1`).
+        // Flow the scene's join key + `.pasta` header span to the sink so the
+        // finalize side can join the runtime identity (e.g. `会話_1`).
         //
-        // JOIN-KEY ENCODING (consumed verbatim by task 2.2; keep in sync):
+        // JOIN-KEY ENCODING (consumed verbatim by finalize; keep in sync):
         //   global: "G:{base}#{counter}"
         //   local:  "L:{parent_base}#{parent_counter}:{fn_name}"
         // where
         //   - `base` / `parent_base` = `SceneRegistry::sanitize_name(name)` (NOT
-        //     re-sanitized here — reuse the registry rule to avoid format drift,
-        //     Requirement 3.3 / design.md:329,350).
+        //     re-sanitized here — reuse the registry rule to avoid format drift).
         //   - `counter` / `parent_counter` = the per-base occurrence order within
         //     this `.pasta` file (`scene_counter`). The join matches it against the
         //     rank of the runtime `create_scene` counters of the same base within
@@ -153,8 +138,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         self.write_blank_line()?;
 
-        // Generate scene-level word definitions (Requirement 2.2, Task 4.3)
-        // These are registered under the current global scene name
+        // Scene-level word definitions, registered under the current global scene name.
         for word in &scene.words {
             self.generate_local_word(word)?;
         }
@@ -163,7 +147,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
 
         // ローカルシーンを照合用の名前ごとの通し番号（_1, _2, ...）で生成する。
-        // トランスパイル時のレジストリの登録と同じ local_scene_counters を使う（2.12）。
+        // トランスパイル時のレジストリの登録と同じ local_scene_counters を使う。
         let first_slot = self.line_map_slots.len();
         for (local_scene, counter) in scene.local_scenes.iter().zip(counters) {
             // Parent reference for the local join key: "{base}#{counter}" identifies
@@ -178,8 +162,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             )?;
         }
 
-        // Generate code blocks at module level (after all local scene functions)
-        // First: global scene level code blocks
+        // Code blocks go at module level, after all local scene functions.
         let blocks_start = self.out_line + 1;
         for code_block in &scene.code_blocks {
             self.generate_code_block(code_block)?;
@@ -192,7 +175,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
         }
         // Lua のブロックの関数は同じグローバルシーンのどのシーンからも呼ばれるので、
-        // このグローバルシーンのすべてのシーン関数の行の対応に含める（2.5）。
+        // このグローバルシーンのすべてのシーン関数の行の対応に含める。
         let blocks = (blocks_start, self.out_line);
         for slot in &mut self.line_map_slots[first_slot..] {
             slot.ranges[1] = blocks;
@@ -203,7 +186,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Generate local scene function (Requirement 3c).
+    /// Generate local scene function.
     ///
     /// Generates:
     /// ```lua
@@ -241,22 +224,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             "__start__".to_string()
         };
 
-        // This is the local scene definition HEADER line.
-        // Source-map wiring (Requirements 1.1, 1.4, 1.5): record the local scene's
-        // `.pasta` span at the function header `.lua` line so `span.start_line` (the
-        // `.pasta` `・シーン` definition header line, or the enclosing global scene
-        // header for the anonymous start scene) maps to a `.pasta` position.
+        // Header line: carries the local scene's `.pasta` span (for the anonymous
+        // start scene, the enclosing global scene header).
         let out_line_before = self.out_line();
         self.writeln(&format!("function SCENE.{}(act, ...)", fn_name))?;
         self.record_span_since(out_line_before, scene.span);
         let fn_start = self.out_line;
 
-        // Source-map scene recording (task 2.1): flow the local scene's deterministic
-        // join key + `.pasta` header span to the sink. The key reuses the SAME
-        // code_gen-computed `fn_name` (counter already applied) and the parent
-        // reference, so task 2.2 can recover nesting level (the `L` prefix) and the
-        // owning global occurrence without re-sanitizing or recomputing counters
-        // (Requirement 3.3 形式ドリフト回避).
+        // Flow the local scene's join key + `.pasta` header span to the sink. The
+        // key reuses the same `fn_name` (counter already applied) and the parent
+        // reference, so finalize can recover the nesting level (the `L` prefix) and
+        // the owning global occurrence without recomputing counters.
         let local_join_key = format!("L:{}:{}", parent_ref, fn_name);
         self.record_scene_span(&local_join_key, scene.span);
 
@@ -265,7 +243,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Session initialization: args and init_scene come first
         self.writeln("local args = { ... }")?;
         // 作者が書いた名前（別名・記号を直す前）を渡す。__start__ はローカル名の代わりに nil。
-        // 4 つ目の行の対応は、整形の後にトランスパイラがこの行の `)` の前へ埋める（2.5）。
+        // 4 つ目の行の対応は、整形の後にトランスパイラがこの行の `)` の前へ埋める。
         let local_name = match scene.name {
             Some(ref name) => StringLiteralizer::literalize(name)?,
             None => "nil".to_string(),
@@ -280,9 +258,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Generate actor initialization block for __start__ only (counter == 0)
         // Order: init_scene -> clear_spot -> set_spot(s)
         if counter == 0 && !actors.is_empty() {
-            // clear_spot at the start of actor initialization block (Requirement 2.1)
             self.writeln("act:clear_spot()")?;
-            // set_spot with new format: act:set_spot("name", number) (Requirement 3.1, 3.2)
+            // act:set_spot("name", number)
             for actor in actors {
                 self.writeln(&format!(
                     r#"act:set_spot("{}", {})"#,
@@ -293,11 +270,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         self.write_blank_line()?;
 
-        // Generate local scene items
         self.generate_local_scene_items(&scene.items)?;
 
-        // Code blocks are NOT generated here - they are generated at global scene level
-        // This ensures code blocks appear after all local scene function definitions
 
         self.end_block()?;
         self.line_map_slots.push(super::LineMapSlot {
@@ -369,10 +343,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
     /// Generate `act:choice("target", "display")` Lua call for a choice node.
     ///
-    /// Source-map wiring (Requirements 1.1, 1.4): records the choice's `.pasta`
-    /// [`Span`](pasta_dsl::parser::Span) against the single output line it emits,
-    /// via `record_span_since`. Choice is a
-    /// branch construct (分岐), one of the major syntax kinds required by 1.4.
+    /// Records the choice's `.pasta` [`Span`](pasta_dsl::parser::Span) against the
+    /// single output line it emits, via `record_span_since`.
     fn generate_choice(
         &mut self,
         choice: &pasta_dsl::parser::ChoiceNode,
@@ -388,10 +360,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
     /// Generate `act:choice_timeout(seconds)` or `act:choice_timeout(nil)` for `!select` cue command.
     ///
-    /// Source-map wiring (Requirements 1.1, 1.4): records the cue command's `.pasta`
-    /// [`Span`](pasta_dsl::parser::Span) against the single output line it emits,
-    /// via `record_span_since`. The `!select`
-    /// cue drives branch (分岐) timeout behavior, part of the major syntax kinds (1.4).
+    /// Records the cue command's `.pasta` [`Span`](pasta_dsl::parser::Span) against
+    /// the single output line it emits, via `record_span_since`.
     fn generate_choice_timeout(
         &mut self,
         cmd: &pasta_dsl::parser::CueCommandNode,

@@ -1,6 +1,4 @@
 //! Transpile context for Lua code generation.
-//!
-//! This module provides context management for the transpilation process.
 
 use pasta_core::registry::{CmpOp, SceneAttr, SceneAttrValue, SceneRegistry, WordDefRegistry};
 use pasta_dsl::parser::{Attr, AttrBody, AttrValue, LocalSceneScope, merge_attrs};
@@ -29,9 +27,8 @@ impl TranspileContext {
             .register_global(name, scene_attrs_of(attrs))
     }
 
-    /// Register a local scene (Task 3.1).
+    /// Register a local scene under the parent global scene.
     ///
-    /// Registers the local scene under the parent global scene.
     /// `local_counter` は照合用の名前ごとの通し番号（[`local_scene_counters`] の値。
     /// 生成器の関数名と同じ番号）。
     /// Returns the assigned scene ID.
@@ -45,7 +42,6 @@ impl TranspileContext {
         // ローカルはファイル属性も親の属性も受け継がない（宣言行の中だけ畳む）
         let attrs = scene_attrs_of(&merge_attrs(&[], &local_scene.attrs));
 
-        // Use scene name if present, otherwise use "__start__"
         let name = local_scene.name.as_deref().unwrap_or("__start__");
 
         self.scene_registry
@@ -57,7 +53,7 @@ impl TranspileContext {
 ///
 /// 名前つきのローカルシーンは照合用の名前（`SceneRegistry::sanitize_name`）ごとに 1 から数える
 /// （`・挨拶・1` と `・挨拶_1` はどちらも `挨拶_1` なので 1・2）。無名の開始シーンは 0。
-/// 生成器の関数名とトランスパイル時のレジストリの登録の両方がこの番号を使う（1.7・2.12）。
+/// 生成器の関数名とトランスパイル時のレジストリの登録の両方がこの番号を使う。
 pub fn local_scene_counters(local_scenes: &[LocalSceneScope]) -> Vec<usize> {
     let mut counters: HashMap<String, usize> = HashMap::new();
     local_scenes
@@ -99,7 +95,7 @@ pub fn scene_attrs_of(attrs: &[Attr]) -> Vec<SceneAttr> {
         .collect()
 }
 
-/// 値の型の規則（要件 4.5）: 小数は整数の値なら整数、引用の有無は区別しない
+/// 値の型の規則: 小数は整数の値なら整数、引用の有無は区別しない
 pub(crate) fn scene_attr_value(v: &AttrValue) -> SceneAttrValue {
     match v {
         AttrValue::Integer(i) => SceneAttrValue::Integer(*i),
@@ -148,11 +144,9 @@ mod tests {
     fn test_register_local_scene() {
         let mut ctx = TranspileContext::new();
 
-        // First register parent
         let parent = create_test_scene("メイン");
         let (_, parent_counter) = ctx.register_global_scene_named(&parent.name, &parent.attrs);
 
-        // Then register local scene
         let local = create_test_local_scene("自己紹介");
         let id = ctx.register_local_scene(&local, "メイン", parent_counter, 1);
 
@@ -165,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_local_scene_counters_count_per_sanitized_name() {
-        // 開始シーンは 0、名前つきは照合用の名前ごとに 1 から数える（1.7）
+        // 開始シーンは 0、名前つきは照合用の名前ごとに 1 から数える
         let locals: Vec<LocalSceneScope> =
             [None, Some("A"), Some("挨拶・1"), Some("A"), Some("挨拶_1")]
                 .into_iter()
@@ -180,7 +174,6 @@ mod tests {
     #[test]
     fn test_register_global_words() {
         let mut ctx = TranspileContext::new();
-        // 単一キー: word_registry 直接呼び出し
         ctx.word_registry
             .register_global("挨拶", vec!["こんにちは".to_string(), "やあ".to_string()]);
 
@@ -192,7 +185,6 @@ mod tests {
     #[test]
     fn test_register_global_words_multi_key() {
         let mut ctx = TranspileContext::new();
-        // 複数キー: 各キーに対して登録
         let kw = KeyWords {
             names: vec!["女性".to_string(), "水の妖精".to_string()],
             words: vec!["水無灯里".to_string(), "アリス・キャロル".to_string()],
@@ -212,7 +204,6 @@ mod tests {
     #[test]
     fn test_register_local_words() {
         let mut ctx = TranspileContext::new();
-        // 単一キー: word_registry 直接呼び出し
         ctx.word_registry.register_local(
             "メイン_1",
             "場所",
@@ -227,7 +218,6 @@ mod tests {
     #[test]
     fn test_register_local_words_multi_key() {
         let mut ctx = TranspileContext::new();
-        // 複数キー: 各キーに対して登録
         let kw = KeyWords {
             names: vec!["場所".to_string(), "地名".to_string()],
             words: vec!["東京".to_string(), "大阪".to_string()],

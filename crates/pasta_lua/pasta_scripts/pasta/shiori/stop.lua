@@ -12,7 +12,7 @@ local RES = require("pasta.shiori.res")
 
 local STOP = {}
 
---- 表記を出す応答のステータス（タスク 1 の SSP の実機の確かめで決めた。500 の Value はバルーンに出ない）
+--- 表記を出す応答のステータス（500 の Value はバルーンに出ないため 200）
 STOP.STATUS = "200 OK"
 
 ---@class StopHold

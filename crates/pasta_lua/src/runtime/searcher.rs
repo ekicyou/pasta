@@ -4,17 +4,16 @@
 //!
 //! 1. ファイルを開く API を narrow `fopen` から Rust std（wide API）へ変える。
 //!    std は 248 文字以上の絶対パスへ拡張長プレフィックスを内部で付与するため、
-//!    設置パスが 260 文字を超えてもモジュールを解決できる（要件 1.1〜1.4・実測 M2）。
-//! 2. `package.path` とモジュール名を ANSI ではなく UTF-8 として解釈する
-//!    （要件 2.1・2.3）。
+//!    設置パスが 260 文字を超えてもモジュールを解決できる。
+//! 2. `package.path` とモジュール名を ANSI ではなく UTF-8 として解釈する。
 //!
 //! 候補パスの生成規則・探索順・チャンク識別子・メッセージ文言は LuaJIT
-//! `lib_package.c`（`searchpath` / `loader_Lua`）と同一に保つ。これにより ASCII
-//! パスでは変更前とバイト単位で同一の結果になる（要件 3.3・3.4・実測 M3・M4）。
+//! `lib_package.c`（`searchpath` / `loader_Lua`）と同一に保つ。ASCII パスでは
+//! 標準とバイト単位で同一の結果になる。
 //!
-//! パス長の判定・`\\?\` の明示付与・短縮名変換・`canonicalize` は一切行わない
-//! （要件 1.6・3.7）。候補パス文字列は、ファイルを開くパス・チャンク識別子・
-//! エラーメッセージの 3 箇所に**そのまま**使われる。
+//! パス長の判定・`\\?\` の明示付与・短縮名変換・`canonicalize` は一切行わない。
+//! 候補パス文字列は、ファイルを開くパス・チャンク識別子・エラーメッセージの 3 箇所に
+//! **そのまま**使われる。
 
 use crate::loader::DicSource;
 use mlua::{Function, Lua, Result as LuaResult, Table, Value};
@@ -34,7 +33,7 @@ const PATH_SEP: char = ';';
 /// テンプレート中のモジュール名プレースホルダ（LuaJIT の `LUA_PATH_MARK`）。
 const PATH_MARK: char = '?';
 
-/// 想定する `package.loaders` の要素数（preload / Lua / C / C-root・実測 M1）。
+/// 想定する `package.loaders` の要素数（preload / Lua / C / C-root）。
 const EXPECTED_LOADERS_LEN: usize = 4;
 
 /// 標準の Lua ファイル searcher が置かれている位置。
@@ -44,7 +43,7 @@ const LUA_LOADER_INDEX: usize = 2;
 ///
 /// Rust 側は値を返すだけにし、ロード失敗の送出はこの Lua 側で行う。Rust の `Err`
 /// をそのまま返すと `pcall(require, …)` が受け取る値が文字列から userdata へ
-/// 変わるためである（実測 M4）。`error(msg, 0)` は位置情報を付けないので、
+/// 変わるためである。`error(msg, 0)` は位置情報を付けないので、
 /// 標準（C 関数からの `luaL_error`）と文言がバイト単位で一致する。
 const WRAPPER_CHUNK: &str = r#"
 local find = ...
@@ -76,7 +75,7 @@ enum SearchOutcome {
 /// `package.path` とモジュール名から候補パスを順に生成する（純粋関数・FS 非依存）。
 ///
 /// 空テンプレートはスキップする。戻り値の順序がそのまま探索順である。
-/// 長さの判定は行わない（要件 1.6）。
+/// 長さの判定は行わない。
 fn candidate_paths(package_path: &str, module_name: &str) -> Vec<String> {
     // 標準は `luaL_gsub(name, ".", LUA_DIRSEP)` をループの外で 1 回だけ行う。
     let name = module_name.replace('.', DIR_SEP);
@@ -129,12 +128,12 @@ fn find_module(
         ));
     };
     // `package.path` に UTF-8 として不正なバイト列が含まれる場合は lossy 変換され、
-    // その候補は開けず `no file` 行に載る（設計「Risks」）。
+    // その候補は開けず `no file` 行に載る。
     let package_path = String::from_utf8_lossy(&package_path.as_bytes()).into_owned();
 
     match search(&package_path, &module_name) {
         SearchOutcome::Found { candidate, source } => {
-            // チャンク識別子は `@` + 候補パス。標準 `luaL_loadfilex` と同一（実測 M3）。
+            // チャンク識別子は `@` + 候補パス。標準 `luaL_loadfilex` と同一。
             match lua
                 .load(&source[..])
                 .set_name(format!("@{candidate}"))
@@ -164,7 +163,7 @@ fn find_module(
 /// 標準 `loaderror` と同一書式のロード失敗メッセージを組み立てる。
 ///
 /// 構文エラーの本文は `SyntaxError { message }` をそのまま使う。mlua の Display が
-/// 付ける `syntax error: ` 接頭辞を載せると標準と文言が食い違うためである（実測 M4）。
+/// 付ける `syntax error: ` 接頭辞を載せると標準と文言が食い違うためである。
 fn load_error(module_name: &str, candidate: &str, error: &mlua::Error) -> String {
     let cause = match error {
         mlua::Error::SyntaxError { message, .. } => message.clone(),
@@ -307,7 +306,7 @@ pub(crate) fn pasta_file_of(lua: &Lua, candidate: &str) -> Option<String> {
 /// VM 構築時（他のどの Lua コードよりも前）に 1 回だけ呼ぶ。
 ///
 /// `package.loaders` と `package.searchers` は LuaJIT では同一テーブルのため、
-/// インプレース代入が両名称から見える（実測 M1）。preload（1 番目）と C searcher
+/// インプレース代入が両名称から見える。preload（1 番目）と C searcher
 /// （3・4 番目）は触らない。
 ///
 /// # Errors
@@ -342,7 +341,7 @@ pub fn install_module_searcher(lua: &Lua) -> LuaResult<()> {
 mod tests {
     use super::*;
 
-    /// 検索パス設定文字列は `;` で分割され、空要素はスキップされる（3.1 / 3.2）。
+    /// 検索パス設定文字列は `;` で分割され、空要素はスキップされる。
     #[test]
     fn candidate_paths_splits_on_path_separator_and_skips_empty() {
         let got = candidate_paths(";a/?.lua;;b/?/init.lua;", "m");
@@ -357,7 +356,7 @@ mod tests {
         assert_eq!(got, vec!["x/m/m.lua".to_string()]);
     }
 
-    /// モジュール名の `.` は OS のディレクトリ区切りへ置換される（M3）。
+    /// モジュール名の `.` は OS のディレクトリ区切りへ置換される。
     #[test]
     fn candidate_paths_replaces_dots_with_dir_separator() {
         let got = candidate_paths("r/?.lua", "pasta.shiori.entry");
@@ -367,7 +366,7 @@ mod tests {
         );
     }
 
-    /// 非 ASCII のモジュール名（`dic/会話.pasta` 由来）も UTF-8 のまま扱う（2.1 / 2.3）。
+    /// 非 ASCII のモジュール名（`dic/会話.pasta` 由来）も UTF-8 のまま扱う。
     #[test]
     fn candidate_paths_keeps_non_ascii_module_name() {
         let got = candidate_paths("r/?.lua", "pasta.scene.会話");
@@ -381,7 +380,7 @@ mod tests {
         assert_eq!(got, vec!["fixed.lua".to_string()]);
     }
 
-    /// 独自のパス長上限を持たない（1.6）。
+    /// 独自のパス長上限を持たない。
     #[test]
     fn candidate_paths_has_no_length_limit() {
         let deep = format!("C:/{}/?.lua", "d".repeat(400));
@@ -391,7 +390,7 @@ mod tests {
         assert!(!got[0].contains("\\?\\"));
     }
 
-    /// 未検出メッセージは候補順の `no file` 行の連結である（1.5 / M4）。
+    /// 未検出メッセージは候補順の `no file` 行の連結である。
     #[test]
     fn search_not_found_message_lists_every_candidate_in_order() {
         let outcome = search("no/such/?.lua;other/?/init.lua", "m");
@@ -404,7 +403,7 @@ mod tests {
         }
     }
 
-    /// 想定レイアウト（4 要素）なら 2 番目だけが置換される（M1）。
+    /// 想定レイアウト（4 要素）なら 2 番目だけが置換される。
     #[test]
     fn install_module_searcher_replaces_only_the_lua_loader() {
         let lua = production_like_vm();
@@ -431,7 +430,7 @@ mod tests {
     }
 
     /// ラッパ経由の往復: 解決したチャンクの識別子が `@` + 候補パスであり、未検出と
-    /// 構文エラーがいずれも Lua **文字列**エラーとして届く（3.4 / 1.5 / 4.9 / M3 / M4）。
+    /// 構文エラーがいずれも Lua **文字列**エラーとして届く。
     #[test]
     fn installed_searcher_resolves_and_raises_string_errors() {
         let dir = tempfile::tempdir().expect("一時ディレクトリの作成に失敗した");
@@ -506,7 +505,7 @@ mod tests {
         );
     }
 
-    /// 探索関数が読み込んだファイルを表に控える（2.5 / 2.6）: 作者の `.lua` はゴーストから
+    /// 探索関数が読み込んだファイルを表に控える: 作者の `.lua` はゴーストから
     /// 見たパス、元の分からないキャッシュと標準ランタイムは控えない。キーは
     /// エラー文の位置の接頭辞と同じ形で、チャンク名は `@` ＋ 候補パスのまま。
     #[test]
@@ -571,7 +570,7 @@ mod tests {
     }
 
     /// 2 つのファイルが同じキーになったら、そのキーは見分けられない（`false`）。同じファイルを
-    /// 読み直しても重複にはならない（2.6）。
+    /// 読み直しても重複にはならない。
     #[test]
     fn chunk_table_drops_duplicate_keys() {
         let dir = tempfile::tempdir().unwrap();
@@ -621,7 +620,7 @@ mod tests {
         );
     }
 
-    /// `.pasta` の候補にだけ `.pasta` のパスを返す（3.5・6.3）。`dic/` の `.lua` の写し・
+    /// `.pasta` の候補にだけ `.pasta` のパスを返す。`dic/` の `.lua` の写し・
     /// 作者の `.lua`・元の分からないキャッシュ・読み込んでいない候補には返さない。
     #[test]
     fn pasta_file_of_returns_only_pasta_sources() {
@@ -668,7 +667,7 @@ mod tests {
         let root = ghost.to_string_lossy().replace('\\', "/");
         assert_eq!(pasta_file_of(&lua, &format!("{root}/dic/天気.pasta")), None);
 
-        // `@pasta_chunks` の値（6.2・6.3）: `.pasta` は表、`dic/` の `.lua` の写しは元のパス、
+        // `@pasta_chunks` の値: `.pasta` は表、`dic/` の `.lua` の写しは元のパス、
         // 表に無いキャッシュは控えない、`scripts/` の `.lua` は今のまま。区切りは `\`。
         let chunks = chunk_table(&lua);
         let value_of = |module: &str| -> String {

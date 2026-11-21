@@ -103,7 +103,6 @@ impl PastaLoader {
     ) -> Result<PastaLuaRuntime, LoaderError> {
         let base_dir = base_dir.as_ref();
 
-        // Check if base directory exists
         if !base_dir.exists() {
             return Err(LoaderError::DirectoryNotFound(base_dir.to_path_buf()));
         }
@@ -144,8 +143,8 @@ impl PastaLoader {
 
         // Phase 2.5: Self-deploy framework scripts (non-fatal)
         // base_dir is finalized by Phase 2; sync the embedded canonical pasta_scripts
-        // to disk BEFORE Phase 3 / package.path construction (Req 6.1). Failure must
-        // NOT abort startup (Req 3.2): log ERROR and continue with existing scripts.
+        // to disk BEFORE Phase 3 / package.path construction. Failure must
+        // NOT abort startup: log ERROR and continue with existing scripts.
         debug!("Phase 2.5: Self-deploying framework scripts");
         match extract::sync_pasta_scripts(base_dir) {
             Ok(_outcome) => {
@@ -178,7 +177,7 @@ impl PastaLoader {
         // Phase 4: Incremental process (transpile .pasta, copy .lua)
         debug!("Phase 4: Incremental processing");
         // One transpiler shared by Phase 4 and Phase 5.5 so the declared scene
-        // names (and debug join keys) always use the same alias table (6.2).
+        // names (and debug join keys) always use the same alias table.
         let transpiler = Self::transpiler_for(&config);
         let (module_names, stats) =
             Self::process_incremental(&pasta_files, &lua_files, &cache_manager, &transpiler)?;
@@ -194,7 +193,6 @@ impl PastaLoader {
             .chain(lua_files.iter().map(|f| source(f, DicSource::Lua)))
             .collect();
 
-        // Log statistics in debug mode
         if config.loader.debug_mode {
             info!(
                 transpiled = stats.transpiled,
@@ -205,7 +203,6 @@ impl PastaLoader {
             );
         }
 
-        // Check for orphaned caches
         let all_source_files: Vec<_> = pasta_files
             .iter()
             .chain(lua_files.iter())
@@ -239,7 +236,7 @@ impl PastaLoader {
 
         // Phase 6: Initialize runtime and load scene_dic
         debug!("Phase 6: Initializing runtime");
-        // Search side gets the same table as the declaration side (6.2).
+        // Search side gets the same table as the declaration side.
         let runtime_config = runtime_config
             .with_scene_aliases(config.scene_aliases.clone())
             .with_ffi(config.loader.ffi)
@@ -315,9 +312,6 @@ impl PastaLoader {
     }
 
     /// Prepare profile directories.
-    ///
-    /// Note: Cache directory management (including version-based clearing)
-    /// is now handled by CacheManager::prepare_cache_dir().
     fn prepare_directories(base_dir: &Path, config: &LoaderConfig) -> Result<(), LoaderError> {
         let dirs = [
             "profile/pasta/save",
@@ -334,8 +328,6 @@ impl PastaLoader {
             }
         }
 
-        // Note: Cache clearing is now handled by CacheManager with version checking
-        // We no longer unconditionally delete cache/lua directory
 
         Ok(())
     }

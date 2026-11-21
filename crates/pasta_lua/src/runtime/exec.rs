@@ -1,7 +1,4 @@
 //! Script execution and accessors for PastaLuaRuntime.
-//!
-//! This file contains the `impl PastaLuaRuntime` methods for executing Lua
-//! scripts and the read-only accessors (split impl pattern).
 
 use super::PastaLuaRuntime;
 use crate::debug::source_map::SourceMap;

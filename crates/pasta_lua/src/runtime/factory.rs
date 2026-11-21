@@ -1,7 +1,4 @@
-//! Factory constructors for PastaLuaRuntime.
-//!
-//! This file contains the `impl PastaLuaRuntime` factory methods used by
-//! PastaLoader to create a runtime from a LoaderContext (split impl pattern).
+//! Factory constructors for PastaLuaRuntime used by PastaLoader.
 
 use super::PastaLuaRuntime;
 use super::lua_require;
@@ -26,18 +23,17 @@ impl PastaLuaRuntime {
     /// 1. Setup package.path for module resolution
     /// 2. Register Rust modules (@pasta_config, @enc, @pasta_persistence, @pasta_log, @pasta_sakura_script)
     /// 3. Register finalize_scene Rust binding
-    /// 4. require("main") - 利用者初期化スクリプト。失敗は**致命**（要件 5.2）
-    /// 5. require("pasta.shiori.entry") - SHIORI 応答関数。失敗は**致命**（要件 4.1）
-    /// 6. require("pasta.scene_dic") - シーン読み込みと finalize。失敗は**致命**（要件 5.1）
-    /// 7. シーン identity 索引の突合 - モジュールロードではない best-effort 処理。
-    ///    失敗しても起動は継続する（デバッグ有効時のみ実行）
+    /// 4. require("main") - 利用者初期化スクリプト。失敗は**致命**
+    /// 5. require("pasta.shiori.entry") - SHIORI 応答関数。失敗は**致命**
+    /// 6. require("pasta.scene_dic") - シーン読み込みと finalize。失敗は**致命**
+    /// 7. シーン identity 索引の突合（デバッグ有効時のみ）。best-effort で、失敗しても
+    ///    起動は継続する
     ///
-    /// 起動モジュール（4〜6）はすべて `require_startup_module` を経由し、失敗時は
-    /// `module` / `fatal` フィールド付きの error ログと、起動モジュール名の文脈を
-    /// 付けた `Err` で可視化される（要件 4.5 / 4.7 / 5.3 / 5.5）。
+    /// 起動モジュール（4〜6）の失敗は、`module` / `fatal` フィールド付きの error ログと、
+    /// 起動モジュール名の文脈を付けた `Err` になる。
     ///
     /// finalize 前の `@pasta_search` には常に空の登録表を渡す（キャッシュの状態によらず
-    /// 見つからない。3.1〜3.3）。finalize が Lua 側の登録から作り直す。
+    /// 見つからない）。finalize が Lua 側の登録から作り直す。
     ///
     /// # Arguments
     /// * `loader_context` - Configuration and paths from PastaLoader
@@ -61,36 +57,20 @@ impl PastaLuaRuntime {
         // as the initial registration inside `with_config_and_source_map`.
         let scene_aliases = runtime_config.scene_aliases.clone();
 
-        // Create base runtime (holds the scene map when debugging is enabled).
         let mut runtime =
             Self::with_config_and_source_map(TranspileContext::new(), runtime_config, source_map)?;
 
-        // Set logger if provided
         runtime.logger = logger;
-
         // Store config and base_dir for Drop-time persistence save
         runtime.base_dir = Some(loader_context.base_dir.clone());
         runtime.config = pasta_config;
 
-        // Setup package.path for module resolution
         Self::setup_package_path(&runtime.lua, &loader_context)?;
-
-        // Register @pasta_config module
         Self::register_config_module(&runtime.lua, &loader_context.custom_fields)?;
-
-        // Register @enc module for encoding conversion
         Self::register_enc_module(&runtime.lua)?;
-
-        // Register @pasta_persistence module for persistent data storage
         Self::register_persistence_module(&runtime.lua, &runtime.config, &runtime.base_dir)?;
-
-        // Register @pasta_log module for Lua logging bridge
         Self::register_log_module(&runtime.lua)?;
-
-        // Register @pasta_sakura_script module
         Self::register_sakura_script_module(&runtime.lua, &runtime.config)?;
-
-        // Register internal @pasta_debug module (production entry only; scene-play-event 2.3)
         Self::register_debug_module(
             &runtime.lua,
             runtime.debug_enabled(),
@@ -98,41 +78,25 @@ impl PastaLuaRuntime {
             &loader_context.base_dir,
         )?;
 
-        // Register finalize_scene Rust binding to overwrite Lua stub (Requirement 4.3)
-        // This must be done before loading scene_dic.lua which calls finalize_scene()
+        // Overwrites the Lua stub; must precede scene_dic.lua, which calls finalize_scene().
         register_finalize_scene(&runtime.lua, scene_aliases)?;
 
         // ========================================
         // Module Loading Phase (all require-based)
         // ========================================
 
-        // Step 4: require("main") - User initialization script
-        // Runs before scene_dic finalization to allow dictionary registration
+        // main runs before scene_dic finalization to allow dictionary registration.
         // SAFETY(injection): All module names below are compile-time string literals.
-        // 起動モジュール 3 種はいずれも致命であり、失敗は `?` で伝搬する。
         require_startup_module(&runtime.lua, "main")?;
 
-        // Step 5: require("pasta.shiori.entry") - SHIORI handlers
         require_startup_module(&runtime.lua, "pasta.shiori.entry")?;
 
-        // Step 6: require("pasta.scene_dic") - Scene loading and finalization
-        // This triggers SearchContext construction from Lua-side registries
+        // Triggers SearchContext construction from Lua-side registries.
         require_startup_module(&runtime.lua, "pasta.scene_dic")?;
 
-        // Step 7 (pasta-scene-kick task 2.2): finalize シーン突合。
-        //
-        // この時点で BOTH が揃う: (a) loader が transpile 中に蓄積した
-        // `(join_key, .pasta 宣言行)` 記録（`runtime.source_map` 内）、(b) finalize
-        // （scene_dic ロードで実行済み）が登録した runtime 実シーン identity
-        // （シーン表の登録名を定義元 `.pasta` ファイルごとに分けたもの）。両者をファイルごとの順位で突き合わせ、`.pasta` (ファイル,
-        // 行範囲) → (scene_id, parent) の `SceneIdentityIndex` を確定し、共有 `Arc<
-        // SourceMap>` の write-once `scene_index` スロットへ充填する（resolver=task 3.1
-        // が読む）。
-        //
-        // ゲート: `source_map` は debug 有効時のみ `Some`（loader Phase 5.5）。無効
-        // （既定）では `None` で本ブロックは丸ごとスキップ＝索引非構築・行マッピング
-        // 不変（requirements 7.1 通常モード非破壊）。突合失敗（記録空・identity 不一致）
-        // は非致命（best-effort）: 空/部分索引のまま続行し、起動を妨げない。
+        // finalize（scene_dic のロード）の後なので、transpile 中の記録と実行時のシーン表が
+        // 両方揃っている。`source_map` はデバッグ有効時だけ `Some`。突合の失敗は非致命で、
+        // 索引なしで起動を続ける。
         if let Some(ref source_map) = runtime.source_map {
             let lua = &runtime.lua;
             let base_dir = &loader_context.base_dir;
@@ -143,7 +107,7 @@ impl PastaLuaRuntime {
             };
             match crate::debug::source_map::build_scene_index(lua, source_map, pasta_file_of) {
                 Ok(index) => {
-                    // write-once: 初回のみ成功。二重充填（Err）は本番経路では起こらない。
+                    // write-once。二重充填は本番経路では起こらない。
                     if source_map.set_scene_index(index).is_err() {
                         tracing::warn!(
                             "scene identity index already set; skipping re-population (task 2.2)"
@@ -153,7 +117,6 @@ impl PastaLuaRuntime {
                     }
                 }
                 Err(e) => {
-                    // 突合自体の失敗は非致命: 索引なしでも通常実行は変わらない。
                     tracing::warn!(error = %e, "scene identity index join failed; continuing without index (task 2.2, best-effort)");
                 }
             }
@@ -167,15 +130,11 @@ impl PastaLuaRuntime {
 ///
 /// 失敗時は
 /// 1. 構造化フィールド `module`（モジュール名）と `fatal`（致命なら `true`）を持つ
-///    error ログへ、mlua の Display（複数行・スタックトレース込み）を欠落なく記録し
-///    （要件 4.7 / 5.3）、
+///    error ログへ、mlua の Display（複数行・スタックトレース込み）を欠落なく記録し、
 /// 2. `failed to load startup module '<module>'` の文脈を付けた `Err` を返す。
 ///
 /// この文脈は `LoaderError::Runtime` → `MyError::Load` を経て `X-ERROR-REASON` へ入るため、
-/// 入れ子の `require` 失敗でも起動モジュール名と根本原因の両方が利用者へ届く（要件 4.5）。
-///
-/// 継続可能な起動モジュールを将来追加する場合は、同じフィールド構成のまま
-/// `fatal = false`・レベル warn で記録する。
+/// 入れ子の `require` 失敗でも起動モジュール名と根本原因の両方が利用者へ届く。
 fn require_startup_module(lua: &Lua, module: &'static str) -> LuaResult<()> {
     fatal_startup_module(module, lua_require(lua, module))?;
     tracing::debug!(module, "Loaded module via require");
@@ -184,7 +143,7 @@ fn require_startup_module(lua: &Lua, module: &'static str) -> LuaResult<()> {
 
 /// 起動モジュールのロード結果を致命として記録・文脈付けする共通処理。
 ///
-/// 起動モジュールの失敗のログ構造と文脈の文言をそろえる単一の窓口（要件 5.3 / 5.5）。
+/// 起動モジュールの失敗のログ構造と文脈の文言をそろえる単一の窓口。
 fn fatal_startup_module<T>(module: &'static str, result: LuaResult<T>) -> LuaResult<T> {
     result
         .inspect_err(|e| {
