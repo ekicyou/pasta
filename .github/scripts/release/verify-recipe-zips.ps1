@@ -50,7 +50,7 @@ try {
         $zipPath = Join-Path $Dir $name
         if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf)) { $errors.Add("配布物が無い: $name"); continue }
 
-        # 壊れた zip でも止めずに問題として集め、もう一方の zip も見る（2.7）。
+        # 壊れた zip でも止めずに問題として集め、もう一方の zip も見る。
         try {
             $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $zipPath).Path)
             try { $entries = @($zip.Entries | ForEach-Object FullName | Sort-Object) } finally { $zip.Dispose() }

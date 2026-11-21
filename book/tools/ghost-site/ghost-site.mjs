@@ -1,12 +1,5 @@
-// ghost-site.mjs — hello-pasta の nar をネットワーク更新の置き場所にする組み立て・照合ツール
-// （hello-pasta-network-update / design「GhostSite」）。Node 22 の標準モジュールだけを使う。
-//
-// タスク 1.1: readNar（zip の読み出しと名前の安全性）・parseUpdates（updates.txt の解析）。
-// タスク 1.2: checkIntegrity（updates.txt とエントリの照合）・extractNar（出力先への展開）。
-// タスク 1.3: buildSite（置き場所の組み立て）と CLI `build`。
-// タスク 1.4: verifyLive（実 URL の見比べ）と CLI `verify-live`。
-// hello-pasta-book-sync タスク 2.1: listTree・narOnlyFiles（nar の側の規則）と CLI `nar-only`。
-// hello-pasta-book-sync タスク 2.2: verifyLive を nar の側の行の見比べに変える（CLI `verify-live` に必須の --tree）。
+// ghost-site.mjs — hello-pasta の nar をネットワーク更新の置き場所にする組み立て・照合ツール。
+// Node 22 の標準モジュールだけを使う。
 
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';

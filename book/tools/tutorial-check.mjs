@@ -1,27 +1,15 @@
 // tutorial-check.mjs — 入門の章の作例 ↔ hello-pasta 実ファイル 一致ガード
-// （要件 9 / design「ツール層 > TutorialCheck」「System Flows > 作例の照合」）。
 //
-// 目的:
-//   入門の章 book/src/getting-started/*.md は、起動可能な最小ゴースト hello-pasta の
-//   dic/*.pasta を、辞書と同じ名前の章（dic/X.pasta ↔ X.md）に「逐語転記」している。
-//   本スクリプトは、その逐語転記が崩れていないことを CI で機械的にガードする。
-//   崩れていれば exit 1。
-//
-//   一致が保証されれば、構文の正しさは manual.yml の第 2 段
-//   （`pasta_check validate` で hello-pasta の実ファイルを検査し、誤りがあれば落ちる）が
-//   transitively 担保する。
-//   ＝章の作例が「起動可能な最小セット一式（hello-pasta 由来）」と
-//   一致することの機械的ガード（フル SSP 実行なし）。
-//
-// 検証方式（2 段ガードの第 1 段。第 2 段の構文検証は manual.yml の pasta_check validate の段）:
-//   構文の検査は第 2 段の pasta_check validate が受け持つため、
-//   本スクリプトは「逐語一致」検証に専念する。照合は 2 つの向きで行う。
+// 入門の章 book/src/getting-started/*.md は、起動可能な最小ゴースト hello-pasta の dic/*.pasta を、
+// 辞書と同じ名前の章（dic/X.pasta ↔ X.md）に「逐語転記」している。崩れていれば exit 1。
+// 構文の正しさは manual.yml の第 2 段（`pasta_check validate` で hello-pasta の実ファイルを検査）が担保するので、
+// 本スクリプトは「逐語一致」の検証に専念する（フル SSP 実行なし）。照合は 2 つの向きで行う。
 //   1. 辞書から章へ: 辞書 dic/X.pasta があれば、章 X.md があり、その章に辞書の全体と
 //      一致する ```pasta ブロックがある（無ければ no-chapter / no-matching-block）。
 //   2. 章から辞書へ: 入門のどの章の ```pasta ブロックも、同じ名前の辞書の全体か、
 //      連続した行の抜き出しである（違えば not-in-dic。辞書の無い章なら no-dic）。
 //      字下げ・引用の中の ```pasta フェンスは抽出できないので indented-fence で、言語名の後ろに飾りの付いた開き（```pasta title など）も attributed-fence で失敗にする。
-//   3. 行事の表 calendar.csv も同じ規則の対で照合する（date-var-calendar 要件 10.6）。
+//   3. 行事の表 calendar.csv も同じ規則の対で照合する。
 //      calendar.csv があれば、その全体と一致する ```csv ブロックがどこかの章にある（無ければ
 //      no-matching-block）。どの章の ```csv ブロックも calendar.csv の全体か連続した行の抜き出し
 //      （違えば not-in-calendar。calendar.csv が無ければ no-calendar）。章の名前は問わない。
@@ -159,7 +147,7 @@ function findIndentedFences(markdown) {
 }
 
 // ---- 段落が画像の行（1 行に、空でない代わりの文を持つ画像 1 つだけ）かを判定 ----
-// 画像の行は C-prose の対象から外す（要件 5.3〜5.5）。代わりの文は `]` と空白以外の字を
+// 画像の行は C-prose の対象から外す。代わりの文は `]` と空白以外の字を
 // 1 つ以上含む（`\S` だと `![]](x.png)` を通してしまう）。代わりの文が空・空白だけ、
 // 地の文と同じ行・2 行の段落・1 行に画像 2 つは false のまま（今までどおり報告する）。
 /**
@@ -171,7 +159,7 @@ function isImageLine(lines) {
 }
 
 // ---- 台詞以外の段落のうち、指示の一文でないもの（説明の地の文）を拾う ----
-// 本文検査（verify-content.mjs）の C-prose の判定（要件 10.8）。本文検査は import した時点で
+// 本文検査（verify-content.mjs）の C-prose の判定。本文検査は import した時点で
 // 検査が走り、中の関数を単体テストできないので、純粋な関数としてここに置く。
 // 行頭のフェンスの中は見ない。段落は空行・フェンス・見出し・区切りで区切る
 // （見出しと区切りは 1 行で終わるので、直後の行は別の段落として見る）。

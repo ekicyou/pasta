@@ -294,7 +294,7 @@ try {
     }
 
     # --- verify-recipe-zips.ps1（偽の exe・表示・dumpbin で。Windows の道具を使わない）---
-    # 版（2.3）と 30 MB（2.6）の失敗は見ない（設計議題 4）。偽の exe の版は 0.0.0 と読めて版の問題も出るが、見たい文が含まれるかだけを見る。
+    # 版と 30 MB の失敗は見ない。偽の exe の版は 0.0.0 と読めて版の問題も出るが、見たい文が含まれるかだけを見る。
     $noVc = Join-Path $tmp 'fake-dumpbin-ok.ps1'
     Write-Utf8 $noVc "'  KERNEL32.dll'`n'  ucrtbase.dll'`n"
 

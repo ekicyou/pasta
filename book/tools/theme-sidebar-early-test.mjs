@@ -1,12 +1,11 @@
 // theme-sidebar-early-test.mjs — 目次を描く前に開き直すスクリプト（book/theme/head.hbs の claudiaSidebarEarly）の jsdom ユニットテスト
-// （getting-started-screenshots の完了時の棚卸・目次の持ち越しのちらつきの修正）。
 //
 // 直す不具合:
 //   幅 620〜1080 px で目次を開いたまま項目を押すと、移った先のページで目次が一瞬閉じて本文の幅が変わり、ちらつく。
 //   mdBook 0.5.4 の本文の頭の埋め込みスクリプトが毎回目次を閉じ、claudia.js の claudiaSidebarKeep が
 //   本文の最後（読み込みの後）で開き直すまでの間に、閉じた画面が一度描かれるため。
 //
-// 観測する完了条件:
+// 観測すること:
 //   - 幅 620 以上 1080 未満・保存値 mdbook-sidebar が visible のとき、mdBook の埋め込みスクリプトが閉じた目次を、
 //     ページの読み込みが終わるより前（DOMContentLoaded の前）に開いた状態へ戻す。
 //     html の sidebar-visible・チェックボックス・ARIA 属性・リンクの tabIndex・目次の display がそろう。

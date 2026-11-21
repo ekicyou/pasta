@@ -1,7 +1,6 @@
-// talk-html-test.mjs — 出力 HTML の台詞を吹き出しに変換するツールの自己テスト
-// （manual-claudia-theme タスク 3.1 / 要件 3.1, 3.3, 3.6, 3.9, 3.10, 3.11, 8.4, 8.6, 10.7 / design「TalkHtmlTransform」）。
+// talk-html-test.mjs — 出力 HTML の台詞を吹き出しに変換するツールの自己テスト。
 //
-// 観測する完了条件（design「Testing Strategy / Unit Tests」）:
+// 観測すること:
 //   - 出力の構造が「出力 HTML 契約」どおり（クラス・alt・名札・本文の強調・コード・リンクの保持）。
 //   - 深さ 0・1・2 のページと print.html で、顔画像の相対パスが正しい。
 //   - 2 回実行しても結果が変わらない。

@@ -1,27 +1,15 @@
-// highlight-html.mjs — HtmlHighlighter（タスク 3.1 / 要件 1.1, 1.4, 4.1, 4.3, 6.1, 6.2, 6.4, 6.5, 7.1）。
+// highlight-html.mjs — HtmlHighlighter。mdbook build の後段で `<book-out-dir>/**/*.html` の
+// `<code class="language-pasta">…</code>` ブロックだけを着色する。
 //
-// 役割（design.md「HtmlHighlighter」Batch / Job Contract）:
-//   - mdbook build 後段で動作。`<book-out-dir>/**/*.html` をグロブ列挙し、
-//     `<code class="language-pasta">…</code>` ブロックのみを処理する。
-//     注: 抽出は `<code>` のクラス基準であり、外側の `<pre>` は要求しない。mdBook が
-//     language-pasta クラスを与えるのはフェンスブロック（`<pre>` 内）のみだが、もし
-//     インライン `<code class="language-pasta">` が現れた場合も同様に着色対象となる
-//     （現 book 出力では非発生・テストで挙動固定済み）。
-//   - 各ブロック内容をタグ除去＋実体参照デコードでソース復元 → 行分割 →
-//     PastaTokenizer でトークナイズ → scopesToClass で hljs 互換クラスへ写像 →
-//     非 null はそのクラスの <span> で包み、null は素のテキスト（プレーン＝6.1）→
-//     `& < > "` を再エスケープして emit。
-//   - 他言語（language-rust 等）・無指定 <code>・インライン <code>・ブロック外 HTML は
-//     バイト単位で不変（1.4）。
-//   - 純静的出力のみ（4.1/4.3）。成果物に WASM・文法・node_modules を出さない。
-//   - 失敗（6.2）: 文法ロード/トークナイズ例外/必須 build-time 依存欠落で process.exit(1)
-//     ＋原因診断を stderr。部分書き込みを避けるためファイル単位で全変換後に書き込む。
-//
-// 冪等の素地（6.5・research §8.4）:
-//   ソース復元時に既存 hljs <span> をタグ除去するため、再実行は常にプレーンテキストから
-//   再生成する＝二重 span を生まない構造。厳密なバイト等価冪等テストは後続 3.2 の領分。
-//
-// 決定論（6.4）: 同一入力 HTML → 同一トークン列 → 同一バイト出力（bigram ツールと同契約）。
+//   - 抽出は `<code>` のクラス基準で、外側の `<pre>` は要求しない（インライン `<code class="language-pasta">` も着色対象）。
+//   - ブロック内容はタグ除去＋実体参照デコードでソースへ戻し、行分割 → PastaTokenizer → scopesToClass で hljs 互換クラスへ写し、
+//     非 null はその <span> で包み、null は素のテキストのまま `& < > "` を再エスケープして出す。
+//   - 他言語・無指定 <code>・インライン <code>・ブロック外 HTML はバイト単位で不変。
+//   - 純静的出力のみ。成果物に WASM・文法・node_modules を出さない。
+//   - 文法ロード/トークナイズ例外/必須 build-time 依存欠落は process.exit(1) ＋原因診断を stderr。
+//     部分書き込みを避けるためファイル単位で全変換後に書き込む。
+//   - 再実行は既存 hljs <span> をタグ除去したプレーンテキストから再生成するので、二重 span を生まない。
+//   - 決定論的: 同一入力 HTML → 同一トークン列 → 同一バイト出力。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,20 +21,15 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const bookDir = path.resolve(here, '../..'); // book/
 const repoRoot = path.resolve(bookDir, '..'); // リポジトリルート
 
-// 文法パス（スクリプト位置基準で解決・既存 tokenizer-test.mjs の repoRoot 解決に倣う）。
-//   pasta: SSOT（読み取り専用・改変禁止）。lua: vendor（入れ子 lua の二段化用）。
+// 文法パス（スクリプト位置基準）。pasta は SSOT（読み取り専用）、lua は入れ子 lua の二段化用の vendor。
 export const GRAMMAR_PATHS = Object.freeze({
   pasta: path.resolve(repoRoot, 'editors/vscode/syntaxes/pasta.tmLanguage.json'),
   lua: path.resolve(here, 'grammars/lua.tmLanguage.json'),
 });
 
-// language-pasta コードブロックを抽出する正規表現。
-//   - `<code ... class="… language-pasta …">…</code>` を捕捉（外側 `<pre>` は不問。
-//     ヘッダコメント参照 — インライン <code> でも同クラスなら処理対象）。
-//   - class 属性内で language-pasta が他クラスと併記される形にも頑健（\b 区切り）。
-//   - `</code>` がブロック内に実体参照化されずに出現しない前提で安全に区切る
-//     （design Batch Contract）。中身は最短一致で取る。
-//   捕捉群: [1]=開始 <code ...> タグ全体, [2]=ブロック本文, [3]=閉じ <code> 直前まで不要。
+// language-pasta コードブロックを抽出する正規表現。外側 `<pre>` は不問（インライン <code> でも同クラスなら対象）。
+// class 属性内で他クラスと併記されても拾う（\b 区切り）。`</code>` はブロック内で実体参照化される前提で、最短一致で区切る。
+// 捕捉群: [1]=開始 <code ...> タグ全体, [2]=ブロック本文。
 const PASTA_BLOCK_RE =
   /(<code\b[^>]*\bclass="[^"]*\blanguage-pasta\b[^"]*"[^>]*>)([\s\S]*?)(<\/code>)/g;
 
@@ -63,9 +46,7 @@ function decodeEntities(s) {
     .replace(/&amp;/g, '&'); // &amp; は最後（多重デコード防止）
 }
 
-// プレーンテキストを HTML テキストノード用に再エスケープする。
-//   `&` を最初に処理（先に変換した実体参照を二重エスケープしないため）。
-//   `"` も再エスケープして属性混入を防ぐ（research §8.4 の「必要なら "」）。
+// プレーンテキストを HTML テキストノード用に再エスケープする。`&` を最初に処理する（二重エスケープを避ける）。`"` も属性混入を防ぐため。
 function escapeText(s) {
   return s
     .replace(/&/g, '&amp;')
@@ -74,19 +55,13 @@ function escapeText(s) {
     .replace(/"/g, '&quot;');
 }
 
-// ブロック本文（<code>…</code> の内側 HTML）からソース文字列を復元する。
-//   1) 既存タグ（hljs <span> 等）を除去 ＝ 再実行でも常にプレーンから再生成（冪等の素地）。
-//   2) 実体参照をデコードして元ソースのテキストへ戻す。
+// ブロック本文（<code>…</code> の内側 HTML）からソース文字列を復元する（タグ除去 → 実体参照デコード）。
 function blockInnerToSource(innerHtml) {
   const noTags = innerHtml.replace(/<[^>]*>/g, '');
   return decodeEntities(noTags);
 }
 
-// トークナイズ済みの 1 行（TokenSpan[]）を hljs span 付き HTML 断片へ整形する。
-//   - scopesToClass が非 null のトークンは <span class="hljs-…">…</span>。
-//   - null のトークンは素のテキスト（プレーン＝6.1）。
-//   - 隣接する同一クラス（または共に null）の断片は 1 つの span/テキストへ結合する
-//     （トークン境界に沿った結合＝決定論的・出力最小化）。
+// トークナイズ済みの 1 行（TokenSpan[]）を hljs span 付き HTML 断片へ整形する。隣接する同一クラス（または共に null）の断片は結合する。
 function renderLine(spans, line) {
   let html = '';
   let runClass = undefined; // 現在の結合中ランのクラス（null=プレーン, string=span）
@@ -139,7 +114,6 @@ export function createHtmlHighlighter() {
   let loaded = false;
 
   async function load(paths = GRAMMAR_PATHS) {
-    // 不在・不正は tokenizer.load 内で例外（6.2: 文法ロード/WASM/依存欠落）。
     await tokenizer.load(paths);
     loaded = true;
   }
@@ -151,7 +125,6 @@ export function createHtmlHighlighter() {
   }
 
   // 1 つの language-pasta ブロック本文を着色済み HTML 本文へ変換する。
-  // ソース復元（タグ除去＋デコード）→ tokenizeText → renderLine を行連結。
   function highlightBlockInner(innerHtml) {
     const source = blockInnerToSource(innerHtml);
     const lines = source.split('\n');
@@ -160,8 +133,7 @@ export function createHtmlHighlighter() {
     return rendered.join('\n');
   }
 
-  // HTML 文字列中の language-pasta ブロックを着色し、{ html, blocksColored } を返す内部関数。
-  // 非 pasta・ブロック外はバイト不変（1.4）。決定論的（6.4）。
+  // HTML 文字列中の language-pasta ブロックを着色し、{ html, blocksColored } を返す。非 pasta・ブロック外はバイト不変。
   function colorize(html) {
     ensureLoaded();
     let blocksColored = 0;
@@ -172,7 +144,6 @@ export function createHtmlHighlighter() {
     return { html: out, blocksColored };
   }
 
-  // HTML 文字列中の language-pasta ブロックのみを着色して返す（純粋・同期・string→string）。
   function highlightHtmlString(html) {
     return colorize(html).html;
   }
@@ -204,7 +175,6 @@ export function createHtmlHighlighter() {
 }
 
 // <book-out-dir> 配下の *.html を再帰列挙する（決定論のためソート）。
-// node_modules / grammars 等は book 出力には存在しない前提だが、安全に走査する。
 function listHtmlFiles(dir) {
   const out = [];
   const walk = (d) => {
@@ -224,8 +194,7 @@ function listHtmlFiles(dir) {
 }
 
 // --- モジュール直 export（テスト用の薄い純関数ラッパ） ---------------------
-// load 済み highlighter を内部生成して 1 回限りの変換を行う非同期版。
-// （主用途はテストの利便。実運用は createHtmlHighlighter を使う。）
+// load 済み highlighter を内部生成して 1 回限りの変換を行う非同期版（主にテスト用）。
 
 /**
  * 文字列 HTML を着色して返す（文法ロード込みの非同期ワンショット）。
@@ -258,11 +227,11 @@ if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1])))
   const dir = process.argv[2] || path.resolve(bookDir, 'book');
   (async () => {
     const hl = createHtmlHighlighter();
-    await hl.load(GRAMMAR_PATHS); // 文法/WASM/依存欠落はここで例外（6.2）
+    await hl.load(GRAMMAR_PATHS); // 文法/WASM/依存欠落はここで例外
     const { filesProcessed, blocksColored, files } = hl.highlightHtmlFiles(dir);
     console.log(`highlight-html: scanned ${files.length} html file(s) under ${dir}`);
     console.log(`highlight-html: colored ${blocksColored} language-pasta block(s) across ${filesProcessed} file(s)`);
-    // 0 件は入力の取り違えか出力形の変化で着色が空回りしている（7.1）。
+    // 0 件は入力の取り違えか出力形の変化で着色が空回りしている。
     if (blocksColored === 0) {
       console.error('highlight-html: language-pasta のブロックを 1 つも着色しなかった');
       process.exitCode = 1;

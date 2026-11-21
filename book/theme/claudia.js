@@ -1,20 +1,13 @@
 /*
- * claudia.js — pasta マニュアルの Claudia テーマのテーマメニュー（manual-claudia-theme タスク 2.5）。
- * mdBook の additional-js として全章に読み込まれ、book.js の後に実行される。
+ * pasta マニュアルの Claudia テーマのテーマメニュー。mdBook の additional-js として book.js の後に実行される。
  *
- * 役割（要件 2.1、design「ThemeMenu」）:
- *   claudia.css が隠す rust・coal・ayu の項目（の li）を、テーマメニューの末尾へ移す。
- *   book.js の矢印キーは隣の li のボタンへ focus() するので、隠れた項目が間にあると
- *   Light から Navy へ進めない。末尾へ寄せれば Auto・Light・Navy の間を矢印キーで移動できる。
- *   book.js の End は最後の li のボタンへ移るが、末尾は隠れた項目なので、見えている最後の項目（Navy）へ移し直す。
+ * claudia.css が隠す rust・coal・ayu の項目（の li）を、テーマメニューの末尾へ移す。
+ * book.js の矢印キーは隣の li のボタンへ focus() するので、隠れた項目が間にあると
+ * Light から Navy へ進めない。末尾へ寄せれば Auto・Light・Navy の間を矢印キーで移動できる。
+ * book.js の End は最後の li のボタンへ移るが、末尾は隠れた項目なので、見えている最後の項目（Navy）へ移し直す。
  *
- * してはいけないこと（design「Security Considerations」）:
- *   外部への通信、保存してある設定値（テーマの保存値を含む）の書き込み、要素の追加や削除をしない。
- *   保存値は、目次の持ち越し（末尾の claudiaSidebarKeep）が目次の mdbook-sidebar を読むだけで、書かない。
- *   項目は消さずに移すだけなので、保存値が rust・coal・ayu でも book.js はそのまま適用する（要件 2.4）。
- *   テーマの保持と初回表示は book.js と book.toml のまま（要件 2.5・2.6）。
- *
- * 検査: book/tools/theme-menu-test.mjs・book/tools/theme-sidebar-test.mjs（jsdom）。
+ * 外部への通信、保存値の書き込み、要素の追加や削除はしない。項目は消さずに移すだけなので、
+ * 保存値が rust・coal・ayu でも book.js はそのまま適用する。
  */
 (function claudiaThemeMenu() {
     'use strict';
@@ -58,18 +51,16 @@
 })();
 
 /*
- * 目次の持ち越し（getting-started-story-guide タスク 2.4、要件 13、design「SidebarKeeper」）。
- *
+ * 目次の持ち越し。
+
  * mdBook 0.5.x は、幅 1080px 未満では保存値（localStorage の mdbook-sidebar）を見ずに、毎回目次を閉じて始める。
  * 一方で book.js は、幅に関係なく開閉のたびに保存値を visible／hidden に書く。
  * そこで、幅 620px 以上 1080px 未満で保存値が visible のときだけ、閉じて始まった目次を開き直す。
  * 620px 未満（開いた目次が本文を画面の外へ押し出す幅）と 1080px 以上（mdBook が保存値どおりにする幅）には触れない。
  *
  * 開く手順は book.js に任せる（チェックボックスの change で、クラス・ARIA 属性・リンクの tabIndex・保存値がそろう）。
- * 目次の要素の判定は保存値を読むより前に行う（目次の無いページでは保存値に触れない）。
- *
- * ふだんは head.hbs の claudiaSidebarEarly が、描く前に同じ条件で目次を開き直している（ここまで待つと、閉じた画面が一度描かれてちらつく）。
- * そのときはチェックボックスが入っているので、ここは何もしない。MutationObserver が無いときの受け皿として残す。
+ * ふだんは head.hbs の claudiaSidebarEarly が描く前に同じ条件で開き直すので、そのときここは何もしない。
+ * MutationObserver が無いときの受け皿として残す。
  */
 (function claudiaSidebarKeep() {
     'use strict';

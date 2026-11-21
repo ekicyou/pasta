@@ -59,7 +59,7 @@ function Invoke-Vsce([string[]]$VsceArgs, [switch]$Echo) {
 }
 
 # Marketplace の版の一覧（vsce show --json の versions[].version）。
-# 失敗・読めない出力（拡張が無いと vsce は "undefined" を出して 0 で終える）は公開済みと見なさず transient で失敗する（7.4）。
+# 失敗・読めない出力（拡張が無いと vsce は "undefined" を出して 0 で終える）は公開済みと見なさず transient で失敗する。
 function Get-Versions {
     $r = Invoke-Vsce @('show', $Extension, '--json')
     try {
@@ -73,7 +73,7 @@ function Get-Versions {
 
 try {
     # vsce の --pat は既定で VSCE_PAT を読み、--azure-credential より優先する（vsce の publish.js の getPAT）。
-    # PAT を使わないこと（5.5・9.6）を確かにするため、vsce に渡さない。値は読まない。
+    # PAT を使わないことを確かにするため、vsce に渡さない。値は読まない。
     Remove-Item Env:VSCE_PAT -ErrorAction Ignore
 
     $vsix = @(Resolve-Path -Path $VsixPath -ErrorAction Ignore | ForEach-Object Path)
@@ -82,7 +82,7 @@ try {
     # npx --no-install が lock の版の vsce を見つけるよう、拡張のディレクトリで呼ぶ。
     Push-Location (Join-Path $PSScriptRoot '../../../editors/vscode')
 
-    # (1) 版が公開済み → 飛ばす（5.2・5.3・7.3）
+    # (1) 版が公開済み → 飛ばす
     if ((Get-Versions) -contains $Version) { Complete skipped '' '公開済みのため飛ばした' }
 
     if ($vsix.Count -ne 1) {

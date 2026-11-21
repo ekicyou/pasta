@@ -1,29 +1,23 @@
-// verify-content.mjs — コンテンツ整合・網羅レビューの機械検証（タスク 7.4）
+// verify-content.mjs — コンテンツ整合・網羅レビューの機械検証
 //
-// 目的（requirements.md R4–R9 / design「Testing Strategy / コンテンツ整合・編集レビュー」）:
-//   本書 book/src/** の本文が、要件 4/5/6/7/8/9 のコンテンツ受入基準を満たすことを、
-//   実ファイル走査により機械的にアサートする。各検証は「実物の book/src・book/tools を読む」ことで
-//   成立し、固定文字列の自己満足チェックではない。
-//   manual-ssot-authority（タスク 3.5）でマニュアルが唯一の権威になったため、doc/spec 権威リンク必須・
-//   ハッシュ対応表整合の検査を外し、doc/spec・GRAMMAR.md を案内しないこと（A-nospec）と
-//   スキル生成対象章の目次到達（A-summary）を検査する。対応表と口調判定は gen-skill-refs.mjs から import する。
+// 本書 book/src/** の本文が、コンテンツの受入基準を満たすことを、実ファイル走査により機械的にアサートする。
+// 各検証は「実物の book/src・book/tools を読む」ことで成立し、固定文字列の自己満足チェックではない。
+// マニュアルが唯一の権威なので、doc/spec・GRAMMAR.md を案内しないこと（A-nospec）と
+// スキル生成対象章の目次到達（A-summary）を検査する。対応表と口調判定は gen-skill-refs.mjs から import する。
 //
-// 検証範囲（7.4 = コンテンツの網羅・整合・ボイスに集中。検索 7.2 / 静的 7.1 / リンク検証 link-check とは重複しない）:
-//   A. 文法網羅・権威（R4.1 / ssot 1.5, 4.2, 9.7） — grammar 全実装章の存在・本文、
-//      book/src に doc/spec・GRAMMAR.md の記述なし（A-nospec）、生成対象章が SUMMARY から到達可能（A-summary）
-//   B. Lua 網羅（R5.1, R5.5）   — 公開モジュール名の登場・LuaJIT 2.1 明示
-//   C. チュートリアル（R6.1, R6.2 / getting-started-story-guide 1.2, 1.4, 7.1, 10.1, 10.7, 10.8） — 前提環境/UTF-8 注意・
-//      段の章の本文（C-steps）、目次の並び（C-order）、tutorial-check 逐語一致、
+// 検証範囲（コンテンツの網羅・整合・ボイスに集中。検索・静的出力・リンク検証は別スクリプトで、重複しない）:
+//   A. 文法網羅・権威 — grammar 全実装章の存在・本文、book/src に doc/spec・GRAMMAR.md の記述なし（A-nospec）、
+//      生成対象章が SUMMARY から到達可能（A-summary）
+//   B. Lua 網羅 — 公開モジュール名の登場・LuaJIT 2.1 明示
+//   C. チュートリアル — 前提環境/UTF-8 注意・段の章の本文（C-steps）、目次の並び（C-order）、tutorial-check 逐語一致、
 //      段の章の H2 4 種（C-sections）、台詞以外の段落は指示の一文だけ（C-prose）
-//   D. ボイス（R7.1, R7.2, R7.4 / ssot 1.7） — 導入/締めのキャラ口調（判定は findVoice）・コードフェンス内に口調なし
-//   E. 外部参照（R8.2, R8.3）   — milkpot(lua51/lua52)＋luajit.org 絶対 URL・lua55 不採用明記
-//   F. バージョン（R9.1, R9.3, R9.4） — introduction の対象バージョンが Cargo.toml と一致・LuaJIT 2.1・将来変更注記
-//   I. 内部設計パート（pasta-runtime-internals-doc 1.2, 1.8, 2.7, 2.10, 2.11） — 10 章の存在・本文・
-//      章構造（extractBody）、題材章 8 章の必須 H2 7 種（この順）、機構語の網羅、概要章の対象外ツールと読者
-//   T. 台詞部品（manual-claudia-theme 4.7, 5.2, 7.1–7.3, 10.2, 10.3, 10.8） — 全章（D 系の章＋debug/＋雑記）の
-//      記法（T-syntax）・導入と締めが二人の台詞だけ（T-intro・T-outro）、顔画像（T-assets）、執筆規約の追従（T-authoring）
-//   例外: talk.mjs の NO_TALK_CHAPTERS の章は D-voice・T-intro・T-outro を外し、台詞が 1 つも無いこと（T-notalk）を求める（T-syntax は外さない）
-//
+//   D. ボイス — 導入/締めのキャラ口調（判定は findVoice）・コードフェンス内に口調なし
+//   E. 外部参照 — milkpot(lua51/lua52)＋luajit.org 絶対 URL・lua55 不採用明記
+//   F. バージョン — introduction の対象バージョンが Cargo.toml と一致・LuaJIT 2.1・将来変更注記
+//   I. 内部設計パート — 10 章の存在・本文・章構造（extractBody）、題材章 8 章の必須 H2 7 種（この順）、機構語の網羅、概要章の対象外ツールと読者
+//   T. 台詞部品 — 全章（D 系の章＋debug/＋雑記）の記法（T-syntax）・導入と締めが二人の台詞だけ（T-intro・T-outro）、
+//      顔画像（T-assets）、執筆規約の追従（T-authoring）
+//   例外: talk.mjs の NO_TALK_CHAPTERS の章は D-voice・T-intro・T-outro を外し、台詞が 1 つも無いこと（T-notalk）を求める（T-syntax は外さない）。
 // 成功で exit 0、失敗（1 件でも）で exit 1。
 
 import fs from 'node:fs';
@@ -76,8 +70,8 @@ function hasVoice(text) {
   return findVoice(text).length > 0;
 }
 
-// コードフェンス内の混入検査に使う「狭い」集合（R7.4）。
-// R7.4 が禁じるのは *解説者 Claudia の地の文（ナレーション）* がコード中へ漏れること。
+// コードフェンス内の混入検査に使う「狭い」集合。
+// 禁じるのは *解説者 Claudia の地の文（ナレーション）* がコード中へ漏れること。
 // 一方、サンプル `.pasta` 内のキャラクター台詞（例: アクター「ラザニア」が「〜ですわ」と話す）は
 // 正当な作例コンテンツであり、お嬢様口調の語尾を含み得る。これを「混入」と誤検出しないため、
 // コード検査では *Claudia の一人称・読者への語りかけに固有* のマーカーのみを対象にする。
@@ -110,7 +104,7 @@ function assert(id, cond, passMsg, failMsg) {
   else fail(id, failMsg);
 }
 
-// N-fence: 4 つのバッククォートの外側のフェンスの中の 3 つのバッククォートで、フェンスを取り違えない（7.2）。
+// N-fence: 4 つのバッククォートの外側のフェンスの中の 3 つのバッククォートで、フェンスを取り違えない。
 {
   const sample = ['````md', '```', '````', '', '## 後ろ', '```', 'x', '```', '', '```', 'y', '```', ''].join('\n');
   const fences = extractCodeFences(sample);
@@ -124,7 +118,7 @@ function assert(id, cond, passMsg, failMsg) {
 }
 
 // ============================================================
-// A. 文法網羅（R4.1 全実装章の網羅）・権威（ssot 1.5, 9.7 doc/spec を案内しない / 4.2 目次到達）
+// A. 文法網羅（全実装章の網羅）・権威（doc/spec を案内しない）・目次到達
 // ============================================================
 const GRAMMAR_CHAPTERS = [
   'index', 'markers', 'block-structure', 'call-jump', 'literals',
@@ -177,7 +171,7 @@ for (const ch of GRAMMAR_CHAPTERS) {
 }
 
 // ============================================================
-// B. Lua 網羅（R5.1 公開モジュール網羅 / R5.5 LuaJIT 2.1 明示）
+// B. Lua 網羅（公開モジュール網羅・LuaJIT 2.1 明示）
 // ============================================================
 const LUA_MODULES = [
   '@pasta_search', '@pasta_persistence', '@pasta_config',
@@ -203,7 +197,7 @@ const LUA_MODULES = [
     `Lua 章に LuaJIT 2.1 明示がある`,
     `Lua 章に LuaJIT 2.1 明示が無い`,
   );
-  // 基礎入口・外部参照リンクの存在（R5.6 / R8.2 連携の最低限）。
+  // 基礎入口・外部参照リンクの存在（最低限）。
   assert(
     'B-basics',
     exists(`${luaDir}/basics.md`) && isSubstantive(read(`${luaDir}/basics.md`), 500),
@@ -213,7 +207,7 @@ const LUA_MODULES = [
 }
 
 // ============================================================
-// C. チュートリアル（R6.1 前提環境/手順/UTF-8 / R6.2 起動可能な最小一式に一致）
+// C. チュートリアル（前提環境/手順/UTF-8・起動可能な最小一式に一致）
 // ============================================================
 // 段の章（ファイル名が 2 桁の数字とハイフンで始まる章）が持つ H2。この順で現れること。
 const GUIDE_SECTIONS = ['叶えたいこと', '辞書を書く', '確かめる', 'もっと詳しく'];
@@ -239,7 +233,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '辞書を書く', '確かめる',
     `チュートリアルに前提環境（Windows / SSP）の記載がある`,
     `チュートリアルに前提環境（Windows / SSP）の記載が無い`,
   );
-  // C-steps: 段の章が 1 枚以上あり、どれも本文を持つ（10.1）。不足した章を名指しする。
+  // C-steps: 段の章が 1 枚以上あり、どれも本文を持つ。不足した章を名指しする。
   const stageFiles = gsFiles.filter((f) => /^\d{2}-/.test(f));
   const thin = stageFiles.filter((f) => !isSubstantive(read(`${gsDir}/${f}`)));
   assert(
@@ -250,7 +244,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '辞書を書く', '確かめる',
       ? `段の章（2 桁の数字とハイフンで始まる .md）が ${gsDir} に 1 枚も無い`
       : `段の章が本文不足/プレースホルダ: ${thin.join(', ')}`,
   );
-  // C-order: 目次の入門の並びが、入口・まず会ってみる・自分のゴーストを始める・段の章（ファイル名の昇順）・付録と一致する（1.2, 1.4）。
+  // C-order: 目次の入門の並びが、入口・まず会ってみる・自分のゴーストを始める・段の章（ファイル名の昇順）・付録と一致する。
   {
     const want = ['index.md', 'hello.md', 'setup.md', ...stageFiles, 'prerequisites.md'];
     const have = [...read(`${SRC}/SUMMARY.md`).matchAll(/\]\((?:\.\/)?getting-started\/([^)\s#]+\.md)(?:#[^)]*)?\)/g)]
@@ -292,7 +286,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '辞書を書く', '確かめる',
           : `段の章 ${f} の H2 の順序が違う（期待: ${GUIDE_SECTIONS.join(' → ')}／実際: ${h2s.filter((h) => GUIDE_SECTIONS.includes(h)).join(' → ')}）`,
       );
     }
-    // C-prose: 台詞以外の段落が指示の一文だけ（7.1, 10.8）。判定は findProseParagraphs。
+    // C-prose: 台詞以外の段落が指示の一文だけ。判定は findProseParagraphs。
     const prose = findProseParagraphs(md);
     assert(
       `C-prose:${f}`,
@@ -317,7 +311,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '辞書を書く', '確かめる',
 }
 
 // ============================================================
-// D. ボイス（R7.1 導入/締めキャラ口調 / R7.2 本体普通文体 / R7.4 コード内に口調なし）
+// D. ボイス（導入/締めキャラ口調・本体普通文体・コード内に口調なし）
 // ============================================================
 // 章の一覧（各フォルダは非再帰・SUMMARY.md を除く）。D 系はこのフォルダ群、T 系はこれに debug/ を足す。
 const VOICE_DIRS = ['', 'grammar', 'lua', 'lua/modules', 'getting-started', 'reference', 'internals', 'notes'];
@@ -348,7 +342,7 @@ function listChapters(dirs) {
       `${rel} の散文部にキャラ口調（導入/締め）がある`,
       `${rel} の散文部にキャラ口調が見当たらない`,
     );
-    // D2: コードフェンス内に *解説者ナレーション* が無い（R7.4）。
+    // D2: コードフェンス内に *解説者ナレーション* が無い。
     // 作例 .pasta のキャラ台詞（丁寧語尾を含み得る）は対象外。Claudia 固有の地の文マーカーのみ検出。
     const fences = extractCodeFences(md);
     for (let i = 0; i < fences.length; i++) {
@@ -369,7 +363,7 @@ function listChapters(dirs) {
 }
 
 // ============================================================
-// E. 外部参照（R8.2 milkpot lua51/lua52 + luajit.org / R8.3 lua55 不採用）
+// E. 外部参照（milkpot lua51/lua52 + luajit.org・lua55 不採用）
 // ============================================================
 {
   const rel = `${SRC}/reference/external-links.md`;
@@ -405,7 +399,7 @@ function listChapters(dirs) {
 }
 
 // ============================================================
-// F. バージョン（R9.1 対象バージョン＝Cargo.toml / R9.3 LuaJIT 2.1 / R9.4 将来変更注記）
+// F. バージョン（対象バージョン＝Cargo.toml・LuaJIT 2.1・将来変更注記）
 // ============================================================
 {
   const rel = `${SRC}/introduction.md`;
@@ -437,7 +431,7 @@ function listChapters(dirs) {
 }
 
 // ============================================================
-// G. デバッグ章（R7.1 導入/締めボイス / R7.3 コード内に口調なし / R8.4 存在・本文・ボイス検査可能）
+// G. デバッグ章（導入/締めボイス・コード内に口調なし・存在・本文・ボイス検査可能）
 // ============================================================
 // isSubstantive / hasVoice / stripCodeFences / extractCodeFences / NARRATION_MARKERS を再利用し、
 // 文法章ループ（GRAMMAR_CHAPTERS）と同型のイディオムでアサートする。
@@ -459,7 +453,7 @@ for (const ch of DEBUG_CHAPTERS) {
     `デバッグ章 ${ch}.md が本文を持つ`,
     `デバッグ章 ${ch}.md が本文不足/プレースホルダ`,
   );
-  // G-voice: 散文部（コードフェンス除去後）に導入/締めのキャラ口調がある（R7.1）。
+  // G-voice: 散文部（コードフェンス除去後）に導入/締めのキャラ口調がある。
   // 口調マーカーは Claudia のものなので、配役が claudia の章だけを見る（emo2 の 2 人が案内する章は対象外）。
   const prose = stripCodeFences(md);
   if (castOf(`debug/${ch}.md`) === 'claudia') assert(
@@ -468,7 +462,7 @@ for (const ch of DEBUG_CHAPTERS) {
     `デバッグ章 ${ch}.md の散文部にキャラ口調（導入/締め）がある`,
     `デバッグ章 ${ch}.md の散文部にキャラ口調が見当たらない`,
   );
-  // G-codevoice: コードフェンス内に解説ナレーションが混入していない（R7.3）。
+  // G-codevoice: コードフェンス内に解説ナレーションが混入していない。
   const fences = extractCodeFences(md);
   const leaked = [];
   for (const body of fences) {
@@ -484,7 +478,7 @@ for (const ch of DEBUG_CHAPTERS) {
   );
 }
 
-// G-fact: 主要事実が章全体のどこかに登場する（取りこぼし防止・R8.1 の最低限）。
+// G-fact: 主要事実が章全体のどこかに登場する（取りこぼし防止の最低限）。
 {
   const allDebug = DEBUG_CHAPTERS
     .map((ch) => `${SRC}/debug/${ch}.md`)
@@ -561,7 +555,7 @@ for (const ch of INTERNALS_CHAPTERS) {
   );
 }
 
-// I-fact: 割り振られた機構を示す語がパート全体に現れる（2.10）、概要章に対象外ツールと読者（1.2, 2.11）。
+// I-fact: 割り振られた機構を示す語がパート全体に現れる、概要章に対象外ツールと読者。
 {
   const allInternals = INTERNALS_CHAPTERS
     .map((ch) => `${SRC}/internals/${ch}`)

@@ -1,15 +1,14 @@
 // talk-html.mjs — mdBook の出力 HTML の台詞引用ブロックを、顔アイコン付きの吹き出し HTML に置き換える。
-// manual-claudia-theme タスク 3.1（要件 3.1, 3.3, 3.6, 3.9, 3.10, 3.11, 8.4, 8.6, 10.7 / design「TalkHtmlTransform」）。
 //
 // 対象: 出力フォルダの *.html すべて（名前順）。
 //   属性の無い <blockquote> の直後の最初の <p> が「【」で始まるものだけを置き換え、それ以外は 1 バイトも変えない。
 //   mdBook 0.5.x の描画形: `> 【表情】本文` → `<blockquote>\n<p>【表情】本文</p>\n</blockquote>`。
 //   注記（`> [!NOTE]`）は `<blockquote class="blockquote-tag …">` で最初の <p> が見出しなので対象外。
-// 出力: design「データモデル / 出力 HTML 契約」の構造。本文はタグを除いた残りの HTML をそのまま移す。
+// 出力: 本文はタグを除いた残りの HTML をそのまま移す。
 //   顔画像の src は、その出力ファイルの位置から出力フォルダの根への相対パス（深さ 1 なら ../img/claudia/…）。
 // 失敗: 未知のタグ・入れ子の台詞（引用やリストの中の台詞・入れ子の引用を含む台詞）を全件集め、
 //   出力ファイルとタグを示して exit 1。このとき、どのファイルにも書き込まない（全ファイルを検査してから書く）。
-// 依存: talk/talk.mjs だけ（design「Allowed Dependencies」）。Node 標準ライブラリのみ。
+// 依存: talk/talk.mjs だけ。Node 標準ライブラリのみ。
 //
 // CLI: node book/tools/talk/talk-html.mjs [book-out-dir]（既定 book/book）
 

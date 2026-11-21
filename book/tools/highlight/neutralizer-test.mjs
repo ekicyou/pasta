@@ -1,33 +1,21 @@
-// neutralizer-test.mjs — ClientNeutralizer の jsdom build-time ユニットテスト
-// （タスク 4.2 / 要件 3.1, 3.2）。
+// neutralizer-test.mjs — ClientNeutralizer の jsdom build-time ユニットテスト。
 //
-// 目的:
-//   正準モジュール `neutralizer.mjs` の `installHljsNeutralizer(win)` を、実 DOM
-//   （jsdom）上で book.js の `codeSnippets()` IIFE 挙動を忠実に模擬して検証する。
+// 正準モジュール `neutralizer.mjs` の `installHljsNeutralizer(win)` を、実 DOM（jsdom）上で
+// book.js の `codeSnippets()` IIFE 挙動を忠実に模擬して検証する。
 //
-//   book.js（research §8.3・`book-c22b7243.js:173-202`）は次のように振る舞う:
-//     - `hljs.configure({ languages: [] })` で自動言語検出を無効化したのち、
-//       ヘッダ内 inline code を除く全 `<code>` を収集し、各要素へ
-//       `hljs.highlightBlock(block)` を無条件適用する（`language-pasta` を
-//       スキップする分岐は存在しない）。
-//     - 未登録言語 `pasta` は plaintext 扱いとなり、`highlightBlock` は要素の
-//       `textContent` を読み直して `innerHTML` をエスケープ再生成する。これにより
-//       build-time に焼き込んだ事前 span（`<span class="hljs-...">`）が破壊される。
+// book.js は `hljs.configure({ languages: [] })` で自動言語検出を無効化したのち、ヘッダ内 inline code を除く全 `<code>` へ
+// `hljs.highlightBlock(block)` を無条件適用する（`language-pasta` をスキップする分岐は無い）。
+// 未登録言語 `pasta` は plaintext 扱いとなり、要素の `textContent` から `innerHTML` を再生成するので、
+// build-time に焼き込んだ事前 span（`<span class="hljs-...">`）が破壊される。
 //
-//   本テストは:
-//     - 実 hljs の「未中和なら事前 span を破壊する」挙動を `fakeHljs` で忠実に模擬し
-//       （`el.innerHTML = escapeHtml(el.textContent)`）、呼び出し回数も spy で記録する。
-//     - `installHljsNeutralizer` を `window.hljs` 代入前に仕込み、代入の瞬間に
-//       `highlightBlock` / `highlightElement` がラップされることを利用する。
-//     - 中和が効いた状態で、pasta ブロックの事前 span が生存（3.1）し、
-//       非 pasta ブロックは原処理へ委譲されて既存挙動どおり再生成される（3.2）ことを
-//       実 DOM 上で証明する。
+// 本テストは:
+//   - 実 hljs の「未中和なら事前 span を破壊する」挙動を `fakeHljs` で模擬し、呼び出し回数も spy で記録する。
+//   - `installHljsNeutralizer` を `window.hljs` 代入前に仕込み、代入の瞬間に `highlightBlock` / `highlightElement` がラップされることを利用する。
+//   - 中和が効いた状態で、pasta ブロックの事前 span が生存し、非 pasta ブロックは原処理へ委譲されて既存挙動どおり再生成されることを実 DOM 上で示す。
 //
-//   公開サイトや実 `book/book` を一切叩かない build-time の純粋単体検証であり、
-//   恒常ゲートではない（要件 8.4 / 6.3 非抵触）。
+// 公開サイトや実 `book/book` は叩かない build-time の純粋単体検証で、恒常ゲートではない。
 //
-// 実行: `node book/tools/highlight/neutralizer-test.mjs`（exit 0 = 全 PASS）。
-// jsdom は book/node_modules に導入済み（タスク 1.1）。
+// 実行: `node book/tools/highlight/neutralizer-test.mjs`（exit 0 = 全 PASS）。jsdom は book/node_modules に導入済み。
 
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
@@ -56,7 +44,7 @@ function escapeHtml(s) {
 }
 
 // pasta ブロックの実 HTML（事前 span 焼き込み済み）。
-// `language-pasta` クラスを持ち、内部に hljs span を内包する（タスク 3.x の出力相当）。
+// `language-pasta` クラスを持ち、内部に hljs span を内包する。
 // textContent は "＊シーン　こんにちは"。未中和の highlightBlock が textContent から
 // innerHTML を再生成すると、これらの span は失われる（= 3.1 が破られる）。
 const PASTA_INNER_HTML =
@@ -142,7 +130,7 @@ function sleep(ms) {
 }
 
 // head.hbs の BEGIN〜END の印の間（最初の `if (!win) {` から）と正準の本体を、
-// 前後の空白と空行を除いた行の並びで比べる（要件 6.1）。
+// 前後の空白と空行を除いた行の並びで比べる。
 function compareMirror(hbs, canonBody) {
   const b = hbs.indexOf('// --- BEGIN canonical hljs neutralizer');
   const e = hbs.indexOf('// --- END canonical hljs neutralizer ---');
@@ -282,7 +270,7 @@ async function run() {
   log('');
 
   // =========================================================================
-  // ケース C: file:// 相当 URL でも同様に動作する（要件 4.2 オフライン閲覧の整合）。
+  // ケース C: file:// 相当 URL でも同様に動作する。
   // =========================================================================
   {
     const dom = buildDom('file:///C:/home/maz/git/pasta/book/book/index.html');
@@ -575,7 +563,7 @@ async function run() {
   log('');
 
   // =========================================================================
-  // ケース K: head.hbs の写しと正準の関数本体が一致する（要件 6.1）。
+  // ケース K: head.hbs の写しと正準の関数本体が一致する。
   // =========================================================================
   {
     const hbs = readFileSync(new URL('../../theme/head.hbs', import.meta.url), 'utf8');
