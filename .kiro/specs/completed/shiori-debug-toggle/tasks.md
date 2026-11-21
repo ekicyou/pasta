@@ -154,3 +154,4 @@
 - VSCode 拡張の `npm test` は、wasm/ を作っていない作業木では `PASTA_VSCODE_NO_WASM=1` を付ける（付けないと vscodeModules の real WASM の 3 本が落ちる。CI も同じ変数を使う）。
 - VSCode の操作中に断る e2e は、ロックがゴーストの決定の後に取られるので、2 本を Promise.all で同時に走らせると勝ち負けで揺れる。先の操作の reload が偽のサーバーに届くのを待ってから後の操作を走らせる（余裕は偽のサーバーの reloadDelayMs の約 100ms）。
 - 6.1 の全体検査（2026-11-21）: pasta_lua・pasta_shiori の試験（x64、i686 は読み込みの印の 2 本）・clippy・fmt、editors/shared 43・recipe 158・VSCode（e2e 31）・両方の tsc と eslint、gen-skill-refs --check・link-check・tutorial-check・verify-content・book の自己テストがすべて通った。10.1 は config.rs の decide_table・save_switch_table、10.2 は debug_save_switch_test.rs の 10 本と pasta_shiori の 2 本、10.3 は debugToggle.test.ts・devActions.test.ts・VSCode の contributions と devCommands e2e。external_control.lua は main から変わっていない（4.2）。
+- 完了時の棚卸（2026-11-21）: その場で解決 0 件・申し送り 1 件（shiori4-v4-host の brief.md へ、ファイルの重なりが無くなったことと判断の行の事実）・起票 0 件。
