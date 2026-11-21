@@ -207,3 +207,8 @@ shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shio
 - **要件定義のモデル**: Opus のまま（スレッドと ABI の決まりは shiori4 の正本が決めていて、`req.version` を入口の印にする案も 1 つに絞れている）。
 - **分割の案**: 要らない（20 を超えるなら、中の表現の作り直しを先の spec に分ける。前のまま）。
 - **見つけた穴・古くなった記述**: ステータスの行の「0.5.0（ノベルゲームと同じリリース）」と、roadmap の台帳の「ノベルゲームと同じリリース」は、上の理由で根拠が無い。前回から残るもの: 版 4 の口の読み込みのログも `LOAD_ENTRY_TARGET` を的にする。Current State の「`shiori4-v3-portable` が入れる（予定）」・基準の `c360adb2`・キックの行は古い。Adjacent に `shiori4-v3-portable`（完了。芯の型）が無い。旧来の口で SHIORI/2.x の開始行を受け続けるかは、残る議題。台帳の「キックの即時化」は対象が無い。
+
+## 申し送り（shiori-debug-toggle より）
+
+- `shiori-debug-toggle` は完了した。`runtime/module_registry.rs`・`factory.rs` には触れず、デバッグの判断の時期も動かしていない（今までどおりローダの Phase 5.5、Lua が起きる前に 1 回）。「先に要るもの」のファイルの重なりから外してよい。
+- 版 4 の口の読み込みのログに関わる事実: ローダは読み込みごとに、`pasta::debug_state` の target で `Debug enabled: development events are allowed` か `Debug disabled: development events are refused` の 1 行を出し、この target は `pasta::load_entry` と同じくログの絞りを越えて必ず通る。道具（`editors/shared/reloadShiori.ts`）は、印 `SHIORI load entry completed` より前のこの行で有効・無効を読む。版 4 の口でも印より前にこの行が並ぶかは見直しの論点（参照: `.kiro/specs/completed/shiori-debug-toggle/design.md` の LoaderPhase55）。
