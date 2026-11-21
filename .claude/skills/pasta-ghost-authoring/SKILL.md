@@ -196,7 +196,7 @@ metadata:
 ```
 
 > 📖 詳細: [references/variables.md](references/variables.md)
-> 📖 グローバル変数の保存先: [references/variables.md](references/variables.md#グローバル変数の保存先)・エンジン予約の `＄＊pasta_` 変数: [references/variables.md](references/variables.md#予約グローバル変数pasta_-で始まる名前)
+> 📖 グローバル変数の保存先: [references/variables.md](references/variables.md#グローバル変数の保存先)・エンジン予約の `＄＊pasta_` 変数: [references/variables.md](references/variables.md#予約グローバル変数pasta_-で始まる名前とデバッグdebug)
 
 ### 3.5 Call Statements（Call文）
 

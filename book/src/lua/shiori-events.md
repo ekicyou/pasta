@@ -1052,7 +1052,7 @@ raise_event(event = "OnPastaCallFunction", references = ["初回起動"])
 
 ### OnPastaSetSaveVariable（グローバル変数に代入）
 
-グローバル変数 `＄＊名前` に、外から値を代入する。`OnPastaCallFunction` と同じく pasta の組み込みのイベントで、デバッグの有無によらず働く。試験の間だけ [`＄＊pasta_talk_interval_min`](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前) を縮める、といった使い方をする。
+グローバル変数 `＄＊名前` に、外から値を代入する。`OnPastaCallFunction` と同じく pasta の組み込みのイベントで、デバッグの有無によらず働く。試験の間だけ [`＄＊pasta_talk_interval_min`](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前とデバッグdebug) を縮める、といった使い方をする。
 
 | Reference | 内容 |
 | --------- | ---- |
@@ -1073,7 +1073,7 @@ raise_event(event = "OnPastaCallFunction", references = ["初回起動"])
 
 - 型を省けば、届いた文字列がそのまま文字列として入る。`01` を送れば文字列の `01` になる。
 - 名前は区切らない。`a.b` は、`a` の中の `b` ではなく、`a.b` という名前の 1 つの変数になる。
-- `pasta_` で始まる[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前)にも代入できる。トークの間隔の変数は `number` を付けて送る。付けないと文字列の `60` が入り、トークの間隔には使われない。代入した値は、次にトーク間隔を計算するときから反映される。
+- `pasta_` で始まる[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前とデバッグdebug)にも代入できる。トークの間隔の変数は `number` を付けて送る。付けないと文字列の `60` が入り、トークの間隔には使われない。代入した値は、次にトーク間隔を計算するときから反映される。
 - 代入した値は、その後に読む `＄＊名前`（Lua の `save.名前`）にすぐ見える。保存は、ほかのグローバル変数と同じく、ランタイムの終了時に行われる（[グローバル変数の保存先](../grammar/variables.md#グローバル変数の保存先)）。代入するたびにファイルへ書き出すことはしない。
 
 **応答**
@@ -1515,7 +1515,7 @@ talk_interval_max = 300
 hour_margin = 30
 ```
 
-- トークの間隔は、予約グローバル変数 `＄＊pasta_talk_interval_min`・`＄＊pasta_talk_interval_max` → `pasta.toml` の値 → 既定値、の順に決まる。数値でない値は無視され、小数は切り捨て、10 秒未満は 10 秒になり、最小間隔が最大間隔を上回ると最大間隔が最小間隔にそろえられる（[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前)）。
+- トークの間隔は、予約グローバル変数 `＄＊pasta_talk_interval_min`・`＄＊pasta_talk_interval_max` → `pasta.toml` の値 → 既定値、の順に決まる。数値でない値は無視され、小数は切り捨て、10 秒未満は 10 秒になり、最小間隔が最大間隔を上回ると最大間隔が最小間隔にそろえられる（[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前とデバッグdebug)）。
 - 設定は、次のトーク時刻を決めるたびに読み直される。
 - Lua から設定値を読むには [@pasta_config](modules/pasta-config.md) を使う。
 - `[ghost]` の全キー（`spot_newlines` を含む）と既定値は [pasta.toml リファレンス](../reference/pasta-toml.md#ghostゴースト動作) を参照する。

@@ -448,7 +448,7 @@ talk_interval_max = 240
 
 この例では、前のトークから 2〜4 分後に次のランダムトークが出る。
 
-- 実行中は、予約グローバル変数 `＄＊pasta_talk_interval_min`・`＄＊pasta_talk_interval_max` に入れた値が `pasta.toml` の値より優先される（[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前)）。
+- 実行中は、予約グローバル変数 `＄＊pasta_talk_interval_min`・`＄＊pasta_talk_interval_max` に入れた値が `pasta.toml` の値より優先される（[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前とデバッグdebug)）。
 - 数値でない値の扱い、下限（10 秒）、最小間隔が最大間隔を上回ったときの扱いは [SHIORI イベントとハンドラの pasta.toml 設定](../lua/shiori-events.md#pastatoml-設定) を参照する。
 
 #### spot_newlines
