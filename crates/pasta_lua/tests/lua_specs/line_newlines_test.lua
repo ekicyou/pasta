@@ -1,4 +1,4 @@
--- actor-line-newlines のテスト
+-- 行の改行（line_newlines）のテスト
 -- act の行の頭の印（act:line）と、次に積む台詞の継ぎ目（seams）
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
@@ -366,7 +366,7 @@ describe("組み立て - 差し込んだ改行で列が進む (5.1)", function()
     end)
 end)
 
--- 4.1・4.2 で入れない継ぎ目は、line_newlines なしとバイトまで同じ（4.5）
+-- 継ぎ目を入れない場合は、line_newlines なしとバイトまで同じ
 local function same_as_off(fill, sakura_extra)
     local off = build_lines(nil, fill, sakura_extra)
     expect(build_lines(1.8, fill, sakura_extra)):toBe(off)

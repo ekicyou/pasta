@@ -1,4 +1,4 @@
--- アクタープロキシの word / expr_fn / expr_fn_var が呼ぶ関数の第 1 引数と戻り値のテスト (actor-proxy-act-delegation)
+-- アクタープロキシの word / expr_fn / expr_fn_var が呼ぶ関数の第 1 引数と戻り値のテスト
 -- 規則: 行のアクターの表のフィールドの関数はプロキシを、それ以外（シーンテーブル・act のメソッド・GLOBAL）の関数は ACT を受け取る。
 -- 関数が ACT・プロキシそのものを返したときは nil にする。
 --

@@ -1,29 +1,18 @@
-//! 本番 marshaling × 実 `!Send` VM アクタースレッドの統合テスト（task 3.4・R5）。
+//! 本番 marshaling × 実 `!Send` VM アクタースレッドの統合テスト。既定（no-feature）ビルドで走る。
 //!
-//! task 5.1 で FFI 出荷経路がアクター経路へ昇格し、marshaling が既定ビルドの依存に
-//! なったため、本テストは **既定（no-feature）ビルドで実行される**（旧 `actor-poc` ガードは
-//! 撤去）。出荷経路そのものを検証するため、既定スイートで走らせるのが正しい。
-//!
-//! # 何を証明するか（task 3.4 の observable 完了条件）
-//! task 3.3 の実アクタースレッド（VM pin）に対し、本番 marshaling 自由関数
-//! （`marshal_get`/`marshal_notify`）を通して:
-//!  (a) GET が実 VM 応答値を **タイムアウト内**に返し、その応答バイト列が byte-invariant
-//!      ゴールデンと不変であること（R5.1/R5.8・R1.1 整合）。
-//!  (b) NOTIFY が即 204 を返し、アクターの完了を待たないこと（R5.2）。
+//! 実アクタースレッド（VM pin）に対し、`marshal_get`/`marshal_notify` を通して:
+//!  (a) GET が実 VM 応答値をタイムアウト内に返し、応答バイト列が byte-invariant ゴールデンと不変であること。
+//!  (b) NOTIFY が即 204 を返し、アクターの完了を待たないこと。
 //!  (c) GET property→callback の 2 ラウンドでコルーチンが tick をまたいで継続し、各ラウンドの
-//!      marshaling 応答がゴールデンと不変であること（R5.7 のコルーチン保存・通常経路）。
-//!  (d) drop→204（応答を返せない異常で reply drop）が無限待機なく 204 になること（R5.3）。
-//!      リクエスト処理エラーは drop ではなく 500 として返る（(f)・仕様
-//!      `lua-require-robustness` 4.3/4.4/4.8）。
-//!  (e) アクター不在（mailbox 閉鎖）GET/NOTIFY が即 204 になること（R5.6）。
+//!      応答がゴールデンと不変であること。
+//!  (d) drop→204（応答を返せない異常で reply drop）が無限待機なく 204 になること。
+//!      リクエスト処理エラーは drop ではなく 500 として返る（(f)）。
+//!  (e) アクター不在（mailbox 閉鎖）の GET/NOTIFY が即 204 になること。
 //!
-//! # 本番 GET_TIMEOUT の扱い（CONCERNS）
-//! 通常経路の (a)/(c) は **本番 `marshal_get`（`GET_TIMEOUT=6.68ms`）** で検証することを
-//! 第一義とするが、デバッグビルド + コールド VM では実 GET が 6.68ms を超えうるため、
-//! 環境非依存に確実な byte-invariant 検証として `marshal_get_with_timeout` に十分大きい
-//! 閾値を与えた経路でゴールデン一致を厳密検証する（タイムアウト→204 の決定論的検証は
-//! marshaling.rs のユニットテストで遅延アクター注入により実施済み）。本番閾値 6.68ms 経路は
-//! 別テストで「204 か ゴールデン値か」のいずれか（無限待機なし・契約充足）を確認する。
+//! # GET_TIMEOUT の扱い
+//! 通常経路の (a)/(c) の厳密なゴールデン一致は `marshal_get_with_timeout` に十分大きい閾値を
+//! 与えて検証する（デバッグビルド + コールド VM でも取りこぼさないため）。本番 `GET_TIMEOUT`
+//! 経路は別テストで確認し、タイムアウト→204 の決定論的検証は marshaling.rs のユニットテストにある。
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -44,8 +33,7 @@ fn neutralize_debug_env() {
     }
 }
 
-/// 大きめ閾値（環境非依存に実 VM 応答を取りこぼさない）。本番閾値 6.68ms の非発火は
-/// 別テストで扱う。
+/// 大きめ閾値（環境非依存に実 VM 応答を取りこぼさない）。
 const GENEROUS: Duration = Duration::from_secs(10);
 
 // Round1/Round2 期待バイト列（byte_invariant_test の特性化ゴールデンと同一）。
@@ -108,15 +96,14 @@ fn normalize_request(text: &str) -> String {
     req
 }
 
-/// clean stop helper。
 fn stop(tx: &flume::Sender<ActorMsg>) {
     let (msg, done_rx) = ActorMsg::stop();
     tx.send(msg).expect("send Stop");
     done_rx.recv_timeout(GENEROUS).expect("Stop must be acked");
 }
 
-/// (a)(c) 本番 marshaling 経由の GET が、実 VM 応答を byte-invariant ゴールデンと不変に
-/// 返し、コルーチンが tick をまたいで継続する（R5.1/R5.7/R5.8・R1.1 整合）。
+/// (a)(c) 本番 marshaling 経由の GET が、実 VM 応答をゴールデンと不変に返し、
+/// コルーチンが tick をまたいで継続する。
 #[test]
 fn marshal_get_through_actor_returns_byte_invariant_golden_and_continues_coroutine() {
     let (load_dir, _temp) = build_async_callback_dir();
@@ -124,7 +111,6 @@ fn marshal_get_through_actor_returns_byte_invariant_golden_and_continues_corouti
     let actor = spawn_actor_thread_with(load_dir, rx, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
-    // Round1: get_property が yield → get タグ応答（marshaling 経由・ゴールデン一致）。
     let round1 = marshal_get_with_timeout(
         &tx,
         MailboxRequest::new(
@@ -162,8 +148,8 @@ fn marshal_get_through_actor_returns_byte_invariant_golden_and_continues_corouti
         .expect("actor thread must join cleanly after Stop");
 }
 
-/// (b) NOTIFY は即 204 を返し、アクターの完了を待たない。後続 GET が同一 FIFO で
-/// NOTIFY 処理完了後に返る（R5.2・単一直列）。
+/// (b) NOTIFY は即 204 を返し、アクターの完了を待たない。後続 GET は同一 FIFO で
+/// NOTIFY 処理完了後に返る。
 #[test]
 fn marshal_notify_through_actor_returns_204_then_get_in_fifo() {
     let (load_dir, _temp) = build_async_callback_dir();
@@ -184,7 +170,6 @@ fn marshal_notify_through_actor_returns_204_then_get_in_fifo() {
         "NOTIFY must return 204 immediately (fire-and-forget)"
     );
 
-    // 後続 GET は同一 FIFO で NOTIFY 完了後に返る（actor-VM 応答・ゴールデン一致）。
     let get_resp = marshal_get_with_timeout(
         &tx,
         MailboxRequest::new(
@@ -205,9 +190,9 @@ fn marshal_notify_through_actor_returns_204_then_get_in_fifo() {
         .expect("actor thread must join cleanly after Stop");
 }
 
-/// (a'') 本番 `marshal_get`（本番 `GET_TIMEOUT`）が通常運転でゴールデン値を返す（R5.1/R5.8）。
-/// RN4 決定で `GET_TIMEOUT` は実 GET が決して接近しない秒オーダーの安全網（5 秒）であり、
-/// 通常 GET は **必ず値**を返す（204 へ化けず byte-invariant）。閾値が安全網サイズであることも確認。
+/// (a'') 本番 `marshal_get`（本番 `GET_TIMEOUT`）が通常運転でゴールデン値を返す。
+/// `GET_TIMEOUT` は実 GET が決して接近しない秒オーダーの安全網（5 秒）であり、
+/// 通常 GET は必ず値を返す（204 へ化けない）。
 #[test]
 fn marshal_get_production_timeout_returns_golden_value() {
     assert!(
@@ -239,21 +224,17 @@ fn marshal_get_production_timeout_returns_golden_value() {
         .expect("actor thread must join cleanly after Stop");
 }
 
-/// (d) drop→204（R5.3）: アクタースレッドが reply を送らず消滅した場合、受信側の
+/// (d) drop→204: アクタースレッドが reply を送らず消滅した場合、受信側の
 /// `recv_timeout` が `Disconnected` を観測して 204 になる（無限待機なし）。
 ///
-/// 実 thread.rs は VM 応答（パース失敗時の 400 含む）を必ず reply で送るため、
-/// 「reply を送らず drop」を実 VM 経路で誘発するのは決定論的でない（VM 内部パニックを
-/// 要する）。そこで本テストは drop の原因を **アクタースレッド消滅**で与える: GET 投入後に
-/// receiver 側（アクタースレッドが所有する `rx`）を含むスレッドを stop させ reply 経路が
-/// 閉じる状況を、receiver を直接 drop することで決定論的に再現する。reply 経路の純粋な
-/// drop→204 はユニットテスト `marshal_get_reply_drop_yields_204` で別途厳密検証済み。
+/// 実 VM 経路で「reply を送らず drop」を誘発するのは決定論的でないため、receiver を
+/// 直接 drop して再現する。純粋な drop→204 はユニットテスト
+/// `marshal_get_reply_drop_yields_204` が検証する。
 #[test]
 fn marshal_get_disconnected_reply_yields_204() {
     let (tx, rx) = mailbox();
-    // GET を投入 → mailbox に積まれるが、誰も drain せず receiver を drop する。
-    // reply_tx は ActorMsg::Get に同梱されたまま rx と共に drop され、reply 経路が
-    // Disconnected になる → marshal_get は 204（無限待機なし）。
+    // GET を投入しても誰も drain せず receiver を drop する。reply_tx は rx と共に drop され、
+    // reply 経路が Disconnected になる。
     drop(rx);
     let resp = marshal_get_with_timeout(
         &tx,
@@ -268,10 +249,8 @@ fn marshal_get_disconnected_reply_yields_204() {
     drop(tx);
 }
 
-/// (d') 実 VM 経路の relay 健全性（R5.1 補完）: パース失敗リクエストは VM が `Ok(400 Bad
-/// Request)` を返す経路であり、marshaling は **その VM 応答をそのまま中継**する（drop に
-/// はならない）。これにより thread.rs の `if let Ok(resp)` 経路が忠実に relay されることを
-/// 確認する（marshaling は VM 出力を改変しない）。
+/// (d') 実 VM 経路の relay 健全性: パース失敗リクエストは VM が `Ok(400 Bad Request)` を返す
+/// 経路で、marshaling はその応答をそのまま中継する（drop にはならない）。
 #[test]
 fn marshal_get_relays_vm_400_for_parse_failure() {
     let (load_dir, _temp) = build_async_callback_dir();
@@ -284,7 +263,6 @@ fn marshal_get_relays_vm_400_for_parse_failure() {
         MailboxRequest::new(1, "this is not a valid shiori request\r\n\r\n".to_string()),
         GENEROUS,
     );
-    // VM が返す 400 Bad Request を marshaling がそのまま中継する（無限待機なし）。
     assert!(
         resp.starts_with("SHIORI/3.0 400"),
         "marshaling must relay the VM's 400 response verbatim (no modification)\nactual: {resp:?}"
@@ -296,7 +274,7 @@ fn marshal_get_relays_vm_400_for_parse_failure() {
         .expect("actor thread must join cleanly after Stop");
 }
 
-/// (e) アクター不在（mailbox 閉鎖）→ 即 204（R5.6）: receiver が落ちた mailbox への
+/// (e) アクター不在（mailbox 閉鎖）→ 即 204: receiver が落ちた mailbox への
 /// GET/NOTIFY は try_send 失敗で即 204（デッドロックなし）。
 #[test]
 fn marshal_into_closed_mailbox_yields_204() {
@@ -312,13 +290,11 @@ fn marshal_into_closed_mailbox_yields_204() {
     drop(tx);
 }
 
-/// (f) ロード失敗状態の GET は 500 + 単一行 `X-ERROR-REASON` を返す（要件 4.3 / 4.8、
-/// design.md `ActorErrorReply`）。
+/// (f) ロード失敗状態の GET は 500 + 単一行 `X-ERROR-REASON` を返す。
 ///
 /// アクタースレッドは生存しているが VM のロードに失敗している状態（`loaded() == false`・
 /// `PastaShiori::request` が `MyError::Load` を返す）を、ゴースト資材の無い空ディレクトリで
-/// 決定論的に作る。旧実装はこの `Err` で reply を drop しており、marshaling 側の
-/// `Disconnected` 安全網が 204 に読み替えていた（要件 4.8 が禁じる無言化）。
+/// 決定論的に作る。reply を drop して 204 に読み替える無言化はしない。
 #[test]
 fn marshal_get_on_load_failed_actor_returns_500_with_single_line_reason() {
     let temp = TempDir::new().expect("create temp dir");

@@ -1,12 +1,10 @@
-//! FFI のテストの共通の部品（lua-cmodule-robustness 1.1）。
+//! FFI のテストの共通の部品。
 //!
 //! - テスト用の `dep.dll` と、`dep.dll` に頼る `foo.dll`（2 版）を、プロセスで 1 回だけ、
 //!   対象のアーキテクチャの `cl.exe` で作る（静的 CRT `/MT`）。人の手での用意は要らない。
 //! - 全テストを 1 つの鍵で直列にする（DLL のモジュールはプロセス全体で共有されるため）。
 //! - ゴーストの雛形のフォルダを作り、版を選んで DLL を写す。
 //! - 読み込み済みのモジュールを名前で引く・8.3 名を得る・FFI だけを開いた素の VM を作る。
-//!
-//! 5.x のタスクはこのファイルを書き換えず、足りない補助は自分のテストのファイルに置く。
 
 #![allow(dead_code)]
 
@@ -200,7 +198,7 @@ pub fn short_path(path: &Path) -> PathBuf {
 /// 長いパスの設定が無効な前提を示す環境変数（CI の LongPathCiStep が `1` にする）。
 pub const LONG_PATHS_DISABLED_ENV: &str = "PASTA_TEST_LONG_PATHS_DISABLED";
 
-/// 前提の確かめ（要件 2.5）。環境変数が `1` のとき、次の 2 つを確かめ、どちらかが崩れていれば失敗にする。
+/// 前提の確かめ。環境変数が `1` のとき、次の 2 つを確かめ、どちらかが崩れていれば失敗にする。
 /// - プロセスの側: 接頭辞なしの 260 文字超えの `existing` へ `GetFileAttributesW` が失敗する。
 ///   マニフェストの無いテストの EXE ではレジストリによらず失敗するので、これだけでは CI の手順が効いた証にならない。
 /// - OS の側: レジストリの `LongPathsEnabled` が無いか 0（CI の手順が効いている）。
@@ -303,10 +301,8 @@ fn dlls_are_built_and_copied_into_ghost_templates() {
     let a = make_ghost(&temp.path().join("a"), FFI_TOML);
     put_dlls(&a.join("scripts"), Which::V1);
     put_dlls(&a.join("scriptlibs"), Which::V2);
-    // 別のゴーストのフォルダ。
     let b = make_ghost(&temp.path().join("b"), FFI_TOML);
     put_dlls(&b.join("scripts"), Which::V2);
-    // 深いフォルダ・ANSI で表せない名前のフォルダ。
     let deep = make_ghost(&deep_dir(&temp.path().join("deep")), FFI_TOML);
     put_dlls(&deep.join("scripts"), Which::V1);
     let non_ansi = make_ghost(&non_ansi_dir(temp.path()), FFI_TOML);
@@ -326,7 +322,6 @@ fn dlls_are_built_and_copied_into_ghost_templates() {
     assert_eq!(loaded_module("foo.dll"), None);
     assert_eq!(loaded_module("dep.dll"), None);
 
-    // 素の VM は FFI だけを開く。
     let lua = bare_ffi_lua();
     let has_ffi: bool = lua.load("return type(ffi) == 'table'").eval().unwrap();
     assert!(has_ffi);

@@ -11,10 +11,6 @@ use pasta_dsl::parser::{
 use std::io::Write;
 
 /// Extract the `.pasta` [`Span`] carried by every [`Action`] variant.
-///
-/// Source-map seam helper (R4): used to thread the originating `.pasta` location to
-/// the output-line recording point. Defined here (not on the `pasta_dsl` AST) to keep
-/// the change within the `code_gen` boundary.
 fn action_span(action: &Action) -> Span {
     match action {
         Action::Talk { span, .. }
@@ -51,15 +47,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(format!("{}, {}", var_path, path_literal))
     }
 
-    /// Generate variable assignment (Requirement 3d).
+    /// Generate variable assignment.
     ///
     /// Local: `var.変数名 = 値`
     /// Global: `save.変数名 = 値`
-    ///
-    /// Source-map wiring (Requirements 1.1, 1.3): records the assignment's `.pasta`
-    /// [`Span`] against the output line it emits via
-    /// [`record_span_since`](Self::record_span_since). The `Property` branch
-    /// delegates to `generate_property_set`, covered by the same `before` mark.
     pub fn generate_var_set(&mut self, var_set: &VarSet) -> Result<(), TranspileError> {
         let out_line_before = self.out_line();
         match &var_set.name {
@@ -105,7 +96,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         self.write_line_terminator()?;
                     }
                     SetValue::WordRef { name } => {
-                        // Generate: var.変数名 = act:word("単語名") or save.変数名 = act:word("単語名")
                         let word_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!("{} = act:word({})", var_path, word_literal))?;
                     }
@@ -119,7 +109,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 }
             }
             None => {
-                // Expression statement: evaluate expression without assignment
                 match &var_set.value {
                     SetValue::Expr(expr @ (Expr::FnCall { .. } | Expr::DynamicFnCall { .. })) => {
                         self.write_indent()?;
@@ -150,8 +139,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
         }
 
-        // Record the (out_line -> span) correspondence for the line just emitted
-        // (Requirement 1.1). Skipped when no line was emitted or no sink is attached.
         self.record_span_since(out_line_before, var_set.span);
 
         Ok(())
@@ -193,22 +180,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Generate scene call (Requirement 3d, 3g).
+    /// Generate scene call.
     ///
     /// Tail: `return act:call(SCENE.__global_name__, <key>, {}, <args>)` (Lua TCO).
     /// Mid: `act:call_restore(SCENE.__global_name__, <key>, {}, <args>)`.
     /// `<key>` is `"名前"` (static) or `act:call_key(…)` (dynamic, see [`Self::call_key`]).
-    ///
-    /// Source-map wiring (Requirement 1.1): records the call's `.pasta` [`Span`]
-    /// against the single output line it emits via
-    /// [`record_span_since`](Self::record_span_since).
     pub(super) fn generate_call_scene(
         &mut self,
         call_scene: &CallScene,
         is_tail_call: bool,
     ) -> Result<(), TranspileError> {
         let out_line_before = self.out_line();
-        // Generate argument list
         let args_str = if let Some(ref args) = call_scene.args {
             let parts = self.generate_args_string(args)?;
             if parts.is_empty() {
@@ -238,8 +220,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             call_head, key, args_str
         ))?;
 
-        // Record the (out_line -> span) correspondence for the line just emitted
-        // (Requirement 1.1).
         self.record_span_since(out_line_before, call_scene.span);
 
         Ok(())
@@ -281,7 +261,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         *last_actor = Some(actor.clone());
         self.generate_line_marker(action_line.span)?;
 
-        // Generate actions
         for action in &action_line.actions {
             self.generate_action(action, actor)?;
         }
@@ -303,7 +282,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         };
         self.generate_line_marker(continue_action.span)?;
 
-        // Generate actions (speaker is inherited)
         for action in &continue_action.actions {
             self.generate_action(action, actor)?;
         }
@@ -312,7 +290,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     }
 
     /// Emit the value-independent line-head marker `act:line()` and record it
-    /// against the `.pasta` line's span (actor-line-newlines 2.2, 2.3).
+    /// against the `.pasta` line's span.
     fn generate_line_marker(&mut self, span: Span) -> Result<(), TranspileError> {
         let out_line_before = self.out_line();
         self.writeln("act:line()")?;
@@ -320,17 +298,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Generate a single action (Requirement 3d, 3e).
+    /// Generate a single action.
     ///
-    /// Source-map seam (R4): this is the representative span-bearing path. The
-    /// action's `.pasta` [`Span`](pasta_dsl::parser::Span) is recorded against the
-    /// generated Lua line via [`record_span_since`](Self::record_span_since) when a
-    /// sink is attached (recording never changes the bytes). Every variant emits
-    /// exactly one line except the rare empty-escape case, which records nothing.
+    /// Every variant emits exactly one line except the rare empty-escape case,
+    /// which records nothing.
     pub fn generate_action(&mut self, action: &Action, actor: &str) -> Result<(), TranspileError> {
         let span = action_span(action);
         let out_line_before = self.out_line();
-        // Actor reference by name string: act:actor_proxy("アクター")
         let actor = &format!("act:actor_proxy({})", StringLiteralizer::literalize(actor)?);
         match action {
             Action::Talk { text, .. } => {
@@ -346,7 +320,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 self.writeln(&format!("{}:talk({}:word({}))", actor, actor, word_literal))?;
             }
             Action::VarRef { name, scope, .. } => {
-                // Variable interpolation: generate talk with concatenation
                 match scope {
                     VarScope::Property => {
                         let prop_literal = StringLiteralizer::literalize(name)?;
@@ -441,22 +414,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
         }
 
-        // Record the (out_line -> span) correspondence for the last line just emitted.
-        // Skipped when no line was emitted (empty escape) or no sink is attached.
         self.record_span_since(out_line_before, span);
 
         Ok(())
     }
 
-    /// Generate code block (Requirement 3f).
+    /// Generate code block.
     ///
     /// Outputs the code block content directly without transformation.
     ///
-    /// Source-map wiring (Requirements 1.1, 1.3): the block is emitted one `.lua`
-    /// line per `.pasta` content line (1:1 line correspondence — `content.lines()`
-    /// is each emitted as one unindented line). Each output line is mapped
-    /// INDIVIDUALLY to its originating `.pasta` line so in-block runtime errors point
-    /// at their own line, instead of collapsing the whole block onto a single span line.
+    /// Each output line maps individually to its originating `.pasta` line so
+    /// in-block runtime errors point at their own line.
     ///
     /// # Line offset
     ///
@@ -468,10 +436,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// fence line. The closing fence is not part of `content`, so no trailing
     /// adjustment is needed.
     pub fn generate_code_block(&mut self, block: &CodeBlock) -> Result<(), TranspileError> {
-        // The opening fence occupies `span.start_line`; content starts on the next
-        // line. `+ 1` skips the fence; `+ offset` walks each content line. Only map
-        // when the span is valid, mirroring `record_span_since`'s guard so default/
-        // synthetic spans (start_line == 0) do not pollute the map.
+        // Content starts on the line after the opening fence. Map only valid spans
+        // (start_line == 0 is synthetic), mirroring `record_span_since`'s guard.
         let content_start_line = if block.span.is_valid() {
             block.span.start_line as u32 + 1
         } else {
@@ -502,11 +468,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// A value that cannot be literalized is a `StringLiteralError` carrying the
     /// definition's span, for all three kinds.
     ///
-    /// Source-map wiring (Requirements 1.1, 1.3): one `.pasta` word definition with
-    /// multiple key names emits one `.lua` line per name; ALL of those output lines
-    /// map to the same definition `.pasta` [`Span`]. Recording happens per emitted
-    /// line (one `record_span_since` per name), so every line is
-    /// covered, not just the last.
+    /// A definition with several key names emits one `.lua` line per name; every
+    /// line maps to the same definition [`Span`].
     pub(super) fn generate_word_definition(
         &mut self,
         word: &KeyWords,
@@ -538,15 +501,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 StringLiteralizer::literalize(name)?,
                 entry
             ))?;
-            // Map this output line to the word definition's `.pasta` span. Every name
-            // line maps to the same span (Requirement 1.3).
             self.record_span_since(out_line_before, word.span);
         }
 
         Ok(())
     }
 
-    /// Generate global word definition (Requirement 2.1, Task 4.2).
+    /// Generate global word definition.
     ///
     /// Generates: `PASTA.create_word("key"):entry("value1", "value2", ...)`
     ///
@@ -555,7 +516,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         self.generate_word_definition(word, "PASTA", ".")
     }
 
-    /// Generate local word definition for a scene (Requirement 2.2, Task 4.3).
+    /// Generate local word definition for a scene.
     ///
     /// Generates: `SCENE:create_word("key"):entry("value1", "value2", ...)`
     ///

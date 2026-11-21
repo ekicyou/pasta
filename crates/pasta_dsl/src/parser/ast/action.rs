@@ -32,8 +32,6 @@ pub enum Action {
     /// Sakura script (\\command[args])
     SakuraScript { script: String, span: Span },
     /// Escape sequence (@@, $$, \\\\)
-    ///
-    /// In pasta2.pest, these are atomic rules that match the literal text.
     Escape { sequence: String, span: Span },
     /// Dynamic word reference (@$var, @$*var, @$0)
     DynamicWordRef {
@@ -220,8 +218,6 @@ pub struct KeyWords {
 
 impl KeyWords {
     /// Returns the first (primary) key name.
-    ///
-    /// Equivalent to the former `name` field for backward compatibility.
     pub fn name(&self) -> &str {
         &self.names[0]
     }

@@ -1,4 +1,4 @@
-//! `scene_join` のファイルごとの突き合わせの単体テスト（scene-identity-format・4.1/4.3/4.5）。
+//! `scene_join` のファイルごとの突き合わせの単体テスト。
 //!
 //! `build_scene_index` 本体は runtime（シーン表・関数の定義元チャンク）を要するため統合
 //! テスト（`tests/scene_identity_index_test.rs`）で観測する。ここでは Lua を使わずに、
@@ -36,13 +36,11 @@ fn ident(scene_id: &str, parent: Option<&str>) -> Option<SceneIdentity> {
 fn parse_base_counter_splits_on_hash() {
     assert_eq!(parse_base_counter("会話#1"), ("会話", Some(1)));
     assert_eq!(parse_base_counter("メイン#42"), ("メイン", Some(42)));
-    // `#` 無し → counter None。
     assert_eq!(parse_base_counter("会話"), ("会話", None));
-    // counter が非数値 → None。
     assert_eq!(parse_base_counter("会話#x"), ("会話", None));
 }
 
-/// `＊章` を 11 個と `＊章11` を 1 個: 末尾の数字を推測しないので取り違えない（4.1）。
+/// `＊章` を 11 個と `＊章11` を 1 個: 末尾の数字を推測しないので取り違えない。
 #[test]
 fn trailing_digit_names_join_without_confusion() {
     let mut list: Vec<(&str, String, u32)> = (1..=11)
@@ -66,7 +64,7 @@ fn trailing_digit_names_join_without_confusion() {
     assert_eq!(index.scene_at("a.pasta", 10), ident("章_1", None));
 }
 
-/// 実行時に無い記録は索引に入らない（4.3）。分けられない名前・ファイルの引けない
+/// 実行時に無い記録は索引に入らない。分けられない名前・ファイルの引けない
 /// シーンは突き合わせに使わない。
 #[test]
 fn records_without_runtime_scene_are_not_indexed() {
@@ -88,7 +86,7 @@ fn records_without_runtime_scene_are_not_indexed() {
 }
 
 /// 2 ファイルの記録がどちらも `G:雑談#1` のとき、それぞれ自分のファイルの登録名に
-/// 解決する（4.5）。ローカルの親も自分のファイルの登録名になる。
+/// 解決する。ローカルの親も自分のファイルの登録名になる。
 #[test]
 fn same_name_in_two_files_resolves_to_own_file() {
     let index = join_records(

@@ -1,21 +1,16 @@
-// verify-static.mjs — 静的出力・オフライン閲覧の検証（tasks.md 7.1）
+// verify-static.mjs — 静的出力・オフライン閲覧の検証
 //
-// 目的:
-//   mdBook の HTML 出力 (`book/book/`) が「サーバープロセス無し・file:// で完全に閲覧可能」
-//   であることを機械的に検証する。具体的には次を立証する。
-//     R1.1 / R1.2 / R1.5 静的出力のみ・オフライン閲覧成立
-//       - 出力配下の全ファイルが静的アセット拡張子のみ（サーバー実行物が無い）
-//       - すべてのページ間リンク／アセット参照（href・src・poster）が
-//         相対パスで、参照先が出力配下に実在する（= file:// で解決可能）
-//       - SUMMARY 由来の全章 HTML が生成され、相互リンク（next/prev・章間）が解決する
-//       - 目次 (toc) が全章を含む
-//     R3.2 / R3.3 / R3.4 表示要素
-//       - コードブロック (<pre><code class="language-...">) が生成されている（R3.3）
-//       - ハイライト用 CSS / JS が同梱されている（R3.3）
+// mdBook の HTML 出力 (`book/book/`) が「サーバープロセス無し・file:// で完全に閲覧可能」であることを機械的に検証する。
+//   静的出力のみ・オフライン閲覧成立:
+//     - 出力配下の全ファイルが静的アセット拡張子のみ（サーバー実行物が無い）
+//     - すべてのページ間リンク／アセット参照（href・src・poster）が相対パスで、参照先が出力配下に実在する（= file:// で解決可能）
+//     - SUMMARY 由来の全章 HTML が生成され、相互リンク（next/prev・章間）が解決する
+//     - 目次 (toc) が全章を含む
+//   表示要素:
+//     - コードブロック (<pre><code class="language-...">) が生成されている
+//     - ハイライト用 CSS / JS が同梱されている
 //
 //   例外: talk.mjs の NO_TALK_CHAPTERS の章は、全章の台詞部品（両方の話し手）の要求から外す（CSS・JS・メニュー id は他章どおり検査する）
-//
-// 設計参照: design.md "Testing Strategy / Build & Static Output", "Site Foundation".
 //
 // 依存ゼロ（Node 標準ライブラリのみ）。検証成功で exit 0、失敗で exit 1。
 //
@@ -94,7 +89,7 @@ const SERVER_EXTS = new Set([
 
 // 出力配下の全ファイルを列挙（rel は POSIX 区切りで返す）。
 // 旧版（classic/。manual.yml の旧版生成段が新版の検査の後に作る）は列挙しない。
-// 旧版は着せ替え前の版を手を加えずに残したもので、その実在は旧版生成段が確かめる（要件 11.3・11.4）。
+// 旧版は着せ替え前の版を手を加えずに残したもので、その実在は旧版生成段が確かめる。
 function listFiles(root) {
   const out = [];
   function walk(dir) {
@@ -279,9 +274,8 @@ function analyze(root) {
 }
 
 // =========================================================================
-// テーマ資材・台詞出力・外部参照・メニュー id の検査（manual-claudia-theme タスク 3.5 /
-// 要件 1.7, 8.4, 8.5, 8.6, 8.9, 10.4 / design「StaticVerifier」）。
-//   pages は SUMMARY 全章（出力根からの相対。manual-print-page-removal 要件 4.1）。lua/modules.html（リダイレクト）と
+// テーマ資材・台詞出力・外部参照・メニュー id の検査。
+//   pages は SUMMARY 全章。lua/modules.html（リダイレクト）と
 //   toc.html（JS 無効時の目次フレーム）は章ではなくテーマ資材を読まないので pages に含めない。
 //   mdBook 0.5.x は追加 CSS・JS を theme/claudia-<hash>.css のようにハッシュ付きで出すため、
 //   固定のファイル名では探さない。参照先の実在は analyze() の相対参照検査が見る。
@@ -366,8 +360,8 @@ function analyzeTheme(root, pages) {
 }
 
 // =========================================================================
-// 全章の印刷用のページ（print.html）が戻っていないかの検査（manual-print-page-removal 要件 4.3・4.4）。
-//   printPage は出力の根の print.html の有無だけで決まる（classic/ の下は見ない。要件 4.6）。
+// 全章の印刷用のページ（print.html）が戻っていないかの検査。
+//   printPage は出力の根の print.html の有無だけで決まる。
 //   pagesLinkingPrint は pages（SUMMARY の全章）のうち、ローカル参照のパスの最後が print.html の
 //   ものを持つページ。外部 URL は見ない。存在しないページは読み飛ばす（章の欠落は「全章の生成」が報告する）。
 //   出力は書き換えない。
@@ -406,7 +400,7 @@ function runSelfTest() {
     check('self-test: 参照を実際に解析している (>50件)', clean.checkedRefCount > 50,
       `checked=${clean.checkedRefCount}`);
 
-    // (a2) 旧版（classic/）は検査しない。旧版の 404.html の /pasta/ や本文の参照は旧版の生成段が扱う（要件 11.3）
+    // (a2) 旧版（classic/）は検査しない。旧版の 404.html の /pasta/ や本文の参照は旧版の生成段が扱う
     const classicDir = path.join(tmp, 'classic');
     fs.mkdirSync(classicDir, { recursive: true });
     fs.writeFileSync(path.join(classicDir, '404.html'),
@@ -425,7 +419,7 @@ function runSelfTest() {
     ];
     check('self-test: classic/ の下の壊れた参照・外部参照・未変換の台詞は報告しない',
       classicHits.length === 0, classicHits.slice(0, 5).join(' / '));
-    // 旧版の print.html は新版の印刷用のページとして報告しない（manual-print-page-removal 要件 4.6）。
+    // 旧版の print.html は新版の印刷用のページとして報告しない。
     check('self-test: classic/print.html を全章の印刷用のページとして報告しない',
       analyzePrint(tmp, summaryChapters()).printPage === false);
     fs.rmSync(classicDir, { recursive: true, force: true });
@@ -449,10 +443,10 @@ function runSelfTest() {
         withServer.serverFiles.includes('evil.php'),
       JSON.stringify(withServer.nonStatic.slice(0, 5)));
 
-    // (d) テーマ資材・台詞出力・外部参照・メニュー id の検査（manual-claudia-theme タスク 3.5）。
+    // (d) テーマ資材・台詞出力・外部参照・メニュー id の検査。
     //   無傷コピーで資材・外部参照・メニュー id・未変換の台詞が合格し、
     //   1 か所ずつ壊すと、壊したページと中身を正しく報告することを確かめる。
-    //   確かめるページは目次の全章だけ（manual-print-page-removal 要件 4.1）。
+    //   確かめるページは目次の全章だけ。
     const pages = summaryChapters();
     const target = 'grammar/index.html';
     const themeClean = analyzeTheme(tmp, pages);
@@ -539,7 +533,7 @@ function runSelfTest() {
       JSON.stringify(r.untransformedTalk));
     fs.writeFileSync(targetFile, fs.readFileSync(path.join(outDir, target), 'utf8')); // (d) の書き換えを戻す
 
-    // (e) 全章の印刷用のページと印刷のボタンが戻ったら検出するべき（manual-print-page-removal 要件 4.3・4.4・4.5）。
+    // (e) 全章の印刷用のページと印刷のボタンが戻ったら検出するべき。
     let p = analyzePrint(tmp, pages);
     check('self-test: 無傷コピーに全章の印刷用のページも、そこへのリンクも無い',
       p.printPage === false && p.pagesLinkingPrint.length === 0, JSON.stringify(p));
@@ -555,7 +549,7 @@ function runSelfTest() {
       p.pagesLinkingPrint.includes(target), JSON.stringify(p));
     fs.writeFileSync(targetFile, targetOriginal);
 
-    // (f) 章のページの poster の壊れた参照も検出するべき（manual-print-page-removal 要件 4.2）。
+    // (f) 章のページの poster の壊れた参照も検出するべき。
     const chapterFile = path.join(tmp, 'grammar', 'index.html');
     const chapterOriginal = fs.readFileSync(chapterFile, 'utf8');
     fs.writeFileSync(chapterFile, chapterOriginal.replace('<main>', '<main><video poster="__missing__.png"></video>'));
@@ -654,7 +648,7 @@ function run() {
       `missing-in-toc=${JSON.stringify(tocMissing)}`);
   }
 
-  // --- (5) コードブロック生成 + ハイライト資材同梱（R3.3） ---
+  // --- (5) コードブロック生成 + ハイライト資材同梱 ---
   log('');
   log('--- (R3.3) コードブロック・シンタックスハイライト ---');
   let codeBlockPages = 0;
@@ -702,10 +696,10 @@ function run() {
   const hasFont = a.files.some((f) => /\.woff2?$/.test(f.rel));
   check('R3.4: Web フォント (woff/woff2) が同梱されている（外部依存なし表示）', hasFont);
 
-  // --- (7) テーマ資材・台詞出力・外部参照・メニュー id（manual-claudia-theme） ---
+  // --- (7) テーマ資材・台詞出力・外部参照・メニュー id ---
   log('');
   log('--- (1.7/8.4–8.6/8.9/10.4) テーマ資材・台詞出力・外部参照・メニュー id ---');
-  // 確かめるページは目次の全章だけ（manual-print-page-removal 要件 4.1）。
+  // 確かめるページは目次の全章だけ。
   const pages = chapters;
   const t = analyzeTheme(outDir, pages);
   check('10.4: テーマ CSS (theme/claudia-*.css) が出力にある', t.themeCss.length > 0,
@@ -726,7 +720,7 @@ function run() {
   check(`8.4: テーマメニューの id（${MENU_IDS.join(', ')}）が全章にある`,
     t.missingMenuIds.length === 0, JSON.stringify(t.missingMenuIds.slice(0, 6)));
 
-  // --- (8) 全章の印刷用のページ（manual-print-page-removal 要件 4.3・4.4） ---
+  // --- (8) 全章の印刷用のページ ---
   log('');
   log('--- (4.3/4.4) 全章の印刷用のページ ---');
   const pr = analyzePrint(outDir, pages);

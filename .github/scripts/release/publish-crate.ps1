@@ -54,7 +54,7 @@ function Get-Url([string]$Url) {
     catch { [pscustomobject]@{ Code = 0; Body = ''; Error = $_.Exception.Message } }
 }
 
-# 200 と 404 だけを判定に使い、それ以外は公開済みと見なさず transient で失敗する（7.4）。
+# 200 と 404 だけを判定に使い、それ以外は公開済みと見なさず transient で失敗する。
 function Test-Exists([string]$Url) {
     $r = Get-Url $Url
     if ($r.Code -eq 200) { return $true }
@@ -87,11 +87,11 @@ try {
     $crateUrl = "$ApiBase/api/v1/crates/$Crate"
     $versionUrl = "$crateUrl/$Version"
 
-    # (1) クレート自体が無い → 初回の公開は Trusted Publishing ではできない（4.6）
+    # (1) クレート自体が無い → 初回の公開は Trusted Publishing ではできない
     if (-not (Test-Exists $crateUrl)) {
         Complete failed not-registered "crates.io にクレートが無い。初回の公開は手で行う（手順書 ``.github/release-ci-setup.md`` §初回公開）"
     }
-    # (2) 版が公開済み → 飛ばす（4.2・7.3）
+    # (2) 版が公開済み → 飛ばす
     if (Test-Exists $versionUrl) { Complete skipped '' '公開済みのため飛ばした' }
 
     # pwsh -File 経由では `a,b` が 1 つの文字列で届くので、カンマでも分ける。
@@ -103,7 +103,7 @@ try {
         exit 0
     }
 
-    # (3) 依存先の同じ版がスパース索引に現れるまで待つ。時間切れでも公開へ進み、未解決なら下の再試行に任せる（4.5）
+    # (3) 依存先の同じ版がスパース索引に現れるまで待つ。時間切れでも公開へ進み、未解決なら下の再試行に任せる
     foreach ($dep in $deps) {
         $deadline = (Get-Date) + $WaitLimit
         while (-not (Test-InIndex $dep)) {
@@ -112,7 +112,7 @@ try {
         }
     }
 
-    # (4) 公開。索引の反映待ちの時間切れは cargo が警告・exit 0 で終えるので成功とみなす。依存先の未解決は再試行（4.5）
+    # (4) 公開。索引の反映待ちの時間切れは cargo が警告・exit 0 で終えるので成功とみなす。依存先の未解決は再試行
     for ($attempt = 0; ; $attempt++) {
         $lines = @()   # 出力が無いと Tee-Object は変数を作らない（StrictMode で参照エラーになる）
         & cargo publish -p $Crate --locked 2>&1 | ForEach-Object { "$_" } | Tee-Object -Variable lines | Write-Host

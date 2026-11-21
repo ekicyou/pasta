@@ -1,13 +1,9 @@
-// Real-module unit tests (review-improvement-loop cell 3.55 / G1).
+// Real-module unit tests.
 //
 // This file imports the REAL modules and runs them against the vscode mock in
 // ./mock/vscode.ts, wired in via
 //   esbuild --alias:vscode=./src/test/mock/vscode.ts
 // so drift between production code and test expectations cannot go unnoticed.
-// (Cell 3.57 / G4 removed the historical wasmBridge.test.ts /
-// integration.test.ts files, which exercised inline COPIES of the production
-// logic — one such mirror had already drifted: 15 vs 17 token types. Their
-// assertions are all subsumed by the real-module tests below.)
 //
 // Covered:
 //   - semanticTokensProvider.ts : PASTA_TOKEN_TYPES/MODIFIERS contracts,
@@ -54,7 +50,7 @@ function test(name: string, fn: () => void | Promise<void>): void {
 }
 
 // 本物の wasm/ を読む試験。wasm/ は wasm-pack で作る生成物（git に無い）なので、CI の job vscode-test
-// （PASTA_VSCODE_NO_WASM=1）でだけ理由を出して外す（pasta-recipe-dev-actions 2.6）。手元では外さない
+// （PASTA_VSCODE_NO_WASM=1）でだけ理由を出して外す。手元では外さない
 function realWasmTest(name: string, fn: () => void | Promise<void>): void {
   if (process.env.PASTA_VSCODE_NO_WASM === '1') {
     queue.push({ name, fn: () => console.log('    - 外した: wasm/ を作らない CI（PASTA_VSCODE_NO_WASM=1）') });
@@ -266,7 +262,7 @@ test('provider returns null when analysis throws (TextMate fallback)', () => {
   assert.strictEqual(provider.provideDocumentSemanticTokens(doc as never, dummyToken), null);
 });
 
-// 要件 8.1: 控えは版つき。違う版の控えは返さず、その場で解き直す
+// 控えは版つき。違う版の控えは返さず、その場で解き直す
 test('provider does not serve tokens cached for a different document version', () => {
   const fresh = { deltaLine: 0, deltaStartCharacter: 0, length: 3, tokenType: 1, tokenModifiers: 0 };
   const bridge = fakeBridge({ result: { tokens: [fresh], diagnostics: [], scenes: [] } });
@@ -284,7 +280,7 @@ test('provider does not serve tokens cached for a different document version', (
   assert.strictEqual(bridge.calls.length, 1, 'the re-analyzed result must be cached for v2');
 });
 
-// 要件 8.2: 今の版の解析に失敗したら、前の版の色を返さず控えも消す
+// 今の版の解析に失敗したら、前の版の色を返さず控えも消す
 test('provider failure on a new version returns null and drops the previous version', () => {
   const opts = { result: { tokens: [], diagnostics: [], scenes: [] }, fail: false };
   const bridge = fakeBridge(opts);
@@ -556,7 +552,7 @@ test('analysis failure logs to the output channel and clears diagnostics', () =>
   h.dm.dispose();
 });
 
-// 要件 8.2: 同期の解析に失敗したら、診断と一緒に色の控えも消す
+// 同期の解析に失敗したら、診断と一緒に色の控えも消す
 test('analysis failure in DocumentSync also drops the cached tokens', () => {
   const opts = {
     result: { tokens: [{ deltaLine: 0, deltaStartCharacter: 0, length: 1, tokenType: 1, tokenModifiers: 0 }], diagnostics: [], scenes: [] },
@@ -576,7 +572,7 @@ test('analysis failure in DocumentSync also drops the cached tokens', () => {
   h.dm.dispose();
 });
 
-// 要件 9.5: wasm32 の panic は trap として JS の例外になる。拡張は落ちず、理由を書き、診断と控えを消す
+// wasm32 の panic は trap として JS の例外になる。拡張は落ちず、理由を書き、診断と控えを消す
 test('a wasm trap during sync is caught, logged, and clears diagnostics and tokens', () => {
   let trap = false;
   const bridge = bridgeWithWasmModule({
@@ -644,9 +640,8 @@ test('dispose cancels pending timers and unsubscribes listeners', async () => {
 });
 
 // =============================================================================
-// WasmBridge (real class) — lifecycle, error wrapping (3.57 / G4 — replaces the
-// deleted inline-copy wasmBridge.test.ts) and wasm-boundary result-shape
-// validation (3.56 / G3)
+// WasmBridge (real class) — lifecycle, error wrapping, and wasm-boundary
+// result-shape validation
 // =============================================================================
 // The wasm module is an out-of-process artifact from the TS bundle's point of
 // view: a malformed `wasm_analyze` result must be rejected AT the bridge
@@ -752,7 +747,7 @@ test('analyzeDocument passes a well-formed wasm result through unchanged', () =>
   assert.deepStrictEqual(result, wellFormed);
 });
 
-// --- ゴースト全体の検査（pasta-check-dic-validate 7.1・要件 11.2 / 11.8） ---
+// --- ゴースト全体の検査 ---
 // wasm_select_ghost_files / wasm_validate_ghost は失敗で null を返す。結果の形を
 // 境界で確かめ、違えば throw する（核の結果はそのまま通す）。
 
@@ -857,7 +852,7 @@ realWasmTest('real WASM: selectGhostFiles / validateGhost results pass the shape
   bridge.dispose();
 });
 
-// 拡張と本物の核をつなぐ（pasta-check-validate-edges 3.4・要件 4.1 / 4.2）。
+// 拡張と本物の核をつなぐ。
 // 大文字・小文字の混じった Ghost/Master の配下の中身の無い dic/x.pasta/ を、
 // 本物の WASM がフォルダの誤りとして返し、フォルダの URI に Error で出る。
 realWasmTest('real WASM: Ghost/Master の配下の空の dic/x.pasta/ は folder-matches-pattern の Error になる', async () => {
@@ -890,7 +885,7 @@ test('validateGhost throws when the bridge is not ready', () => {
 });
 
 // =============================================================================
-// wordRefDecorator (real) — 箱の範囲は TextMate の文法の規則から（要件 5.1〜5.3）
+// wordRefDecorator (real) — 箱の範囲は TextMate の文法の規則から
 // =============================================================================
 
 for (const c of WORD_REF_CASES) {
@@ -949,7 +944,7 @@ test('word-ref decorator re-applies on active-editor change and document edits',
 });
 
 // =============================================================================
-// mock/vscode — 3 つのコマンドの流れで使う API が記録を残す（タスク 2.2・要件 8.1）
+// mock/vscode — 3 つのコマンドの流れで使う API が記録を残す
 // =============================================================================
 
 test('mock: showQuickPick は決めた選択を返し、次は閉じた（undefined）になる', async () => {
@@ -1012,10 +1007,10 @@ function ghostValidatorCreated(fromCollection: number, fromWatcher: number): { c
   };
 }
 
-/** 要件（requirements.md の Introduction）の例の文書 */
+/** 例の文書 */
 const REQUIREMENT_EXAMPLE = '＊挨拶\n  さくら：やあ\n  ・朝\n    さくら：おはよう\n＊\n  さくら：またね\n';
 
-// 5 つのコマンドは activate が 1 回で登録する（4.1・5.1・6.1）
+// 5 つのコマンドは activate が 1 回で登録する
 const DEV_COMMANDS = ['pasta.runSceneAtCursor', 'pasta.reloadShiori', 'pasta.showSaveVariables', 'pasta.enableShioriDebug', 'pasta.disableShioriDebug'];
 function assertDevCommandsRegistered(): void {
   for (const id of DEV_COMMANDS) {
@@ -1032,14 +1027,14 @@ realWasmTest('activate loads the real WASM bridge and registers the ghost valida
   const lensesBefore = mock.registeredCodeLensProviders.length;
   mock.registeredCommands.clear();
   await activate(context as never);
-  // WASM が読めたら GhostValidator を作って登録する（11.12）
+  // WASM が読めたら GhostValidator を作って登録する
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 1, watchers: 1 });
   const state = getActivationState();
   assert.strictEqual(state.wasmReady, true, 'real wasm/pasta_lsp_wasm_bg.wasm must load');
-  // DAP の提示モードの切り替えはもう登録しない（要件 1.3）
+  // DAP の提示モードの切り替えはもう登録しない
   assert.ok(!mock.registeredCommands.has('pasta.debug.toggleSourcePresentation'), 'DAP toggle command must not be registered');
   assertDevCommandsRegistered();
-  // 5.1・1.13: 2 つのプロバイダが pasta に登録され、本物の WASM で要件の例から 2 つのグローバルと 1 つのローカルが出る
+  // 2 つのプロバイダが pasta に登録され、本物の WASM で例の文書から 2 つのグローバルと 1 つのローカルが出る
   const symbols = mock.registeredDocumentSymbolProviders.slice(symbolsBefore);
   const lenses = mock.registeredCodeLensProviders.slice(lensesBefore);
   assert.deepStrictEqual(symbols.map((r) => r.selector), [{ language: 'pasta' }]);
@@ -1067,11 +1062,11 @@ test('WASM が読めないときは GhostValidator を作らず、activate は�
   mock.registeredCommands.clear();
   await activate(context as never);
   assert.strictEqual(getActivationState().wasmReady, false);
-  // 5.1: アウトラインも見出しの上の ▶ も出さない
+  // アウトラインも見出しの上の ▶ も出さない
   assert.strictEqual(mock.registeredDocumentSymbolProviders.length, symbolsBefore);
   assert.strictEqual(mock.registeredCodeLensProviders.length, lensesBefore);
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 0, watchers: 0 });
-  assertDevCommandsRegistered(); // WASM と関係なく登録する（1.5）
+  assertDevCommandsRegistered(); // WASM と関係なく登録する
   deactivate();
 });
 

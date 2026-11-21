@@ -5,14 +5,13 @@
 //!
 //! - チャンク識別子（`source` / `short_src`）とチャンクへ渡される引数
 //!   （`?.lua` と `?/init.lua` の両パターン・モジュール名にドットを含む場合を含む）
-//!   — 要件 3.4（「現行の区切り文字の混在を含む」）
 //! - 未検出・構文エラー・実行時エラーの 3 種について、`pcall(require, …)` が受け取る
-//!   値の型と文言 — 要件 1.5 / 4.9
-//! - 検索パスの優先順位と `?.lua` → `?/init.lua` の試行順 — 要件 3.1 / 3.2 / 3.3
+//!   値の型と文言
+//! - 検索パスの優先順位と `?.lua` → `?/init.lua` の試行順
 //! - `package.loaded` 登録済みモジュールが searcher を経由せず解決されること
 //!
-//! これが要件 3.4 の恒久ゲートであり、`#[ignore]` は付けない（要件 6.6: 常時実行）。
-//! `PASTA_DEBUG` の中和は `tests/common` の `#[ctor]` ガードが担う（要件 6.4）。
+//! これは恒久ゲートであり、`#[ignore]` は付けない（常時実行）。
+//! `PASTA_DEBUG` の中和は `tests/common` の `#[ctor]` ガードが担う。
 //!
 //! 標準 searcher は長パス・非 ANSI パスを扱えないため、比較の土台は短い ASCII の
 //! 一時ディレクトリに限る。長パス・非 ANSI 側の検証は
@@ -75,10 +74,10 @@ impl Tree {
         write(&first_dir, "a/b.lua", PROBE_BODY);
         // `?/init.lua` パターン・ドット有り。
         write(&first_dir, "pkg/sub/init.lua", PROBE_BODY);
-        // 同一モジュール名が両パターンに存在する（試行順の検証用・要件 3.2）。
+        // 同一モジュール名が両パターンに存在する（試行順の検証用）。
         write(&first_dir, "both.lua", PROBE_BODY);
         write(&first_dir, "both/init.lua", PROBE_BODY);
-        // 同一モジュール名が両検索ルートに存在する（優先順位の検証用・要件 3.3）。
+        // 同一モジュール名が両検索ルートに存在する（優先順位の検証用）。
         write(&first_dir, "dup.lua", PROBE_BODY);
         write(&second_dir, "dup.lua", PROBE_BODY);
         // ロード失敗の 2 種。
@@ -178,7 +177,7 @@ fn pcall_require(module: &str) -> String {
     )
 }
 
-/// 要件 3.4 / 3.1 / 3.2: `?.lua` と `?/init.lua` の両パターンについて、チャンク識別子
+/// `?.lua` と `?/init.lua` の両パターンについて、チャンク識別子
 /// （`source` / `short_src`）とチャンクへ渡される引数がバイト単位で一致する。
 ///
 /// ドットを含むモジュール名を含めることで、前置部が `/`・展開部が OS 区切りという
@@ -224,7 +223,7 @@ fn chunk_identity_matches_standard_for_both_filename_patterns() {
     }
 }
 
-/// 要件 3.2: 1 つの検索パスに対し `?.lua` を `?/init.lua` より先に試す。
+/// 1 つの検索パスに対し `?.lua` を `?/init.lua` より先に試す。
 #[test]
 fn plain_file_pattern_is_tried_before_init_pattern() {
     let tree = Tree::new();
@@ -238,7 +237,7 @@ fn plain_file_pattern_is_tried_before_init_pattern() {
     );
 }
 
-/// 要件 3.3: 同名モジュールが複数の検索パスにあるとき優先順位の高い側が勝つ。
+/// 同名モジュールが複数の検索パスにあるとき優先順位の高い側が勝つ。
 #[test]
 fn higher_priority_search_path_wins() {
     let tree = Tree::new();
@@ -252,7 +251,7 @@ fn higher_priority_search_path_wins() {
     );
 }
 
-/// 要件 1.5 / 4.9 / 3.1 / 3.2: 未検出時に `pcall` が受け取る値の型と文言がバイト一致し、
+/// 未検出時に `pcall` が受け取る値の型と文言がバイト一致し、
 /// 全 searcher の候補行を検索パス順・パターン順に含む。
 #[test]
 fn not_found_error_matches_standard_byte_for_byte() {
@@ -265,7 +264,7 @@ fn not_found_error_matches_standard_byte_for_byte() {
         "未検出エラーが標準の型（文字列）・書式になっていない: {observed}"
     );
 
-    // 候補パスが「検索パス順 × `?.lua` → `?/init.lua`」の順に並ぶ（要件 3.1 / 3.2）。
+    // 候補パスが「検索パス順 × `?.lua` → `?/init.lua`」の順に並ぶ。
     let first = &tree.first;
     let second = &tree.second;
     let expected_order = format!(
@@ -280,7 +279,7 @@ fn not_found_error_matches_standard_byte_for_byte() {
     );
 }
 
-/// 要件 4.9: 構文エラー時に `pcall` が受け取る値の型と文言がバイト一致する。
+/// 構文エラー時に `pcall` が受け取る値の型と文言がバイト一致する。
 #[test]
 fn syntax_error_matches_standard_byte_for_byte() {
     let tree = Tree::new();
@@ -296,7 +295,7 @@ fn syntax_error_matches_standard_byte_for_byte() {
     );
 }
 
-/// 要件 4.9: 実行時エラー時に `pcall` が受け取る値の型と文言がバイト一致する。
+/// 実行時エラー時に `pcall` が受け取る値の型と文言がバイト一致する。
 ///
 /// 文言には短縮ソース名が現れるため、チャンク識別子の同一性もここで効く。
 #[test]

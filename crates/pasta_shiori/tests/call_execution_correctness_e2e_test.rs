@@ -1,7 +1,5 @@
 //! Call の実行の正しさ（文脈の復元・選択肢のジャンプ先・動的コールの失敗）の SHIORI 経由 E2E テスト
 //!
-//! 仕様 `call-execution-correctness`（requirements 8.1–8.3）。
-//!
 //! フィクスチャ `tests/fixtures/call_execution_correctness/` の辞書を読み込み、シーンを SHIORI
 //! リクエストのイベント ID（シーン関数フォールバック）で起動して、応答のさくらスクリプトと
 //! ゴーストのログの警告を確かめる。フィクスチャは埋め込みの標準ランタイムと本番 entry.lua を通す
@@ -97,11 +95,11 @@ fn test_minimal_scene_talks() {
 }
 
 // ---------------------------------------------------------------------------
-// 特性化テスト（tasks 1.2）: 変更前のコードで成功し、以後の変更で落ちないことの基準
+// 特性化テスト: 既存の挙動を固定する基準
 // 辞書: dic/characterization.pasta
 // ---------------------------------------------------------------------------
 
-/// 4.1: 末尾の Call（動的コール `＞＠次（）`、Lua のカウンタ）だけで 10 万回つないでも
+/// 末尾の Call（動的コール `＞＠次（）`、Lua のカウンタ）だけで 10 万回つないでも
 /// 深さの上限によるエラーにならず、最後のシーンまで実行される
 #[test]
 fn test_tail_call_chain_100k_completes() {
@@ -110,7 +108,7 @@ fn test_tail_call_chain_100k_completes() {
     assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
 }
 
-/// 4.4: 同じグローバルシーンの配下のローカルシーンを Call したときの応答（途中の Call と
+/// 同じグローバルシーンの配下のローカルシーンを Call したときの応答（途中の Call と
 /// 末尾の Call）。前方一致するグローバルシーンよりローカルシーンが選ばれる
 #[test]
 fn test_call_local_scene_in_same_global() {
@@ -119,7 +117,7 @@ fn test_call_local_scene_in_same_global() {
     assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
 }
 
-/// 4.2: 末尾の Call で別のグローバルシーンへ移った後は、移った先のシーンの文脈で解決される
+/// 末尾の Call で別のグローバルシーンへ移った後は、移った先のシーンの文脈で解決される
 /// （単語参照は移った先のローカル単語、Call は移った先の配下のローカルシーン）
 #[test]
 fn test_tail_call_to_other_global_resolves_in_callee_context() {
@@ -128,9 +126,9 @@ fn test_tail_call_to_other_global_resolves_in_callee_context() {
     assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
 }
 
-/// 2.6: 別のグローバルシーンへの途中の Call を含まないシーンが出した選択肢を、既定の自動
+/// 別のグローバルシーンへの途中の Call を含まないシーンが出した選択肢を、既定の自動
 /// ルーティングで選んだときのジャンプ先。出したシーンの配下のローカルシーンが先に選ばれ、
-/// 無ければグローバルシーンへフォールバックする。`\q` の文字列そのものは確かめない（2.4 で変わる）
+/// 無ければグローバルシーンへフォールバックする。`\q` の文字列そのものは確かめない。
 #[test]
 fn test_choice_routing_without_mid_call() {
     let select = |title: &str, id: &str| {
@@ -147,7 +145,7 @@ fn test_choice_routing_without_mid_call() {
     }
 }
 
-/// 4.8: ローカルシーンの最後の行が Call のとき、呼ばれた側の戻り値がそのシーンの戻り値になる。
+/// ローカルシーンの最後の行が Call のとき、呼ばれた側の戻り値がそのシーンの戻り値になる。
 /// Lua の関数が `act:call` でローカルシーンを呼び、その戻り値をアクション行で出力する
 #[test]
 fn test_tail_call_return_value_propagates() {
@@ -157,7 +155,7 @@ fn test_tail_call_return_value_propagates() {
 }
 
 // ---------------------------------------------------------------------------
-// 途中の Call と式の関数呼び出しから戻った後の文脈（tasks 4.1）
+// 途中の Call と式の関数呼び出しから戻った後の文脈
 // 辞書: dic/mid_call_context.pasta。呼び出し元と呼ばれた側に同名のローカル単語・ローカルシーン・
 // 関数を置き、出力でどちらの文脈で解決されたかを見分ける。
 // ---------------------------------------------------------------------------
@@ -169,7 +167,7 @@ fn assert_fires(event_id: &str, expected: &str) {
     assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
 }
 
-/// 1.11（U28）・1.1–1.3・1.7・1.8: `＞挨拶` → `＞別グローバル` → `＞挨拶` の 2 回とも呼び出し元の
+/// `＞挨拶` → `＞別グローバル` → `＞挨拶` の 2 回とも呼び出し元の
 /// ローカルシーンを実行し、戻った後の単語参照（アクター付き・代入）・関数呼び出し（アクター付き・代入）・
 /// 動的コールも呼び出し元で解決される。呼ばれた側の行は呼ばれた側で解決される
 #[test]
@@ -180,13 +178,13 @@ fn test_u28_mid_call_restores_caller_context() {
     );
 }
 
-/// 1.4: 入れ子（A→B→C）。戻った行はそれぞれ自分のシーンで解決される
+/// 入れ子（A→B→C）。戻った行はそれぞれ自分のシーンで解決される
 #[test]
 fn test_nested_mid_calls_restore_each_level() {
     assert_fires("OnNestedMid", r"\p[0]ＣＢＡ\e");
 }
 
-/// 1.5: 呼ばれた側が `＞チェイントーク` で中断し、次の OnTalk の機会に再開して最後まで実行した後、
+/// 呼ばれた側が `＞チェイントーク` で中断し、次の OnTalk の機会に再開して最後まで実行した後、
 /// 呼び出し元の続きが呼び出し元で解決される
 #[test]
 fn test_mid_call_restores_after_chain_talk_resume() {
@@ -206,54 +204,54 @@ fn test_mid_call_restores_after_chain_talk_resume() {
     assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
 }
 
-/// 1.10: 途中の Call のターゲットが Lua の関数で、その中から別のグローバルシーンが呼ばれた後も、
+/// 途中の Call のターゲットが Lua の関数で、その中から別のグローバルシーンが呼ばれた後も、
 /// 次の行は呼び出し元で解決される
 #[test]
 fn test_mid_call_to_lua_function_calling_other_global() {
     assert_fires("OnLuaTargetMid", r"\p[0]先元\e");
 }
 
-/// 4.3・4.2: G→A→(末尾)B→G。A の末尾の Call の後は B の文脈で、G に戻った行は G で解決される
+/// G→A→(末尾)B→G。A の末尾の Call の後は B の文脈で、G に戻った行は G で解決される
 #[test]
 fn test_mid_call_then_tail_call_returns_to_caller_context() {
     assert_fires("OnMidThenTail", r"\p[0]ＡＢＧ\e");
 }
 
-/// 3.1: 式の関数呼び出しが 5 段目（グローバル辞書の前方一致）で別のグローバルシーンを実行した後、
+/// 式の関数呼び出しが 5 段目（グローバル辞書の前方一致）で別のグローバルシーンを実行した後、
 /// 同じ行の残りと次の行（単語参照・Call）が呼び出し元で解決される
 #[test]
 fn test_expr_fn_stage5_global_scene_restores_context() {
     assert_fires("OnExprStage5", r"\p[0]先元元元ローカル終\e");
 }
 
-/// 3.4: `＠＊関数（…）` の中から別のグローバルシーンを呼んだ後、同じ行の残りと次の行が呼び出し元で
+/// `＠＊関数（…）` の中から別のグローバルシーンを呼んだ後、同じ行の残りと次の行が呼び出し元で
 /// 解決される
 #[test]
 fn test_global_fn_calling_other_global_restores_context() {
     assert_fires("OnGlobalFnCall", r"\p[0]先元元\e");
 }
 
-/// 1.8: 別のグローバルシーンへの途中の Call が動的コール（`＞＄g`）でも、次の行は呼び出し元で解決される
+/// 別のグローバルシーンへの途中の Call が動的コール（`＞＄g`）でも、次の行は呼び出し元で解決される
 #[test]
 fn test_dynamic_mid_call_to_other_global_restores_context() {
     assert_fires("OnDynamicMid", r"\p[0]先元\e");
 }
 
-/// 1.6: 途中の Call のターゲットが `GLOBAL` の関数で、その中から別のグローバルシーンが呼ばれた後も、
+/// 途中の Call のターゲットが `GLOBAL` の関数で、その中から別のグローバルシーンが呼ばれた後も、
 /// 次の行は呼び出し元で解決される
 #[test]
 fn test_mid_call_to_global_function_calling_other_global() {
     assert_fires("OnGlobalTargetMid", r"\p[0]先元\e");
 }
 
-/// 1.1・1.3: 別のグローバルシーンへの途中の Call から戻った後、動的単語参照（`＠＄変数`）と動的関数
+/// 別のグローバルシーンへの途中の Call から戻った後、動的単語参照（`＠＄変数`）と動的関数
 /// 呼び出し（`＠＄変数（…）`）が呼び出し元で解決される（呼ばれた側では同じ書き方が呼ばれた側に解決される）
 #[test]
 fn test_dynamic_refs_after_mid_call_resolve_in_caller_context() {
     assert_fires("OnDynRefAfterMid", r"\p[0]先語先関数元語元関数\e");
 }
 
-/// 1.6: 途中の Call のターゲットが act のメソッド（3 段目の `call`）で、その中で別のグローバルシーンが
+/// 途中の Call のターゲットが act のメソッド（3 段目の `call`）で、その中で別のグローバルシーンが
 /// 実行された後も、次の行は呼び出し元で解決される
 #[test]
 fn test_mid_call_to_act_method_restores_caller_context() {
@@ -261,8 +259,8 @@ fn test_mid_call_to_act_method_restores_caller_context() {
 }
 
 // ---------------------------------------------------------------------------
-// 選択肢の探索範囲（tasks 4.2）
-// 辞書: dic/choice_scope.pasta（2.6 は dic/characterization.pasta の OnChoiceMenu）。選択肢を出したシーン（A）と
+// 選択肢の探索範囲
+// 辞書: dic/choice_scope.pasta（OnChoiceMenu だけ dic/characterization.pasta）。選択肢を出したシーン（A）と
 // もう一方のシーン（B）の両方に同名のローカルシーンを置き、ジャンプ先の出力でどちらから探したかを見分ける。
 // `\q` の第 3 引数は登録名（元の名前_連番）。
 // ---------------------------------------------------------------------------
@@ -308,7 +306,7 @@ fn assert_choice_jumps(event: &str, response: &str, choices: &[(&str, &str, &str
     }
 }
 
-/// 2.1・2.7: A が途中の Call で B を呼び、戻った後に A が出した選択肢は A の配下から探し、A の配下に
+/// A が途中の Call で B を呼び、戻った後に A が出した選択肢は A の配下から探し、A の配下に
 /// 無ければ（B の配下にあっても）グローバルシーンを探す
 #[test]
 fn test_choice_after_mid_call_routes_to_emitter() {
@@ -327,7 +325,7 @@ fn test_choice_after_mid_call_routes_to_emitter() {
     );
 }
 
-/// 2.2: A が選択肢を出した後に途中の Call で B を呼び、戻って A の続きの行を実行して終わっても、A の配下から探す
+/// A が選択肢を出した後に途中の Call で B を呼び、戻って A の続きの行を実行して終わっても、A の配下から探す
 #[test]
 fn test_choice_before_mid_call_routes_to_emitter() {
     assert_choice_jumps(
@@ -337,7 +335,7 @@ fn test_choice_before_mid_call_routes_to_emitter() {
     );
 }
 
-/// 2.3・2.7: 呼ばれた側 B が出した選択肢は、A に戻って A が（自分のローカルシーンを呼んでから）終わっても
+/// 呼ばれた側 B が出した選択肢は、A に戻って A が（自分のローカルシーンを呼んでから）終わっても
 /// B の配下から探し、B の配下に無ければ（A の配下にあっても）グローバルシーンを探す
 #[test]
 fn test_choice_from_callee_routes_to_callee() {
@@ -351,7 +349,7 @@ fn test_choice_from_callee_routes_to_callee() {
     );
 }
 
-/// 2.4: 1 つの応答に A と、A が途中の Call で呼んだ B が同じジャンプ先名で出した選択肢があるとき、どちらを選んでも出したシーンの
+/// 1 つの応答に A と、A が途中の Call で呼んだ B が同じジャンプ先名で出した選択肢があるとき、どちらを選んでも出したシーンの
 /// 配下から探す
 #[test]
 fn test_choices_from_both_scenes_in_one_response() {
@@ -365,7 +363,7 @@ fn test_choices_from_both_scenes_in_one_response() {
     );
 }
 
-/// 2.5: A が末尾の Call で B へ移り、B が出した選択肢は B の配下から探す
+/// A が末尾の Call で B へ移り、B が出した選択肢は B の配下から探す
 #[test]
 fn test_choice_after_tail_call_routes_to_callee() {
     assert_choice_jumps(
@@ -375,7 +373,7 @@ fn test_choice_after_tail_call_routes_to_callee() {
     );
 }
 
-/// 2.6: 別のグローバルシーンへの途中の Call を含まないシーンの選択肢は、`\q` に出したシーンが加わり、
+/// 別のグローバルシーンへの途中の Call を含まないシーンの選択肢は、`\q` に出したシーンが加わり、
 /// ジャンプ先は現行どおり（出したシーンの配下、無ければグローバルシーン）
 #[test]
 fn test_choice_without_mid_call_carries_scope() {
@@ -389,7 +387,7 @@ fn test_choice_without_mid_call_carries_scope() {
     );
 }
 
-/// 2.8: 呼ばれた側 B が選択肢を出した後に `＞チェイントーク` で中断し、中断中に選ばれても B の配下から探す
+/// 呼ばれた側 B が選択肢を出した後に `＞チェイントーク` で中断し、中断中に選ばれても B の配下から探す
 #[test]
 fn test_choice_during_chain_talk_suspension_routes_to_callee() {
     assert_choice_jumps(
@@ -399,7 +397,7 @@ fn test_choice_during_chain_talk_suspension_routes_to_callee() {
     );
 }
 
-/// 3.2: 式の関数呼び出しが 5 段目で別のグローバルシーン B を実行した後も、B が出した選択肢は B の配下から、
+/// 式の関数呼び出しが 5 段目で別のグローバルシーン B を実行した後も、B が出した選択肢は B の配下から、
 /// A が出した選択肢は A の配下から探す
 #[test]
 fn test_choices_after_expr_fn_global_scene_route_to_emitters() {
@@ -413,7 +411,7 @@ fn test_choices_after_expr_fn_global_scene_route_to_emitters() {
     );
 }
 
-/// 2.9: Reference2 が無い、または既知のグローバルシーン名でない選択は、最後にシーン文脈となったグローバル
+/// Reference2 が無い、または既知のグローバルシーン名でない選択は、最後にシーン文脈となったグローバル
 /// シーンの配下から探す。OnCsAfterMid では途中の Call の先（後選Ｂ）が最後にシーン文脈となっている
 #[test]
 fn test_choice_without_known_scope_falls_back_to_last_global_scene() {
@@ -424,7 +422,7 @@ fn test_choice_without_known_scope_falls_back_to_last_global_scene() {
     }
 }
 
-/// 2.7: 明示的な `＊OnChoiceSelectEx` シーンは Reference2 があっても優先される。見つからない選択 ID は
+/// 明示的な `＊OnChoiceSelectEx` シーンは Reference2 があっても優先される。見つからない選択 ID は
 /// 現行どおり 204（話すことが無い）
 #[test]
 fn test_choice_routing_order_unchanged() {
@@ -446,8 +444,8 @@ fn test_choice_routing_order_unchanged() {
 }
 
 // ---------------------------------------------------------------------------
-// 失敗した Call（tasks 4.3）
-// 辞書: dic/failed_call.pasta。失敗表記が Call 行の位置に出て、ログの警告が design.md の
+// 失敗した Call
+// 辞書: dic/failed_call.pasta。失敗表記が Call 行の位置に出て、ログの警告が
 // DynamicCallKey の表（と ActCall の「見つからない」）の文言・件数どおりで、途中の Call の後は
 // 呼び出し元の文脈（＠失話題：元）で続く。
 // ---------------------------------------------------------------------------
@@ -473,7 +471,7 @@ fn assert_failed_call(event_id: &str, expected: &str, warnings: &[&str]) {
     assert_eq!(lua_warning_messages(&log), warnings, "{event_id}:\n{log}");
 }
 
-/// 5.1–5.4・5.2・5.11: `＞＄未代入` は検索せず（`nil` で始まるローカルシーン・関数・グローバルシーンを
+/// `＞＄未代入` は検索せず（`nil` で始まるローカルシーン・関数・グローバルシーンを
 /// 呼ばない）、変数のパスを含む警告 1 件と失敗表記を出し、次の行を呼び出し元で解決する
 #[test]
 fn test_failed_call_undefined_variable() {
@@ -484,7 +482,7 @@ fn test_failed_call_undefined_variable() {
     );
 }
 
-/// 5.1・5.3・5.5: `＞＠値なし（）` は関数の表記を含む警告 1 件と失敗表記
+/// `＞＠値なし（）` は関数の表記を含む警告 1 件と失敗表記
 #[test]
 fn test_failed_call_function_returning_nothing() {
     assert_failed_call(
@@ -494,7 +492,7 @@ fn test_failed_call_function_returning_nothing() {
     );
 }
 
-/// 5.6（expr-nil-coercion 5.3）: `＞＄未代入＆「x」` は連結の nil を空文字列とみなした結果 `x` を探し、
+/// `＞＄未代入＆「x」` は連結の nil を空文字列とみなした結果 `x` を探し、
 /// 見つからないので「見つからない」の失敗表記と警告 1 件を出し、次の行を呼び出し元で解決する
 #[test]
 fn test_failed_call_concat_with_nil_operand() {
@@ -505,13 +503,13 @@ fn test_failed_call_concat_with_nil_operand() {
     );
 }
 
-/// 5.7: `＞「nil」` は文字列 `nil` を検索キーにして通常どおり検索する（警告なし）
+/// `＞「nil」` は文字列 `nil` を検索キーにして通常どおり検索する（警告なし）
 #[test]
 fn test_call_string_nil_is_searched() {
     assert_failed_call("OnFcNilStrMid", r"\p[0]前nil先後\e", &[]);
 }
 
-/// 6.3・6.6: 空文字列（変数と式）は検索せず、それぞれ警告 1 件と失敗表記
+/// 空文字列（変数と式）は検索せず、それぞれ警告 1 件と失敗表記
 #[test]
 fn test_failed_call_empty_string() {
     assert_failed_call(
@@ -524,7 +522,7 @@ fn test_failed_call_empty_string() {
     );
 }
 
-/// 6.3・6.6: 真偽値（変数と関数）は検索せず、それぞれ型名を含む警告 1 件と失敗表記
+/// 真偽値（変数と関数）は検索せず、それぞれ型名を含む警告 1 件と失敗表記
 #[test]
 fn test_failed_call_boolean() {
     assert_failed_call(
@@ -537,7 +535,7 @@ fn test_failed_call_boolean() {
     );
 }
 
-/// 5.9: 引数リスト付きでも引数の式は書いた順に評価され、Call だけを行わない。失敗表記はキーの評価の
+/// 引数リスト付きでも引数の式は書いた順に評価され、Call だけを行わない。失敗表記はキーの評価の
 /// 時点（引数の式が積む出力より前）に出る
 #[test]
 fn test_failed_call_with_argument_list() {
@@ -548,7 +546,7 @@ fn test_failed_call_with_argument_list() {
     );
 }
 
-/// 5.8: 値が nil の動的コールが末尾の Call（ローカルシーンの最後の行・グローバルシーンの最後の行）でも
+/// 値が nil の動的コールが末尾の Call（ローカルシーンの最後の行・グローバルシーンの最後の行）でも
 /// エラーにせず、ローカルシーンの後は呼び出し元の続きを実行し、シーンを通常どおり終える
 #[test]
 fn test_failed_tail_call() {
@@ -562,7 +560,7 @@ fn test_failed_tail_call() {
     );
 }
 
-/// 4.6: 存在しないシーンへの静的と動的の Call は、見つからない名前を含む失敗表記と警告 1 件ずつを出し、
+/// 存在しないシーンへの静的と動的の Call は、見つからない名前を含む失敗表記と警告 1 件ずつを出し、
 /// 次の行を呼び出し元で解決する
 #[test]
 fn test_failed_call_scene_not_found() {
@@ -576,7 +574,7 @@ fn test_failed_call_scene_not_found() {
     );
 }
 
-/// failure-output-unification 4.5: 出力が失敗表記だけのシーンも、空の出力（204）にせず 200 で返す
+/// 出力が失敗表記だけのシーンも、空の出力（204）にせず 200 で返す
 #[test]
 fn test_failure_notation_only_scene_responds() {
     let (values, log) = run_with_extra_dic(
@@ -595,7 +593,7 @@ fn test_failure_notation_only_scene_responds() {
 }
 
 // ---------------------------------------------------------------------------
-// 式の中の nil（expr-nil-coercion tasks 3.2）
+// 式の中の nil
 // 辞書: dic/expr_nil.pasta。算術の nil は 0、連結の nil は空文字列として、作例・再起動・Call の
 // ターゲットを SHIORI 経由で確かめる。演算子の無いターゲット（変数 1 つ・関数呼び出し 1 つ）は不変。
 // ---------------------------------------------------------------------------
@@ -606,7 +604,7 @@ fn talk_chance(time: &str) -> String {
     format!("ID: OnSecondChange\r\nStatus: idle\r\nReference0: 1\r\nX-Pasta-Time: {time}")
 }
 
-/// 6.5: 入門ガイドの回数の作例（`＄＊回数＝＄＊回数＋１`、初期化行も Lua も無し）が、OnTalk の
+/// 入門ガイドの回数の作例（`＄＊回数＝＄＊回数＋１`、初期化行も Lua も無し）が、OnTalk の
 /// 機会の 1 回目に 1、2 回目に 2 と話し、ログに警告が無い
 #[test]
 fn test_counter_example_counts_from_one_without_warning() {
@@ -627,7 +625,7 @@ fn test_counter_example_counts_from_one_without_warning() {
     assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
 }
 
-/// 1.7: 同じフォルダで読み込み → 2 回話す → 破棄（保存）→ 再読み込み → 話すで、保存された値から
+/// 同じフォルダで読み込み → 2 回話す → 破棄（保存）→ 再読み込み → 話すで、保存された値から
 /// 数え続けて 3 と話す
 #[test]
 fn test_counter_continues_after_restart() {
@@ -650,13 +648,13 @@ fn test_counter_continues_after_restart() {
     assert_eq!(values, ["", r"\p[0]この話をするのは3回目ですね\e"]);
 }
 
-/// 5.3: `＞＄時間帯＆「の挨拶」`（`＄時間帯` は未代入）は連結の結果 `の挨拶` を探して `＊の挨拶` を呼ぶ
+/// `＞＄時間帯＆「の挨拶」`（`＄時間帯` は未代入）は連結の結果 `の挨拶` を探して `＊の挨拶` を呼ぶ
 #[test]
 fn test_call_concat_target_with_nil_operand_searches_result() {
     assert_failed_call("OnEnConcatTarget", r"\p[0]前挨拶後\e", &[]);
 }
 
-/// 5.4: `＞＄未代入＆＄未代入２` は連結の結果が空文字列なので、従来どおり空文字列の失敗表記と警告 1 件
+/// `＞＄未代入＆＄未代入２` は連結の結果が空文字列なので、空文字列の失敗表記と警告 1 件
 #[test]
 fn test_call_concat_target_empty_result_fails_as_empty_string() {
     assert_failed_call(
@@ -666,7 +664,7 @@ fn test_call_concat_target_empty_result_fails_as_empty_string() {
     );
 }
 
-/// 5.2: ターゲットが変数 1 つ（`＞＄未代入`）で nil なら、従来どおりの警告と失敗表記
+/// ターゲットが変数 1 つ（`＞＄未代入`）で nil なら、警告と失敗表記
 #[test]
 fn test_call_lone_variable_target_nil_unchanged() {
     assert_failed_call(
@@ -676,7 +674,7 @@ fn test_call_lone_variable_target_nil_unchanged() {
     );
 }
 
-/// 5.2: ターゲットが関数呼び出し 1 つ（`＞＠何も返さない（）`）で nil なら、従来どおりの警告と失敗表記
+/// ターゲットが関数呼び出し 1 つ（`＞＠何も返さない（）`）で nil なら、警告と失敗表記
 #[test]
 fn test_call_lone_function_target_nil_unchanged() {
     assert_failed_call(

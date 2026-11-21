@@ -1,4 +1,4 @@
-//! [`resolve_position`] の単体テスト（scene-play-event task 2.1・debug-mcp-runtime 4.2）。
+//! [`resolve_position`] の単体テスト。
 //!
 //! 位置はパスだけを受ける。相対はゴーストのフォルダーに結び、絶対（UNC を含む）は
 //! そのまま使う。`file:///…` や `%41` は URI として復号せず、パスの文字のまま扱う。
@@ -23,7 +23,7 @@ fn map_with_index(file: &str) -> SourceMap {
 }
 
 // ===========================================================================
-// scene-play-event task 2.1: `resolve_position`（requirements 2.2-2.7/5.3）。
+// `resolve_position`
 // ===========================================================================
 
 /// `base`（ghost/master 相当の絶対パス）配下の `dic/boot.pasta` に索引を張る。

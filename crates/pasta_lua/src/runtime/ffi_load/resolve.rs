@@ -15,9 +15,9 @@ const MAX_PATH: usize = 260;
 pub(super) enum Resolved {
     /// ゴーストのフォルダ（探索のフォルダ・基点・絶対パス）にあるファイル。
     Ghost { path: PathBuf, file_name: String },
-    /// 名前だけで、探索のフォルダのどこにも無い。OS の既定の探索に任せる（3.4）。
+    /// 名前だけで、探索のフォルダのどこにも無い。OS の既定の探索に任せる。
     System { file_name: String },
-    /// 区切り（またはドライブの `:`）のある名前で、そのファイルが無い（3.7）。
+    /// 区切り（またはドライブの `:`）のある名前で、そのファイルが無い。
     Missing,
 }
 
@@ -64,7 +64,7 @@ pub(super) fn resolve(name: &str, base_dir: &Path, search_dirs: &[PathBuf]) -> R
     }
 }
 
-/// 絶対パスはそのまま、それ以外は基点の後ろに `\` と名前を文字列としてつなぐ（3.5・3.6）。
+/// 絶対パスはそのまま、それ以外は基点の後ろに `\` と名前を文字列としてつなぐ。
 ///
 /// `Path::join` は `\foo`・`C:foo` で基点を捨てるので使わない。
 fn join_to_base(name: &str, base_dir: &Path) -> PathBuf {
@@ -78,7 +78,7 @@ fn join_to_base(name: &str, base_dir: &Path) -> PathBuf {
     PathBuf::from(s)
 }
 
-/// 最後の部分に `.` が無ければ `.dll` を足す（3.1）。
+/// 最後の部分に `.` が無ければ `.dll` を足す。
 pub(super) fn with_extension_rule(name: &str) -> String {
     let last = name.rsplit(['/', '\\']).next().unwrap_or(name);
     if last.contains('.') {
@@ -88,7 +88,7 @@ pub(super) fn with_extension_rule(name: &str) -> String {
     }
 }
 
-/// ファイル名を ANSI のバイト列にする。往復で一致しなければ None（2.8）。
+/// ファイル名を ANSI のバイト列にする。往復で一致しなければ None。
 ///
 /// 往復で比べるので、似た文字への黙った置き換え（best-fit）も表せない扱いになる。
 pub(super) fn ansi_file_name(file_name: &str) -> Option<Vec<u8>> {
@@ -100,7 +100,7 @@ pub(super) fn ansi_file_name(file_name: &str) -> Option<Vec<u8>> {
 /// LoadLibraryExW に渡す NUL 終端の UTF-16。260 以上なら `\\?\` を付ける。
 ///
 /// UNC（`\\server\share`）は `\\?\UNC\server\share` の形にする。既に `\\?\`・`\\.\` で
-/// 始まるものはそのまま。この形は読むときにだけ使い、文言・ログには出さない（2.7）。
+/// 始まるものはそのまま。この形は読むときにだけ使い、文言・ログには出さない。
 pub(super) fn load_path_form(path: &Path) -> Vec<u16> {
     let wide: Vec<u16> = path.as_os_str().encode_wide().collect();
     let w = |s: &str| s.encode_utf16().collect::<Vec<u16>>();

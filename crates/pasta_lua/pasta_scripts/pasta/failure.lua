@@ -6,7 +6,7 @@
 
 local FAILURE = {}
 
---- 種類の名前の表（失敗表記の【】の先頭に出す。後続 spec は自分の名前を足す）
+--- 種類の名前の表（失敗表記の【】の先頭に出す）
 ---@type table<string, string>
 FAILURE.LABEL = {
     UNDEFINED_VAR      = "値の無い変数",
@@ -127,7 +127,7 @@ function FAILURE.value_of(v)
 end
 
 ---@class FailureRecord
----@field label string        種類の名前（FAILURE.LABEL の値。後続 spec は自分の名前を足す）
+---@field label string        種類の名前（FAILURE.LABEL の値）
 ---@field subject string|nil  対象（辞書の書き方に変換済み。無ければ説明を対象の位置に出す）
 ---@field detail string|nil   説明（値なし・空文字列・型の名前・値）
 ---@field warning string|nil  ログの警告文（現行の文言のまま。nil ならログを出さない）

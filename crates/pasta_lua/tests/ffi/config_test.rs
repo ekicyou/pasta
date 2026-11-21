@@ -1,10 +1,10 @@
-//! `[loader] ffi` の読み取りと FFI を開く・開かないの確かめ（要件 1.x・9.7）。
+//! `[loader] ffi` の読み取りと FFI を開く・開かないの確かめ。
 
 use pasta_lua::PastaLoader;
 
 use crate::dll_fixture::{FFI_TOML, Which, lock, make_ghost, put_dlls};
 
-/// 煙のテスト（4.1）: `ffi = true` のゴーストでは `ffi.load("foo")` が探索のフォルダの DLL を返し、
+/// 煙のテスト: `ffi = true` のゴーストでは `ffi.load("foo")` が探索のフォルダの DLL を返し、
 /// `ffi = false` では `ffi` が `nil` のまま。
 #[test]
 fn ffi_load_smoke_reads_dll_from_search_folder() {
@@ -27,7 +27,7 @@ fn ffi_load_smoke_reads_dll_from_search_folder() {
         .eval()
         .expect("ffi.load(\"foo\") が失敗した");
     assert_eq!(sum, 3);
-    // 引数なしの呼び出しは、元の ffi.load と同じ `got no value` の文言のまま（6.4）。
+    // 引数なしの呼び出しは、元の ffi.load と同じ `got no value` の文言のまま。
     let no_arg: String = runtime
         .lua()
         .load("local ok, e = pcall(ffi.load); return e")
@@ -61,7 +61,7 @@ fn ffi_closed_state(ghost: &std::path::Path) -> (String, bool) {
         .unwrap()
 }
 
-/// `ffi = false` と未記入（キーなし・`[loader]` の節なし）は同じで、FFI を開かない（1.1・1.3）。
+/// `ffi = false` と未記入（キーなし・`[loader]` の節なし）は同じで、FFI を開かない。
 /// 同じフォルダで pasta.toml だけを書き換えて比べる（失敗の文言は探したパスを含むため）。
 #[test]
 fn ffi_false_and_unset_keep_ffi_closed() {
@@ -80,7 +80,7 @@ fn ffi_false_and_unset_keep_ffi_closed() {
 }
 
 /// `ffi = true` では `ffi == require "ffi"` で、`ffi.load` は pasta のラッパ（Lua の関数）に
-/// 置き換わる。元の `ffi.load` は C の関数（1.2）。
+/// 置き換わる。元の `ffi.load` は C の関数。
 #[test]
 fn ffi_true_opens_same_table_and_replaces_load() {
     let _guard = lock();
@@ -107,7 +107,7 @@ fn ffi_true_opens_same_table_and_replaces_load() {
     assert_eq!(orig_what, "C");
 }
 
-/// `ffi = true` では `ffi.load` 以外の FFI（`cdef`・`new`・`C`）が LuaJIT のまま使える（1.6）。
+/// `ffi = true` では `ffi.load` 以外の FFI（`cdef`・`new`・`C`）が LuaJIT のまま使える。
 #[test]
 fn ffi_true_keeps_other_ffi_features() {
     let _guard = lock();
@@ -131,7 +131,7 @@ fn ffi_true_keeps_other_ffi_features() {
     assert_eq!((x, y, pid), (7, 1.5, std::process::id()));
 }
 
-/// 真偽値でない `[loader] ffi` は pasta.toml の読み込みの失敗（1.4）。
+/// 真偽値でない `[loader] ffi` は pasta.toml の読み込みの失敗。
 #[test]
 fn ffi_non_bool_fails_to_load() {
     let _guard = lock();

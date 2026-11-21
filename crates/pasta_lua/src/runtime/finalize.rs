@@ -5,14 +5,6 @@
 //! 2. Collects word definitions from `pasta.word` Lua registry
 //! 3. Builds `SceneRegistry` and `WordDefRegistry` from collected data
 //! 4. Constructs `SearchContext` and registers it as `@pasta_search` module
-//!
-//! # Requirements Coverage
-//! - Req 1: Lua側シーン情報収集
-//! - Req 2: 単語辞書情報収集
-//! - Req 3: SearchContext構築・登録
-//! - Req 4: Rust-Lua連携メカニズム
-//! - Req 6: エラーハンドリング
-//! - Req 7: 将来拡張への備え
 
 use mlua::{Function, Lua, Result as LuaResult, Table, Value};
 use pasta_core::registry::{
@@ -35,21 +27,16 @@ pub struct WordCollectionEntry {
     pub actor_name: Option<String>,
 }
 
-/// Collect all scenes from Lua `pasta.scene` registry (Requirement 1.1, 1.2).
-///
-/// # Arguments
-/// * `lua` - Lua instance reference
+/// Collect all scenes from Lua `pasta.scene` registry.
 ///
 /// # Returns
 /// * `Ok(Vec<(global_name, local_name)>)` - Scene information list
 /// * `Err(e)` - Collection error
 pub fn collect_scenes(lua: &Lua) -> LuaResult<Vec<(String, String)>> {
-    // Get pasta.scene module
     // SAFETY(injection): Module name is a compile-time string literal, not derived from
     // external input. No injection vector exists. Error is propagated via `?`.
     let scene_module: Table = lua.load("return require('pasta.scene')").eval()?;
 
-    // Call get_all_scenes()
     let get_all_scenes: Function = scene_module.get("get_all_scenes")?;
     let registry: Table = get_all_scenes.call(())?;
 
@@ -59,7 +46,6 @@ pub fn collect_scenes(lua: &Lua) -> LuaResult<Vec<(String, String)>> {
     for pair in registry.pairs::<String, Table>() {
         let (global_name, scene_table) = pair?;
 
-        // Iterate over scene table entries
         for entry in scene_table.pairs::<String, Value>() {
             let (local_name, _value) = entry?;
 
@@ -72,7 +58,6 @@ pub fn collect_scenes(lua: &Lua) -> LuaResult<Vec<(String, String)>> {
         }
     }
 
-    // Log warning if registry is empty (Requirement 1.3)
     if scenes.is_empty() {
         tracing::warn!("Scene registry is empty");
     }
@@ -110,21 +95,16 @@ fn collect_word_entries(
     Ok(())
 }
 
-/// Collect all words from Lua `pasta.word` registry (Requirement 2.6).
-///
-/// # Arguments
-/// * `lua` - Lua instance reference
+/// Collect all words from Lua `pasta.word` registry.
 ///
 /// # Returns
 /// * `Ok(Vec<WordCollectionEntry>)` - Word information list
 /// * `Err(e)` - Collection error
 pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
-    // Get pasta.word module
     // SAFETY(injection): Module name is a compile-time string literal, not derived from
     // external input. No injection vector exists. Error is propagated via `?`.
     let word_module: Table = lua.load("return require('pasta.word')").eval()?;
 
-    // Call get_all_words()
     let get_all_words: Function = word_module.get("get_all_words")?;
     let all_words: Table = get_all_words.call(())?;
 
@@ -154,7 +134,7 @@ pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
     Ok(entries)
 }
 
-/// Lua の倉 `STORE.scene_attrs` からシーンの属性を集める（5.1・5.3）。
+/// Lua の倉 `STORE.scene_attrs` からシーンの属性を集める。
 ///
 /// キーは（グローバルの登録名, ローカルの関数名）。グローバル自身は `__start__`。
 /// 写せない項目は警告して飛ばす。倉は読むだけで書き換えない。
@@ -221,12 +201,12 @@ fn scene_attr_from_item(item: &Table) -> Option<SceneAttr> {
     }
 }
 
-/// Build SceneRegistry from collected scene data (Requirement 1.4, 5.3).
+/// Build SceneRegistry from collected scene data.
 ///
 /// Uses `register_global_raw` to preserve the full name with counter
 /// as collected from Lua runtime. This avoids double-counting.
 ///
-/// 登録順は（名前, 通し番号）の昇順に決める（2.9）。グローバルを並べ、
+/// 登録順は（名前, 通し番号）の昇順に決める。グローバルを並べ、
 /// 同じグローバルの中のローカルも同じ規則で並べる。`HashMap` の走査順や
 /// Lua の `pairs` の順には依存しない。
 ///
@@ -237,7 +217,6 @@ pub fn build_scene_registry(
 ) -> SceneRegistry {
     let mut registry = SceneRegistry::new();
 
-    // Group by global scene name
     let mut grouped: HashMap<&str, Vec<String>> = HashMap::new();
     for (global_name, local_name) in scenes {
         grouped
@@ -249,10 +228,8 @@ pub fn build_scene_registry(
     let mut globals: Vec<_> = grouped.into_iter().collect();
     globals.sort_by(|(a, _), (b, _)| scene_order_key(a).cmp(&scene_order_key(b)));
 
-    // Register scenes using raw method (full name already includes counter)
     for (global_name, mut local_names) in globals {
         local_names.sort_by(|a, b| scene_order_key(a).cmp(&scene_order_key(b)));
-        // Use register_global_raw to preserve the full name with counter
         let attrs_of = |local: &str| {
             attrs
                 .get(&(global_name.to_string(), local.to_string()))
@@ -279,13 +256,12 @@ fn scene_order_key(registered: &str) -> (&str, Option<usize>, &str) {
     (name, counter, registered)
 }
 
-/// Build WordDefRegistry from collected word data (Requirement 2.7, 5.3).
+/// Build WordDefRegistry from collected word data.
 fn build_word_registry(entries: &[WordCollectionEntry]) -> WordDefRegistry {
     let mut registry = WordDefRegistry::new();
 
     for entry in entries {
         if let Some(ref actor_name) = entry.actor_name {
-            // Actor words: register with actor scope
             registry.register_actor(actor_name, &entry.key, entry.values.clone());
         } else if entry.is_local {
             if let Some(ref scene_name) = entry.scene_name {
@@ -299,7 +275,7 @@ fn build_word_registry(entries: &[WordCollectionEntry]) -> WordDefRegistry {
     registry
 }
 
-/// Main finalize implementation (Requirement 4.2, 5.5, 6.4, 6.5).
+/// Main finalize implementation.
 ///
 /// Collects Lua-side registries and builds SearchContext.
 ///
@@ -311,7 +287,6 @@ fn build_word_registry(entries: &[WordCollectionEntry]) -> WordDefRegistry {
 /// * `Ok(true)` - Success
 /// * `Err(LuaError)` - Failure
 pub fn finalize_scene_impl(lua: &Lua, aliases: &SceneAliasTable) -> LuaResult<bool> {
-    // Collect scenes from Lua registry
     let scenes = collect_scenes(lua)?;
     tracing::debug!(
         scene_count = scenes.len(),
@@ -324,20 +299,17 @@ pub fn finalize_scene_impl(lua: &Lua, aliases: &SceneAliasTable) -> LuaResult<bo
         "Collected scene attributes from Lua store"
     );
 
-    // Collect words from Lua registry
     let word_entries = collect_words(lua)?;
     tracing::debug!(
         word_count = word_entries.len(),
         "Collected words from Lua registry"
     );
 
-    // Build registries
     let scene_registry = build_scene_registry(&scenes, &scene_attrs);
     let word_registry = build_word_registry(&word_entries);
 
-    // Register @pasta_search module (Requirement 3.3, 3.4, 5.4)
     let search = crate::search::register(lua, scene_registry, word_registry, aliases.clone())?;
-    // 番号の重なりは読み込みエラー（3.3）。トランスパイル時の部品の生成では見ない
+    // 番号の重なりは読み込みエラー。トランスパイル時の部品の生成では見ない
     search
         .borrow::<crate::search::SearchContext>()?
         .check_scene_orders()
@@ -352,7 +324,7 @@ pub fn finalize_scene_impl(lua: &Lua, aliases: &SceneAliasTable) -> LuaResult<bo
     Ok(true)
 }
 
-/// Register the finalize_scene function binding (Requirement 4.1, 4.3, 4.4, 5.6).
+/// Register the finalize_scene function binding.
 ///
 /// This function overwrites the stub `PASTA.finalize_scene()` with a Rust implementation.
 ///
@@ -365,14 +337,11 @@ pub fn finalize_scene_impl(lua: &Lua, aliases: &SceneAliasTable) -> LuaResult<bo
 /// * `Ok(())` - Success
 /// * `Err(e)` - Registration failed
 pub fn register_finalize_scene(lua: &Lua, aliases: SceneAliasTable) -> LuaResult<()> {
-    // Create Rust function
     let finalize_fn = lua.create_function(move |lua, ()| finalize_scene_impl(lua, &aliases))?;
 
-    // Get pasta module from package.loaded
     let package: Table = lua.globals().get("package")?;
     let loaded: Table = package.get("loaded")?;
 
-    // Get or require pasta module
     // SAFETY(injection): Module name is a compile-time string literal ("pasta"),
     // not derived from external input. No injection vector exists.
     let pasta_module: Table = if let Ok(module) = loaded.get::<Table>("pasta") {
@@ -381,17 +350,12 @@ pub fn register_finalize_scene(lua: &Lua, aliases: SceneAliasTable) -> LuaResult
         lua.load("return require('pasta')").eval()?
     };
 
-    // Overwrite finalize_scene with Rust function
     pasta_module.set("finalize_scene", finalize_fn)?;
 
     tracing::debug!("Registered finalize_scene Rust binding");
 
     Ok(())
 }
-
-// Future extension point (Requirement 7.1, 7.2, 7.3):
-// a `collect_actors()` for actor dictionary support can be added here, e.g.
-// `pub fn collect_actors(lua: &Lua) -> LuaResult<Vec<ActorCollectionEntry>>`.
 
 #[cfg(test)]
 mod tests {
@@ -413,7 +377,7 @@ mod tests {
             .collect()
     }
 
-    /// 2.9: 登録順は（名前, 通し番号）の昇順（番号は数値比較・番号なしが先）。
+    /// 登録順は（名前, 通し番号）の昇順（番号は数値比較・番号なしが先）。
     /// 走査順を変えても同じ登録順になる。
     #[test]
     fn test_build_scene_registry_orders_by_name_and_counter() {

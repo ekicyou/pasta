@@ -3,11 +3,6 @@
 //! This module defines all AST types corresponding to the grammar rules
 //! defined in grammar.pest. The types follow a 3-layer scope hierarchy:
 //! FileScope ⊃ GlobalSceneScope ⊃ LocalSceneScope.
-//!
-//! # Differences from pasta.pest
-//!
-//! - `ContinueAction`: Continuation lines now explicitly start with `：` or `:`
-//!   (pasta2.pest specification change from pasta.pest)
 
 mod action;
 mod attr_merge;

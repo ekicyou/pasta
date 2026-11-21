@@ -1,7 +1,7 @@
 //! validate サブコマンドの CLI 統合テスト
 //!
-//! ビルド済みのバイナリを起動し、終了コード・出力・読むだけであること（Req 1.6）・
-//! 見本のゴースト hello-pasta が誤り 0 で通ること（Req 9.5）を確かめる。
+//! ビルド済みのバイナリを起動し、終了コード・出力・読むだけであること・
+//! 見本のゴースト hello-pasta が誤り 0 で通ることを確かめる。
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -59,7 +59,7 @@ fn snapshot(root: &Path) -> Vec<(PathBuf, SystemTime)> {
     v
 }
 
-/// 誤りあり → 終了コード 1、問題の行のパスは ghost/master/ から始まる（Req 7.2・7.5）
+/// 誤りあり → 終了コード 1、問題の行のパスは ghost/master/ から始まる
 #[test]
 fn test_validate_errors_exit_one() {
     let (_t, target, master) = ghost();
@@ -73,7 +73,7 @@ fn test_validate_errors_exit_one() {
     assert!(stdout.contains("誤り 1 件"), "{stdout}");
 }
 
-/// 構文エラーも 1 件 1 行。標準出力のどの行も `ghost/master/…:行:列: 誤り|注意: ` か、案内・まとめの行（Req 7.1）
+/// 構文エラーも 1 件 1 行。標準出力のどの行も `ghost/master/…:行:列: 誤り|注意: ` か、案内・まとめの行
 #[test]
 fn test_validate_each_finding_is_one_line() {
     let (_t, target, master) = ghost();
@@ -113,7 +113,7 @@ fn test_validate_each_finding_is_one_line() {
     );
 }
 
-/// 読めない辞書があると飛び先の検査を省き、理由を案内の行に出す（1.1・1.4・1.5）
+/// 読めない辞書があると飛び先の検査を省き、理由を案内の行に出す
 #[test]
 fn test_validate_unreadable_dictionary_skips_references() {
     let (_t, target, master) = ghost();
@@ -131,7 +131,7 @@ fn test_validate_unreadable_dictionary_skips_references() {
     assert!(!stdout.contains("飛び先を検査しなかった"), "{stdout}");
 }
 
-/// 誤りなし（注意あり）→ 終了コード 0（Req 7.6）
+/// 誤りなし（注意あり）→ 終了コード 0
 #[test]
 fn test_validate_warnings_only_exit_zero() {
     let (_t, target, master) = ghost();
@@ -144,7 +144,7 @@ fn test_validate_warnings_only_exit_zero() {
     assert!(stdout.contains("誤り 0 件、注意 1 件"), "{stdout}");
 }
 
-/// フォルダが無い・ghost/master を直接渡す → 終了コード 1、理由を stderr に出し検査しない（Req 1.3）
+/// フォルダが無い・ghost/master を直接渡す → 終了コード 1、理由を stderr に出し検査しない
 #[test]
 fn test_validate_bad_folder_exit_one() {
     let (_t, target, master) = ghost();
@@ -156,7 +156,7 @@ fn test_validate_bad_folder_exit_one() {
     }
 }
 
-/// 知らないオプション → 終了コード 1、理由と使い方（Req 1.4）
+/// 知らないオプション → 終了コード 1、理由と使い方
 #[test]
 fn test_validate_unknown_option_exit_one() {
     let (_t, target, _master) = ghost();
@@ -170,7 +170,7 @@ fn test_validate_unknown_option_exit_one() {
     assert!(stderr.contains("Usage: pasta_check"), "{stderr}");
 }
 
-/// 出力は 2 回とも同じ。実行の前後でフォルダの一覧と更新時刻が変わらない（Req 1.6・7.3）
+/// 出力は 2 回とも同じ。実行の前後でフォルダの一覧と更新時刻が変わらない
 #[test]
 fn test_validate_stable_and_read_only() {
     let (t, target, master) = ghost();
@@ -191,7 +191,7 @@ fn test_validate_stable_and_read_only() {
     );
 }
 
-/// 中身の無い `dic/x.pasta/` → 終了コード 1、フォルダの 1 行（行・列なし）を出す（2.1・4.1）
+/// 中身の無い `dic/x.pasta/` → 終了コード 1、フォルダの 1 行（行・列なし）を出す
 #[test]
 fn test_validate_folder_matching_pattern_exit_one() {
     let (_t, target, master) = ghost();
@@ -207,16 +207,16 @@ fn test_validate_folder_matching_pattern_exit_one() {
         "ghost/master/dic/x.pasta: 誤り: 辞書のパターンに一致するフォルダです。pasta.dll はこのフォルダを辞書として読めず、ゴーストを読み込めません",
         "{stdout}"
     );
-    // フォルダは検査した辞書ファイルの数に入らない（2.5）
+    // フォルダは検査した辞書ファイルの数に入らない
     assert!(
         stdout.contains("検査した辞書ファイル 1 個: 誤り 1 件、注意 0 件"),
         "{stdout}"
     );
 }
 
-/// 見本のゴースト hello-pasta は誤り 0 件・注意 0 件で終了コード 0、読むだけ（Req 9.5・1.6・5.3）。
+/// 見本のゴースト hello-pasta は誤り 0 件・注意 0 件で終了コード 0、読むだけ。
 /// 11 段目の前方一致の候補（`11-jump.pasta` の `＞まかない` → `＊まかないナポリタン`・`＊まかないペペロンチーノ`・`＊まかない試作`）が注意にならないこと＝
-/// 前方一致の重なりを報告しないこと（5.4）も、これで守る
+/// 前方一致の重なりを報告しないことも、これで守る
 #[test]
 fn test_validate_hello_pasta_clean() {
     let target =
@@ -261,7 +261,7 @@ fn test_validate_characterize_file_collection() {
     );
 }
 
-/// 特性化（13.8）: 最上位の `profile` の飛ばしは大文字・小文字を区別する（`Profile` は飛ばさない）
+/// 特性化: 最上位の `profile` の飛ばしは大文字・小文字を区別する（`Profile` は飛ばさない）
 #[test]
 fn test_validate_characterize_profile_case_sensitive() {
     let (_t, target, master) = ghost();
@@ -284,7 +284,7 @@ fn test_validate_characterize_profile_case_sensitive() {
     );
 }
 
-/// 特性化（13.8）: `pasta_patterns` が届く形でも、最上位の `profile` の下は一覧に入らず検査されない
+/// 特性化: `pasta_patterns` が届く形でも、最上位の `profile` の下は一覧に入らず検査されない
 #[test]
 fn test_validate_characterize_top_profile_not_listed() {
     let (_t, target, master) = ghost();

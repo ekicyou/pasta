@@ -38,7 +38,7 @@ impl LuaTranspiler {
         Self { config }
     }
 
-    /// Transpile PastaFile to Lua code (MAJOR-2).
+    /// Transpile PastaFile to Lua code.
     ///
     /// Processes FileItems in document order, registering each global scene
     /// with its inherited attributes and generating code for actors and scenes.
@@ -74,7 +74,7 @@ impl LuaTranspiler {
     /// only the scene declarations (their `.pasta` lines need no shift). The shift is
     /// used here to place the `init_scene` line maps on the final `.lua` lines.
     ///
-    /// # Byte-invariance (Requirement 7.1)
+    /// # Byte-invariance
     ///
     /// The line recorder is always attached; `sink` is optional and only receives
     /// the same records. Normalization ([`normalize_output_with_shift`]) only trims
@@ -93,9 +93,8 @@ impl LuaTranspiler {
     ) -> Result<(TranspileContext, LineShift), TranspileError> {
         let mut context = TranspileContext::new();
 
-        // Use intermediate buffer for code generation
         let mut intermediate_buffer: Vec<u8> = Vec::new();
-        // シーンの行の対応（runtime-error-balloon 2.5）のために、行の記録をいつも受け取る。
+        // シーンの行の対応のために、行の記録をいつも受け取る。
         // 渡されたシンクへもそのまま流す。
         let mut recorder = LineRecorder {
             lines: BTreeMap::new(),
@@ -104,13 +103,11 @@ impl LuaTranspiler {
         let mut codegen = LuaCodeGenerator::new(&mut intermediate_buffer);
         codegen.set_source_map(&mut recorder);
 
-        // Write header
         codegen.write_header()?;
 
         // n 番目のグローバルシーンの属性（ファイル属性の受け継ぎと畳みの後）
         let mut scene_attrs = file.global_scene_attrs().into_iter();
 
-        // Process FileItems in document order (MAJOR-2)
         for item in &file.items {
             match item {
                 // 受け継ぎは global_scene_attrs が決める
@@ -129,8 +126,7 @@ impl LuaTranspiler {
         }
         let slots = codegen.take_line_map_slots();
 
-        // Convert intermediate buffer to UTF-8 string and normalize. The shift maps
-        // recorded pre-normalize lines onto final `.lua` lines for the line maps.
+        // The shift maps recorded pre-normalize lines onto final `.lua` lines for the line maps.
         let raw_output = String::from_utf8(intermediate_buffer)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         let (normalized_output, shift) = normalize_output_with_shift(&raw_output);
@@ -142,7 +138,6 @@ impl LuaTranspiler {
             &file.path.to_string_lossy(),
         )?;
 
-        // Write normalized output to final writer
         writer.write_all(normalized_output.as_bytes())?;
 
         Ok((context, shift))
@@ -184,7 +179,6 @@ impl LuaTranspiler {
             .unwrap_or(&scene.name);
         let (_, counter) = context.register_global_scene_named(declared_name, attrs);
 
-        // Register scene-level word definitions in WordDefRegistry
         let module_name = SceneRegistry::registered_name(declared_name, counter);
         for kw in &scene.words {
             for name in &kw.names {
@@ -197,7 +191,7 @@ impl LuaTranspiler {
         codegen.generate_global_scene(scene, declared_name, counter, attrs)?;
 
         // Register named local scenes (start scene is part of global)
-        // 通し番号は生成器と同じ local_scene_counters（照合用の名前ごと）を使う（2.12）。
+        // 通し番号は生成器と同じ local_scene_counters（照合用の名前ごと）を使う。
         let local_counters = local_scene_counters(&scene.local_scenes);
         for (local_scene, local_counter) in scene.local_scenes.iter().zip(local_counters) {
             if local_scene.name.is_some() {
@@ -257,7 +251,7 @@ impl SourceMapSink for LineRecorder<'_> {
 
 /// 整形の後の生成コードの各 `init_scene` の行の `)` の前に、そのシーンの行の対応
 /// `"<.pasta のファイル>|<.lua の行>:<.pasta の行>,..."`（1 行の文字列の定数）を埋める。
-/// 行は増やさない（runtime-error-balloon 2.5）。行は整形の後の最終の行。
+/// 行は増やさない。行は整形の後の最終の行。
 fn fill_line_maps(
     normalized: &str,
     shift: &LineShift,

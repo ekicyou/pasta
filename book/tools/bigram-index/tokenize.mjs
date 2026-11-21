@@ -1,25 +1,18 @@
-// 索引・クエリ共有の正準 bigram tokenize（単一ソース）。
+// 索引・クエリ共有の正準 bigram tokenize（単一ソース）。依存ゼロの純関数。
 //
-// 設計（design.md「Bigram Search」/ research.md D-1）:
-//   - 日本語（空白で区切られない CJK 等）は「隣接2文字を全位置で」=連続 bigram 化する。
-//     位置非依存で全 2-gram を索引・クエリの双方で同一規則生成することで、
-//     「任意の連続2文字以上の日本語語句」がその語を含むページにヒットする（要件 2.4）。
-//   - ASCII 語（英数）は従来どおり空白・ハイフン区切りの単語トークンを維持する。
-//   - 索引側ビルダ（build-index.mjs）とクエリ側でこの関数を共有し、
-//     規則不一致による検索破綻を防ぐ（design Invariants）。
+//   - 日本語（空白で区切られない CJK 等）は隣接 2 文字を全位置で bigram 化する。索引・クエリの双方で同一規則を使うので、
+//     連続 2 文字以上の日本語語句が、その語を含むページにヒットする。
+//   - ASCII 語（英数）は空白・ハイフン区切りの単語トークンを維持する。
 //
-// クエリ側の実態（本実装タスク 3.2 の確定方式）: ブラウザは ESM import 不可のため、
-// theme/head.hbs に本関数のミラー（ES5 化した同一規則のコピー）をインライン同梱し、
-// defineProperty フックで elasticlunr.tokenizer を差し替えている。
-// 本ファイルを変更した場合は head.hbs の BEGIN/END canonical bigram tokenize
-// ブロックも必ず同期すること（verify-search.mjs が規則一致を検証する）。
-// 依存ゼロの純関数とする。
+// ブラウザは ESM import 不可のため、theme/head.hbs に本関数のミラー（ES5 化した同一規則のコピー）を
+// インライン同梱し、defineProperty フックで elasticlunr.tokenizer を差し替えている。
+// 本ファイルを変更したら head.hbs の BEGIN/END canonical bigram tokenize ブロックも同期すること
+// （verify-search.mjs が規則一致を検証する）。
 
 // 正規化: 小文字化 + 全角英数を半角へ（NFKC は CJK 互換まで畳むため使わず、英数記号のみ畳む）。
 function normalize(text) {
   return text
     .toLowerCase()
-    // 全角英数字 → 半角
     .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
 }
 

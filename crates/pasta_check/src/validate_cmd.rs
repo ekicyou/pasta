@@ -1,6 +1,6 @@
 //! validate サブコマンドの殻: ゴーストのフォルダから一覧と中身を集め、検査の核を呼ぶ。
 //!
-//! 読むだけで、ファイルを作らない・書き換えない・消さない（Req 1.6）。
+//! 読むだけで、ファイルを作らない・書き換えない・消さない。
 
 use pasta_check::ghost_files::collect;
 use pasta_check::validate::{Report, derived_homeurl_finding, validate_ghost};
@@ -16,7 +16,7 @@ pub(crate) enum ValidateOutcome {
 }
 
 impl ValidateOutcome {
-    /// 誤りがあれば 1、無ければ 0（Req 7.5・7.6）
+    /// 誤りがあれば 1、無ければ 0
     pub(crate) fn exit_code(&self) -> i32 {
         match self {
             ValidateOutcome::HasErrors(_) => 1,
@@ -27,7 +27,7 @@ impl ValidateOutcome {
 
 /// --target のゴーストのフォルダを確かめて検査する。フォルダの誤りは Err（理由）
 ///
-/// `ghost/master` そのものを渡されても読み替えない（Req 1.3）。
+/// `ghost/master` そのものを渡されても読み替えない。
 pub(crate) fn run(target: &Path) -> Result<ValidateOutcome, String> {
     if !target.exists() {
         return Err(format!("{} がありません", target.display()));
@@ -58,7 +58,7 @@ pub(crate) fn run_on_master(master: &Path) -> Result<ValidateOutcome, String> {
 fn check_master(master: &Path) -> Result<Report, String> {
     let (input, files) = collect(master)?;
     let report = validate_ghost(&input, &files);
-    // 無い・読めない・フォルダの descript.txt は注意を出さず、結果も変えない（Req 8.4）
+    // 無い・読めない・フォルダの descript.txt は注意を出さず、結果も変えない
     let Some(f) = fs::read(master.join("descript.txt"))
         .ok()
         .and_then(|bytes| derived_homeurl_finding(&bytes))
@@ -139,17 +139,14 @@ mod tests {
     #[test]
     fn test_run_folder_errors() {
         let (_t, target, master) = ghost();
-        // 存在しない
         let e = run(&target.join("nope")).unwrap_err();
         assert!(e.contains("nope"), "{e}");
-        // ディレクトリでない
         let file = target.join("file.txt");
         fs::write(&file, "x").unwrap();
         assert!(run(&file).is_err());
         // ghost/master を含まない（ghost/master そのものも読み替えない）
         assert!(run(&master).is_err());
         assert!(run(&target.join("ghost")).is_err());
-        // ghost/master がファイル
         let other = target.join("other");
         fs::create_dir_all(other.join("ghost")).unwrap();
         fs::write(other.join("ghost/master"), "x").unwrap();
@@ -161,7 +158,7 @@ name,my-ghost
 homeurl,https://ekicyou.github.io/pasta/hello-pasta/
 ";
 
-    /// 派生ゴーストの homeurl が hello-pasta の置き場所を指すと注意だけで終了コード 0（Req 8.3・8.7）
+    /// 派生ゴーストの homeurl が hello-pasta の置き場所を指すと注意だけで終了コード 0
     #[test]
     fn test_run_derived_homeurl_warns_exit_0() {
         let (_t, target, master) = ghost();
@@ -181,7 +178,7 @@ homeurl,https://ekicyou.github.io/pasta/hello-pasta/
         assert_eq!(outcome.exit_code(), 0);
     }
 
-    /// hello-pasta 自身・descript.txt が無い・フォルダのときは注意を出さない（Req 8.4）
+    /// hello-pasta 自身・descript.txt が無い・フォルダのときは注意を出さない
     #[test]
     fn test_run_homeurl_no_warning_cases() {
         let (_t, target, master) = ghost();

@@ -1,7 +1,4 @@
 //! Integration tests for sakura script basic functionality.
-//!
-//! Covers: Lua module exposure, actor parameter reference,
-//! token decomposition, wait insertion rules, and error handling.
 
 use crate::common;
 
@@ -9,7 +6,7 @@ use common::{create_sakura_test_runtime, create_sakura_test_runtime_with_config}
 use pasta_lua::loader::TalkConfig;
 
 // ============================================
-// Requirement 1: Lua Module Exposure
+// Lua Module Exposure
 // ============================================
 
 #[test]
@@ -67,7 +64,7 @@ fn test_talk_to_script_with_custom_normal_wait() {
 }
 
 // ============================================
-// Requirement 2: Actor Parameter Reference
+// Actor Parameter Reference
 // ============================================
 
 #[test]
@@ -144,7 +141,7 @@ fn test_actor_non_numeric_fallback() {
 }
 
 // ============================================
-// Requirement 4: Token Decomposition
+// Token Decomposition
 // ============================================
 
 #[test]
@@ -195,7 +192,7 @@ fn test_complex_sakura_tag() {
 }
 
 // ============================================
-// Requirement 5: Wait Insertion Rules
+// Wait Insertion Rules
 // ============================================
 
 #[test]
@@ -208,7 +205,7 @@ fn test_consecutive_punctuation_max_wait() {
     };
     let lua = create_sakura_test_runtime_with_config(&config);
 
-    // Requirement 7.1: 」」」！？。、 -> 」」」！？。、\_w[950]
+    // 」」」！？。、 -> 」」」！？。、\_w[950]
     let result: String = lua
         .load(
             r#"
@@ -267,7 +264,7 @@ fn test_line_end_prohibited_no_wait() {
 }
 
 // ============================================
-// Requirement 6: Error Handling
+// Error Handling
 // ============================================
 
 #[test]

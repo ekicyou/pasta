@@ -1,4 +1,4 @@
-//! 検査の規則のテスト（4.x）
+//! 検査の規則のテスト
 
 use std::collections::BTreeMap;
 
@@ -132,7 +132,7 @@ fn module_name_uses_pasta_dll_path() {
     );
 }
 
-/// 大文字と小文字だけ違う名前も重なりとして比べる。報告には各ファイルの実際のモジュール名を使う（2.8）
+/// 大文字と小文字だけ違う名前も重なりとして比べる。報告には各ファイルの実際のモジュール名を使う
 #[test]
 fn case_only_difference_collides() {
     let found = module_findings(&["dic/A-b.pasta", "dic/a_b.pasta"]);
@@ -226,7 +226,7 @@ fn syntax_errors_in_two_files_both_reported_at_parser_position() {
         assert_eq!(f.path, path);
         assert_eq!(f.line, Some(line as u32));
         assert_eq!(f.column, Some(column as u32));
-        // 解析器の文言の位置と枠を外し、末尾の `= …` の説明だけを「構文エラー: 」の後ろに付ける（7.1 の 1 行）
+        // 解析器の文言の位置と枠を外し、末尾の `= …` の説明だけを「構文エラー: 」の後ろに付ける
         let (_, short) = message
             .rsplit_once("\n  = ")
             .expect("pest の説明の行がある");
@@ -236,7 +236,7 @@ fn syntax_errors_in_two_files_both_reported_at_parser_position() {
     }
 }
 
-/// 構文エラーは pest の短い説明だけの 1 行（7.1。design.md の例 `構文エラー: expected action_line` と同じ形）
+/// 構文エラーは pest の短い説明だけの 1 行（例: `構文エラー: expected action_line`）
 #[test]
 fn syntax_error_is_one_line_with_short_pest_description() {
     let found = syntax_findings(vec![(
@@ -252,7 +252,7 @@ fn syntax_error_is_one_line_with_short_pest_description() {
     );
 }
 
-/// 公開の syntax_finding は、ゴースト全体の検査の syntax の報告と同じ 1 件を作る（1.4・11.1）
+/// 公開の syntax_finding は、ゴースト全体の検査の syntax の報告と同じ 1 件を作る
 #[test]
 fn public_syntax_finding_matches_validate_ghost() {
     let src = "＊会話\n  ＠＠＠\n";
@@ -404,7 +404,7 @@ fn property_reference_allowed_forms_are_not_errors() {
 #[test]
 fn continuation_without_actor_is_error_per_local_scene() {
     let msg = "アクターの無い継続行です。前の行にアクター行が必要です";
-    // 開始のブロックの最初の行が継続行。列は字下げの後ろの `：` の位置（7.1。Call・選択肢と同じ）
+    // 開始のブロックの最初の行が継続行。列は字下げの後ろの `：` の位置（Call・選択肢と同じ）
     assert_eq!(
         transpile_findings("＊場面\n  ：続き\n"),
         vec![(
@@ -455,7 +455,7 @@ fn transpile_errors_found_in_every_file_and_occurrence() {
     );
 }
 
-/// `＆優先` の値が整数でなければ、pasta.dll と同じく誤り。位置は属性の位置（5.6）
+/// `＆優先` の値が整数でなければ、pasta.dll と同じく誤り。位置は属性の位置
 #[test]
 fn invalid_priority_is_error_at_attribute() {
     let err = |line, col, msg: &str| {
@@ -501,7 +501,7 @@ fn invalid_priority_is_error_at_attribute() {
     }
 }
 
-/// `＆重み`・`＆順番` の値の誤りと両方書きも、pasta.dll と同じく誤り。ファイル・行・値つき（6.1・4.2・4.4・3.2）
+/// `＆重み`・`＆順番` の値の誤りと両方書きも、pasta.dll と同じく誤り。ファイル・行・値つき
 #[test]
 fn invalid_weight_order_and_weight_with_order_are_errors() {
     let one = |kind, line, col, msg: &str| vec![(kind, Some(line), Some(col), msg.to_string())];
@@ -635,7 +635,7 @@ fn invalid_weight_order_and_weight_with_order_are_errors() {
     }
 }
 
-/// 数・番号・括弧・演算子の新しい誤りも、pasta.dll と同じ parse_str の位置と文で 1 つずつ出る（2.9・4.4）
+/// 数・番号・括弧・演算子の新しい誤りも、pasta.dll と同じ parse_str の位置と文で 1 つずつ出る
 #[test]
 fn number_and_limit_errors_match_parse_str() {
     let huge = format!("1{}", "0".repeat(399));

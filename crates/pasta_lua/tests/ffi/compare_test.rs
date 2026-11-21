@@ -1,12 +1,12 @@
-//! 元の `ffi.load` と並べた位置・文言・型の比べ（要件 6.x・9.6）。
+//! 元の `ffi.load` と並べた位置・文言・型の比べ。
 //!
 //! FFI だけを開いた素の VM（元の `ffi.load`）と、`ffi = true` のゴーストの VM に、同じチャンク名の
 //! 同じ Lua を流し、`pcall` の結果の型と文言をバイトで比べる。
 //! - `cannot load module '<名前>': <理由>` の文言は、`': ` までの前の部分（位置・名前）をそのまま比べ、
-//!   理由は元の側を ANSI から UTF-8 にしてから比べる（6.2・6.4）。
-//! - 数の引数は LuaJIT と同じく文字列にして読むので、理由は同じく UTF-8 にしてから比べる（6.2）。
-//! - 名前に ANSI に無い文字を含むときは、理由は pasta が自分で見つけた原因でよい（6.3）。前の部分は
-//!   同じで、名前が欠けないこと（6.5）を確かめる。
+//!   理由は元の側を ANSI から UTF-8 にしてから比べる。
+//! - 数の引数は LuaJIT と同じく文字列にして読むので、理由は同じく UTF-8 にしてから比べる。
+//! - 名前に ANSI に無い文字を含むときは、理由は pasta が自分で見つけた原因でよい。前の部分は
+//!   同じで、名前が欠けないことを確かめる。
 
 use mlua::{Lua, Value};
 use pasta_lua::PastaLoader;
@@ -21,9 +21,9 @@ const CHUNK: &str = "=compare";
 /// 理由の部分の比べ方。
 #[derive(Clone, Copy, Debug)]
 enum Reason {
-    /// 元の側を ANSI から UTF-8 にしてから同じ（6.2）。
+    /// 元の側を ANSI から UTF-8 にしてから同じ。
     Utf8,
-    /// pasta が自分で見つけた原因でよい（6.3）。
+    /// pasta が自分で見つけた原因でよい。
     Own,
 }
 
@@ -111,10 +111,10 @@ fn failures_match_original_ffi_load() {
     let orig = bare_ffi_lua();
 
     let cases: &[(&str, Reason)] = &[
-        // 名前だけで無いもの（OS の既定の探索へ渡る・3.4）。
+        // 名前だけで無いもの（OS の既定の探索へ渡る）。
         (r#""pasta_cmp_missing""#, Reason::Utf8),
         (r#""pasta_cmp_missing", true"#, Reason::Utf8),
-        // 相対パスで無いもの（pasta が自分で失敗させる・3.7）。
+        // 相対パスで無いもの（pasta が自分で失敗させる）。
         (r#""sub/pasta_cmp_missing.dll""#, Reason::Utf8),
         (r#""sub\\pasta_cmp_missing""#, Reason::Utf8),
         // 文字列でない引数。`nil` は元の ffi.load へそのまま渡る。数は LuaJIT と同じく文字列にして読む。
@@ -127,7 +127,7 @@ fn failures_match_original_ffi_load() {
         }
     }
 
-    // 位置の付き方: 関数の中からは呼び出し元の行、直接の pcall では位置なし（6.1・6.4）。
+    // 位置の付き方: 関数の中からは呼び出し元の行、直接の pcall では位置なし。
     let inner = compare(
         &orig,
         pasta,
@@ -149,13 +149,13 @@ fn failures_match_original_ffi_load() {
         "{outer}"
     );
 
-    // 引数なしは `got no value` のまま（4.1 の Implementation Notes）。
+    // 引数なしは `got no value` のまま。
     let no_arg = compare(&orig, pasta, &direct(""), Reason::Utf8);
     assert!(no_arg.ends_with("got no value)"), "{no_arg}");
     let nil_arg = compare(&orig, pasta, &direct("nil"), Reason::Utf8);
     assert!(nil_arg.ends_with("got nil)"), "{nil_arg}");
 
-    // ANSI に無い文字を含む名前: 前の部分（名前）は元の側と同じバイトで、pasta の文言では欠けない（6.5）。
+    // ANSI に無い文字を含む名前: 前の部分（名前）は元の側と同じバイトで、pasta の文言では欠けない。
     for name in [
         format!("pasta_cmp_{NON_ANSI_DIR_NAME}"),
         format!("{NON_ANSI_DIR_NAME}/pasta_cmp_missing.dll"),

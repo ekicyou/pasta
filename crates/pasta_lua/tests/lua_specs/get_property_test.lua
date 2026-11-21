@@ -1,6 +1,5 @@
 -- get_property メソッドのテスト
 -- SHIORI_ACT_IMPL.get_property() のバリデーション・タグ発行・多値返却を検証する
--- Requirements: 2.1, 3.1, 4.1, 4.2, 4.3, 5.4
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -44,7 +43,6 @@ end
 
 -- ============================================================================
 -- Group A: バリデーションテスト（コルーチン内）
--- Requirement 2.1
 -- ============================================================================
 
 describe("SHIORI_ACT_IMPL.get_property() - validation in coroutine", function()
@@ -100,7 +98,6 @@ end)
 
 -- ============================================================================
 -- Group B: メインスレッド呼び出しテスト
--- Requirement 2.1
 -- ============================================================================
 
 describe("SHIORI_ACT_IMPL.get_property() - main thread error", function()
@@ -116,7 +113,6 @@ end)
 
 -- ============================================================================
 -- Group C: タグ生成テスト（単一 string 引数）
--- Requirements: 3.1, 4.1
 -- ============================================================================
 
 describe("SHIORI_ACT_IMPL.get_property() - single string tag generation", function()
@@ -161,7 +157,6 @@ end)
 
 -- ============================================================================
 -- Group D: タグ生成テスト（table 引数・多値）
--- Requirements: 4.2, 4.3
 -- ============================================================================
 
 describe("SHIORI_ACT_IMPL.get_property() - table argument tag generation", function()
@@ -183,7 +178,6 @@ end)
 
 -- ============================================================================
 -- Group E: escape_tag_arg テスト（get_property 経由）
--- Requirement 4.3
 -- ============================================================================
 
 describe("SHIORI_ACT_IMPL.get_property() - escape_tag_arg via tag", function()
@@ -206,7 +200,6 @@ end)
 
 -- ============================================================================
 -- Group F: timeout デフォルトメッセージテスト
--- Requirement 5.4
 -- ============================================================================
 
 describe("SHIORI_ACT_IMPL.get_property() - default timeout_message", function()
@@ -246,8 +239,7 @@ describe("SHIORI_ACT_IMPL.get_property() - default timeout_message", function()
 end)
 
 -- ============================================================================
--- Group G: 時刻の飛びをまたぐ待ち時間（tutorial-ssp-gaps Task 8.3）
--- Requirements: 2.5, 7.3, 7.5
+-- Group G: 時刻の飛びをまたぐ待ち時間
 -- 締め切りと掃引の今は なめらかな時計（CLOCK.steady）で数える。os.time() は
 -- SSP の req.date.unix と同じ OS の時計なので、飛びに合わせて差し替える。
 -- ============================================================================
@@ -317,8 +309,7 @@ describe("SHIORI_ACT_IMPL.get_property() - 時刻の飛びをまたぐ待ち時�
 end)
 
 -- ============================================================================
--- Group H: 続きの中の get_property の期限（ponytail-lua-scripts Task 4.1）
--- Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+-- Group H: 続きの中の get_property の期限
 -- 期限は、そのシーンを再開した要求（チェイントークの区切り・コールバックの応答・
 -- 時間切れ）のなめらかな時計から数える。act.req は替えない。
 -- ============================================================================

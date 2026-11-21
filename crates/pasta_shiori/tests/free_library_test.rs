@@ -1,5 +1,4 @@
-//! ホストが `unload` を呼ばずに `FreeLibrary` で pasta.dll を外す場合の統合テスト（仕様 `ponytail-shiori`・
-//! 要件 1.2・1.3・1.5・1.8）。
+//! ホストが `unload` を呼ばずに `FreeLibrary` で pasta.dll を外す場合の統合テスト。
 //!
 //! 親の `#[test]` が、同じテストの実行ファイルを子のプロセスとして起こす（役は環境変数で指示）。子は
 //! `cargo test` が cdylib として作った `pasta.dll`（置き場は `dll_path` を参照）を
@@ -8,7 +7,7 @@
 //! 子のプロセスに分けるのは、テストの実行ファイルに静的にリンクした pasta とは別の、本物の DLL の
 //! 読み込みと解放をホストと同じ形で起こすため。
 //!
-//! 場合 A・B は直した後の期待（アクタースレッドが pasta.dll の参照を持つ・6.2）。場合 C は直す前と同じ。
+//! 場合 A・B は、アクタースレッドが pasta.dll の参照を持つ場合の期待。
 
 #![cfg(windows)]
 
@@ -134,7 +133,7 @@ fn child() {
         "A" => {
             assert!(drive_loadu(module, &dir), "loadu");
             let res = drive_get(module);
-            // 前提（設計の Open Questions 8）：ffi.load でシステムの DLL を読めること。
+            // 前提：ffi.load でシステムの DLL を読めること。
             assert!(res.contains("Value: ffi=true"), "ffi.load failed: {res}");
         }
         // 版 3：インスタンスを手放したまま（unload を呼ばずに）外す。
@@ -179,7 +178,7 @@ struct ChildResult {
 
 fn run_child(role: &str) -> ChildResult {
     let dll = dll_path();
-    // 前提（設計の Open Questions 8）：cargo test が統合テストの前に cdylib の pasta.dll を作ること。
+    // 前提：cargo test が統合テストの前に cdylib の pasta.dll を作ること。
     assert!(dll.is_file(), "pasta.dll not found: {}", dll.display());
     let ghost = copy_fixture_to_temp("free_library");
     let start = Instant::now();
@@ -218,7 +217,7 @@ fn run_child(role: &str) -> ChildResult {
     }
 }
 
-/// 場合 A：旧来の入口・C モジュールあり・unload を呼ばずに外す（1.3）。
+/// 場合 A：旧来の入口・C モジュールあり・unload を呼ばずに外す。
 /// アクタースレッドが参照を持つので、FreeLibrary は 1 減らすだけですぐ戻り、モジュールは外れない。
 #[test]
 fn case_a_legacy_with_c_module_free_without_unload() {
@@ -231,7 +230,7 @@ fn case_a_legacy_with_c_module_free_without_unload() {
     assert!(r.loaded, "case A: module must stay loaded");
 }
 
-/// 場合 B：版 3 のインスタンスを手放したまま外す（1.2・1.5）。モジュールは外れず、すぐ戻る。
+/// 場合 B：版 3 のインスタンスを手放したまま外す。モジュールは外れず、すぐ戻る。
 #[test]
 fn case_b_v3_abandoned_instance_free() {
     let r = run_child("B");
@@ -243,7 +242,7 @@ fn case_b_v3_abandoned_instance_free() {
     assert!(r.loaded, "case B: module must stay loaded");
 }
 
-/// 場合 C：loadu → unload → 外す（1.8）。参照を返し忘れて DLL を残さないこと（直す前も後も同じ）。
+/// 場合 C：loadu → unload → 外す。参照を返し忘れて DLL を残さないこと。
 #[test]
 fn case_c_balanced_unload_then_free() {
     let r = run_child("C");

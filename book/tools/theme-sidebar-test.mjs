@@ -1,13 +1,12 @@
 // theme-sidebar-test.mjs — 目次の持ち越しのスクリプト（book/theme/claudia.js の claudiaSidebarKeep）の jsdom ユニットテスト
-// （getting-started-story-guide タスク 2.4 / 要件 13.1, 13.2, 13.3, 13.4、design「SidebarKeeper」）。
 //
-// 観測する完了条件:
+// 観測すること:
 //   - 幅 620 以上 1080 未満・保存値 mdbook-sidebar が visible・目次が閉じている、のときだけ目次を開く。
 //     開く手順は book.js に任せる（目次の display を空に戻し、チェックボックスを入れて change を 1 回送る）。
 //   - 開くときのアニメーションを出さない（change の間は html に sidebar-resizing が付いていて、終わると外れている）。
 //   - 保存値が hidden・無し、幅が 620 未満・1080 以上、すでに開いている、のどれかなら何もしない。
 //   - 目次の要素が無いページでは保存値を読まない。保存値を読むと例外になるときは何もせず、例外を外へ出さない。
-//   - 保存値を書かない。外部への通信（fetch・XMLHttpRequest・WebSocket・EventSource・sendBeacon）をしない。
+//   - 保存値を書かない。外部への通信をしない。
 //     要素を足さず、消さない。
 //
 // テストの模型:
@@ -193,7 +192,7 @@ function run(js, { width = 800, stored = 'visible', open = false, checkbox = tru
   };
 }
 
-// どの場合にも共通の確かめ（設計の表の「全部の場合」）
+// どの場合にも共通の確かめ
 function checkCommon(id, r, { writes = 0 } = {}) {
   const bad = [];
   if (r.error !== null) bad.push(`例外: ${r.error.message}`);

@@ -1,5 +1,5 @@
 -- act:choice / act:choice_timeout トークン蓄積テスト
--- choice-definition-dsl Task 3.2: 選択肢トークン蓄積メソッド
+-- 選択肢トークン蓄積メソッド
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -87,7 +87,7 @@ describe("ACT - choice()", function()
 end)
 
 -- ============================================================================
--- call-execution-correctness 2.4: 選択肢トークンに出したシーンを載せる
+-- 選択肢トークンに出したシーンを載せる
 -- ============================================================================
 
 describe("ACT - choice() の scope", function()

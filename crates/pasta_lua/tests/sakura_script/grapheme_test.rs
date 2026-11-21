@@ -1,6 +1,6 @@
-//! talk-grapheme-clusters: 台詞の「1 文字」を書記素クラスタで扱うことのテスト。
+//! 台詞の「1 文字」を書記素クラスタで扱うことのテスト。
 //!
-//! 特性化テスト（要件 3.4・3.5・5.1・6.5）: 本体をクラスタ化する前の出力を固定する。
+//! 特性化テスト: 本体をクラスタ化する前の出力を固定する。
 //! 期待値は以後書き換えない。台詞には 1 コードポイントのクラスタだけを使い、
 //! `ﾞ`・`ﾟ` は前の字につながらない位置（単位の直後）にだけ置く。
 
@@ -117,7 +117,7 @@ fn test_mixed_talk_output_with_budoux_is_fixed() {
 
 const WOMAN_GESTURING_OK: &str = "\u{1F646}\u{200D}\u{2640}\u{FE0F}"; // 🙆‍♀️
 
-/// 要件 3.2・3.7: 複数コードポイントの項目は全体で当たり、その部品も単独で当たる。
+/// 複数コードポイントの項目は全体で当たり、その部品も単独で当たる。
 #[test]
 fn test_classify_multi_codepoint_item_and_its_parts() {
     let config = TalkConfig {
@@ -130,7 +130,7 @@ fn test_classify_multi_codepoint_item_and_its_parts() {
     assert_eq!(sets.classify("。"), TokenKind::Period);
 }
 
-/// 要件 3.3: 2 つ目以降のコードポイントでは種類を決めない。
+/// 2 つ目以降のコードポイントでは種類を決めない。
 #[test]
 fn test_classify_ignores_non_first_codepoints() {
     let config = TalkConfig {
@@ -141,7 +141,7 @@ fn test_classify_ignores_non_first_codepoints() {
     assert_eq!(sets.classify(WOMAN_GESTURING_OK), TokenKind::General);
 }
 
-/// 要件 3.6: 全体で外れたら、先頭のコードポイントで判定する（`❗️` = `❗` + U+FE0F）。
+/// 全体で外れたら、先頭のコードポイントで判定する（`❗️` = `❗` + U+FE0F）。
 #[test]
 fn test_classify_falls_back_to_first_codepoint() {
     let config = TalkConfig {
@@ -153,7 +153,7 @@ fn test_classify_falls_back_to_first_codepoint() {
 }
 
 // ============================================
-// 単位でない所を書記素クラスタ 1 つずつ切り出す（要件 1.1・1.3・1.4・1.5・5.3）
+// 単位でない所を書記素クラスタ 1 つずつ切り出す
 // ============================================
 
 fn tokenize(input: &str) -> Vec<(TokenKind, String)> {
@@ -215,7 +215,7 @@ fn test_halfwidth_kana_with_voiced_mark_is_one_token() {
 }
 
 // ============================================
-// budoux の改行と幅をクラスタで数える（要件 4.1〜4.8）
+// budoux の改行と幅をクラスタで数える
 // ============================================
 
 /// budoux を `widths` にしたアクターで `talk_to_script` を呼び、出力と終わりの列の字数を返す。
@@ -233,7 +233,7 @@ fn talk_budoux_width(widths: &str, input: &str) -> (String, i64) {
         .unwrap()
 }
 
-/// 要件 4.3・4.4: 組み合わせの絵文字は 1 つで幅 2。
+/// 組み合わせの絵文字は 1 つで幅 2。
 #[test]
 fn test_budoux_counts_emoji_cluster_as_width_two() {
     for emoji in [
@@ -248,14 +248,14 @@ fn test_budoux_counts_emoji_cluster_as_width_two() {
     }
 }
 
-/// 要件 4.5: 1 コードポイントのクラスタと `\r\n` の幅は今と同じ（曖昧な字は 2・制御文字は 0）。
+/// 1 コードポイントのクラスタと `\r\n` の幅は今と同じ（曖昧な字は 2・制御文字は 0）。
 #[test]
 fn test_budoux_single_codepoint_and_crlf_width_unchanged() {
     assert_eq!(talk_budoux_width("100", "a♀あ").1, 5);
     assert_eq!(talk_budoux_width("100", "あ\r\nい").1, 4);
 }
 
-/// 要件 4.1・4.2・4.8: 改行はクラスタの境界にだけ入り、クラスタの中身は続けて出る。
+/// 改行はクラスタの境界にだけ入り、クラスタの中身は続けて出る。
 #[test]
 fn test_budoux_breaks_only_at_cluster_boundaries() {
     let clusters = [
@@ -309,7 +309,7 @@ fn break_lines(input: &str, widths: &str) -> String {
         .unwrap()
 }
 
-/// 要件 4.1・4.2・6.4: `break_lines` で組み合わせの絵文字・結合文字を並べた台詞を狭い幅で割る。
+/// `break_lines` で組み合わせの絵文字・結合文字を並べた台詞を狭い幅で割る。
 #[test]
 fn test_break_lines_breaks_emoji_run_between_clusters() {
     // 絵文字だけが続くと budoux は区切らないので、語を挟む。
@@ -330,7 +330,7 @@ fn test_break_lines_breaks_emoji_run_between_clusters() {
     }
 }
 
-/// 要件 4.3・4.8・6.4: 縦書きのアクター（`budoux` と `budoux_newlines`）でも `🙆‍♀️` は続けて出て、幅 2 で数える。
+/// 縦書きのアクター（`budoux` と `budoux_newlines`）でも `🙆‍♀️` は続けて出て、幅 2 で数える。
 /// 語は「今日は」「🙆‍♀️いい」「天気」。`🙆‍♀️` を幅 4 と数えると「🙆‍♀️いい」の前で割れる。
 #[test]
 fn test_vertical_actor_keeps_emoji_cluster_together() {
@@ -347,7 +347,7 @@ fn test_vertical_actor_keeps_emoji_cluster_together() {
     assert_eq!(out, format!(r"今日は{WOMAN_GESTURING_OK}いい\n[150]天気"));
 }
 
-/// 要件 4.7（決定 9）: 単独の `\` に続く語で上限を超えたら `\` の前で割る。
+/// 単独の `\` に続く語で上限を超えたら `\` の前で割る。
 /// `\` ＋ U+0301 のクラスタは単独の `\` ではないので、その後ろで割る（`\\` にならない）。
 #[test]
 fn test_budoux_lone_backslash_guard_only_for_bare_backslash() {
@@ -358,7 +358,7 @@ fn test_budoux_lone_backslash_guard_only_for_bare_backslash() {
     );
 }
 
-/// 要件 4.1・4.7: `\` ＋ 結合文字のクラスタは割れずに 1 つで出て、`\\` を作らない。
+/// `\` ＋ 結合文字のクラスタは割れずに 1 つで出て、`\\` を作らない。
 #[test]
 fn test_budoux_backslash_with_combining_mark_stays_one_cluster() {
     let (out, _) = talk_budoux_width("4", "今日は\\\u{301}いい天気ですね");
@@ -366,7 +366,7 @@ fn test_budoux_backslash_with_combining_mark_stays_one_cluster() {
 }
 
 // ============================================
-// 退行テスト: talk_to_script の自動ウェイト（要件 6.1・6.2・6.3・6.6・5.3）
+// 退行テスト: talk_to_script の自動ウェイト
 // ============================================
 
 /// `config` で `talk_to_script` を呼び、出力を返す。
@@ -382,7 +382,7 @@ fn talk(config: &TalkConfig, input: &str) -> String {
         .unwrap()
 }
 
-/// 要件 2.3・2.4・6.1: 報告の 2 例。
+/// 報告の 2 例。
 #[test]
 fn test_reported_examples_wait_once_per_cluster() {
     let config = TalkConfig {
@@ -399,7 +399,7 @@ fn test_reported_examples_wait_once_per_cluster() {
     );
 }
 
-/// 要件 3.2・6.2: chars_period に書いた組み合わせの絵文字の後ろに句点のウェイト。
+/// chars_period に書いた組み合わせの絵文字の後ろに句点のウェイト。
 #[test]
 fn test_multi_codepoint_chars_period_gets_period_wait() {
     let config = TalkConfig {
@@ -410,7 +410,7 @@ fn test_multi_codepoint_chars_period_gets_period_wait() {
         talk(&config, &format!("あ{WOMAN_GESTURING_OK}い")),
         format!(r"あ\_w[50]{WOMAN_GESTURING_OK}\_w[950]い\_w[50]")
     );
-    // 要件 3.3: 部品（♀・U+FE0F）だけを書いても、クラスタは一般のまま 1 つのウェイト
+    // 部品（♀・U+FE0F）だけを書いても、クラスタは一般のまま 1 つのウェイト
     let config = TalkConfig {
         chars_period: "\u{2640}\u{FE0F}".to_string(),
         ..mixed_talk_config()
@@ -421,7 +421,7 @@ fn test_multi_codepoint_chars_period_gets_period_wait() {
     );
 }
 
-/// 要件 1.5・6.3・5.3: 肌色・国旗 2 つ・結合文字・半角カナ＋濁点の途中にウェイトが無い。
+/// 肌色・国旗 2 つ・結合文字・半角カナ＋濁点の途中にウェイトが無い。
 #[test]
 fn test_no_wait_inside_clusters() {
     for cluster in [
@@ -444,7 +444,7 @@ fn test_no_wait_inside_clusters() {
     );
 }
 
-/// 要件 1.3・1.4・2.6・6.6: Prepend の後ろの単位、単位の直後の結合文字、単独の `\` の守り。
+/// Prepend の後ろの単位、単位の直後の結合文字、単独の `\` の守り。
 #[test]
 fn test_unit_boundaries_and_lone_backslash_waits() {
     let config = mixed_talk_config();

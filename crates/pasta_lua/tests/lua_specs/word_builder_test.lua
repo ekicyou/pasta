@@ -1,5 +1,5 @@
 -- pasta.word（WordBuilder / resolve_value）単体テスト
--- review-improvement-loop cell 3.46 (G1): 既存 actor_word_test が触れていない
+-- 既存 actor_word_test が触れていない
 -- ビルダー境界（空 entry・複数 entry・チェーン）・create_local・エイリアス・
 -- resolve_value の全分岐を固定する
 --

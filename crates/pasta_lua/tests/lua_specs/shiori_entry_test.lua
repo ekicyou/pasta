@@ -1,6 +1,6 @@
 -- pasta.shiori.entry（SHIORI load/request/unload・GLOBAL.close_ghost）と
 -- EVENT.fire のコールバックルーティング統合・OnSecondChange sweep 分岐のテスト
--- review-improvement-loop cell 3.48 (G1): SHIORI プロトコル境界の公開挙動を固定する
+-- SHIORI プロトコル境界の公開挙動を固定する
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -85,7 +85,7 @@ local function with_balloon_warning(value, body)
     if not ok then error(err, 0) end
 end
 
---- 応答の形を検査する（6.2）: 先頭行がステータス行と完全に一致し、SHIORI/3.0 が 1 回だけ現れる
+--- 応答の形を検査する: 先頭行がステータス行と完全に一致し、SHIORI/3.0 が 1 回だけ現れる
 --- @param res string SHIORI 応答
 --- @param status_line string 期待するステータス行
 local function expect_status(res, status_line)
@@ -145,7 +145,7 @@ describe("SHIORI.request - xpcall 境界", function()
             error("entry boom\nsecond line detail")
         end
 
-        -- 表記を出さない設定では今のまま（6.5）
+        -- 表記を出さない設定では今のまま
         local res
         with_balloon_warning(false, function()
             res = ENTRY.request({ id = "OnEntryRequestError", method = "get", version = 30 })
@@ -231,7 +231,7 @@ describe("SHIORI.request - 止まるエラーの表記（表記を出す設定�
 end)
 
 -- ============================================================================
--- SHIORI.request - 止まるエラーの表記を場所ごとに確かめる（1.1, 1.2, 1.6, 1.8, 2.5, 3.3, 3.4, 3.6, 5.2, 6.1）
+-- SHIORI.request - 止まるエラーの表記を場所ごとに確かめる
 -- ============================================================================
 describe("SHIORI.request - 止まるエラーの表記の場所ごとの確かめ", function()
     --- イベントを SHIORI.request で送る
@@ -550,7 +550,7 @@ describe("EVENT.fire - コールバックルーティング統合", function()
 end)
 
 -- ============================================================================
--- SHIORI.request - コールバック・掃引の再開の回帰テスト（1.1–1.4, 1.7, 1.8, 2.2, 2.4, 2.6, 3.1, 3.2, 3.4）
+-- SHIORI.request - コールバック・掃引の再開の回帰テスト
 -- ============================================================================
 describe("SHIORI.request - コールバック・掃引の再開", function()
     --- シーン関数をコルーチンにして返すハンドラを登録する
@@ -658,7 +658,7 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
         register_scene("OnEntryReplace", function(act)
             scene_co = coroutine.running()
             act:get_property("name")
-            -- 台詞を出すので、戻った回に別のシーンの継続を置き換える (chain-talk-interrupt 2.5)
+            -- 台詞を出すので、戻った回に別のシーンの継続を置き換える
             act:talk(require("pasta.actor").get_or_create("さくら"), "前半")
             act:yield()
             act:raw_script("後半")
@@ -677,7 +677,7 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
         reset_state()
         register_scene("OnEntryFinish", function(act)
             act:get_property("name")
-            -- 台詞を出すので、戻った回に別のシーンの継続を空にする (chain-talk-interrupt 2.5)
+            -- 台詞を出すので、戻った回に別のシーンの継続を空にする
             act:talk(require("pasta.actor").get_or_create("さくら"), "終わり")
             return act:build()
         end)
@@ -774,7 +774,7 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
     end)
 
     -- ========================================================================
-    -- runtime-error-balloon 5: 時間切れの出口の表記（1.3, 1.4, 1.5, 4.2, 5.6, 6.1, 6.2）
+    -- 時間切れの出口の表記
     -- ========================================================================
 
     --- body を実行する間の警告ログを集める
@@ -895,7 +895,7 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
 end)
 
 -- ============================================================================
--- SHIORI.request - ハンドラの戻り値の応答化（4.1, 4.2, 4.4, 4.5, 4.6）
+-- SHIORI.request - ハンドラの戻り値の応答化
 -- ============================================================================
 describe("SHIORI.request - ハンドラの戻り値の応答化", function()
     --- 戻り値を返すハンドラを登録して SHIORI.request を通した応答を返す

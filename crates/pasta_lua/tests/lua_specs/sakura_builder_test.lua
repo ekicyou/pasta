@@ -23,7 +23,7 @@ local function setup()
 end
 
 -- ============================================================================
--- Requirement 6: sakura_builderモジュール（グループ化形式）
+-- sakura_builderモジュール（グループ化形式）
 -- ============================================================================
 
 describe("SAKURA_BUILDER - talk token", function()
@@ -322,7 +322,7 @@ describe("SAKURA_BUILDER - 複合シナリオ", function()
         expect(result:find("Hello")):toBeTruthy()
         expect(result:find("\\s%[5%]")):toBeTruthy()
         expect(result:find("\\_w%[100%]")):toBeTruthy()
-        -- 意図した変更(R3.1): A(spot0)→B(spot1) は各spot初テキストのため段落区切り改行を出さない
+        -- A(spot0)→B(spot1) は各spot初テキストのため段落区切り改行を出さない
         expect(result:find("\\n%[150%]")):toBeFalsy()
         expect(result:find("\\p%[1%]")):toBeTruthy()
         expect(result:find("Hi")):toBeTruthy()
@@ -354,7 +354,7 @@ describe("SAKURA_BUILDER - talk_to_script変換", function()
 end)
 
 -- ============================================================================
--- actor-spot-refactoring: spotトークン処理 (Task 2.1)
+-- spotトークン処理
 -- ============================================================================
 
 describe("SAKURA_BUILDER - spotトークン処理", function()
@@ -408,7 +408,7 @@ describe("SAKURA_BUILDER - spotトークン処理", function()
 end)
 
 -- ============================================================================
--- actor-spot-refactoring: clear_spotトークン処理 (Task 2.2)
+-- clear_spotトークン処理
 -- ============================================================================
 
 describe("SAKURA_BUILDER - clear_spotトークン処理", function()
@@ -466,7 +466,7 @@ describe("SAKURA_BUILDER - clear_spotトークン処理", function()
 end)
 
 -- ============================================================================
--- actor-spot-refactoring: actorトークンのactor切り替え検出 (Task 2.3)
+-- actorトークンのactor切り替え検出
 -- ============================================================================
 
 describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", function()
@@ -520,7 +520,7 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
     test("spot変更時に\\n[N]を出力する（Nはconfig.spot_newlines * 100）", function()
         local BUILDER, actors = setup()
 
-        -- 意図した変更(R2.7): 完全遅延方式では A→B の単純切替では改行ゼロ。
+        -- 完全遅延方式では A→B の単純切替では改行ゼロ。
         -- N 算出（spot_newlines * 100）を検証するため A→B→A 往復にし、
         -- 戻り手番(A2)の直前で \n[150] が1回だけ出ることを確認する。
         local tokens = {
@@ -590,7 +590,7 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
 end)
 
 -- ============================================================================
--- sakura-script-newline: 直前が全さくらスクリプトなら段落区切り改行を抑制
+-- 直前が全さくらスクリプトなら段落区切り改行を抑制
 -- 判定基準:「前回の段落区切り改行以降に一般文字列（talk）が1文字でも出力されたか」
 -- ============================================================================
 
@@ -693,9 +693,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 改行キャンセル", functi
     test("A→B の単純切替では各spot初テキストのため改行を出さない（意図した変更 R3.1）", function()
         local BUILDER, actors = setup()
 
-        -- 意図した変更(R3.1): 先出し版は離脱側(A)末尾に \n[150] を出していたが、
-        -- 完全遅延方式では A(spot0)・B(spot1) とも各 spot の初テキストであり、
-        -- 離脱側末尾のゴミ改行は排除される（改行ゼロ）。
+        -- 完全遅延方式では A(spot0)・B(spot1) とも各 spot の初テキストなので、離脱側末尾に改行は出ない（改行ゼロ）。
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
             { type = "spot", actor = actors.kero,   spot = 1 },
@@ -749,7 +747,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 改行キャンセル", functi
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
-        -- 意図した変更(R3.1/R5.2): A(spot0)・B(spot1) とも各 spot の初テキストのため
+        -- A(spot0)・B(spot1) とも各 spot の初テキストのため
         -- 段落区切り改行は出ない。先頭 surface 手番はもちろん、可視発話 A→B の間にも出ない。
         expect(count_break(result)):toBe(0)
         expect(result:find("A\\p%[1%]B")):toBeTruthy()
@@ -785,7 +783,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 改行キャンセル", functi
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
-        -- 意図した変更(R2.3/R3.1): 「こんにちは」は spot0 初テキスト、「またね」は spot1 初テキスト。
+        -- 「こんにちは」は spot0 初テキスト、「またね」は spot1 初テキスト。
         -- spot0 へ戻る surface のみの手番で pending がセットされるが、次の切替(→spot1)で破棄・再評価され、
         -- 切替先 spot1 は has-text 偽のため改行は出ない。往復のいずれの手番でも段落改行はゼロ。
         expect(count_break(result)):toBe(0)
@@ -831,9 +829,8 @@ describe("SAKURA_BUILDER - sakura-script-newline: 改行キャンセル", functi
 end)
 
 -- ============================================================================
--- sakura-script-newline: 完全遅延（Task 3.1）
+-- 完全遅延
 -- 会話終端・往復・スポット共有シナリオの完全遅延挙動を固定するテスト。
--- 要件 2.6, 2.7, 2.8, 3.1, 6.6, 7.3
 -- ============================================================================
 
 describe("SAKURA_BUILDER - sakura-script-newline: 完全遅延（Task 3.1）", function()
@@ -847,7 +844,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 完全遅延（Task 3.1）", f
     test("A→B 終了で段落区切り改行がゼロ（異なるスポット 0/1）", function()
         local BUILDER, actors = setup()
 
-        -- 意図した挙動(R2.6/R3.1): A(spot0)→B(spot1) で会話が終わる場合、
+        -- A(spot0)→B(spot1) で会話が終わる場合、
         -- 各 spot は初テキストであり、離脱側末尾のゴミ改行も出さない完全遅延方式では
         -- 出力全体に段落区切り改行 \n[ が1つも含まれない。
         local tokens = {
@@ -875,7 +872,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 完全遅延（Task 3.1）", f
     test("A→B→A 往復（異なるスポット）で戻り手番のみ改行", function()
         local BUILDER, actors = setup()
 
-        -- 意図した挙動(R2.7/R2.8): A1・B1 は各 spot 初テキストのため改行なし。
+        -- A1・B1 は各 spot 初テキストのため改行なし。
         -- A2 は has-text 済みの spot0 へ戻るため、その直前でのみ \n[150] が1回出る。
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
@@ -910,9 +907,8 @@ describe("SAKURA_BUILDER - sakura-script-newline: 完全遅延（Task 3.1）", f
     test("同一スポット共有の2アクター交代（spot 0 共有）でも切替直後に改行", function()
         local BUILDER, actors = setup()
 
-        -- 意図した挙動(R6.6/R3.1): 両アクターとも spot 0。A1 で spot0 に has-text が付き、
+        -- 両アクターとも spot 0。A1 で spot0 に has-text が付き、
         -- B へ切り替えると同一 spot0 を解決し pending が真になるため、B1 直前に \n[150] が出る。
-        -- 先出し版の「同一スポット抑制」は完全遅延方式では適用されない。
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
             { type = "spot", actor = actors.kero,   spot = 0 },
@@ -979,9 +975,9 @@ describe("SAKURA_BUILDER - sakura-script-newline: 完全遅延（Task 3.1）", f
 end)
 
 -- ============================================================================
--- sakura-script-newline: 保留破棄・フラッシュ位置・クリア系（Task 3.2）
+-- 保留破棄・フラッシュ位置・クリア系
 -- 完全遅延方式(S0–S7)の pending 破棄 / フラッシュ位置 / clear系リセット挙動を
--- 固定するテスト。要件 1.3, 2.2, 2.3, 3.3, 4.4, 4.6, 7.3
+-- 固定するテスト。
 -- ============================================================================
 
 describe("SAKURA_BUILDER - sakura-script-newline: 保留破棄・フラッシュ・クリア（Task 3.2）", function()
@@ -992,7 +988,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 保留破棄・フラッシュ
         return c
     end
 
-    -- 1. pending 破棄→再評価 (R2.3)
+    -- 1. pending 破棄→再評価
     test("has-text済みスポットへ surface のみで戻り次の切替が起きると保留が破棄され切替先で再評価される", function()
         local BUILDER, actors = setup()
 
@@ -1038,7 +1034,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 保留破棄・フラッシュ
         expect(count(result, "\\n%[150%]")):toBe(1)
     end)
 
-    -- 2. テキストなし終端の保留破棄 (R3.3)
+    -- 2. テキストなし終端の保留破棄
     test("has-text済みスポットへ surface/wait のみで戻り終端すると保留改行を出さず \\e で終わる", function()
         local BUILDER, actors = setup()
 
@@ -1072,7 +1068,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 保留破棄・フラッシュ
         expect(result:find("\\n%[")):toBeFalsy()
     end)
 
-    -- 3. フラッシュ位置 (R1.3)
+    -- 3. フラッシュ位置
     test("戻り手番の先頭に surface を挟むと \\n[N] は surface の後・talk の直前に出る", function()
         local BUILDER, actors = setup()
 
@@ -1108,7 +1104,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 保留破棄・フラッシュ
         expect(count(result, "\\n%[150%]")):toBe(1)
     end)
 
-    -- 4. 同一アクター継続グループでのフラッシュ (R2.2)
+    -- 4. 同一アクター継続グループでのフラッシュ
     test("切替グループが surface のみでも同一アクター後続グループの talk 直前でフラッシュされる", function()
         local BUILDER, actors = setup()
 
@@ -1148,7 +1144,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 保留破棄・フラッシュ
         expect(count(result, "\\p%[0%]")):toBe(2)
     end)
 
-    -- 5. clear_spot リセット (R4.4)
+    -- 5. clear_spot リセット
     test("has-text済み状態で clear_spot 後は以後の切替で保留が発生しない", function()
         local BUILDER, actors = setup()
 
@@ -1191,7 +1187,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 保留破棄・フラッシュ
         expect(result:find("\\p%[1%]B2")):toBeTruthy()
     end)
 
-    -- 6. \c で保留破棄＋has-text リセット (R4.6)
+    -- 6. \c で保留破棄＋has-text リセット
     test("\\c は保留改行を破棄し当該スポットの has-text を偽へリセットする", function()
         local BUILDER, actors = setup()
 
@@ -1268,7 +1264,7 @@ describe("SAKURA_BUILDER - sakura-script-newline: 保留破棄・フラッシュ
 end)
 
 -- ============================================================================
--- actor-spot-refactoring: 統合シナリオ (Task 4.4)
+-- 統合シナリオ
 -- ============================================================================
 
 describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構造）", function()
@@ -1314,7 +1310,7 @@ describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構�
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
         expect(result:find("\\p%[0%]Sakura speaks")):toBeTruthy()
-        -- 意図した変更(R3.1): A(spot0)→B(spot1) は各spot初テキストのため \n[150] を出さない
+        -- A(spot0)→B(spot1) は各spot初テキストのため \n[150] を出さない
         expect(result:find("\\p%[1%]Kero speaks")):toBeTruthy()
         expect(result:find("\\n%[150%]")):toBeFalsy()
     end)
@@ -1348,7 +1344,7 @@ describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構�
 end)
 
 -- ============================================================================
--- persist-spot-position: build()シグネチャ拡張テスト (Task 5.3, 5.4, 5.5)
+-- build()シグネチャ拡張テスト
 -- ============================================================================
 
 describe("SAKURA_BUILDER - persist-spot-position: 純粋関数性テスト (Task 5.3)", function()
@@ -1503,7 +1499,7 @@ describe("SAKURA_BUILDER - persist-spot-position: spotトークン処理 (Task 5
         local BUILDER, actors = setup()
 
         -- 前回のスポット状態を入力として渡す
-        -- 意図した変更(R2.7): 完全遅延方式では A→B の単純切替は改行ゼロになるため、
+        -- 完全遅延方式では A→B の単純切替は改行ゼロになるため、
         -- 引き継いだ spot 値による段落改行の観測を維持するには A→B→A 往復が必要。
         local input_spots = { ["さくら"] = 0, ["うにゅう"] = 1 }
         local tokens = {
@@ -1546,7 +1542,7 @@ describe("SAKURA_BUILDER - persist-spot-position: spotトークン処理 (Task 5
 end)
 
 -- ============================================================================
--- act-sakura-script-method: sakura_scriptトークン処理 (Task 4.3)
+-- sakura_scriptトークン処理
 -- ============================================================================
 
 describe("SAKURA_BUILDER - sakura_scriptトークン処理", function()
@@ -1609,7 +1605,7 @@ describe("SAKURA_BUILDER - sakura_scriptトークン処理", function()
 end)
 
 -- ============================================================================
--- choice-definition-dsl: choice/choice_timeoutトークン処理 (Task 4.1)
+-- choice/choice_timeoutトークン処理
 -- ============================================================================
 
 describe("SAKURA_BUILDER - choiceトークン処理", function()
@@ -1719,7 +1715,7 @@ describe("SAKURA_BUILDER - choiceトークン処理", function()
 end)
 
 -- ============================================================================
--- call-execution-correctness 2.4: 選択肢トークンの scope を \q の第 3 引数に出す
+-- 選択肢トークンの scope を \q の第 3 引数に出す
 -- ============================================================================
 
 describe("SAKURA_BUILDER - choiceトークンの scope（\\q 第 3 引数）", function()
@@ -1838,14 +1834,12 @@ describe("SAKURA_BUILDER - choice統合シナリオ", function()
 end)
 
 -- ============================================================================
--- sakura-builder-string-buffer: バッファ化検証 (Task 3.1)
--- 設計 Testing Strategy「Integration Tests」項2-3 / 要件 2.4, 3.4, 3.5, 4.1, 4.2
--- 既に Task 2.1 で実装済みの挙動（バッファ化）を
--- 実行パスで検証する追加テスト。
+-- バッファ化検証
+-- バッファ化した挙動を実行パスで検証する。
 -- ============================================================================
 
 describe("SAKURA_BUILDER - string-buffer: 空入力 (Task 3.1)", function()
-    -- 要件 3.4: 空の grouped_tokens に対しては \e のみを返す
+    -- 空の grouped_tokens に対しては \e のみを返す
     test("空の grouped_tokens で build() が \\e のみを返す", function()
         local BUILDER = setup()
 
@@ -1856,9 +1850,9 @@ describe("SAKURA_BUILDER - string-buffer: 空入力 (Task 3.1)", function()
 end)
 
 -- ============================================================================
--- actor-surface-restore: 現行出力の特性化（Task 1.1）
+-- 現行出力の特性化
 -- 外見復旧フック追加前の出力を完全一致で固定する。以下の構成はいずれも
--- 機能導入後もバイト等価でなければならない（要件 5.1, 5.2, 5.3, 5.4）。
+-- 機能導入後もバイト等価でなければならない。
 -- 複数ビルドに跨る会話は同一 actor_spots を連続する BUILDER.build に渡す。
 -- 一般文字列は句読点を含めずウェイトタグが挿入されない決定的な出力にする。
 -- ============================================================================
@@ -2269,9 +2263,8 @@ describe("SAKURA_BUILDER - actor-surface-restore: 着せ替え復旧の統合（
 end)
 
 -- ============================================================================
--- paragraph-break-tag-only-talk: 字のある talk の段落区切りの特性化（Task 1.2）
--- 本仕様で変えない部分（Requirement 3.1・3.3・4.3）を現行コードで固定する。
--- 戻り時の改行 1 つ・\c・clear_spot・終端での破棄・改行幅は sakura-script-newline の Task 3.1/3.2 の
+-- 字のある talk の段落区切りの特性化
+-- 戻り時の改行 1 つ・\c・clear_spot・終端での破棄・改行幅は
 -- 「完全遅延」「保留破棄・フラッシュ・クリア」の各テストが押さえている。
 -- ============================================================================
 
@@ -2297,7 +2290,7 @@ describe("SAKURA_BUILDER - paragraph-break-tag-only-talk: タグを含む字の�
 end)
 
 -- ============================================================================
--- paragraph-break-tag-only-talk: 字の無いトークンを段落区切りの状態から外す（Task 5.1）
+-- 字の無いトークンを段落区切りの状態から外す
 -- 既定設定（script_wait_normal=50 → 実効ウェイト 0）で句読点の無いテキストを使い、ウェイトを入れない。
 -- スポットは さくら=0・うにゅう=1 を明示する（スポット共有の復旧タグを出さない）。
 -- ============================================================================
@@ -2317,7 +2310,7 @@ describe("SAKURA_BUILDER - paragraph-break-tag-only-talk: 字の無いトーク�
         return { ["さくら"] = 0, ["うにゅう"] = 1 }
     end
 
-    -- 申し送りの最小例（6.1）
+    -- 申し送りの最小例
     test("4.1: タグだけの talk の後のアクターの初回の手番に改行を出さない（申し送り a）", function()
         local BUILDER, actors = setup()
         local a, b = actors.sakura, actors.kero
@@ -2343,7 +2336,7 @@ describe("SAKURA_BUILDER - paragraph-break-tag-only-talk: 字の無いトーク�
             "\\p[0]A1\\p[1]B1\\p[0]\\s[1000]\\![bind,腕,組み,1]\\p[1]\\n[150]B2\\p[0]\\n[150]A2\\e")
     end)
 
-    -- 字の境界（6.2）。共通の並び: さくら A1 → うにゅう X → さくら A2 → うにゅう B2。
+    -- 字の境界。共通の並び: さくら A1 → うにゅう X → さくら A2 → うにゅう B2。
     -- X が字を出すなら B2 の前に \n[150] が出る。X の出力は X の文字列そのまま（既定設定でウェイト 0）。
     local boundary_cases = {
         { "talk", "\\s[1000]", false, "1.2" },
@@ -2403,7 +2396,7 @@ describe("SAKURA_BUILDER - paragraph-break-tag-only-talk: 字の無いトーク�
         expect(result):toBe("\\p[0]A1\\p[1]B1\\p[0]\\n[150]\\_u[0x3042]\\e")
     end)
 
-    -- 保留中の改行（6.3）
+    -- 保留中の改行
     test("2.4: 字の無い talk と wait の後の字のある talk の直前に改行を出す", function()
         local BUILDER, actors = setup()
         local a, b = actors.sakura, actors.kero
@@ -2441,7 +2434,7 @@ describe("SAKURA_BUILDER - paragraph-break-tag-only-talk: 字の無いトーク�
 end)
 
 -- ============================================================================
--- choice-line-layout: 選択肢の行の配置
+-- 選択肢の行の配置
 -- 選択肢の前と、選択肢の後の台詞の前に出す行の区切りを完全一致で固定する。
 -- 既定設定（script_wait_normal=50 → 実効ウェイト 0）で句読点の無いテキストを使い、ウェイトを入れない。
 -- スポットは さくら=0・うにゅう=1 を明示する（スポット共有の復旧タグを出さない）。
@@ -2479,7 +2472,7 @@ describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置", functi
         expect(inline):toBe("\\p[0]どれ\\n\\q[はい,OnYes]\\n\\__q[OnNo]いいえ\\__q\\e")
     end)
 
-    -- 選択肢のトークンと、その出力（タグの中身は変えない。3.1）
+    -- 選択肢のトークンと、その出力（タグの中身は変えない）
     local function choice(display)
         return { type = "choice", display = display, target = display .. "先" }
     end
@@ -2680,7 +2673,7 @@ describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置", functi
     end)
 
     -- ------------------------------------------------------------------------
-    -- Task 2.3: 台詞に書いた \c を吹き出しの消去として数える（7.1〜7.4）
+    -- 台詞に書いた \c を吹き出しの消去として数える
     -- DSL の台詞の行に書いた \c は、テキストが \c だけの sakura_script になる。
     -- ------------------------------------------------------------------------
     local function script(actor, text)
@@ -2820,7 +2813,7 @@ describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置", functi
 end)
 
 -- ============================================================================
--- 選択肢の後の 2 か所の区切り（vertical-balloon-lines 5.1〜5.5・5.7）
+-- 選択肢の後の 2 か所の区切り
 -- ============================================================================
 
 describe("SAKURA_BUILDER - vertical-balloon-lines: after_choice_newlines", function()
@@ -2900,7 +2893,7 @@ describe("SAKURA_BUILDER - vertical-balloon-lines: after_choice_newlines", funct
 end)
 
 -- ============================================================================
--- 立ち位置の警告を未登録アクターで重ねない（failure-output-unification 5.4・6.3）
+-- 立ち位置の警告を未登録アクターで重ねない
 -- ============================================================================
 
 describe("SAKURA_BUILDER - 未登録アクターの actor_spots fallback", function()
@@ -2950,7 +2943,7 @@ describe("SAKURA_BUILDER - 未登録アクターの actor_spots fallback", funct
 end)
 
 -- ============================================================================
--- 吹き出しごとの列の持ち越し（vertical-balloon-lines 1.5・2.4・4.1〜4.5・4.8）
+-- 吹き出しごとの列の持ち越し
 -- 本物の @pasta_sakura_script を使う。終わりの列の状態はテスト用の columns_out で覗く
 -- ============================================================================
 
@@ -3151,7 +3144,7 @@ describe("SAKURA_BUILDER - vertical-balloon-lines: 列の持ち越し", function
 end)
 
 -- ============================================================================
--- 単独の `\` の直後の pasta の区切り（vertical-balloon-lines 1.2・決定 9）
+-- 単独の `\` の直後の pasta の区切り
 -- ============================================================================
 
 describe("SAKURA_BUILDER - vertical-balloon-lines: 単独の \\ の後の区切り", function()
@@ -3280,7 +3273,7 @@ describe("SAKURA_BUILDER - vertical-balloon-lines: 単独の \\ の後の区切�
 end)
 
 -- ============================================================================
--- 作例の照合・Rust との同値・区切りの不変条件（vertical-balloon-lines 7.1・7.3・決定 7・決定 8）
+-- 作例の照合・Rust との同値・区切りの不変条件
 -- 本物の @pasta_sakura_script を使う（lua_unittest_runner が登録する）
 -- ============================================================================
 
@@ -3476,7 +3469,7 @@ describe("SAKURA_BUILDER - vertical-balloon-lines: 作例・同値・不変条�
 end)
 
 -- ============================================================================
--- actor-display-style: 装いの出し入れの組み立て（Task 3.1）
+-- 装いの出し入れの組み立て
 -- ============================================================================
 
 describe("SAKURA_BUILDER - actor-display-style: 装いの出し入れ（Task 3.1）", function()
@@ -3619,10 +3612,10 @@ describe("SAKURA_BUILDER - actor-display-style: 装いの出し入れ（Task 3.1
             .. "\\p[0]\\f[default]\\n[150]P2"
             .. "\\p[0]\\f[default]" .. GAL .. "\\n[150]G1"
             .. "\\p[0]\\f[default]" .. OJI_FONT .. "\\n[150]O2\\e")
-        -- 6.2/6.3: 立ち絵の復旧タグは最初のぱすたの 1 回だけ
+        -- 立ち絵の復旧タグは最初のぱすたの 1 回だけ
         local _, surfaces = result:gsub("\\s%[", "")
         expect(surfaces):toBe(1)
-        -- 装いを抜くと、装いの無いゴーストの出力と同じ（6.1 の改行・6.2/6.3 の復旧は装いに左右されない）
+        -- 装いを抜くと、装いの無いゴーストの出力と同じ（改行・復旧タグは装いに左右されない）
         expect((result:gsub("\\f%[[^%]]*%]", ""))):toBe(run(nil, nil))
     end)
 

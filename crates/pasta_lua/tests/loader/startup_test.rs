@@ -17,7 +17,6 @@ fn test_load_minimal() {
     let temp = copy_fixture_to_temp("minimal");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // Verify runtime is usable
     let result = runtime.exec("return 1 + 1").unwrap();
     assert_eq!(result.as_i64(), Some(2));
 }
@@ -27,7 +26,6 @@ fn test_load_with_config() {
     let temp = copy_fixture_to_temp("with_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // Verify runtime is usable
     let result = runtime.exec("return 'hello'").unwrap();
     assert_eq!(value_as_str(&result).as_deref(), Some("hello"));
 }
@@ -37,7 +35,6 @@ fn test_load_with_custom_config() {
     let temp = copy_fixture_to_temp("with_custom_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // Verify @pasta_config module is accessible
     let result = runtime
         .exec(
             r#"
@@ -54,7 +51,6 @@ fn test_pasta_config_nested_table() {
     let temp = copy_fixture_to_temp("with_custom_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // Verify nested table access
     let result = runtime
         .exec(
             r#"
@@ -71,7 +67,6 @@ fn test_pasta_config_deeply_nested() {
     let temp = copy_fixture_to_temp("with_custom_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // Verify deeply nested table access
     let result = runtime
         .exec(
             r#"
@@ -88,7 +83,6 @@ fn test_pasta_config_excludes_loader() {
     let temp = copy_fixture_to_temp("with_custom_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // Verify [loader] section is NOT in @pasta_config
     let result = runtime
         .exec(
             r#"
@@ -105,7 +99,6 @@ fn test_pasta_config_ghost_section() {
     let temp = copy_fixture_to_temp("with_ghost_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // Verify [ghost] section is accessible via pasta.config
     let result = runtime
         .exec(
             r#"
@@ -135,7 +128,6 @@ fn test_pasta_config_returns_default_for_missing_section() {
     "#,
         )
         .unwrap();
-    // Should return default value 1.5
     assert_eq!(result.as_f64(), Some(1.5));
 }
 
@@ -213,7 +205,7 @@ fn test_shiori_act_uses_config_choice_newlines() {
     );
 }
 
-/// vertical-balloon-lines 5.1・5.2・5.6: SHIORI の act が `[ghost]` の `after_choice_newlines` を読み、
+/// SHIORI の act が `[ghost]` の `after_choice_newlines` を読み、
 /// 選択肢の後の選択肢の前と台詞の前の区切りに使う。
 #[test]
 fn test_shiori_act_uses_config_after_choice_newlines() {
@@ -247,7 +239,7 @@ fn test_shiori_act_uses_config_after_choice_newlines() {
     );
 }
 
-/// pasta.toml の装い（font）から出力までの通し（actor-display-style 1.1・2.1）。
+/// pasta.toml の装い（font）から出力までの通し。
 /// 読み込んだ `STORE.actors` のアクターで組み立てると、装いのタグが書いた順に出て、
 /// 装いの無いアクターへ切り替えると `\f[default]` で戻る
 #[test]
@@ -286,11 +278,9 @@ fn test_package_path_set() {
     let temp = copy_fixture_to_temp("minimal");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // Verify package.path is set
     let result = runtime.exec("return package.path").unwrap();
     let path = value_as_str(&result).unwrap();
 
-    // Should contain all search paths
     assert!(path.contains("profile/pasta/save/lua") || path.contains("profile\\pasta\\save\\lua"));
     assert!(path.contains("scripts"));
     assert!(
@@ -320,7 +310,7 @@ fn test_load_nonexistent_directory() {
     }
 }
 
-/// ローダ経由でも `std_package` を欠いた構成は名前付きの構成エラーになる（3.1、7.2）。
+/// ローダ経由でも `std_package` を欠いた構成は名前付きの構成エラーになる。
 #[test]
 fn test_load_with_config_missing_std_package_fails_with_name() {
     for libs in [vec!["std_string"], vec!["std_all", "-std_package"]] {
@@ -344,16 +334,13 @@ fn test_load_with_config_missing_std_package_fails_with_name() {
 
 #[test]
 fn test_load_empty_dic() {
-    // Create a temporary directory with no .pasta files
     let temp = TempDir::new().unwrap();
     let base_dir = temp.path();
 
     std::fs::create_dir_all(base_dir.join("dic/empty")).unwrap();
 
-    // Create minimal pasta.toml
     std::fs::write(base_dir.join("pasta.toml"), "[loader]\ndebug_mode = true\n").unwrap();
 
-    // Copy pasta_scripts directory for pasta module
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let scripts_src = crate_root.join("pasta_scripts");
     let scripts_dst = base_dir.join("pasta_scripts");
@@ -362,7 +349,6 @@ fn test_load_empty_dic() {
         copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
     }
 
-    // Copy scriptlibs directory
     let scriptlibs_src = crate_root.join("scriptlibs");
     let scriptlibs_dst = base_dir.join("scriptlibs");
     if scriptlibs_src.exists() {
@@ -370,10 +356,8 @@ fn test_load_empty_dic() {
         copy_dir_recursive(&scriptlibs_src, &scriptlibs_dst).unwrap();
     }
 
-    // Should succeed but with warning (no files found)
     let runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Runtime should still be usable
     let result = runtime.exec("return 42").unwrap();
     assert_eq!(result.as_i64(), Some(42));
 }
@@ -395,7 +379,7 @@ fn test_load_missing_pasta_toml() {
     }
 }
 
-/// dsl-literal-fixes 8.2: 別々の行の `""` を含む辞書でも、ローダ経由で scene_dic のロードが通る（U24）。
+/// 別々の行の `""` を含む辞書でも、ローダ経由で scene_dic のロードが通る。
 #[test]
 fn test_load_separate_line_blank_strings() {
     let temp = TempDir::new().unwrap();
@@ -455,7 +439,6 @@ fn test_load_custom_pasta_patterns() {
     .unwrap();
     std::fs::write(base_dir.join("extra/bar.lua"), "return { bar = true }\n").unwrap();
 
-    // Copy runtime deps (pasta_scripts, scriptlibs)
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     for dir_name in &["pasta_scripts", "scriptlibs"] {
         let src = crate_root.join(dir_name);
@@ -468,7 +451,6 @@ fn test_load_custom_pasta_patterns() {
 
     let _runtime = PastaLoader::load(base_dir).unwrap();
 
-    // All three modules must be registered in scene_dic.lua
     let scene_dic_path = base_dir.join("profile/pasta/cache/lua/pasta/scene_dic.lua");
     let scene_dic = std::fs::read_to_string(&scene_dic_path).unwrap();
     assert!(
@@ -519,7 +501,7 @@ fn test_config_load_with_file() {
 }
 
 // ============================================================================
-// Cache Freshness Tests (ponytail-lua-loader 2.1)
+// Cache Freshness Tests
 // ============================================================================
 
 /// `EVENT.fire` でイベント（未登録ならイベント名と同じ名前のシーン）を起こし、応答を返す。
@@ -544,7 +526,7 @@ fn roll_back_to_yesterday(path: &std::path::Path, content: &str) {
 }
 
 /// 辞書（`.pasta` と `.lua`）を前日の時刻の別の内容に戻して起動し直すと、戻した内容で動き、
-/// キャッシュの時刻が元にそろって 2 回目の起動では変換が省かれる（1.1・1.2・1.3・1.5・1.7・9.2）。
+/// キャッシュの時刻が元にそろって 2 回目の起動では変換が省かれる。
 #[test]
 fn test_rolled_back_dictionaries_run_restored_content() {
     let temp = common::create_temp_with_pasta("＊OnRollback\n　さくら：「今日の台詞」\n");
@@ -581,10 +563,10 @@ fn test_rolled_back_dictionaries_run_restored_content() {
 }
 
 // ============================================================================
-// Cache Write Failure Tests (ponytail-lua-loader 2.2)
+// Cache Write Failure Tests
 // ============================================================================
 
-/// `.pasta` のキャッシュが書けないと読み込みが失敗し、エラーにその `.pasta` のパスが入る（1.6・9.2）。
+/// `.pasta` のキャッシュが書けないと読み込みが失敗し、エラーにその `.pasta` のパスが入る。
 #[test]
 fn test_pasta_cache_write_failure_fails_load_with_path() {
     let temp = common::create_temp_with_pasta("＊OnCacheBlocked\n　さくら：「台詞」\n");
@@ -608,11 +590,11 @@ fn test_pasta_cache_write_failure_fails_load_with_path() {
 }
 
 // ============================================================================
-// Search Before Finalize Tests (ponytail-lua-loader 2.5)
+// Search Before Finalize Tests
 // ============================================================================
 
 /// finalize の前（`main.lua` の実行中）の検索は、キャッシュが無い起動（全部を変換）でも
-/// 2 回目の起動（全部を省く）でも見つからず、finalize の後は見つかる（3.1〜3.4・9.2）。
+/// 2 回目の起動（全部を省く）でも見つからず、finalize の後は見つかる。
 #[test]
 fn test_search_before_finalize_is_always_nil() {
     let temp = common::create_temp_with_pasta("＊OnBoot\n　さくら：「起動」\n");
@@ -636,11 +618,11 @@ fn test_search_before_finalize_is_always_nil() {
 }
 
 // ============================================================================
-// Orphaned Cache Warning Tests (ponytail-lua-loader 3.3)
+// Orphaned Cache Warning Tests
 // ============================================================================
 
 /// `debug_mode` のゴーストでも、孤立したキャッシュの警告はファイルにつき 1 行だけ出て、
-/// ファイルは消さずに残す（7.1〜7.3）。
+/// ファイルは消さずに残す。
 #[tracing_test::traced_test]
 #[test]
 fn test_orphaned_cache_warned_once_and_kept() {

@@ -1,6 +1,5 @@
 -- mouse_pause_test.lua
 -- 止めている間のつつき・撫での既定ハンドラ（pasta.shiori.event.mouse）のテスト
--- ontalk-suppression Task 2.2 (Requirements: 2.9, 2.10, 2.11, 5.1)
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect

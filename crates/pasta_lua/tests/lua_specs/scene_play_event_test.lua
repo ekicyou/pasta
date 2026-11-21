@@ -1,4 +1,4 @@
--- scene-play-event: シーンを名前・登録名の組から再生する口の単体テスト
+-- シーンを名前・登録名の組から再生する口の単体テスト
 -- pasta.scene の co_exec_exact（2 つ目の戻り値・ローカル）と co_exec_registered を確かめる。
 --
 -- STORE.scenes はスイート間で共有されるため、衝突しない一意プレフィックス "spe_" を使う。
@@ -136,7 +136,7 @@ describe("SCENE.co_exec_registered", function()
 end)
 
 -- ============================================================================
--- 3.2: 既定のハンドラ REG.OnPastaScene・REG.OnPastaSceneAt
+-- 既定のハンドラ REG.OnPastaScene・REG.OnPastaSceneAt
 -- @pasta_debug・@pasta_search・@pasta_log・pasta.config を差し替えて、門・引数・失敗・成功を確かめる。
 -- ============================================================================
 

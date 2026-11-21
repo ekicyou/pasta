@@ -1,7 +1,6 @@
 -- ============================================================================
--- Task 1.2: CALLBACK.try_route / CALLBACK.sweep テスト
--- Task 3.1: CALLBACK ID generation and staging テスト
--- Requirements: 1.1, 1.2, 5.1, 5.2, 5.3, R4 (callback chaining)
+-- CALLBACK.try_route / CALLBACK.sweep テスト
+-- CALLBACK ID generation and staging テスト
 -- ============================================================================
 
 local describe = require("lua_test.test").describe
@@ -26,7 +25,7 @@ local function reload_callback_modules(reset_res)
 end
 
 -- ============================================================================
--- Task 3.1: ID generation and staging tests
+-- ID generation and staging tests
 -- ============================================================================
 describe("CALLBACK - ID generation and staging", function()
     local CALLBACK, STORE
@@ -118,7 +117,7 @@ describe("CALLBACK - ID generation and staging", function()
 end)
 
 -- ============================================================================
--- Task 1.2: try_route / sweep tests
+-- try_route / sweep tests
 -- ============================================================================
 describe("CALLBACK.try_route", function()
     local CALLBACK, STORE
@@ -232,12 +231,12 @@ describe("CALLBACK.try_route", function()
         expect(CALLBACK.pending["OnPastaCallBack2"].on_timeout):toBe("chained timeout")
         -- Response from intermediate yield
         expect(result:find("200 OK")).not_:toBe(nil)
-        -- 待機として登録したシーンは継続に入れない（1.4）
+        -- 待機として登録したシーンは継続に入れない
         expect(STORE.co_scene):toBe(nil)
     end)
 
     -- ========================================================================
-    -- callback-resume-unification 2.1: 再開を EVENT.drive 経由にする
+    -- 再開を EVENT.drive 経由にする
     -- ========================================================================
     test("出力の無い中断を飛ばして出力まで進め、出力付きの中断は継続に入る (1.1)", function()
         setup()
@@ -306,7 +305,7 @@ describe("CALLBACK.try_route", function()
     end)
 
     -- ========================================================================
-    -- 3.49 (G3) 境界回帰テスト: reference 欠落 req のハードニング
+    -- 境界回帰テスト: reference 欠落 req のハードニング
     -- Rust 境界（lua_request.rs）は reference テーブルを常時生成するが、
     -- Lua 側から直接 EVENT.fire/try_route を呼ぶ経路では欠落しうる。
     -- 旧実装は pending 削除後に nil 添字エラーとなり待機コルーチンを孤児化していた。
@@ -423,7 +422,7 @@ describe("CALLBACK.sweep", function()
         if not ok then error(err, 0) end
     end
 
-    -- 表記を出さない設定に固定したテスト（今の 500・nil の応答を確かめる。runtime-error-balloon 6.2, 6.5）
+    -- 表記を出さない設定に固定したテスト（今の 500・nil の応答を確かめる。）
     local function test_off(name, body)
         test(name, function()
             with_balloon_warning(false, body)
@@ -495,8 +494,7 @@ describe("CALLBACK.sweep", function()
         expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
         -- 500 response returned
         expect(result:find("500 Internal Server Error")).not_:toBe(nil)
-        -- 3.49 (G3) 随伴更新: sweep が RES.err 経路へ統一され、ヘッダーキーは
-        -- res.lua 正準の "X-Error-Reason" となった（旧: インライン構築の "X-ERROR-REASON"）
+        -- ヘッダーキーは res.lua 正準の "X-Error-Reason"（"X-ERROR-REASON" ではない）
         expect(result:find("X%-Error%-Reason: callback timeout: get_property")).not_:toBe(nil)
         -- log.warn called
         expect(#warn_calls):toBe(1)
@@ -563,7 +561,7 @@ describe("CALLBACK.sweep", function()
     end)
 
     -- ========================================================================
-    -- callback-resume-unification 2.2: 集める → 外す → 並べる → 順に再開
+    -- 集める → 外す → 並べる → 順に再開
     -- ========================================================================
     test("番号の小さい順（1 → 2 → 10）に再開し、最初の応答を返して残りは警告して捨てる (2.1, 2.7)", function()
         setup()
@@ -729,7 +727,7 @@ describe("CALLBACK.sweep", function()
     end)
 
     -- ========================================================================
-    -- 3.49 (G3) 境界回帰テスト: sweep タイムアウト 500 の RES.err 経路統一
+    -- 境界回帰テスト: sweep タイムアウト 500 は RES.err 経路
     -- （X-Error-Reason 正準ケーシング・標準ヘッダー付与・空文字列正規化）
     -- ========================================================================
     test_off("sweep: タイムアウト 500 は RES.err 経路で X-Error-Reason 正準ヘッダーを出力する (3.49 G3)", function()
@@ -749,7 +747,7 @@ describe("CALLBACK.sweep", function()
         -- 正準ケーシングを plain find（大文字小文字厳密）で固定
         expect(result:find("X-Error-Reason: timeout via sweep", 1, true)).not_:toBe(nil)
         expect(result:find("X-ERROR-REASON", 1, true)):toBe(nil)
-        -- RES.build 標準ヘッダー3種を含む（旧インライン構築でも同一だが経路統一を固定）
+        -- RES.build 標準ヘッダー3種を含む
         expect(result:find("Charset: ", 1, true)).not_:toBe(nil)
         expect(result:find("Sender: ", 1, true)).not_:toBe(nil)
         expect(result:find("SecurityLevel: ", 1, true)).not_:toBe(nil)
@@ -803,7 +801,7 @@ describe("CALLBACK.sweep", function()
     end)
 
     -- ========================================================================
-    -- runtime-error-balloon 5: 時間切れの出口の表記（1.3, 1.4, 1.5, 4.2, 5.6）
+    -- 時間切れの出口の表記
     -- ========================================================================
     test("理由付きの時間切れは、時間切れの表記の 200 を候補にし、警告は再開前の 1 行だけ (1.3)", function()
         with_balloon_warning(true, function()
@@ -902,9 +900,9 @@ describe("CALLBACK.sweep", function()
 end)
 
 -- ============================================================================
--- callback-resume-unification 1.1: EVENT.drive の失敗の経路での予約の掃除
+-- EVENT.drive の失敗の経路での予約の掃除
 -- 予約（stage_pending）の後、中断せずにエラーで終わるシーンの予約が残ると、
--- 次にコルーチンを返すイベントで古いイベント名での登録や「multiple staging」が起きる（2.4）
+-- 次にコルーチンを返すイベントで古いイベント名での登録や「multiple staging」が起きる
 -- ============================================================================
 describe("EVENT.drive - エラー時の予約の掃除", function()
     local CALLBACK, STORE, EVENT, REG

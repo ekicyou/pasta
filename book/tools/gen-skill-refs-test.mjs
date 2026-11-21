@@ -1,7 +1,5 @@
-// gen-skill-refs-test.mjs — gen-skill-refs の自動検証（manual-ssot-authority タスク 3.3・3.4 /
-// 要件 5.1–5.9, 1.7, 7.1–7.4, 7.7）。
+// gen-skill-refs-test.mjs — gen-skill-refs の自動検証。
 //
-// 検証方針（design「Testing Strategy / Unit Tests」）:
 //   - outName と実物の GENERATION_MAP（24 エントリ・(skill, outName) 重複なし）。
 //   - findVoice: 口調マーカーの検出と、普通文体と衝突する 3 語（否定先読み）の非検出。
 //   - extractBody: 導入・締めの除去、本文内 `---` の保持、bad-structure、voice-in-body（行番号つき）、
@@ -12,15 +10,12 @@
 //   - renderEntry: 固定 2 行ヘッダ・LF・末尾改行 1 つ・BOM なし、LF/CRLF 入力でバイト一致。
 //   - generateAll / writeAll / checkAll（tmp サンドボックス）: stale（章だけ変更・生成物だけ手編集）、
 //     CRLF 化だけは一致、orphan、部分書き出しなし、同一内容は書き換えない。
-//   - CLI（サンドボックスへツールを複製）: 書き出し直後の --check が exit 0、STALE/ORPHAN 報告と exit 1、
-//     GenError で exit 1。
+//   - CLI（サンドボックスへツールを複製）: 書き出し直後の --check が exit 0、STALE/ORPHAN 報告と exit 1、GenError で exit 1。
 //   - 実リポジトリ: 24 章すべてが抽出・口調判定・リンク書き換えを通る（メモリ上のみ）。
-//   manual-claudia-theme タスク 3.2（要件 4.3, 4.4, 5.4, 10.1, 10.7）:
-//   - chapterRegions: 導入・本文・締めの範囲、本文の範囲が extractBody の本文と一致（実リポジトリの全章でも
-//     タスク 3.2 以前の判定と一致）、bad-structure、本文の台詞・口調では投げない。
+//   - chapterRegions: 導入・本文・締めの範囲、本文の範囲が extractBody の本文と一致、bad-structure、本文の台詞・口調では投げない。
 //   - talk-in-body: 本文（フェンス外）の台詞の開始行（行頭・字下げ・入れ子の引用・リストの中・タグの不正を含む）を
 //     行番号付きで全件返す。導入・締めの台詞は生成物に出ない。CLI は exit 1。
-//   実リポジトリの book/src・スキルには書き込まない。
+// 実リポジトリの book/src・スキルには書き込まない。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -557,9 +552,9 @@ log('\n[J] 実リポジトリ: 24 章のメモリ上全生成（書き出さな�
 }
 
 // ============================================================
-// manual-claudia-theme タスク 3.2（要件 4.3, 4.4, 5.4, 10.1, 10.7 / design「ChapterStructure」）
+// chapterRegions
 log('\n[K] chapterRegions（導入・本文・締めの領域）');
-// タスク 3.2 以前の extractBody の本文範囲の判定の写し（領域分けへの移設で範囲が変わらないことの基準）。
+// 領域分け導入前の extractBody の本文範囲の判定の写し（移設で範囲が変わらないことの基準）。
 function legacyBodyRange(text) {
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
   const masked = maskFences(text).split('\n');
@@ -594,7 +589,7 @@ function legacyBodyRange(text) {
   check('K-9 本文の台詞・口調では投げない', e3 === null, e3 && e3.message);
 }
 {
-  // 実リポジトリの全章（SUMMARY.md を除く）で、本文の範囲がタスク 3.2 以前の判定と一致する。
+  // 実リポジトリの全章（SUMMARY.md を除く）で、本文の範囲が領域分け導入前の判定と一致する。
   const src = path.join(REPO_ROOT, 'book/src');
   const chapters = listMarkdownFiles(src).map((f) => path.relative(src, f).split(path.sep).join('/'))
     .filter((c) => c !== 'SUMMARY.md').sort();

@@ -4,8 +4,6 @@
 //! 各テストシナリオはマルチラウンドのリクエスト・レスポンスサイクルとして構成される。
 //! このファイルはチェーントーク遷移・複数プロパティマッピング・トークン退避/復元の
 //! 干渉回避・タイムアウト sweep を扱う。
-//!
-//! 検証要件: 2.1, 2.2, 2.3, 3.1, 3.2, 5.2, 6.1, 6.2, 6.3
 
 mod common;
 
@@ -79,7 +77,7 @@ ID: OnResumeChain
 }
 
 // ============================================================================
-// Scenario: get_property → チェイントーク（callback-resume-unification 1.3, 6.1）
+// Scenario: get_property → チェイントーク
 // コールバックの応答に前半、次の OnTalk の機会に後半が出る。
 // OnTalk は OnSecondChange → 仮想ディスパッチャで起こす（X-Pasta-Time で時刻を固定し、
 // talk 間隔はフィクスチャの pasta.toml で 10 秒に固定）。
@@ -258,8 +256,8 @@ Reference0: 1
 "#,
     );
     // sweep の応答は EVENT.fire で包まれずにそのまま返る。
-    // 既定の設定（balloon_warning を書かない）では時間切れの表記の 200 で、理由の行は今と同じ
-    // （runtime-error-balloon 1.3。表記を出さない設定の 500 は Lua のテストで確かめる）
+    // 既定の設定（balloon_warning を書かない）では時間切れの表記の 200 で、理由の行は今と同じ。
+    // 表記を出さない設定の 500 は Lua のテストで確かめる。
     assert_eq!(resp2.status_code, 200, "R2 sweep response should be 200");
     let v2 = resp2.value.as_ref().expect("R2 should have Value");
     assert!(

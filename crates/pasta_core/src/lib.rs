@@ -1,7 +1,6 @@
 //! Pasta Core - Language-independent registry and utility layer.
 //!
 //! This crate provides the registry functionality for the Pasta DSL.
-//! DSL parsing (parser, AST, grammar) has been moved to the `pasta_dsl` crate.
 //!
 //! # Modules
 //!

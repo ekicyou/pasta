@@ -1,5 +1,4 @@
--- persistence_spec.lua
--- Lua-side persistence tests for store-save-persistence feature
+-- Lua-side persistence tests
 -- Additional tests for @pasta_persistence low-level API
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test

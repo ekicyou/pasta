@@ -57,7 +57,6 @@ impl WordTable {
         let entries = registry.into_entries();
         let mut prefix_index: BTreeMap<String, Vec<_>> = BTreeMap::new();
 
-        // Build prefix index
         for entry in &entries {
             let entry_list = prefix_index.entry(entry.key.clone()).or_default();
             entry_list.push(entry.id);
@@ -93,7 +92,6 @@ impl WordTable {
         module_name: &str,
         key: &str,
     ) -> Result<Vec<String>, WordTableError> {
-        // If module_name is empty, search global only
         if module_name.is_empty() {
             let mut global_entry_ids: Vec<usize> = Vec::new();
             for (matched_key, ids) in self
@@ -101,7 +99,6 @@ impl WordTable {
                 .range::<str, _>((Bound::Included(key), Bound::Unbounded))
                 .take_while(|(k, _)| k.starts_with(key))
             {
-                // Skip local keys (start with ':')
                 if !matched_key.starts_with(':') {
                     global_entry_ids.extend(ids.iter().copied());
                 }
@@ -129,7 +126,6 @@ impl WordTable {
             return Ok(all_words);
         }
 
-        // module_name is non-empty: search local only (no fallback)
         let local_key = format!(":{}:{}", module_name, key);
         let mut local_entry_ids: Vec<usize> = Vec::new();
         for (_matched_key, ids) in self
@@ -176,10 +172,8 @@ impl WordTable {
     /// # Returns
     /// Ok(word) on success, Err(WordNotFound) if no match
     pub fn search_word(&mut self, module_name: &str, key: &str) -> Result<String, WordTableError> {
-        // Build cache key
         let cache_key = WordCacheKey::new(module_name, key);
 
-        // Check if cache exists and has remaining words
         if let Some(cached) = self.cached_selections.get_mut(&cache_key)
             && let Some(word) = cached.words.get(cached.next_index).cloned()
         {
@@ -187,10 +181,8 @@ impl WordTable {
             return Ok(word);
         }
 
-        // Collect all word candidates
         let all_words = self.collect_word_candidates(module_name, key)?;
 
-        // Step 4: Shuffle and cache
         let mut word_indices: Vec<usize> = (0..all_words.len()).collect();
         self.random_selector.shuffle_usize(&mut word_indices);
         let shuffled_words: Vec<String> = word_indices
@@ -198,7 +190,6 @@ impl WordTable {
             .filter_map(|i| all_words.get(i).cloned())
             .collect();
 
-        // Step 5: Return first word and cache the rest
         let result =
             shuffled_words
                 .first()

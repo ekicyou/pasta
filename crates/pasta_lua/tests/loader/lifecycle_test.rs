@@ -11,14 +11,11 @@ use pasta_lua::loader::PastaLoader;
 
 #[test]
 fn test_directories_created() {
-    // Use correct pasta syntax
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Load should create profile directories
     let _runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Verify directories were created
     assert!(base_dir.join("profile/pasta/save").exists());
     assert!(base_dir.join("profile/pasta/save/lua").exists());
     assert!(base_dir.join("profile/pasta/cache").exists());
@@ -27,11 +24,9 @@ fn test_directories_created() {
 
 #[test]
 fn test_cache_incremental_update() {
-    // Use helper that copies scripts
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Create cache directory with old file that has matching version
     let cache_dir = base_dir.join("profile/pasta/cache/lua");
     std::fs::create_dir_all(&cache_dir).unwrap();
 
@@ -45,13 +40,10 @@ fn test_cache_incremental_update() {
     )
     .unwrap();
 
-    // Create pasta/scene subdirectory for cache files
     std::fs::create_dir_all(cache_dir.join("pasta/scene")).unwrap();
 
-    // Create an unrelated cache file (simulating orphan)
     std::fs::write(cache_dir.join("pasta/scene/orphan.lua"), "-- orphan cache").unwrap();
 
-    // Load should preserve cache (incremental update)
     let _runtime = PastaLoader::load(base_dir).unwrap();
 
     // Orphan cache file should still exist (we don't auto-delete)
@@ -60,7 +52,6 @@ fn test_cache_incremental_update() {
         "Orphan cache should be preserved"
     );
 
-    // New scene_dic.lua should exist
     assert!(
         cache_dir.join("pasta/scene_dic.lua").exists(),
         "scene_dic.lua should exist"
@@ -68,16 +59,14 @@ fn test_cache_incremental_update() {
 }
 
 // ============================================================================
-// User Scripts Priority Tests (Task 7.1)
+// User Scripts Priority Tests
 // ============================================================================
 
 #[test]
 fn test_scripts_priority_over_pasta_scripts() {
-    // Task 7.1: scripts/main.lua が pasta_scripts/main.lua より優先されることを検証
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Create scripts directory with a custom main.lua
     let scripts_dir = base_dir.join("scripts");
     std::fs::create_dir_all(&scripts_dir).unwrap();
     std::fs::write(
@@ -102,10 +91,8 @@ return { source = "pasta_scripts" }
     )
     .unwrap();
 
-    // Load the runtime
     let runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Verify scripts/main.lua was loaded (has priority)
     let result = runtime.exec("return _G.MAIN_SOURCE").unwrap();
     assert_eq!(
         value_as_str(&result).as_deref(),
@@ -116,11 +103,9 @@ return { source = "pasta_scripts" }
 
 #[test]
 fn test_scripts_module_priority() {
-    // Task 7.1: scripts内のモジュールがpasta_scriptsより優先されることを検証
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Create scripts directory with a custom module
     let scripts_dir = base_dir.join("scripts");
     std::fs::create_dir_all(&scripts_dir).unwrap();
     std::fs::write(
@@ -129,7 +114,6 @@ fn test_scripts_module_priority() {
     )
     .unwrap();
 
-    // Create same module in pasta_scripts (lower priority)
     let pasta_scripts_dir = base_dir.join("pasta_scripts");
     std::fs::write(
         pasta_scripts_dir.join("test_module.lua"),
@@ -137,10 +121,8 @@ fn test_scripts_module_priority() {
     )
     .unwrap();
 
-    // Load the runtime
     let runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Require the module - should get scripts version
     let result = runtime
         .exec(r#"return require("test_module").source"#)
         .unwrap();
@@ -157,37 +139,32 @@ fn test_scripts_module_priority() {
 }
 
 // ============================================================================
-// Default main.lua Tests (Task 7.3)
+// Default main.lua Tests
 // ============================================================================
 
 #[test]
 fn test_default_main_lua_fallback() {
-    // Task 7.3: scriptsにmain.luaを配置しない状態でエラーなく初期化完了を検証
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
     // Don't create scripts/main.lua - should fall back to pasta_scripts/main.lua
     // The default pasta_scripts/main.lua should be copied by copy_dir_recursive
 
-    // Load the runtime - should succeed without error
     let runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Runtime should be usable
     let result = runtime.exec("return 'initialized'").unwrap();
     assert_eq!(value_as_str(&result).as_deref(), Some("initialized"));
 }
 
 // ============================================================================
-// Initialization Order Tests (Task 7.2)
+// Initialization Order Tests
 // ============================================================================
 
 #[test]
 fn test_main_lua_executed_before_scene_dic() {
-    // Task 7.2: main.lua内でscene_dicファイナライズ前の状態であることを検証
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Create scripts with a main.lua that records initialization state
     let scripts_dir = base_dir.join("scripts");
     std::fs::create_dir_all(&scripts_dir).unwrap();
     std::fs::write(
@@ -208,17 +185,14 @@ return {}
     )
     .unwrap();
 
-    // Load the runtime
     let runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Verify main.lua was executed
     let result = runtime.exec("return _G.MAIN_EXECUTED").unwrap();
     assert!(
         result.as_boolean() == Some(true),
         "main.lua should have been executed"
     );
 
-    // Verify SCENE API was available during main.lua execution
     let result = runtime.exec("return _G.SCENE_API_AVAILABLE").unwrap();
     assert!(
         result.as_boolean() == Some(true),
@@ -228,11 +202,9 @@ return {}
 
 #[test]
 fn test_dictionary_registration_in_main_lua() {
-    // Task 7.2: 辞書登録APIが利用可能であることを確認
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Create scripts with a main.lua that registers a custom dictionary
     let scripts_dir = base_dir.join("scripts");
     std::fs::create_dir_all(&scripts_dir).unwrap();
     std::fs::write(
@@ -250,17 +222,14 @@ return {}
     )
     .unwrap();
 
-    // Load the runtime
     let runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Verify dictionary was registered
     let result = runtime.exec("return _G.DICTIONARY_REGISTERED").unwrap();
     assert!(
         result.as_boolean() == Some(true),
         "Dictionary should have been registered in main.lua"
     );
 
-    // Verify the registered word is available via pasta.word API
     let result = runtime
         .exec(
             r#"
@@ -278,20 +247,17 @@ return {}
 }
 
 // ============================================================================
-// scene_dic require Tests (Task 7.4)
+// scene_dic require Tests
 // ============================================================================
 
 #[test]
 fn test_scene_dic_require_resolution() {
-    // Task 7.4: require("pasta.scene_dic")でscene_dicが解決されることを検証
     // Note: scene_dic.lua doesn't return a table - it loads modules and calls finalize_scene()
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Load the runtime
     let runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Verify scene_dic was loaded (package.loaded["pasta.scene_dic"] should be truthy)
     let result = runtime
         .exec(
             r#"
@@ -307,21 +273,17 @@ fn test_scene_dic_require_resolution() {
 
 #[test]
 fn test_scene_dic_new_path() {
-    // Task 7.4: 新パス（cache/pasta/scene_dic.lua）からの読み込みを確認
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Load the runtime
     let _runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Verify scene_dic.lua exists at new path
     let new_path = base_dir.join("profile/pasta/cache/lua/pasta/scene_dic.lua");
     assert!(
         new_path.exists(),
         "scene_dic.lua should exist at cache/lua/pasta/scene_dic.lua"
     );
 
-    // Verify old path does NOT exist
     let old_path = base_dir.join("profile/pasta/cache/lua/scene_dic.lua");
     assert!(
         !old_path.exists(),
@@ -354,8 +316,8 @@ fn test_scene_module_with_dot_in_file_name() {
     );
 }
 
-/// 読み込みが作る生成コードの行の対応は、`.pasta` をゴーストのフォルダーから見た形で持つ
-/// （runtime-error-balloon 2.5）。絶対パスは載せない。
+/// 読み込みが作る生成コードの行の対応は、`.pasta` をゴーストのフォルダーから見た形で持つ。
+/// 絶対パスは載せない。
 #[test]
 fn test_generated_line_map_uses_ghost_relative_pasta_path() {
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");

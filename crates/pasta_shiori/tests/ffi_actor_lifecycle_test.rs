@@ -1,16 +1,16 @@
-//! FFI 所有モデル E2E 統合テスト（task 5.1・R8.1/R8.2/R8.3/R8.4）。
+//! FFI 所有モデル E2E 統合テスト。
 //!
 //! `windows.rs` の FFI extern 入口（`load`/`request`/`unload`）が結線する本番ライフサイクル
 //! 自由関数 [`pasta::actor::lifecycle`]（`static LEGACY` 所有モデル）を、実ゴースト VM に対して
 //! **load→request→unload→reload** の完全サイクルで駆動し、以下を実証する:
 //!
 //!  (a) `spawn_actor` がアクタースレッド上で実 VM をロードし、`marshal_request` 経由の GET が
-//!      byte-invariant ゴールデン応答を返す（R8.2: VM アクセスはメッセージ送信経由のみ）。
-//!  (b) コルーチン継続（GET property yield → callback resume）がアクター経路で不変（R9・R1.1）。
-//!  (c) NOTIFY が即 204、後続 GET が同一 FIFO で返る（R5.2・単一直列）。
+//!      byte-invariant ゴールデン応答を返す（VM アクセスはメッセージ送信経由のみ）。
+//!  (b) コルーチン継続（GET property yield → callback resume）がアクター経路で不変。
+//!  (c) NOTIFY が即 204、後続 GET が同一 FIFO で返る。
 //!  (d) `teardown_actor`（unload 相当）→ 再 `spawn_actor`（reload）で新スレッド＋新チャネルが
-//!      正常稼働し、reload 後も GET 応答が不変（R7.2 reload・R8 所有モデル）。
-//!  (e) アクター不在（teardown 後）の `marshal_request` は 204（無限待機なし・R5.6）。
+//!      正常稼働し、reload 後も GET 応答が不変。
+//!  (e) アクター不在（teardown 後）の `marshal_request` は 204（無限待機なし）。
 //!
 //! # 単一スレッド直列実行（`static LEGACY` 共有のため）
 //! `lifecycle::LEGACY` はプロセスグローバルである。本ファイルは **1 つの `#[test]`** に
@@ -98,7 +98,7 @@ fn ffi_ownership_model_load_request_unload_reload_cycle() {
         "spawn_actor must load the ghost VM on the actor thread"
     );
 
-    // --- フェーズ 2: request（GET property コルーチン継続・R9/R1.1） ---
+    // --- フェーズ 2: request（GET property コルーチン継続） ---
     let round1 = marshal_request(&normalize_request(
         "GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n",
     ));

@@ -10,7 +10,7 @@ pub struct Found {
     pub file: Option<String>,
 }
 
-/// 2.4〜2.7 の決まりで探す。見つからなければ Err（パスと理由の日本語の文）
+/// 渡されたパスの下・直下・上の祖先から ghost/master を探す。見つからなければ Err（パスと理由の日本語の文）
 pub fn find_master(path: &Path) -> Result<Found, String> {
     let abs =
         std::path::absolute(path).map_err(|e| format!("{} を開けません: {e}", path.display()))?;
@@ -24,7 +24,7 @@ pub fn find_master(path: &Path) -> Result<Found, String> {
     let master = child_dir(dir, "ghost")
         .and_then(|g| child_dir(&g, "master"))
         .or_else(|| name_is(dir, "ghost").then(|| child_dir(dir, "master")).flatten())
-        // (5)(6) D 自身か、上へたどって最も近い ghost/master
+        // D 自身か、上へたどって最も近い ghost/master
         .or_else(|| {
             dir.ancestors()
                 .find(|d| name_is(d, "master") && d.parent().is_some_and(|p| name_is(p, "ghost")))
@@ -36,7 +36,7 @@ pub fn find_master(path: &Path) -> Result<Found, String> {
                 abs.display()
             )
         })?;
-    // master の中のファイルだけを開く。profile の下（11.4）や master の外はゴーストだけ開く
+    // master の中のファイルだけを開く。profile の下や master の外はゴーストだけ開く
     let file = if meta.is_dir() {
         None
     } else {
@@ -90,7 +90,7 @@ pub enum Want {
     Read,
 }
 
-/// 開発の操作の読み取りの門（9.4・9.6・7.9）。abs は絶対パス。通れば読むパスを返す
+/// 開発の操作の読み取りの門。abs は絶対パス。通れば読むパスを返す
 pub fn dev_path(master: &Path, abs: &Path, want: Want) -> Result<PathBuf, String> {
     let deny = || format!("{}: 開いているゴーストの外は読みません", abs.display());
     let rel = abs.strip_prefix(master).map_err(|_| deny())?;

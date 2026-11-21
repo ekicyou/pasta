@@ -1,18 +1,17 @@
-//! scene-play-event の結合テスト（task 4.1）。
+//! デバッグ用イベント（`OnPastaScene`・`OnPastaSceneAt` ほか）の結合テスト。
 //!
 //! デバッグを有効にしたゴーストを一時フォルダに作って `PastaLoader::load_with_config` で読み込み、
 //! `SHIORI.request` に GET のリクエスト（`OnPastaScene`・`OnPastaSceneAt`）を渡して確かめる。
 //!
 //! - 名前で大域・ローカルを再生し、200 の Value が 1 ビート目だけで、続きが
-//!   `STORE.co_scene` に置かれる（要件 1.1・1.2・3.1・3.2・3.3）
-//! - 同じ名前の大域が 2 つあり片方だけがローカルを持つとき、毎回再生できる（要件 1.8）
-//! - 相対パスと絶対パスで位置から再生できる（要件 2.1・2.3・2.4）
-//! - 有効ならシーンマップがあり、`debug_enabled()` と `@pasta_debug.enabled()` が真になる（debug-mcp-runtime 7.6）
-//! - デバッグが無効なら 204、見つからないときは 200 で失敗の表記（要件 4.4・5.1・5.3・7.1・7.4、task 4.2）
+//!   `STORE.co_scene` に置かれる
+//! - 同じ名前の大域が 2 つあり片方だけがローカルを持つとき、毎回再生できる
+//! - 相対パスと絶対パスで位置から再生できる
+//! - 有効ならシーンマップがあり、`debug_enabled()` と `@pasta_debug.enabled()` が真になる
+//! - デバッグが無効なら 204、見つからないときは 200 で失敗の表記
 //! - `OnPastaDumpVariables` は有効なとき 204 で `variables.toml` を書き、無効・external なら
-//!   204 と警告で書かない（debug-mcp-runtime 4.2・4.3・5.1〜5.3・5.6）
+//!   204 と警告で書かない
 //! - リロードで有効・無効が切り替わり、JIT が働き、`[debug]` の古いキーは警告なく読み飛ばす
-//!   （debug-mcp-runtime 1.2・3.2・3.3・3.8）
 //!
 //! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従う。
 
@@ -169,17 +168,17 @@ fn lua_bool(runtime: &PastaLuaRuntime, code: &str) -> bool {
     runtime.lua().load(code).eval::<bool>().unwrap()
 }
 
-/// 1.1・1.2・3.1・3.2・3.3: 名前で大域とローカルを再生し、1 ビート目だけを返し、続きを場面の続きに置く。
+/// 名前で大域とローカルを再生し、1 ビート目だけを返し、続きを場面の続きに置く。
 #[test]
 fn on_pasta_scene_plays_global_and_local_by_name() {
     let temp = tempfile::TempDir::new().unwrap();
     let runtime = load_debug_ghost(temp.path());
 
-    // 1.1: 大域だけ（Reference1 なし）
+    // 大域だけ（Reference1 なし）
     let value = value_of_200(&request(&runtime, "OnPastaScene", &["再生大域"]));
     assert!(value.contains("大域の声"), "global scene played: {value}");
 
-    // 1.2: 大域の中のローカル（大域の本体は流さない）
+    // 大域の中のローカル（大域の本体は流さない）
     let value = value_of_200(&request(&runtime, "OnPastaScene", &["再生親", "再生子"]));
     assert!(value.contains("子の声"), "local scene played: {value}");
     assert!(
@@ -187,7 +186,7 @@ fn on_pasta_scene_plays_global_and_local_by_name() {
         "global body must not play: {value}"
     );
 
-    // 3.1: 進行中の場面の続きを中断し、元に戻さない
+    // 進行中の場面の続きを中断し、元に戻さない
     runtime
         .exec(
             r#"
@@ -198,7 +197,6 @@ fn on_pasta_scene_plays_global_and_local_by_name() {
         )
         .unwrap();
 
-    // 3.2: 2 ビートのシーンは 1 ビート目だけを返す
     let value = value_of_200(&request(&runtime, "OnPastaScene", &["二拍"]));
     assert!(value.contains("一拍目"), "beat 1 delivered: {value}");
     assert!(
@@ -206,7 +204,6 @@ fn on_pasta_scene_plays_global_and_local_by_name() {
         "beat 2 must not be delivered yet: {value}"
     );
 
-    // 3.3: 続きは STORE.co_scene に置かれ、古い続きは戻らない
     assert!(
         lua_bool(
             &runtime,
@@ -237,7 +234,7 @@ fn on_pasta_scene_plays_global_and_local_by_name() {
     assert!(!value.contains("一拍目"), "beat 1 must not repeat: {value}");
 }
 
-/// 1.8: 同じ名前の大域が 2 つあり、片方だけがローカルを持つとき、ローカルを毎回再生できる。
+/// 同じ名前の大域が 2 つあり、片方だけがローカルを持つとき、ローカルを毎回再生できる。
 #[test]
 fn on_pasta_scene_plays_local_owned_by_one_of_twin_globals_every_time() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -252,13 +249,13 @@ fn on_pasta_scene_plays_local_owned_by_one_of_twin_globals_every_time() {
     }
 }
 
-/// 2.1・2.3・2.4: 相対パスと絶対パスで位置から再生する。
+/// 相対パスと絶対パスで位置から再生する。
 #[test]
 fn on_pasta_scene_at_plays_by_relative_and_absolute_path() {
     let temp = tempfile::TempDir::new().unwrap();
     let runtime = load_debug_ghost(temp.path());
 
-    // 2.3: ghost/master/ からの相対パス（ローカルの行）
+    // ghost/master/ からの相対パス（ローカルの行）
     let line = LINE_LOCAL_BODY.to_string();
     let value = value_of_200(&request(&runtime, "OnPastaSceneAt", &[REL_PATH, &line]));
     assert!(
@@ -270,7 +267,7 @@ fn on_pasta_scene_at_plays_by_relative_and_absolute_path() {
         "global body must not play: {value}"
     );
 
-    // 2.4: 絶対パス（大域の行）
+    // 絶対パス（大域の行）
     let abs = temp.path().join(REL_PATH).to_string_lossy().to_string();
     let line = LINE_GLOBAL_BODY.to_string();
     let value = value_of_200(&request(&runtime, "OnPastaSceneAt", &[&abs, &line]));
@@ -279,7 +276,7 @@ fn on_pasta_scene_at_plays_by_relative_and_absolute_path() {
         "absolute path plays global: {value}"
     );
 
-    // 2.1: 同じ名前の大域のうち、指した位置のものを毎回再生する
+    // 同じ名前の大域のうち、指した位置のものを毎回再生する
     let line = LINE_SECOND_TWIN_BODY.to_string();
     for i in 0..4 {
         let value = value_of_200(&request(&runtime, "OnPastaSceneAt", &[REL_PATH, &line]));
@@ -290,7 +287,7 @@ fn on_pasta_scene_at_plays_by_relative_and_absolute_path() {
     }
 }
 
-/// 4.2・4.3（debug-mcp-runtime 7.6）: 有効ならシーンマップがあり、`debug_enabled()` と
+/// 有効ならシーンマップがあり、`debug_enabled()` と
 /// `@pasta_debug.enabled()` がどちらも真で、位置で再生できる。
 #[test]
 fn enabled_debug_holds_scene_map_and_reports_enabled() {
@@ -312,7 +309,7 @@ fn enabled_debug_holds_scene_map_and_reports_enabled() {
     assert!(value.contains("大域の声"), "plays by position: {value}");
 }
 
-/// 4.4・7.1: デバッグを無効にしたゴーストでは、2 つのイベントが 204 になる。
+/// デバッグを無効にしたゴーストでは、2 つのイベントが 204 になる。
 #[test]
 fn scene_play_events_return_204_when_debug_disabled() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -345,7 +342,7 @@ fn scene_play_events_return_204_when_debug_disabled() {
     }
 }
 
-/// 5.1・5.2・5.3: 見つからないときは 200 で、イベント名と探した名前か位置を含む失敗の表記が返る。
+/// 見つからないときは 200 で、イベント名と探した名前か位置を含む失敗の表記が返る。
 #[test]
 fn scene_play_events_return_failure_notice_when_not_found() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -374,7 +371,7 @@ fn scene_play_events_return_failure_notice_when_not_found() {
     );
 }
 
-/// debug-mcp-runtime 1.5: 有効なゴーストのログには、`Startup sequence completed` の直前に
+/// 有効なゴーストのログには、`Startup sequence completed` の直前に
 /// 開発用のイベントを許したことの info が 1 行あり、無効なゴーストには無い。
 #[test]
 fn debug_enabled_startup_log_line_only_when_enabled() {
@@ -421,7 +418,7 @@ fn debug_enabled_startup_log_line_only_when_enabled() {
     assert!(!disabled_log.contains(LINE), "{disabled_log}");
 }
 
-/// debug-mcp-runtime 3.2・1.2: 同じフォルダを有効 → 無効 → 有効で読み直すと、`debug_enabled()` と
+/// 同じフォルダを有効 → 無効 → 有効で読み直すと、`debug_enabled()` と
 /// `OnPastaScene` の 200・204 が切り替わり、どの VM でも JIT が働く。
 #[test]
 fn reload_toggles_debug_and_keeps_jit() {
@@ -446,7 +443,7 @@ fn reload_toggles_debug_and_keeps_jit() {
     }
 }
 
-/// debug-mcp-runtime 3.3・3.8: `[debug]` に古いキーが残っていても読み込みが通り、有効で、
+/// `[debug]` に古いキーが残っていても読み込みが通り、有効で、
 /// 警告が無く、`.lua.map` を作らない。
 #[test]
 fn old_debug_keys_are_skipped_silently() {
@@ -492,7 +489,7 @@ fn assert_no_save_file(base: &Path) {
     assert!(files.is_empty(), "save file must not be written: {files:?}");
 }
 
-/// 5.1・5.2・5.3・5.6: 有効なとき 204 で、保存変数を要件 5 の例のとおりテキストの TOML に書く。
+/// 有効なとき 204 で、保存変数をテキストの TOML に書く。
 /// 2 回目で置き換わり、フォルダが無くても作り、`obfuscate = true` でもテキストで、
 /// `save.toml` を書かず、保存変数と場面の続きを変えない。
 #[test]
@@ -573,7 +570,7 @@ obfuscate = true
     assert_no_save_file(temp.path());
 }
 
-/// 4.2・4.3: 無効なら・external なら 204 で、警告を書き、ファイルを書かない。
+/// 無効なら・external なら 204 で、警告を書き、ファイルを書かない。
 #[test]
 fn on_pasta_dump_variables_refused_when_disabled_or_external() {
     pasta_lua::init_tracing();
@@ -626,7 +623,7 @@ enabled = true
     }
 }
 
-/// scene-play-locals 1.1・1.3: Reference2 のインライン表の値を、再生するシーンのローカル変数として読める。
+/// Reference2 のインライン表の値を、再生するシーンのローカル変数として読める。
 #[test]
 fn on_pasta_scene_reads_reference2_locals() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -652,7 +649,7 @@ fn line_of(needle: &str) -> String {
     (at + 1).to_string()
 }
 
-/// scene-play-locals 1.1・1.2・1.5・2.1〜2.4: 文字列・整数・真偽値・日付が、名前でも位置でも台詞と
+/// 文字列・整数・真偽値・日付が、名前でも位置でも台詞と
 /// Lua のブロックから読め、整数は算術に使える。
 #[test]
 fn reference2_locals_typed_values_by_name_and_position() {
@@ -678,7 +675,7 @@ fn reference2_locals_typed_values_by_name_and_position() {
     }
 }
 
-/// scene-play-locals 1.3: `＞` の呼び先・ローカルシーン・チェイントークの続きでも同じ値が読める。
+/// `＞` の呼び先・ローカルシーン・チェイントークの続きでも同じ値が読める。
 #[test]
 fn reference2_locals_reach_call_local_scene_and_continuation() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -720,7 +717,7 @@ fn reference2_locals_reach_call_local_scene_and_continuation() {
     assert!(value.contains("続きで雨"), "continuation: {value}");
 }
 
-/// scene-play-locals 1.4・1.7: 本文の代入が勝ち、Reference2 は転記された `＄r0` に勝ち、
+/// 本文の代入が勝ち、Reference2 は転記された `＄r0` に勝ち、
 /// 次の Reference2 無しの再生には残らない。
 #[test]
 fn reference2_locals_precedence_and_no_carry_over() {
@@ -799,7 +796,7 @@ fn assert_failure_value(response: &str, notation: &str) {
     );
 }
 
-/// scene-play-locals 3.1〜3.4・1.6: Reference2 が無い・`""`・`{}` では今と同じ台詞で警告が無く、
+/// Reference2 が無い・`""`・`{}` では今と同じ台詞で警告が無く、
 /// Reference1 を `""` にすればグローバルシーンが鳴り、Reference1 の `{ … }` はローカルシーンの名前になる。
 #[test]
 fn reference2_absent_or_empty_keeps_current_behavior() {
@@ -826,7 +823,7 @@ fn reference2_absent_or_empty_keeps_current_behavior() {
         }
     }
 
-    // 3.3: Reference1 を空にして Reference2 を付けるとグローバルシーン
+    // Reference1 を空にして Reference2 を付けるとグローバルシーン
     let value = value_of_200(&request(
         &runtime,
         "OnPastaScene",
@@ -835,7 +832,7 @@ fn reference2_absent_or_empty_keeps_current_behavior() {
     assert!(value.contains("大域の声"), "global scene played: {value}");
     take_warnings(&runtime); // 未登録アクターの警告を捨てる
 
-    // 3.4: Reference1 に表を書くと、その名前のローカルシーンを探す
+    // Reference1 に表を書くと、その名前のローカルシーンを探す
     let response = request(&runtime, "OnPastaScene", &["再生親", "{ '天気' = '雨' }"]);
     assert_failure_value(
         &response,
@@ -847,7 +844,7 @@ fn reference2_absent_or_empty_keeps_current_behavior() {
     );
 }
 
-/// scene-play-locals 4.1〜4.5・4.8: 誤りの 3 種が、両方のイベントで表記と警告 1 行になり、
+/// 誤りの 3 種が、両方のイベントで表記と警告 1 行になり、
 /// 何も再生せず場面の続きを変えない。複数の誤りでは並べ替えた最初のキーの 1 件だけ。
 #[test]
 fn reference2_errors_report_notation_and_one_warning() {
@@ -915,13 +912,13 @@ fn reference2_errors_report_notation_and_one_warning() {
             "代入できない値：{E} Reference2 ＄a（表）",
             "bad argument: Reference2 key='a' (table is not assignable)",
         ),
-        // 4.5: "1" < "b" なので、"b" の型の誤りより先に "1" の名前の誤りだけが出る
+        // "1" < "b" なので、"b" の型の誤りより先に "1" の名前の誤りだけが出る
         (
             r#"{ "b" = [1], "1" = 2 }"#,
             r#"名前にならない値：{E} Reference2（"1"）"#,
             "bad argument: Reference2 key='1' (not a local variable name)",
         ),
-        // 4.8: 表記では `\` が `\\` になり、警告は届いたまま
+        // 表記では `\` が `\\` になり、警告は届いたまま
         (
             r"{ 'C:\dic' = 1 }",
             r#"名前にならない値：{E} Reference2（"C:\\dic"）"#,
@@ -957,7 +954,7 @@ fn reference2_errors_report_notation_and_one_warning() {
     );
 }
 
-/// scene-play-locals 4.6: Reference0 → Reference1 → Reference2 → シーンの検索 の順に確かめ、最初の誤りだけを出す。
+/// Reference0 → Reference1 → Reference2 → シーンの検索 の順に確かめ、最初の誤りだけを出す。
 #[test]
 fn reference2_checked_after_reference0_and_1_before_lookup() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -1004,7 +1001,7 @@ fn reference2_checked_after_reference0_and_1_before_lookup() {
     );
 }
 
-/// scene-play-locals 5.1・5.2: `external`・デバッグ無効では、Reference2 が誤っていても 204 と門の警告 1 行だけ。
+/// `external`・デバッグ無効では、Reference2 が誤っていても 204 と門の警告 1 行だけ。
 #[test]
 fn reference2_not_read_when_gate_refuses() {
     let enabled = tempfile::TempDir::new().unwrap();
@@ -1043,7 +1040,7 @@ fn reference2_not_read_when_gate_refuses() {
     }
 }
 
-/// scene-play-locals 4.7: `[logging] balloon_warning = false` では 204 で、警告は出る。
+/// `[logging] balloon_warning = false` では 204 で、警告は出る。
 #[test]
 fn reference2_error_with_balloon_warning_off_is_204_with_warning() {
     let temp = tempfile::TempDir::new().unwrap();

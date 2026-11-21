@@ -1,4 +1,4 @@
-//! 派生ゴーストの homeurl の判定（8.3〜8.6）。descript.txt の bytes を受ける純関数で、ファイルは読まない。
+//! 派生ゴーストの homeurl の判定。descript.txt の bytes を受ける純関数で、ファイルは読まない。
 
 use super::report::{Finding, FindingKind, msg};
 

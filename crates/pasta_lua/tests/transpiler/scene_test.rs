@@ -1,16 +1,16 @@
 //! Scene-related integration tests for pasta_lua transpiler.
 //!
-//! - set_spot tests (scene-actors-lua-codegen)
-//! - Tail Call Optimization (TCO) tests (Requirement 4)
+//! - set_spot tests
+//! - Tail Call Optimization (TCO) tests
 
 use pasta_dsl::parse_str;
 use pasta_lua::LuaTranspiler;
 
 // ============================================================================
-// set_spot Tests (scene-actors-lua-codegen)
+// set_spot Tests
 // ============================================================================
 
-/// Test 3.1: 複数アクター生成テスト
+/// 複数アクター生成テスト
 #[test]
 fn test_set_spot_multiple_actors() {
     let source = r#"
@@ -24,13 +24,11 @@ fn test_set_spot_multiple_actors() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify clear_spot is generated (Requirement 2.1)
     assert!(
         lua_code.contains("act:clear_spot()"),
         "Missing clear_spot call. Generated code:\n{lua_code}"
     );
 
-    // Verify set_spot calls are generated with new format (Requirement 3.1, 3.2)
     assert!(
         lua_code.contains(r#"act:set_spot("さくら", 0)"#),
         "Missing さくら set_spot call. Generated code:\n{lua_code}"
@@ -40,7 +38,6 @@ fn test_set_spot_multiple_actors() {
         "Missing うにゅう set_spot call. Generated code:\n{lua_code}"
     );
 
-    // Verify order: init_scene -> clear_spot -> set_spot (new order)
     let init_scene_pos = lua_code
         .find("act:init_scene")
         .expect("init_scene not found");
@@ -68,7 +65,7 @@ fn test_set_spot_multiple_actors() {
     );
 }
 
-/// Test 3.2: 単一アクター生成テスト
+/// 単一アクター生成テスト
 #[test]
 fn test_set_spot_single_actor() {
     let source = r#"
@@ -82,19 +79,16 @@ fn test_set_spot_single_actor() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify clear_spot is generated (Requirement 2.1)
     assert!(
         lua_code.contains("act:clear_spot()"),
         "Missing clear_spot call. Generated code:\n{lua_code}"
     );
 
-    // Verify single actor set_spot is generated with new format (Requirement 3.1, 3.2)
     assert!(
         lua_code.contains(r#"act:set_spot("さくら", 0)"#),
         "Missing single actor set_spot call. Generated code:\n{lua_code}"
     );
 
-    // Verify order: init_scene -> clear_spot -> set_spot (new order)
     let init_scene_pos = lua_code
         .find("act:init_scene")
         .expect("init_scene not found");
@@ -115,7 +109,7 @@ fn test_set_spot_single_actor() {
     );
 }
 
-/// Test 3.3: アクター未定義テスト
+/// アクター未定義テスト
 #[test]
 fn test_set_spot_empty_actors() {
     let source = r#"
@@ -128,20 +122,18 @@ fn test_set_spot_empty_actors() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify no set_spot calls are generated (Requirement 2.2)
     assert!(
         !lua_code.contains("set_spot"),
         "set_spot should not be generated when no actors defined. Generated code:\n{lua_code}"
     );
 
-    // Verify no clear_spot call is generated (Requirement 2.2)
     assert!(
         !lua_code.contains("act:clear_spot()"),
         "clear_spot should not be generated when no actors defined. Generated code:\n{lua_code}"
     );
 }
 
-/// Test 3.4: 明示的番号付きアクターテスト
+/// 明示的番号付きアクターテスト
 #[test]
 fn test_set_spot_with_explicit_number() {
     let source = r#"
@@ -155,7 +147,6 @@ fn test_set_spot_with_explicit_number() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify clear_spot is generated (Requirement 2.1)
     assert!(
         lua_code.contains("act:clear_spot()"),
         "Missing clear_spot call. Generated code:\n{lua_code}"
@@ -175,7 +166,6 @@ fn test_set_spot_with_explicit_number() {
         "Missing まりか set_spot(3). Generated code:\n{lua_code}"
     );
 
-    // Verify order: init_scene -> clear_spot -> all set_spot (new order)
     let init_scene_pos = lua_code
         .find("act:init_scene")
         .expect("init_scene not found");
@@ -197,10 +187,10 @@ fn test_set_spot_with_explicit_number() {
 }
 
 // ============================================================================
-// Tail Call Optimization (TCO) Tests - Requirement 4
+// Tail Call Optimization (TCO) Tests
 // ============================================================================
 
-/// Test 4.1: 単一の act:call() のみを含むシーン関数から return act:call(...) が生成される
+/// 単一の act:call() のみを含むシーン関数から return act:call(...) が生成される
 #[test]
 fn test_single_call_scene_gets_return() {
     let source = r#"
@@ -213,15 +203,13 @@ fn test_single_call_scene_gets_return() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify that single call gets return prefix (Requirement 4.1)
-    // Counter now assigned by Lua runtime, uses SCENE.__global_name__
     assert!(
         lua_code.contains(r#"return act:call(SCENE.__global_name__, "シーン2""#),
         "Single call should have 'return' prefix for TCO. Generated code:\n{lua_code}"
     );
 }
 
-/// Test 4.2: 複数の act:call() を含むシーン関数から、最後の呼び出しのみに return が付与される
+/// 複数の act:call() を含むシーン関数から、最後の呼び出しのみに return が付与される
 #[test]
 fn test_multiple_call_scenes_only_last_gets_return() {
     let source = r#"
@@ -236,8 +224,6 @@ fn test_multiple_call_scenes_only_last_gets_return() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify first and second calls do NOT have return (Requirement 4.2)
-    // Counter now assigned by Lua runtime, uses SCENE.__global_name__
     assert!(
         lua_code.contains(r#"act:call_restore(SCENE.__global_name__, "シーン1""#),
         "First call should NOT have 'return' prefix. Generated code:\n{lua_code}"
@@ -247,13 +233,11 @@ fn test_multiple_call_scenes_only_last_gets_return() {
         "Second call should NOT have 'return' prefix. Generated code:\n{lua_code}"
     );
 
-    // Verify the last call HAS return
     assert!(
         lua_code.contains(r#"return act:call(SCENE.__global_name__, "シーン3""#),
         "Last call should have 'return' prefix for TCO. Generated code:\n{lua_code}"
     );
 
-    // Verify first calls do not have return prefix
     // Check that "return act:call" appears exactly once for シーン3
     let return_calls: Vec<_> = lua_code.match_indices("return act:call").collect();
     assert_eq!(
@@ -264,7 +248,7 @@ fn test_multiple_call_scenes_only_last_gets_return() {
     );
 }
 
-/// Test 4.3: act:call() の後に ActionLine が続く場合、return が生成されない
+/// act:call() の後に ActionLine が続く場合、return が生成されない
 #[test]
 fn test_call_scene_followed_by_action_no_return() {
     let source = r#"
@@ -281,21 +265,17 @@ fn test_call_scene_followed_by_action_no_return() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify that call does NOT have return when followed by action (Requirement 4.3)
-    // Counter now assigned by Lua runtime, uses SCENE.__global_name__
     // The call should appear without return prefix
     assert!(
         lua_code.contains(r#"act:call_restore(SCENE.__global_name__, "シーン2""#),
         "Call should be present. Generated code:\n{lua_code}"
     );
 
-    // Verify return is NOT before this call (it's not the tail)
     assert!(
         !lua_code.contains(r#"return act:call(SCENE.__global_name__, "シーン2""#),
         "Call followed by action should NOT have 'return' prefix. Generated code:\n{lua_code}"
     );
 
-    // Verify the talk action comes after the call
     let call_pos = lua_code
         .find(r#"act:call_restore(SCENE.__global_name__, "シーン2""#)
         .expect("Call not found");
@@ -305,7 +285,7 @@ fn test_call_scene_followed_by_action_no_return() {
     assert!(call_pos < talk_pos, "Call should come before talk action");
 }
 
-/// Test 4.4: シーン関数に act:call() が含まれない場合、return が生成されない
+/// シーン関数に act:call() が含まれない場合、return が生成されない
 #[test]
 fn test_no_call_scene_no_return() {
     let source = r#"
@@ -322,14 +302,12 @@ fn test_no_call_scene_no_return() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify no return statements for calls (only function return, not call return)
     // The scene should have talk actions but no return act:call
     assert!(
         !lua_code.contains("return act:call"),
         "No call scene means no 'return act:call' should be generated. Generated code:\n{lua_code}"
     );
 
-    // Verify talk actions are generated correctly
     assert!(
         lua_code.contains(r#"act:actor_proxy("さくら"):talk("こんにちは")"#),
         "Talk action should be present. Generated code:\n{lua_code}"
@@ -340,7 +318,7 @@ fn test_no_call_scene_no_return() {
     );
 }
 
-/// Test 4.5: テストフィクスチャを使用した末尾再帰最適化の E2E 検証
+/// テストフィクスチャを使用した末尾再帰最適化の E2E 検証
 #[test]
 fn test_tail_call_optimization_fixture() {
     let source = include_str!("../fixtures/tail_call_optimization.pasta");

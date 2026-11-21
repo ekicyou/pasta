@@ -1,16 +1,4 @@
 //! Runtime Syntax E2E Tests for pasta_lua.
-//!
-//! These tests verify syntax parsing, variable scoping, error reporting,
-//! and chaintalk (＞チェイントーク) runtime execution:
-//! - Comment line parse verification
-//! - Attribute inheritance from file scope to scenes
-//! - Variable scope separation (local/global/system)
-//! - Error message specificity (line/column numbers)
-//! - Chaintalk transpile, finalize, and coroutine execution
-//!
-//! # Requirements Coverage
-//! - Requirement 7.1: Untested area tests
-//! - Requirement 7.2: Runtime E2E tests
 
 use crate::common;
 
@@ -19,15 +7,10 @@ use pasta_lua::loader::TalkConfig;
 use pasta_lua::sakura_script;
 
 // ============================================================================
-// Task 3.1: Comment Line Parse Test
+// Comment Line Parse Test
 // ============================================================================
 
-/// Test that comment lines are not included in AST (Task 3.1)
-///
-/// Verifies:
-/// - Lines starting with ＃ are treated as comments
-/// - Comments do not appear in transpiled output
-/// - Mixed comments and code parse correctly
+/// Test that comment lines are not included in AST
 #[test]
 fn test_comment_line_explicit_parse() {
     use pasta_dsl::parser::parse_str;
@@ -40,10 +23,8 @@ fn test_comment_line_explicit_parse() {
 ＃ 最後のコメント
 "#;
 
-    // Parse should succeed
     let file = parse_str(source, "test.pasta").expect("Should parse with comments");
 
-    // Should have exactly one scene (メイン)
     let scene_count = file
         .items
         .iter()
@@ -52,7 +33,6 @@ fn test_comment_line_explicit_parse() {
 
     assert_eq!(scene_count, 1, "Should have exactly 1 scene");
 
-    // Transpiled code should not contain comment text
     let lua_code = transpile(source);
     assert!(
         !lua_code.contains("これはコメントです"),
@@ -65,12 +45,12 @@ fn test_comment_line_explicit_parse() {
 }
 
 // ============================================================================
-// Task 3.2: Attribute Inheritance Test
+// Attribute Inheritance Test
 // ============================================================================
 
-/// Test attribute inheritance from file scope to scenes (Task 3.2)
+/// Test attribute inheritance from file scope to scenes
 ///
-/// Verifies (scene-attribute-store 3.1・3.5・6.5):
+/// Verifies:
 /// - File-level attributes are inherited by scenes, in written order
 /// - A scene attribute with the same name keeps the file position and takes the scene value
 /// - Inside a scene function, `act.current_scene.__global_name__` reads the running scene's attrs
@@ -128,15 +108,10 @@ end
 }
 
 // ============================================================================
-// Task 3.3: Variable Scope Test
+// Variable Scope Test
 // ============================================================================
 
-/// Test variable scope separation (Task 3.3)
-///
-/// Verifies:
-/// - Local variables (＄) are action-scoped
-/// - Global variables (＄＊) are save-scoped
-/// - System variables (＄＊＊) are system-scoped (if implemented)
+/// Test variable scope separation
 #[test]
 fn test_variable_scope_complete() {
     let source = r#"
@@ -148,35 +123,27 @@ fn test_variable_scope_complete() {
 
     let lua_code = transpile(source);
 
-    // Local variable uses var.name format
     assert!(
         lua_code.contains("var."),
         "Local variable should use var.name format. Generated code:\n{}",
         lua_code
     );
 
-    // Global variable uses save.name format
     assert!(
         lua_code.contains("save."),
         "Global variable should use save.name format. Generated code:\n{}",
         lua_code
     );
 
-    // Verify code compiles
     let lua = create_runtime_with_finalize().unwrap();
     lua.load(&lua_code).exec().unwrap();
 }
 
 // ============================================================================
-// Task 3.4: Error Message Specificity Test
+// Error Message Specificity Test
 // ============================================================================
 
-/// Test error message includes line and column numbers (Task 3.4)
-///
-/// Verifies:
-/// - Parse errors include line number
-/// - Parse errors include column number
-/// - Error message is descriptive
+/// Test error message includes line and column numbers
 #[test]
 fn test_error_message_specificity() {
     use pasta_dsl::parser::parse_str;
@@ -190,19 +157,15 @@ fn test_error_message_specificity() {
     let error = result.unwrap_err();
     let error_str = format!("{:?}", error);
 
-    // Error should contain line number
     assert!(
         error_str.contains("line") || error_str.contains("1"),
         "Error should include line information: {}",
         error_str
     );
 
-    // Test another error pattern: unclosed action
     let invalid_source2 = "＊メイン\n  さくら：";
     let result2 = parse_str(invalid_source2, "test.pasta");
 
-    // This might succeed or fail depending on grammar
-    // The important thing is that errors are descriptive
     if let Err(error2) = result2 {
         let error_str2 = format!("{:?}", error2);
         assert!(
@@ -214,34 +177,27 @@ fn test_error_message_specificity() {
 }
 
 // ============================================================================
-// Task 4: Chaintalk (＞チェイントーク) E2E Tests
+// Chaintalk (＞チェイントーク) E2E Tests
 // ============================================================================
 
-/// Test that chaintalk fixture parses and transpiles correctly (Task 4.1)
-///
-/// Verifies:
-/// - ＞チェイントーク is transpiled to act:call with "チェイントーク" label
-/// - The transpiled code contains the expected scene structure
+/// Test that chaintalk fixture parses and transpiles correctly
 #[test]
 fn test_fixture_chaintalk_parses() {
     let source = include_str!("../fixtures/e2e/runtime_e2e_scene_chaintalk.pasta");
     let lua_code = transpile(source);
 
-    // Verify actor definition
     assert!(
         lua_code.contains("create_actor(\"さくら\")"),
         "Should contain さくら actor definition. Generated code:\n{}",
         lua_code
     );
 
-    // Verify scene is created
     assert!(
         lua_code.contains("チェイントークテスト"),
         "Should contain チェイントークテスト scene. Generated code:\n{}",
         lua_code
     );
 
-    // Verify ＞チェイントーク is transpiled to act:call with "チェイントーク" key
     assert!(
         lua_code.contains("\"チェイントーク\""),
         "Should contain act:call with チェイントーク key. Generated code:\n{}",
@@ -249,14 +205,7 @@ fn test_fixture_chaintalk_parses() {
     );
 }
 
-/// Test chaintalk transpile → finalize → GLOBAL function resolution (Task 4.2)
-///
-/// Verifies the complete E2E flow:
-/// 1. Pasta DSL with ＞チェイントーク transpiles to Lua
-/// 2. Transpiled code loads and finalizes successfully
-/// 3. Scene can be found via search
-/// 4. GLOBAL.チェイントーク is registered and accessible at L3
-/// 5. Scene execution with coroutine produces intermediate output via yield
+/// Test chaintalk transpile → finalize → GLOBAL function resolution
 #[test]
 fn test_e2e_chaintalk_transpile_and_execute() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -271,15 +220,12 @@ fn test_e2e_chaintalk_transpile_and_execute() {
     let source = include_str!("../fixtures/e2e/runtime_e2e_scene_chaintalk.pasta");
     let lua_code = transpile(source);
 
-    // Load transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Finalize scenes
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Verify GLOBAL functions are registered
     let global_ok: bool = lua
         .load(
             r#"
@@ -322,7 +268,6 @@ fn test_e2e_chaintalk_transpile_and_execute() {
         .eval()
         .unwrap();
 
-    // After first fire, we expect response and suspended coroutine
     assert!(
         fire_result.contains("status=true"),
         "EVENT.fire should return a response, got: {}",
@@ -341,7 +286,7 @@ fn test_e2e_chaintalk_transpile_and_execute() {
 
 /// DSL から転記メソッドを Call して、SHIORI リクエスト由来の変数
 /// （＄ｒＮ / ＄rN / ＄req_id）と日時変数（＄時１２ 等）を参照できること。
-/// 転記を呼ばないイベントのシーンにも、選ぶ前の自動転記で値が入ること（scene-condition-attributes 6.1）。
+/// 転記を呼ばないイベントのシーンにも、選ぶ前の自動転記で値が入ること。
 #[test]
 fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -402,8 +347,7 @@ fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
 }
 
 /// 未定義の変数・単語・関数をアクション行で参照すると、"nil" を出さず
-/// その位置に失敗表記を出す（failure-output-unification 対応表 #1・#3・#5、
-/// マニュアル book/src/reference/runtime-failures.md と同じ扱い）。
+/// その位置に失敗表記を出す（マニュアル book/src/reference/runtime-failures.md と同じ扱い）。
 /// 前後に文字がある単語参照が nil 連結で実行時エラーにならないことも確認する。
 #[test]
 fn test_e2e_undefined_refs_in_action_line_render_failure_notation() {
@@ -443,7 +387,7 @@ fn test_e2e_undefined_refs_in_action_line_render_failure_notation() {
 }
 
 // ============================================================================
-// dynamic-word-reference: ＠＄変数名 / ＠＄変数名（…） E2E
+// ＠＄変数名 / ＠＄変数名（…） E2E
 // ============================================================================
 
 /// Transpile `source`, finalize, fire scene `id` once per entry of `ids` and
@@ -507,7 +451,7 @@ end
   さくら：前＠＄z　後。
 "#;
 
-/// R3.2: アクター付きの行の `＠＄x` は、静的参照と同じくアクター辞書を先に探す。
+/// アクター付きの行の `＠＄x` は、静的参照と同じくアクター辞書を先に探す。
 #[test]
 fn test_e2e_dynamic_word_ref_actor_line_uses_actor_dictionary() {
     let out = fire_scenes(DYNAMIC_REF_SOURCE, &["アクター辞書"]).remove(0);
@@ -518,7 +462,7 @@ fn test_e2e_dynamic_word_ref_actor_line_uses_actor_dictionary() {
     assert!(!out.contains("グローバル表情"), "global word leaked: {out}");
 }
 
-/// R3.3: 代入の右辺 `＄y＝＠＄x` はアクター辞書を探さない。
+/// 代入の右辺 `＄y＝＠＄x` はアクター辞書を探さない。
 #[test]
 fn test_e2e_dynamic_word_ref_assignment_skips_actor_dictionary() {
     let out = fire_scenes(DYNAMIC_REF_SOURCE, &["代入の右辺"]).remove(0);
@@ -528,7 +472,7 @@ fn test_e2e_dynamic_word_ref_assignment_skips_actor_dictionary() {
     );
 }
 
-/// R1.5: プロパティ代入の右辺 `＄％prop＝＠＄x` は、動的参照の結果を代入する。
+/// プロパティ代入の右辺 `＄％prop＝＠＄x` は、動的参照の結果を代入する。
 #[test]
 fn test_e2e_dynamic_word_ref_property_assignment() {
     let out = fire_scenes(DYNAMIC_REF_SOURCE, &["プロパティ代入"]).remove(0);
@@ -538,7 +482,7 @@ fn test_e2e_dynamic_word_ref_property_assignment() {
     );
 }
 
-/// R2.1: アクター付きの行の `＠＄f（１）` でも、シーンテーブルの関数は第 1 引数に ACT を受け取る。
+/// アクター付きの行の `＠＄f（１）` でも、シーンテーブルの関数は第 1 引数に ACT を受け取る。
 #[test]
 fn test_e2e_dynamic_fn_call_scene_function_receives_act() {
     let out = fire_scenes(DYNAMIC_REF_SOURCE, &["プロキシ"]).remove(0);
@@ -548,7 +492,7 @@ fn test_e2e_dynamic_fn_call_scene_function_receives_act() {
     );
 }
 
-/// R2.4: アクション行の `＠話す（…）` で Lua ブロックのシーン関数を呼ぶと、
+/// アクション行の `＠話す（…）` で Lua ブロックのシーン関数を呼ぶと、
 /// 行の外（`＄r＝＠話す（…）`）と同じく実行される。
 #[test]
 fn test_e2e_action_line_calls_lua_scene_function() {
@@ -576,7 +520,7 @@ end
     assert!(!out.contains("table:"), "must not render a table: {out}");
 }
 
-/// R4.5: 未代入の `＠＄z` はその位置に失敗表記が出て、行の残りが出力される。
+/// 未代入の `＠＄z` はその位置に失敗表記が出て、行の残りが出力される。
 #[test]
 fn test_e2e_dynamic_word_ref_unassigned_keeps_rest_of_line() {
     let out = fire_scenes(DYNAMIC_REF_SOURCE, &["未代入"]).remove(0);
@@ -587,7 +531,7 @@ fn test_e2e_dynamic_word_ref_unassigned_keeps_rest_of_line() {
     );
 }
 
-/// R3.4: `＄x` の値が「果物」のとき、`＠＄x` と `＠果物` は実物の単語レジストリの
+/// `＄x` の値が「果物」のとき、`＠＄x` と `＠果物` は実物の単語レジストリの
 /// 1 つの巡回を共有する。1 回の発火で静的 2 回・動的 2 回の計 4 回を引き、
 /// 候補 4 つがちょうど 1 回ずつ出ることを、複数回の発火で確認する
 /// （巡回が別々なら同じ候補が重複しうる）。

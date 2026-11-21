@@ -93,7 +93,7 @@ fn walk(
     Ok(())
 }
 
-/// 中身をバイトで読み、UTF-8 で読めない・読めないを区別する（Req 3.4）
+/// 中身をバイトで読み、UTF-8 で読めない・読めないを区別する
 pub fn read_file(path: &Path) -> FileText {
     match fs::read(path) {
         Err(e) => FileText::Unreadable {
@@ -152,7 +152,7 @@ mod tests {
         );
     }
 
-    /// 一覧: 中身の無いフォルダや辞書の名前のフォルダも dirs に入る（Req 2.3）
+    /// 一覧: 中身の無いフォルダや辞書の名前のフォルダも dirs に入る
     #[test]
     fn test_collect_dirs() {
         let (_t, _target, master) = ghost();

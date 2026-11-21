@@ -1,4 +1,4 @@
--- 動的参照（＠＄名前・＠＄名前（…））のランタイムテスト (dynamic-word-reference)
+-- 動的参照（＠＄名前・＠＄名前（…））のランタイムテスト
 -- WORD.dynamic_key: 参照変数の値 → 検索キー（使えない値は警告して nil）
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
@@ -121,7 +121,7 @@ describe("WORD.dynamic_key - 依存方向", function()
 end)
 
 -- ============================================================================
--- act の動的参照（task 2.2）: find_act_handler の skip_methods・word(値, パス)・expr_fn_var
+-- act の動的参照: find_act_handler の skip_methods・word(値, パス)・expr_fn_var
 -- ============================================================================
 
 local GLOBAL = require("pasta.global")
@@ -409,7 +409,7 @@ describe("ACT - expr_fn_var(値, 変数パス, 引数…)", function()
 end)
 
 -- ============================================================================
--- アクター付きの動的参照（task 2.3）: PROXY_IMPL の skip_methods・word(値, パス)・expr_fn_var
+-- アクター付きの動的参照: PROXY_IMPL の skip_methods・word(値, パス)・expr_fn_var
 -- ============================================================================
 
 --- with_act に加えて pasta.store（@pasta_config は空の代役）・pasta.actor も新規ロードし、

@@ -221,11 +221,6 @@ pub struct ActionLine {
 /// Continuation action line without speaker.
 ///
 /// Corresponds to the `continue_action_line` rule: `：actions`
-///
-/// # pasta2.pest Specification Change
-///
-/// In pasta2.pest, continuation lines explicitly start with `：` or `:`.
-/// This is a change from pasta.pest where continuation lines had no explicit prefix.
 #[derive(Debug, Clone)]
 pub struct ContinueAction {
     /// List of actions

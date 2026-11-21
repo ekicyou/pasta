@@ -1,7 +1,6 @@
 //! Lua code generator for Pasta DSL.
 //!
 //! This module generates Lua source code from Pasta AST nodes.
-//! Implements Requirements 1, 3a-3g for Lua code generation.
 
 mod element_gen;
 mod expr_gen;
@@ -19,16 +18,14 @@ use std::io::Write;
 ///
 /// Generates Lua source code from Pasta AST nodes.
 ///
-/// # Source-map seam (R4: feasibility)
+/// # Source-map seam
 ///
 /// The generator tracks `out_line`, the 1-based line number of the most recently
 /// emitted output line, and carries an optional [`SourceMapSink`]. When a sink is
-/// attached (via [`set_source_map`](LuaCodeGenerator::set_source_map)) and a span is
-/// known at the emit point, the generator records `(out_line -> span)` so the
-/// `.pasta` <-> `.lua` line correspondence is resolvable. `LuaTranspiler` always
-/// attaches its line recorder (scene line maps); the caller's own sink is optional
-/// and is fed through it. Recording only observes line numbers and never changes
-/// the emitted bytes.
+/// attached (via [`set_source_map`](LuaCodeGenerator::set_source_map)) and a span
+/// is known at the emit point, it records `(out_line -> span)`. `LuaTranspiler`
+/// always attaches its line recorder (scene line maps) and feeds the caller's own
+/// sink through it. Recording never changes the emitted bytes.
 ///
 /// # Writing
 ///
@@ -37,31 +34,19 @@ use std::io::Write;
 /// `write_line_terminator`・`generate_expr`。ほかの所から `self.writer` に直に書くと
 /// 空行の位置と `out_line` がずれる。
 pub struct LuaCodeGenerator<'a, W: Write> {
-    /// Output writer
     writer: &'a mut W,
-    /// Current indentation level
     indent_level: usize,
-    /// 1-based line number of the most recently emitted output line.
+    /// 1-based line number of the most recently emitted output line; 0 before any.
     ///
-    /// Starts at 0 (nothing emitted yet) and is incremented by exactly 1 for each
-    /// line terminator actually written (`writeln`, flushed pending blank lines,
-    /// `write_line_terminator`, and per embedded `\n` in `write_raw`). Pending
-    /// blank lines are not counted until written, so the count always equals the
-    /// number of `\n` in the emitted bytes.
+    /// Incremented by 1 per line terminator actually written (including each
+    /// embedded `\n` in `write_raw`). Pending blank lines count only once written,
+    /// so it always equals the number of `\n` in the emitted bytes.
     out_line: u32,
     /// 保留中の区切りの空行の数（次の書き出しで出す。`end` の前では捨てる）。
-    ///
-    /// `self.writer` へ直接書いてよいのは `write_indent`・`write_raw`（頭で保留を
-    /// 出す）と `write_line_terminator`・`generate_expr`（いつもそのどちらかの後）
-    /// だけ。ほかの所から書くと空行の位置がずれる。
     pending_blank_lines: u32,
-    /// Optional source-map sink (producer side of the `debug -> code_gen` seam).
-    ///
-    /// `None` until [`set_source_map`](Self::set_source_map) (`LuaTranspiler` always
-    /// sets its line recorder). When `Some`, the generator calls
-    /// `record(out_line, span)` for span-bearing constructs.
+    /// Optional source-map sink; `None` until [`set_source_map`](Self::set_source_map).
     source_map: Option<&'a mut dyn SourceMapSink>,
-    /// シーン関数ごとの行の対応の置き場所（runtime-error-balloon 2.5）。
+    /// シーン関数ごとの行の対応の置き場所。
     /// トランスパイラが整形の後に `init_scene` の行へ行の対応を埋める。
     line_map_slots: Vec<LineMapSlot>,
 }
@@ -90,11 +75,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
     }
 
-    /// Attach a source-map sink (producer side of the source-map seam).
-    ///
-    /// While a sink is attached, the generator records `(out_line -> span)` for
-    /// span-bearing constructs it emits. Attaching a sink NEVER changes the emitted
-    /// bytes — it only observes line numbers.
+    /// Attach a source-map sink. Attaching never changes the emitted bytes.
     pub fn set_source_map(&mut self, sink: &'a mut dyn SourceMapSink) {
         self.source_map = Some(sink);
     }
@@ -104,27 +85,21 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         std::mem::take(&mut self.line_map_slots)
     }
 
-    /// Current value of the output-line counter (1-based line most recently emitted).
-    ///
-    /// Returns 0 before any line has been emitted. Exposed for accuracy assertions
-    /// and for callers that need the line a construct will land on.
+    /// Current value of the output-line counter (1-based line most recently
+    /// emitted); 0 before any line has been emitted.
     pub fn out_line(&self) -> u32 {
         self.out_line
     }
 
-    /// The one recording rule for span-bearing elements (Requirement 6.3): if any
-    /// line was written since `before` (an earlier [`out_line`](Self::out_line)),
-    /// record `(out_line -> span)` for the last written line; otherwise record
-    /// nothing. Also skipped when no sink is attached or the span is invalid
+    /// The one recording rule for span-bearing elements: if any line was written
+    /// since `before` (an earlier [`out_line`](Self::out_line)), record
+    /// `(out_line -> span)` for the last written line; otherwise record nothing.
+    /// Also skipped when no sink is attached or the span is invalid
     /// (`end_byte == 0`).
     ///
-    /// # Coverage
-    ///
-    /// Scope headers (actor / global scene / local scene), actions, var sets,
-    /// calls, choices, cue commands, and word definitions. Code blocks use
-    /// [`record_block_line`](Self::record_block_line) per content line instead. The
-    /// post-transpile normalize line shift is applied by the consumer, using the
-    /// [`LineShift`](crate::normalize::LineShift) returned by
+    /// Code blocks use [`record_block_line`](Self::record_block_line) per content
+    /// line instead. The post-transpile normalize line shift is applied by the
+    /// consumer, using the [`LineShift`](crate::normalize::LineShift) returned by
     /// `LuaTranspiler::transpile_with_source_map`.
     fn record_span_since(&mut self, before: u32, span: Span) {
         if self.out_line > before
@@ -135,17 +110,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
     }
 
-    /// Record a scene declaration's deterministic join key + `.pasta` span via the
-    /// sink's [`record_scene`](SourceMapSink::record_scene), if a sink is attached
-    /// and the span is valid.
+    /// Record a scene declaration's join key + `.pasta` span via the sink's
+    /// [`record_scene`](SourceMapSink::record_scene), if a sink is attached and the
+    /// span is valid.
     ///
-    /// No-op when no sink is attached. Invalid/default spans (`end_byte == 0`) are skipped, mirroring
-    /// [`record_span_since`](Self::record_span_since), so synthetic/headerless scenes do not
-    /// pollute the scene index. Unlike `record_span_since`, this does NOT consume
-    /// `out_line`: the scene join is keyed by the `.pasta` span (header line range),
-    /// not the emitted `.lua` line. The `scene_join_key` is built at the call site in
-    /// `scope_gen.rs` (see its encoding doc) and must be reproducible at finalize
-    /// (task 2.2) from runtime/registry data.
+    /// Invalid/default spans (`end_byte == 0`) are skipped, mirroring
+    /// [`record_span_since`](Self::record_span_since), so synthetic/headerless
+    /// scenes do not pollute the scene index. Unlike `record_span_since`, this does
+    /// NOT consume `out_line`: the join is keyed by the `.pasta` span (header line
+    /// range), not the emitted `.lua` line. The `scene_join_key` is built at the
+    /// call site in `scope_gen.rs` and must be reproducible at finalize from
+    /// runtime/registry data.
     fn record_scene_span(&mut self, scene_join_key: &str, span: Span) {
         if let Some(sink) = self.source_map.as_deref_mut()
             && span.is_valid()
@@ -156,17 +131,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
     /// Record `(out_line -> pasta_line)` directly if a sink is attached.
     ///
-    /// No-op when no sink is attached. Unlike [`record_span_since`](Self::record_span_since), this maps the most recently
-    /// emitted output line to an explicit 1-based `.pasta` line rather than a span's
-    /// `start_line`. It is the per-line mapping primitive used by multi-line elements
-    /// whose output lines correspond 1:1 to distinct `.pasta` source lines — chiefly
-    /// code blocks, where in-block line precision requires
-    /// each generated `.lua` line to resolve to its own originating `.pasta` line.
-    ///
-    /// `pasta_line` must be 1-based. Callers compute it as
-    /// `block.span.start_line + offset` (see `generate_code_block`). A `0` value is
-    /// treated as invalid and skipped, mirroring the `span.is_valid()` guard in
-    /// `record_span_since` (the default/uninitialized line is not recorded).
+    /// Maps the most recently emitted output line to an explicit 1-based `.pasta`
+    /// line rather than a span's `start_line`; used by code blocks, whose output
+    /// lines correspond 1:1 to distinct `.pasta` lines. A `0` is treated as
+    /// invalid and skipped, mirroring the `span.is_valid()` guard in
+    /// `record_span_since`.
     fn record_block_line(&mut self, pasta_line: u32) {
         if let Some(sink) = self.source_map.as_deref_mut()
             && pasta_line > 0
@@ -224,11 +193,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Emit a bare line terminator for the open line built via `write_raw` fragments.
-    ///
-    /// Writes the same byte the previous inline `writeln!(self.writer)` calls wrote
-    /// (a single `\n`, later normalized) and advances `out_line` by 1. Keeps the
-    /// out-line accounting centralized so the counter cannot drift from the bytes.
+    /// Emit a bare line terminator for the open line built via `write_raw`
+    /// fragments (a single `\n`, later normalized); advances `out_line` by 1.
     fn write_line_terminator(&mut self) -> Result<(), TranspileError> {
         writeln!(self.writer)?;
         self.out_line += 1;
@@ -249,8 +215,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
     /// Close a block: dedent, drop pending blank lines, write `end`, and hold a
     /// separating blank line (so a blank appears only before a following sibling).
-    ///
-    /// Common pattern used by actor, global scene, and local scene generators.
     fn end_block(&mut self) -> Result<(), TranspileError> {
         self.dedent();
         self.pending_blank_lines = 0;
@@ -424,7 +388,7 @@ mod tests {
         );
     }
 
-    /// `record_span_since` rule (Requirement 6.3): nothing written since
+    /// `record_span_since` rule: nothing written since
     /// `before` -> no record (a pending blank line is not a write); several lines
     /// written -> the last written line is recorded.
     #[test]

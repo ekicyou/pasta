@@ -1,14 +1,4 @@
 //! CONFIG.actor → STORE.actors 自動初期化テスト
-//!
-//! Requirements:
-//! - 2.1: CONFIG.actor がテーブル型の場合、STORE.actors に参照共有で設定
-//! - 2.2: CONFIG.actor がテーブル型でない場合、空テーブル維持
-//! - 2.3: メタテーブル設定は pasta.actor モジュールに委譲
-//! - 2.4: STORE.actors の各テーブル要素に ACTOR_IMPL メタテーブル設定
-//! - 2.5: 非テーブル要素はスキップ
-//! - 2.6: get_or_create で既存アクター保持
-//! - 4.1: 動的追加と CONFIG 由来アクターの共存
-//! - 4.2: ACTOR.get_or_create が CONFIG 由来プロパティを保持
 
 use crate::common;
 
@@ -16,17 +6,15 @@ use common::copy_fixture_to_temp;
 use pasta_lua::loader::PastaLoader;
 
 // ============================================================================
-// Task 2.1: pasta.store 初期化ロジックの単体テスト
+// pasta.store 初期化ロジックの単体テスト
 // ============================================================================
 
 /// CONFIG.actor がテーブル型の場合、STORE.actors が同一参照になること
-/// (Requirement 2.1)
 #[test]
 fn test_store_actors_is_config_actor_reference() {
     let temp = copy_fixture_to_temp("with_actor_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // CONFIG.actor と STORE.actors が同一参照であることを確認
     let result = runtime
         .exec(
             r#"
@@ -43,13 +31,11 @@ fn test_store_actors_is_config_actor_reference() {
 }
 
 /// CONFIG.actor の値が STORE.actors から取得できること
-/// (Requirement 2.1)
 #[test]
 fn test_store_actors_has_config_values() {
     let temp = copy_fixture_to_temp("with_actor_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // さくらアクターの spot 値を確認
     let result = runtime
         .exec(
             r#"
@@ -60,7 +46,6 @@ fn test_store_actors_has_config_values() {
         .unwrap();
     assert_eq!(result.as_i64(), Some(0), "さくらの spot は 0 であるべき");
 
-    // うにゅうアクターの spot 値を確認
     let result = runtime
         .exec(
             r#"
@@ -73,13 +58,11 @@ fn test_store_actors_has_config_values() {
 }
 
 /// CONFIG.actor が nil の場合、STORE.actors が空テーブルであること
-/// (Requirement 2.2)
 #[test]
 fn test_store_actors_empty_when_no_config_actor() {
     let temp = copy_fixture_to_temp("minimal");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // STORE.actors が空テーブルであることを確認
     let result = runtime
         .exec(
             r#"
@@ -98,11 +81,10 @@ fn test_store_actors_empty_when_no_config_actor() {
 }
 
 // ============================================================================
-// Task 2.2: pasta.actor メタテーブル設定の単体テスト
+// pasta.actor メタテーブル設定の単体テスト
 // ============================================================================
 
 /// STORE.actors の各テーブル要素に ACTOR_IMPL メタテーブルが設定されること
-/// (Requirement 2.4)
 #[test]
 fn test_config_actors_have_metatable() {
     let temp = copy_fixture_to_temp("with_actor_config");
@@ -125,7 +107,6 @@ fn test_config_actors_have_metatable() {
 }
 
 /// メタテーブルメソッド（create_word）が利用可能なこと
-/// (Requirement 2.4, 4.2)
 /// 注: CONFIG由来アクターにはnameフィールドがないため、ACTOR.get_or_create経由で
 /// nameが設定されたアクターを取得してからcreate_wordをテストする
 #[test]
@@ -151,17 +132,15 @@ fn test_config_actors_can_use_metatable_methods() {
 }
 
 // ============================================================================
-// Task 2.3: CONFIG.actor と動的追加の共存テスト（統合テスト）
+// CONFIG.actor と動的追加の共存テスト（統合テスト）
 // ============================================================================
 
 /// ACTOR.get_or_create が CONFIG 由来プロパティを保持したアクターを返すこと
-/// (Requirement 4.2)
 #[test]
 fn test_get_or_create_preserves_config_properties() {
     let temp = copy_fixture_to_temp("with_actor_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // ACTOR.get_or_create で取得したアクターが CONFIG 由来プロパティを保持
     let result = runtime
         .exec(
             r#"
@@ -179,13 +158,11 @@ fn test_get_or_create_preserves_config_properties() {
 }
 
 /// 動的追加と CONFIG 由来アクターが共存すること
-/// (Requirement 4.1)
 #[test]
 fn test_dynamic_and_config_actors_coexist() {
     let temp = copy_fixture_to_temp("with_actor_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // 動的にアクターを追加しても CONFIG 由来アクターが残っていることを確認
     let result = runtime
         .exec(
             r#"
@@ -211,17 +188,15 @@ fn test_dynamic_and_config_actors_coexist() {
 }
 
 // ============================================================================
-// co-exec-actor-init: CONFIG由来アクターの name フィールド注入テスト
+// CONFIG由来アクターの name フィールド注入テスト
 // ============================================================================
 
 /// CONFIG由来アクターに name フィールドが正しく注入されていること
-/// (co-exec-actor-init Requirement 1.1, 1.5)
 #[test]
 fn test_config_actors_have_name_field() {
     let temp = copy_fixture_to_temp("with_actor_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // さくらアクターの name フィールドを確認
     let result = runtime
         .exec(
             r#"
@@ -235,7 +210,6 @@ fn test_config_actors_have_name_field() {
         "CONFIG由来アクターに name = 'さくら' が注入されるべき"
     );
 
-    // うにゅうアクターの name フィールドを確認
     let result = runtime
         .exec(
             r#"
@@ -251,7 +225,6 @@ fn test_config_actors_have_name_field() {
 }
 
 /// CONFIG.actor 経由でも name が参照できること（参照共有の確認）
-/// (co-exec-actor-init Requirement 1.1)
 #[test]
 fn test_config_actor_name_via_config_module() {
     let temp = copy_fixture_to_temp("with_actor_config");
@@ -272,13 +245,11 @@ fn test_config_actor_name_via_config_module() {
 }
 
 /// 動的追加アクターが CONFIG.actor にも反映されること（参照共有の検証）
-/// (Requirement 4.1)
 #[test]
 fn test_dynamic_actor_reflects_in_config() {
     let temp = copy_fixture_to_temp("with_actor_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // STORE.actors への追加が CONFIG.actor にも反映されることを確認
     let result = runtime
         .exec(
             r#"
@@ -303,7 +274,6 @@ fn test_dynamic_actor_reflects_in_config() {
 
 /// pasta.toml の `[actor]` に書いた `budoux_newlines`・`budoux_jump` が
 /// `@pasta_config` から読め、`talk_to_script` に効くこと
-/// (vertical-balloon-lines Requirement 1.7)
 #[test]
 fn test_config_actor_budoux_newlines_and_jump_reach_talk_to_script() {
     let temp = copy_fixture_to_temp("with_actor_config");

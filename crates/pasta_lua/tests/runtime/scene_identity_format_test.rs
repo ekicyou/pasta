@@ -1,12 +1,12 @@
-//! 登録名の形式（`{名前}_{通し番号}`）の統合テスト（scene-identity-format）。
+//! 登録名の形式（`{名前}_{通し番号}`）の統合テスト。
 //!
 //! - `＊A1` と `＊A`×11 が 12 個の別々のシーンとして登録され、`A1_1` と `A_11` の両方が
-//!   実行できる（1.3・8.1）。旧形式（`A` ＋ `11` = `A11`）では `A1` の 1 本目と衝突する。
+//!   実行できる。旧形式（`A` ＋ `11` = `A11`）では `A1` の 1 本目と衝突する。
 //! - 実行時のシーン表の関数名（`グローバル::ローカル`）の集合が、トランスパイル時のレジストリが
-//!   Rust の規則（`SceneRegistry::registered_name`）で組み立てた集合と一致する（6.3・2.12）。
+//!   Rust の規則（`SceneRegistry::registered_name`）で組み立てた集合と一致する。
 //!   グローバルの登録名は Lua（`SCENE.create_scene`）が、ローカルの関数名は Rust の生成器が作るので、
 //!   ここが Rust と Lua の形式、およびレジストリと生成器の通し番号の突き合わせになる。
-//! - 照合用の名前が重なるローカルシーン（`・挨拶・1` と `・挨拶_1`）が別々の関数になる（1.7）。
+//! - 照合用の名前が重なるローカルシーン（`・挨拶・1` と `・挨拶_1`）が別々の関数になる。
 
 use std::collections::BTreeSet;
 
@@ -85,7 +85,7 @@ fn run_scene(lua: &Lua, global: &str, local: &str) -> String {
     .unwrap()
 }
 
-/// 1.3・8.1: `＊A1`＋`＊A`×11 が 12 個の別々のシーンになり、`A1_1` と `A_11` の両方が実行できる。
+/// `＊A1`＋`＊A`×11 が 12 個の別々のシーンになり、`A1_1` と `A_11` の両方が実行できる。
 #[test]
 fn a1_and_eleven_a_scenes_are_twelve_distinct_runnable_scenes() {
     let (lua, _) = load_fixture();
@@ -105,7 +105,7 @@ fn a1_and_eleven_a_scenes_are_twelve_distinct_runnable_scenes() {
     assert!(run_scene(&lua, "A_11", "__start__").contains("A本体11"));
 }
 
-/// 6.3: 実行時の関数名の集合（グローバル・ローカルとも）が、定義から Rust の規則で組み立てた
+/// 実行時の関数名の集合（グローバル・ローカルとも）が、定義から Rust の規則で組み立てた
 /// トランスパイル時のレジストリの集合と一致する。
 #[test]
 fn runtime_registered_names_match_rust_registered_name_rule() {
@@ -117,7 +117,7 @@ fn runtime_registered_names_match_rust_registered_name_rule() {
     );
 }
 
-/// 1.7・8.1: 同じグローバルシーンの中の `・挨拶・1` と `・挨拶_1` は照合用の名前（`挨拶_1`）が
+/// 同じグローバルシーンの中の `・挨拶・1` と `・挨拶_1` は照合用の名前（`挨拶_1`）が
 /// 重なるが、別々の関数（`挨拶_1_1`・`挨拶_1_2`）になり、どちらも実行できる。
 #[test]
 fn locals_with_overlapping_sanitized_names_are_distinct_runnable_functions() {
@@ -139,7 +139,7 @@ fn locals_with_overlapping_sanitized_names_are_distinct_runnable_functions() {
     assert_eq!(runtime_fn_names(&lua), registry_fn_names(&registry));
 }
 
-/// 2.12・6.3: 開始シーン＋名前の異なるローカルシーン 2 つ＋同名のローカルシーン 2 つを持つ
+/// 開始シーン＋名前の異なるローカルシーン 2 つ＋同名のローカルシーン 2 つを持つ
 /// 1 ファイルで、辞書確定前のレジストリと確定後のシーン表の関数名の集合が一致し、
 /// 決まった順に選ぶ設定の下で検索の結果も同じになる。
 #[test]
@@ -206,7 +206,7 @@ fn transpile_time_registry_matches_finalized_scene_table() {
     );
 }
 
-/// 2.9: 決まった順に選ぶ設定（`set_scene_selector(0)`）の下で、`＊メイン`×10 は
+/// 決まった順に選ぶ設定（`set_scene_selector(0)`）の下で、`＊メイン`×10 は
 /// `メイン_1`・`メイン_2`・…・`メイン_10` の順に返る（辞書確定の登録順と検索キーの統合確認）。
 #[test]
 fn deterministic_selector_returns_scenes_in_counter_order() {
@@ -236,7 +236,7 @@ fn deterministic_selector_returns_scenes_in_counter_order() {
 /// 呼ぶ回数。候補が混ざっていれば、シャッフル＆順次消費で必ず 1 巡する数より多くする。
 const REPEAT: usize = 30;
 
-/// 8.2（2.2・2.3・2.4・2.10）: `＞A1`・`search_scene("A1")`・`SCENE.search("A1")` を繰り返しても
+/// `＞A1`・`search_scene("A1")`・`SCENE.search("A1")` を繰り返しても
 /// `＊A` は 1 度も選ばれない。`＊章`／`＊章・1`、`＊会話・朝` の中の `・挨拶`／`・挨拶・1` も同様。
 #[test]
 fn call_and_search_never_pick_scene_named_by_shorter_prefix() {
@@ -288,7 +288,7 @@ fn call_and_search_never_pick_scene_named_by_shorter_prefix() {
     }
 }
 
-/// 2.5: 登録名の形の名前（`メイン_1`）を `search_scene` の第 1 引数に渡すと、作者が書いた名前として
+/// 登録名の形の名前（`メイン_1`）を `search_scene` の第 1 引数に渡すと、作者が書いた名前として
 /// 扱われ、`＊メイン` の 1 つ目（`メイン_1`）ではなく `＊メイン・1`（`メイン_1_1`）だけが返る。
 #[test]
 fn registered_name_as_search_name_does_not_point_to_first_scene() {
@@ -316,7 +316,7 @@ fn registered_name_as_search_name_does_not_point_to_first_scene() {
     );
 }
 
-/// 2.7: `search_scene` が返したグローバルの登録名を第 2 引数に渡すと、そのシーンのローカルシーンが返る。
+/// `search_scene` が返したグローバルの登録名を第 2 引数に渡すと、そのシーンのローカルシーンが返る。
 #[test]
 fn returned_registered_name_finds_local_scenes() {
     let (lua, _) = load_fixture();
@@ -337,7 +337,7 @@ fn returned_registered_name_finds_local_scenes() {
     assert!(ll.starts_with("挨拶_"), "・挨拶 のどれか: {ll}");
 }
 
-/// 2.8: 動的ターゲット（`＞＄変数`）と SHIORI イベントの経路（`SCENE.co_exec`）は、`＞シーン名` と
+/// 動的ターゲット（`＞＄変数`）と SHIORI イベントの経路（`SCENE.co_exec`）は、`＞シーン名` と
 /// 同じ候補から選ぶ。`章・1` は `＊章・1` だけ、`章` は `＊章`×11・`＊章11`・`＊章_2`・`＊章・1` の 14 個。
 #[test]
 fn dynamic_target_and_event_choose_from_same_candidates_as_call() {
@@ -382,7 +382,7 @@ fn dynamic_target_and_event_choose_from_same_candidates_as_call() {
     }
 }
 
-/// 3.2〜3.4: `WORD.create_local("メイン_1", キー)` の単語は `メイン_1` の実行中に参照でき、
+/// `WORD.create_local("メイン_1", キー)` の単語は `メイン_1` の実行中に参照でき、
 /// `search_word(キー, "メイン_1")` で見つかる。旧形式 `メイン1` では見つからず、エラーにもならない。
 #[test]
 fn local_words_use_new_registered_name() {

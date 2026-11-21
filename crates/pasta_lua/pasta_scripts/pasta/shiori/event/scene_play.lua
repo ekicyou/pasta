@@ -131,7 +131,7 @@ REG.OnPastaSceneAt = REG.OnPastaSceneAt or function(act)
     if not debug then return nil end
     local file, line = act.req.reference[0], act.req.reference[1]
     if not FAILURE.is_name(file) then return FAILURE.bad_reference0(act, event, file) end
-    -- 全角の数字・前後の空白・小数・符号は数にしない（要件 2.6）
+    -- 全角の数字・前後の空白・小数・符号は数にしない
     local n = type(line) == "string" and line:match("^%d+$") and tonumber(line)
     if not n or n < 1 then
         return FAILURE.reply(act, {

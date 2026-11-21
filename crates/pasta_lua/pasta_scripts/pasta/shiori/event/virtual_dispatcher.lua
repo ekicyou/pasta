@@ -13,26 +13,22 @@
 --- local result = dispatcher.dispatch(act)
 --- ```
 
--- 1. require文（CLOCK だけを先に読む。ほかのモジュールは循環参照を避けるため、使う関数の中で遅延ロードする）
+-- CLOCK だけを先に読む。ほかのモジュールは循環参照を避けるため、使う関数の中で遅延ロードする
 local CLOCK = require("pasta.shiori.clock")
 
--- 2. モジュールローカル変数（SHIORIセッション中のみ有効）
+-- SHIORIセッション中のみ有効なモジュールローカル変数
 local next_hour_unix = 0   -- 次の正時タイムスタンプ（CLOCK.now の時刻で数える）
 local seen_epoch = 0       -- 前回見た時刻の飛びの通し番号（CLOCK.epoch）
 local next_talk_time = 0   -- 次回トーク発行予定時刻（CLOCK.steady の時刻で数える）
 local talk_suspend_count = 0 -- 最後に自動トークを出したときの CLOCK.suspend_count()
 local scene_executor = nil -- テスト用: シーン実行関数のオーバーライド
 
--- 3. モジュールテーブル宣言
 ---@class VirtualDispatcher
 local M = {}
-
--- 4. 内部関数
 
 --- 時刻が飛んで次の正時を決め直すときの猶予（秒）。分の合図の遅れと読み取りの往復を吸収する（調整つまみ）
 local REBASE_GRACE = 70
 
--- ブロック対象SSP Statusキーワード一覧
 local BLOCKED_STATUSES = {
     "talking",
     "choosing",
@@ -128,7 +124,6 @@ end
 ---@param act ShioriAct actオブジェクト（SCENE.co_exec / テスト用 scene_executor へ渡される）
 ---@return thread|nil コルーチンまたはnil
 local function create_scene_thread(event_name, act)
-    -- テスト用オーバーライドがあれば使用
     if scene_executor then
         return scene_executor(event_name, act)
     end
@@ -136,8 +131,6 @@ local function create_scene_thread(event_name, act)
     local SCENE = require("pasta.scene")
     return SCENE.co_exec(act, event_name, nil, nil)
 end
-
--- 5. 公開関数
 
 --- Status文字列にブロック対象キーワードが含まれるか判定
 ---@param status string|nil act.req.status値
@@ -170,21 +163,17 @@ function M.check_hour(act)
         next_hour_unix = calculate_next_hour_unix(current_unix - REBASE_GRACE)
     end
 
-    -- 正時未到達
     if current_unix < next_hour_unix then
         return nil
     end
 
-    -- 次の正時を更新
     next_hour_unix = calculate_next_hour_unix(current_unix)
 
     -- 日時変数を転記（OnHour発火時のみ）
-    -- エラーは SHIORI.request の xpcall でキャッチされる
     if act.transfer_date_to_var then
         act:transfer_date_to_var()
     end
 
-    -- 4段階フォールバックチェーンでシーンを解決
     local hh = string.format("%02d", CLOCK.date(act.req).hour)
     local candidates = { "時報" .. hh, "OnHour" .. hh, "時報その他", "OnHourOther" }
     for _, name in ipairs(candidates) do
@@ -206,13 +195,11 @@ function M.check_talk(act)
     -- 間隔は飛びを差し引いた「なめらかな時計」で数える（実際に過ぎた時間）
     local current_unix = CLOCK.steady(act.req)
 
-    -- 初回または次回トーク時刻未設定
     if next_talk_time == 0 then
         next_talk_time = calculate_next_talk_time(current_unix)
         return nil
     end
 
-    -- 次回トーク時刻未到達
     if current_unix < next_talk_time then
         return nil
     end
@@ -228,8 +215,6 @@ function M.check_talk(act)
     -- 次回トーク時刻を再計算（発行成否に関わらず）
     next_talk_time = calculate_next_talk_time(current_unix)
 
-    -- チェイントーク継続確認（OnTalk発動タイミングで判定）
-    -- 続きがあれば継続用コルーチン（新規シーン検索スキップ）、なければ新規シーンのthread（実行しない）
     local STORE = require("pasta.store")
     local t = STORE.co_scene or create_scene_thread("OnTalk", act)
     if type(t) == "thread" then
@@ -242,12 +227,10 @@ end
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
 ---@return thread|nil コルーチンまたはnil
 function M.dispatch(act)
-    -- act.req.date 存在チェック
     if not act.req or not act.req.date then
         return nil
     end
 
-    -- Statusブロックガード（dispatch入口で一括判定）
     if M.is_blocked(act.req.status) then
         return nil
     end
@@ -258,13 +241,11 @@ function M.dispatch(act)
         return nil
     end
 
-    -- OnHour 判定（優先）
     local hour_result = M.check_hour(act)
     if hour_result then
         return hour_result
     end
 
-    -- OnTalk 判定
     return M.check_talk(act)
 end
 
@@ -299,8 +280,6 @@ function M.wake_talk(act)
     if n == 0 or talk_suspend_count == n then return end
     next_talk_time = now
 end
-
--- 6. テスト用関数（内部状態リセット）
 
 --- テスト用: 内部状態をリセット
 function M._reset()

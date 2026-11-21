@@ -15,7 +15,6 @@ local SCENE = require "pasta.scene"
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス可能）
 ---@return thread|nil シーンコルーチン、またはnil
 REG.OnBoot = REG.OnBoot or function(act)
-    -- Try to find a Pasta DSL scene for OnBoot
     return SCENE.co_exec(act, act.req.id, nil, nil)
 end
 

@@ -3,7 +3,7 @@
 ---
 --- 単語定義の登録と取得を担当する。
 --- グローバル単語、ローカル単語（シーンスコープ）、アクター単語の3種をサポート。
---- ビルダーパターンAPIで可変長引数・メソッドチェーンを提供（Requirement 9）。
+--- ビルダーパターンAPIで可変長引数・メソッドチェーンを提供する。
 
 local STORE = require("pasta.store")
 local FAILURE = require("pasta.failure")
@@ -22,14 +22,13 @@ local WORD = {}
 local WORD_BUILDER_IMPL = {}
 WORD_BUILDER_IMPL.__index = WORD_BUILDER_IMPL
 
---- 値を追加（Requirement 9.3, 9.5）
+--- 値を追加
 --- @param self WordBuilder ビルダーオブジェクト
 --- @param ... string 可変長引数で値を受け取る
 --- @return WordBuilder メソッドチェーン用に自身を返す
 function WORD_BUILDER_IMPL.entry(self, ...)
     local values = { ... }
     if #values > 0 then
-        -- 既存のエントリ配列に新しい値リストを追加
         table.insert(self._registry[self._key], values)
     end
     return self
@@ -40,7 +39,6 @@ end
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
 local function create_builder(registry, key)
-    -- キーが未登録なら初期化
     if not registry[key] then
         registry[key] = {}
     end
@@ -55,38 +53,36 @@ end
 -- 公開API
 -------------------------------------------
 
---- グローバル単語ビルダーを作成（Requirement 9.1）
+--- グローバル単語ビルダーを作成
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
 function WORD.create_global(key)
     return create_builder(STORE.global_words, key)
 end
 
---- ローカル単語ビルダーを作成（Requirement 9.2）
+--- ローカル単語ビルダーを作成
 --- @param scene_name string シーン名
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
 function WORD.create_local(scene_name, key)
-    -- シーンが未登録なら初期化
     if not STORE.local_words[scene_name] then
         STORE.local_words[scene_name] = {}
     end
     return create_builder(STORE.local_words[scene_name], key)
 end
 
---- アクター単語ビルダーを作成（actor-word-dictionary）
+--- アクター単語ビルダーを作成
 --- @param actor_name string アクター名
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
 function WORD.create_actor(actor_name, key)
-    -- アクターが未登録なら初期化
     if not STORE.actor_words[actor_name] then
         STORE.actor_words[actor_name] = {}
     end
     return create_builder(STORE.actor_words[actor_name], key)
 end
 
---- 全単語情報を取得（Requirement 2.6）
+--- 全単語情報を取得
 --- @return table {global: {key: [[values]]}, local: {scene: {key: [[values]]}}, actor: {name: {key: [[values]]}}} 形式
 function WORD.get_all_words()
     return {
@@ -110,9 +106,8 @@ end
 
 --- 値を解決（関数なら実行、配列なら最初の要素、その他はそのまま）
 ---
---- 旧 ACT_IMPL.word / PROXY_IMPL.word の検索パスで共通利用されていた汎用ユーティリティ。
---- handler-resolution-fallback 以降 pasta_scripts 内に呼び出し元はないが、
---- 出荷物の公開 API（外部ゴーストスクリプトからの利用面）として維持する。
+--- 旧来の検索パスで共通利用されていた汎用ユーティリティ。
+--- pasta_scripts 内に呼び出し元はないが、外部ゴーストスクリプトからの利用面として維持する。
 --- @param value any 検索結果
 --- @param act Act アクションオブジェクト
 --- @return any 解決後の値
@@ -122,7 +117,6 @@ function WORD.resolve_value(value, act)
     elseif type(value) == "function" then
         return value(act)
     elseif type(value) == "table" then
-        -- 配列なら最初の要素を返す（完全一致の場合）
         if #value > 0 then
             return value[1]
         end
@@ -133,7 +127,7 @@ function WORD.resolve_value(value, act)
 end
 
 -------------------------------------------
--- dynamic_key - 動的参照のキー解決（dynamic-word-reference）
+-- dynamic_key - 動的参照のキー解決
 -------------------------------------------
 
 --- 動的参照（＠＄名前・＠＄名前（…））の参照変数の値を検索キーに変換する。

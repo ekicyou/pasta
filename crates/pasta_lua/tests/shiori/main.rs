@@ -1,5 +1,3 @@
-// tests/shiori/main.rs
-//
 // SHIORI関連の統合テストをグルーピングするエントリーポイント。
 // common ヘルパーは #[path] で tests/common/ を参照する。
 

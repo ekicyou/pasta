@@ -1,4 +1,4 @@
-//! 条件の保存変数の未代入と、優先で塞がれた場面を注意する段（8.1〜8.5）。
+//! 条件の保存変数の未代入と、優先で塞がれた場面を注意する段。
 //!
 //! 構文木を読むだけで、Lua の中の代入は見ない（だから注意にとどめる）。
 
@@ -18,7 +18,7 @@ pub(crate) fn check(model: &SceneModel, parsed: &[(String, PastaFile)]) -> Vec<F
     findings
 }
 
-/// 条件・フラグの `＄＊名前` のうち、辞書のどこでも `＄＊名前＝…` していないもの（8.1・8.3）
+/// 条件・フラグの `＄＊名前` のうち、辞書のどこでも `＄＊名前＝…` していないもの
 fn unassigned(parsed: &[(String, PastaFile)]) -> Vec<Finding> {
     let mut assigned = BTreeSet::new();
     // 属性は書いた所ごとに 1 回（ファイル属性は受け継いだシーンの数でなく、その行に 1 回）
@@ -75,7 +75,7 @@ struct Candidate<'a> {
     attrs: Vec<SceneAttr>,
 }
 
-/// 同じ照合用の名前の候補に、条件もフラグも無い優先 P の場面があれば、P より低い場面を注意する（8.5）。
+/// 同じ照合用の名前の候補に、条件もフラグも無い優先 P の場面があれば、P より低い場面を注意する。
 /// グループはグローバルどうし（別名を置き換えた後）と、同じ親の中のローカルどうし
 fn shadowed(model: &SceneModel, parsed: &[(String, PastaFile)]) -> Vec<Finding> {
     // キーは（親の登録名。グローバルは ""、照合用の名前）

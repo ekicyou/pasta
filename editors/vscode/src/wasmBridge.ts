@@ -128,7 +128,7 @@ function isGhostReport(value: unknown): value is GhostReport {
 }
 
 /**
- * Boundary validation for the untyped `wasm_analyze` result (cell 3.56 / G3):
+ * Boundary validation for the untyped `wasm_analyze` result:
  * the result must carry `tokens`, `diagnostics` and `scenes` arrays (items unchecked). Rejecting a
  * malformed shape HERE keeps the failure on the callers' established
  * `WASM analysis failed` exception path instead of escaping as a distant
@@ -210,7 +210,7 @@ export class WasmBridge {
   }
 
   /**
-   * pasta.toml の pasta_patterns に従って検査する辞書ファイルを選ぶ（11.8）。
+   * pasta.toml の pasta_patterns に従って検査する辞書ファイルを選ぶ。
    * @throws Error if WASM is not initialized or the result is not a string[]
    */
   selectGhostFiles(input: GhostInput): string[] {
@@ -223,7 +223,7 @@ export class WasmBridge {
   }
 
   /**
-   * ゴースト全体を検査し、核の報告をそのまま返す（11.2）。
+   * ゴースト全体を検査し、核の報告をそのまま返す。
    * @throws Error if WASM is not initialized or the result is not a GhostReport
    */
   validateGhost(input: GhostInput, files: Readonly<Record<string, FileText>>): GhostReport {

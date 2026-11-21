@@ -24,13 +24,12 @@ local CHOICE_SCOPE_REF_INDEX = 2
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス可能）
 ---@return thread|nil シーンコルーチン、またはnil
 REG.OnChoiceSelectEx = REG.OnChoiceSelectEx or function(act)
-    -- 1. 明示的 ＊OnChoiceSelectEx シーンが存在すれば優先実行（3.5）。イベントとして扱い、条件漏れなら次へ
+    -- 明示的 ＊OnChoiceSelectEx シーンが存在すれば優先実行。イベントとして扱い、条件漏れなら次へ
     local explicit = SCENE.co_exec(act, "OnChoiceSelectEx", nil, nil)
     if explicit then
         return explicit
     end
 
-    -- 2. Reference から選択IDを取得
     local ref = act.req.reference
     if not ref then
         return nil
@@ -40,11 +39,9 @@ REG.OnChoiceSelectEx = REG.OnChoiceSelectEx or function(act)
         return nil
     end
 
-    -- 3. 選択IDでシーンを前方一致検索（ローカル→グローバル、3.1/3.4）
-    --    SCENE.search を直接呼び出し、STORE.last_global_scene をスコープに使用
-    --    co_exec/find_scene は global_scene_name を透過しないため直接検索が必須
-    --    ローカルに無ければグローバルシーンを探す
-    --    シャッフル＆順次消費は SCENE.search 内部で処理される（3.2）
+    -- 選択IDでシーンを前方一致検索（ローカル→グローバル）。
+    -- co_exec/find_scene は global_scene_name を透過しないため SCENE.search を直接呼ぶ。
+    -- シャッフル＆順次消費は SCENE.search 内部で処理される。
     --    最初の探索範囲は Reference2（選択肢を出したグローバルシーン）。既知のグローバルシーン名で
     --    なければ（手書きの \q・Reference2 を返さないベースウェアなど）最後にシーン文脈となった
     --    グローバルシーンを使う
@@ -66,7 +63,7 @@ REG.OnChoiceSelectEx = REG.OnChoiceSelectEx or function(act)
         return nil
     end
 
-    -- 4. コルーチン化して返す（act は EVENT.fire の初回 resume 時に渡される）
+    -- act は EVENT.fire の初回 resume 時に渡される
     return SCENE.wrap(result.func)
 end
 

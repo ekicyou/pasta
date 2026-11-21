@@ -1,5 +1,5 @@
 -- pasta.config（PASTA_CONFIG.get）単体テスト
--- review-improvement-loop cell 3.46 (G1): 直接テストが存在しなかった設定取得ラッパーの挙動を固定する
+-- 直接テストが存在しなかった設定取得ラッパーの挙動を固定する
 --
 -- pasta.config はロード時に @pasta_config を pcall require して束縛するため、
 -- package.loaded を退避→差し替え→再ロード→復元のパターンでバックエンドを制御する。

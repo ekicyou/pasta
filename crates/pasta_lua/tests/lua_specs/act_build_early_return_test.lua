@@ -1,5 +1,5 @@
 -- ACT:build() 早期リターンテスト
--- act-build-early-return 機能: トークン0件時のnilリターン検証
+-- トークン0件時のnilリターン検証
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -13,7 +13,7 @@ local function create_mock_actors()
 end
 
 -- ============================================================================
--- R1: ACT:build()の早期リターン（撮影トークン0件時）
+-- ACT:build()の早期リターン（撮影トークン0件時）
 -- ============================================================================
 
 describe("ACT:build() - 早期リターン（トークン0件時）", function()
@@ -84,7 +84,7 @@ describe("ACT:build() - 早期リターン（トークン0件時）", function()
 end)
 
 -- ============================================================================
--- R2: SHIORI_ACT:build()の早期リターン（ACT:build()がnil時）
+-- SHIORI_ACT:build()の早期リターン（ACT:build()がnil時）
 -- ============================================================================
 
 describe("SHIORI_ACT:build() - 早期リターン（トークン0件時）", function()

@@ -1,14 +1,13 @@
 // theme-menu-test.mjs — テーマメニューのスクリプト（book/theme/claudia.js）の jsdom ユニットテスト
-// （manual-claudia-theme タスク 2.5 / 要件 2.1, 2.4, 2.5, 2.6、design「ThemeMenu」「Security Considerations」）。
 //
-// 観測する完了条件:
+// 観測すること:
 //   - claudia.js を実行すると、隠した rust・coal・ayu の項目がメニューの末尾へ移り、
 //     先頭から Auto・Light・Navy の順に並ぶ。
 //   - mdBook 0.5.x の book.js と同じ矢印キーの規則（隣の li のボタンへ focus()）で、
 //     Auto・Light・Navy の 3 項目の間を上下に移動でき、隠した項目へは進まない。
 //     Home は Auto、End は Navy へ移る。
 //   - 対照として、claudia.js が無いと Light から Navy へ矢印キーで進めない（テストが問題を検出できる）。
-//   - 外部への通信（fetch・XMLHttpRequest・WebSocket・EventSource・sendBeacon）をしない。
+//   - 外部への通信をしない。
 //     テーマメニューの関数は、保存してある設定値（localStorage・sessionStorage）を読み書きしない。要素を足さず、html のテーマのクラスも変えない。
 //     同じファイルの目次の持ち越し（claudiaSidebarKeep）は、目次のあるページで localStorage の mdbook-sidebar を読むだけで、書かない（検査は theme-sidebar-test.mjs。このテストの模型には目次の要素が無いので、保存値に触れない）。
 //   - メニューが無いページでは何もしない（例外を出さない）。2 回実行しても並びは変わらない。

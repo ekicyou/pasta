@@ -1,4 +1,4 @@
-//! 行事の表（ghost/master 直下の calendar.csv）の選択と検査。pasta.dll の段 1.6 と同じ規則（Req 6.4）。
+//! 行事の表（ghost/master 直下の calendar.csv）の選択と検査。pasta.dll の段 1.6 と同じ規則。
 
 use std::collections::BTreeMap;
 

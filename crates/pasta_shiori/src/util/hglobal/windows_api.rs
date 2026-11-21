@@ -9,10 +9,9 @@ use windows_sys::Win32::Globalization::*;
 pub(crate) const MB_ERR_INVALID_CHARS: u32 = 0x0000_0008;
 
 /// Convert a Rust buffer length to the `i32` the Win32 conversion APIs take.
-/// 3.37 (G3): lengths above `i32::MAX` are rejected — a plain `as` cast would
-/// wrap (e.g. `u32::MAX as i32 == -1`, which `MultiByteToWideChar`
-/// interprets as "null-terminated input", reading past
-/// the end of the borrowed slice). Same defect class as pasta_lua 3.11.
+/// Lengths above `i32::MAX` are rejected: a plain `as` cast would wrap
+/// (e.g. `u32::MAX as i32 == -1`, which `MultiByteToWideChar` interprets as
+/// "null-terminated input", reading past the end of the borrowed slice).
 fn buffer_len_to_i32(len: usize) -> Result<i32> {
     i32::try_from(len).map_err(|_| {
         Error::new(
@@ -25,17 +24,14 @@ fn buffer_len_to_i32(len: usize) -> Result<i32> {
 /// Wrapper for MultiByteToWideChar.
 ///
 /// See https://msdn.microsoft.com/en-us/library/windows/desktop/dd319072(v=vs.85).aspx
-/// for more details.
 pub(crate) fn multi_byte_to_wide_char(
     codepage: u32,
     flags: u32,
     multi_byte_str: &[u8],
 ) -> Result<String> {
-    // Empty string
     if multi_byte_str.is_empty() {
         return Ok(String::new());
     }
-    // Reject lengths the Win32 API cannot represent (prevents `as` cast wrap).
     let in_len = buffer_len_to_i32(multi_byte_str.len())?;
     // SAFETY: MultiByteToWideChar is called with valid inputs:
     // - codepage and flags are caller-provided API parameters
@@ -73,11 +69,8 @@ pub(crate) fn multi_byte_to_wide_char(
 }
 
 // ----------------------------------------------------------------------
-// 3.37 (G3): boundary regression for the FFI length guard.
-// Direct >2GiB inputs cannot be allocated in a test, so the guard is pinned
-// at the helper level (the production function feeds every length through
-// it). RED evidence: with the guard mutated back to `Ok(len as i32)`, the
-// rejection test fails (u32::MAX wraps to -1 == "null-terminated input").
+// FFI length guard. Direct >2GiB inputs cannot be allocated in a test, so the
+// guard is pinned at the helper level (every length goes through it).
 // ----------------------------------------------------------------------
 
 #[test]

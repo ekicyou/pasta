@@ -34,10 +34,9 @@ local function reload_event_modules(reset_res)
 end
 
 -- ============================================================================
--- Task 2.1: set_co_scene() ローカル関数のテスト
--- Task 2.2: EVENT.fire thread判定とresume処理
--- Task 2.3: EVENT.fire コルーチン状態管理
--- Requirements: 1.1-1.6, 2.1-2.8
+-- set_co_scene() ローカル関数のテスト
+-- EVENT.fire thread判定とresume処理
+-- EVENT.fire コルーチン状態管理
 -- ============================================================================
 
 describe("EVENT.fire - コルーチン対応", function()
@@ -151,8 +150,7 @@ describe("EVENT.fire - コルーチン対応", function()
 end)
 
 -- ============================================================================
--- Task 3.1: resume_until_valid() 単体テスト
--- Requirements: 1.1, 1.2, 1.3
+-- resume_until_valid() 単体テスト
 -- ============================================================================
 
 describe("resume_until_valid - nil yieldスキップループ", function()
@@ -353,8 +351,7 @@ describe("EVENT.fire - 既存コルーチン置換", function()
 end)
 
 -- ============================================================================
--- Task 3.2: EVENT.fire統合テスト（nil yieldスキップ対応）
--- Requirements: 2.1, 2.4, 3.1, 3.2
+-- EVENT.fire統合テスト（nil yieldスキップ対応）
 -- ============================================================================
 
 describe("EVENT.fire - nil yieldスキップ統合", function()
@@ -450,8 +447,7 @@ describe("EVENT.fire - nil yieldスキップ統合", function()
 end)
 
 -- ============================================================================
--- Task 3.3: 後方互換性テスト
--- Requirements: 2.2, 2.3
+-- 後方互換性テスト
 -- ============================================================================
 
 describe("EVENT.fire - 後方互換性", function()
@@ -487,7 +483,7 @@ describe("EVENT.fire - 後方互換性", function()
 end)
 
 -- ============================================================================
--- EVENT.fire - コルーチンの出力は接頭辞にかかわらず Value（4.7）
+-- EVENT.fire - コルーチンの出力は接頭辞にかかわらず Value
 -- ============================================================================
 describe("EVENT.fire - コルーチンの出力の応答化", function()
     test("SHIORI/ で始まる出力も素通しせず Value にした 200 OK になる", function()
@@ -500,7 +496,7 @@ describe("EVENT.fire - コルーチンの出力の応答化", function()
 
         local result = EVENT.fire({ id = "TestEvent" })
 
-        -- 先頭行の完全一致・SHIORI/3.0 が 1 回だけ・Value 行の完全一致（6.2）
+        -- 先頭行の完全一致・SHIORI/3.0 が 1 回だけ・Value 行の完全一致
         expect(result:match("^(.-)\r\n")):toBe("SHIORI/3.0 200 OK")
         local _, count = result:gsub("SHIORI/3%.0", "")
         expect(count):toBe(1)

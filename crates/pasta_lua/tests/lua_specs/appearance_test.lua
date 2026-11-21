@@ -1,10 +1,5 @@
 -- appearance_test.lua
 -- pasta.shiori.appearance 外見状態の走査・観測テスト
--- actor-surface-restore Task 2.1 (Requirements: 1.2, 1.3, 1.4, 1.5, 1.7, 1.8)
--- actor-surface-restore Task 2.2 (Requirements: 2.1, 2.2, 2.3, 2.4, 2.8, 2.9, 2.10, 2.11, 4.4, 5.5)
--- actor-surface-restore Task 4.1 (Requirements: 3.1, 3.4, 3.11, 3.12, 3.13)
--- actor-surface-restore Task 4.2 (Requirements: 3.2, 3.3, 3.5, 3.7, 3.8, 3.9, 3.10, 3.11, 2.11)
--- paragraph-break-tag-only-talk Task 3.2 (Requirements: 8.3, 9.3, 9.4, 10.5)
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -173,7 +168,7 @@ describe("APPEARANCE.observe - サーフェス変更", function()
 end)
 
 describe("APPEARANCE.observe - スコープ切替タグ", function()
-    -- \hello・\p3x は \h・\p3 と読む（10.5）
+    -- \hello・\p3x は \h・\p3 と読む
     local scope_tags = { "\\0", "\\1", "\\h", "\\u", "\\p[2]", "\\p3", "\\hello", "\\p3x" }
     for _, tag in ipairs(scope_tags) do
         test(tag .. " で全スポットを不明化し、以降の \\s を記録しない", function()
@@ -620,7 +615,7 @@ describe("APPEARANCE.restore - 先頭タグ列", function()
         { "talk 内のスコープ切替タグの後", { { type = "talk", text = "\\1\\s[3]あ" } } },
         { "talk 先頭の \\\\s[ID]（エスケープ後の平文）", { { type = "talk", text = "\\\\s[3]あ" } } },
         { "talk 先頭の \\%s[ID]（エスケープ後の平文）", { { type = "talk", text = "\\%s[3]あ" } } },
-        -- 中身のある囲みは字なので先頭タグ列はそこで終わる（9.3）
+        -- 中身のある囲みは字なので先頭タグ列はそこで終わる
         { "talk 先頭の中身のある囲みの後", { { type = "talk", text = "\\_?x\\_?\\s[5]" } } },
     }
     for _, c in ipairs(not_suppressed) do

@@ -1,4 +1,4 @@
-//! 部分トークン提供統合テスト (Task 8.5)
+//! 部分トークン提供統合テスト
 //!
 //! エラー時の部分トークン提供検証（pasta_dsl部分パース統合）
 
@@ -6,12 +6,9 @@ use pasta_lsp::analysis::AnalysisEngine;
 
 #[test]
 fn test_partial_tokens_on_error() {
-    // Full parse fails → partial parse provides some tokens
     let source = "＊挨拶\n  Alice：こんにちは\n\n壊れた行\n";
     let result = AnalysisEngine::analyze(source);
 
-    // Partial parse should provide at least some tokens from the valid part
-    // and diagnostics for the invalid part
     // The exact result depends on parse_str_partial behavior
     let has_output = !result.tokens.is_empty() || !result.diagnostics.is_empty();
     assert!(has_output, "部分パースで何らかの出力がある");
@@ -32,8 +29,6 @@ fn test_full_parse_success_no_fallback() {
 fn test_complete_failure_still_returns_result() {
     let source = "完全に不正な入力ですわ！！！\n";
     let result = AnalysisEngine::analyze(source);
-    // Even on total failure, the function should return without panicking
-    // and provide some diagnostics
     assert!(
         !result.diagnostics.is_empty(),
         "完全失敗でもDiagnosticsを返す"
@@ -87,7 +82,6 @@ fn test_partial_token_positions_corrected_for_later_scopes() {
 
 #[test]
 fn test_mixed_valid_invalid_content() {
-    // Source with a valid global scene followed by garbage
     let source = "＊挨拶\n  Alice：OK\n\nこれは構文エラー\n";
     let result = AnalysisEngine::analyze(source);
 
@@ -121,7 +115,7 @@ fn abs_tokens(source: &str) -> Vec<(u32, u32, u32, u32)> {
         .collect()
 }
 
-/// 1 つのシーンの誤りは、ほかの部分の色を変えず、そのシーンの行に色を付けない（要件 3.1・3.3）
+/// 1 つのシーンの誤りは、ほかの部分の色を変えず、そのシーンの行に色を付けない
 #[test]
 fn test_error_scene_keeps_other_tokens_and_has_none_itself() {
     let build = |line5: &str| {

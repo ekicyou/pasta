@@ -1,8 +1,5 @@
 //! AST visitor methods for semantic token generation: action/cue visitors and
 //! shared span→token helpers.
-//!
-//! This file exceeds the 300-line guideline as documented in the design spec
-//! (guideline exception: tightly-coupled visitor methods).
 
 use pasta_dsl::parser::ast::*;
 
@@ -27,13 +24,12 @@ impl super::AnalysisEngine {
                 Self::visit_continue_action(ca, source, tokens);
             }
             LocalSceneItem::CueCommand(cue) => {
-                // キューコマンド行の細粒度セマンティックトークン生成
                 if cue.span.is_valid() {
                     Self::visit_cue_command(cue, source, tokens);
                 }
             }
             LocalSceneItem::Choice(choice) => {
-                // 選択肢の部品の色は足さない（要件 5.7）。行末のコメントだけ
+                // 選択肢の部品の色は足さない。行末のコメントだけ
                 if choice.span.is_valid() {
                     Self::visit_choice_comment(choice, source, tokens);
                 }
@@ -47,11 +43,10 @@ impl super::AnalysisEngine {
         let base_offset = span_start_in_line;
         let line0 = (line - 1) as u32;
 
-        // Skip leading whitespace (pad)
         let trimmed = span_text.trim_start();
         let mut cursor = span_text.len() - trimmed.len();
 
-        // 1) マーカー: ！ (3 bytes) or ! (1 byte) — 全角優先
+        // マーカー: ！ (3 bytes) or ! (1 byte) — 全角優先
         let remaining = &span_text[cursor..];
         let marker = if remaining.starts_with('！') {
             "！"
@@ -69,7 +64,6 @@ impl super::AnalysisEngine {
         });
         cursor += marker.len();
 
-        // 2) コマンド名
         if let Some(name_pos) = span_text[cursor..].find(cue.command.as_str()) {
             let name_start = cursor + name_pos;
             tokens.push(RawToken {
@@ -82,12 +76,11 @@ impl super::AnalysisEngine {
             cursor = name_start + cue.command.len();
         }
 
-        // 3) スコープ: ScopedName.span (@名前 全体を 1 WORD トークン)
+        // スコープ: ScopedName.span (@名前 全体を 1 WORD トークン)
         if let Some(ref scope) = cue.scope
             && scope.span.is_valid()
         {
             Self::add_token_from_span(&scope.span, source, token_type::WORD, 0, tokens);
-            // カーソルを scope 後に進める
             let scope_end = scope
                 .span
                 .end_byte
@@ -97,10 +90,8 @@ impl super::AnalysisEngine {
             }
         }
 
-        // 4) 引数リスト
         if !cue.args.is_empty() {
             let remaining = &span_text[cursor..];
-            // 開き括弧検出
             if let Some(paren_pos) = find_open_paren(remaining) {
                 let abs_paren = cursor + paren_pos;
                 let paren_len = Self::push_char_op_token(
@@ -120,11 +111,9 @@ impl super::AnalysisEngine {
                     &span_text[inner_start..]
                 };
 
-                // 各引数をスキャン
                 let mut arg_cursor = 0usize;
                 for arg in &cue.args {
                     let remaining_args = &args_text[arg_cursor..];
-                    // カンマ・空白スキップ
                     let skip = remaining_args
                         .find(|c: char| !c.is_whitespace() && c != '、' && c != ',')
                         .unwrap_or(0);
@@ -191,7 +180,6 @@ impl super::AnalysisEngine {
                     arg_cursor = arg_text_start + arg_end;
                 }
 
-                // 閉じ括弧
                 if let Some(cp) = close_pos {
                     Self::push_char_op_token(span_text, cp, base_offset, line0, tokens, line_text);
                 }
@@ -252,7 +240,6 @@ impl super::AnalysisEngine {
             let actor_start_utf16 = utf8_offset_to_utf16(line_text, actor_byte_start);
             let actor_len_utf16 = utf8_len_to_utf16(&al.actor);
 
-            // Actor name token
             tokens.push(RawToken {
                 line: (line - 1) as u32,
                 start_char: actor_start_utf16,
@@ -263,7 +250,6 @@ impl super::AnalysisEngine {
 
             // Colon separator: located immediately after the actor name
             let colon_byte_offset = actor_byte_start + al.actor.len();
-            // Skip optional whitespace between actor name and colon
             let after_actor = &line_text[colon_byte_offset..];
             let trimmed = after_actor.trim_start();
             let ws_bytes = after_actor.len() - trimmed.len();

@@ -333,7 +333,7 @@ impl SearchContext {
         }
     }
 
-    /// 同じ名前の中の番号の重なりがあれば、最初の組を `DuplicateOrder` で返す（3.3）
+    /// 同じ名前の中の番号の重なりがあれば、最初の組を `DuplicateOrder` で返す
     pub fn check_scene_orders(&self) -> Result<(), SearchError> {
         let Some(dup) = self.scene_table.duplicate_orders().into_iter().next() else {
             return Ok(());
@@ -352,7 +352,7 @@ impl SearchContext {
         .into())
     }
 
-    /// 選んだ後の控え（順番を使わずシャッフルへ戻った理由）があれば注意のログに出す（3.1）
+    /// 選んだ後の控え（順番を使わずシャッフルへ戻った理由）があれば注意のログに出す
     fn warn_pick_fallback(table: &mut SceneTable, name: &str) {
         let reason = match table.take_pick_warning() {
             None => return,
@@ -723,7 +723,7 @@ mod tests {
 
     #[test]
     fn test_search_scene_registered_name_is_treated_as_name() {
-        // 第 1 引数の登録名は作者が書いた名前として扱う（scene-identity-format 2.5）。
+        // 第 1 引数の登録名は作者が書いた名前として扱う。
         // 検索キーは通し番号を除いた名前なので、登録名ではそのシーンに当たらない。
         for mut ctx in create_symbol_name_contexts() {
             assert_eq!(ctx.search_scene(SYMBOL_GLOBAL, None).unwrap(), None);
@@ -924,8 +924,8 @@ mod tests {
 
     #[test]
     fn test_alias_global_search_replaces_written_name() {
-        // 3.1・3.6: `会話` is searched as `OnTalk` by prefix, so both `OnTalk`
-        // and `OnTalk朝` are candidates; 3.7: `会話・朝` is not.
+        // `会話` is searched as `OnTalk` by prefix, so both `OnTalk`
+        // and `OnTalk朝` are candidates; `会話・朝` is not.
         let mut ctx = create_alias_context(SceneAliasTable::builtin_default());
         assert_eq!(global_hits(&mut ctx, "会話", 4), ["OnTalk_1", "OnTalk朝_1"]);
 
@@ -939,14 +939,14 @@ mod tests {
 
     #[test]
     fn test_alias_not_applied_to_longer_written_name() {
-        // 3.7: `会話・朝` is not an exact alias match; only its own scene hits.
+        // `会話・朝` is not an exact alias match; only its own scene hits.
         let mut ctx = create_alias_context(SceneAliasTable::builtin_default());
         assert_eq!(global_hits(&mut ctx, "会話・朝", 3), ["会話_朝_1"]);
     }
 
     #[test]
     fn test_alias_not_applied_to_local_search_or_words() {
-        // 4.7: a parent scope or a word search ignores the alias table.
+        // a parent scope or a word search ignores the alias table.
         let mut ctx = create_alias_context(SceneAliasTable::builtin_default());
         assert_eq!(
             ctx.search_scene("会話", Some("メイン_1")).unwrap(),
@@ -974,7 +974,7 @@ mod tests {
     #[tracing_test::traced_test]
     #[test]
     fn test_alias_miss_logs_both_names() {
-        // 8.2: a miss after replacement records the written and resolved names.
+        // a miss after replacement records the written and resolved names.
         let mut ctx = SearchContext::with_aliases(
             SceneRegistry::new(),
             WordDefRegistry::new(),
@@ -1028,7 +1028,7 @@ mod tests {
 
     #[test]
     fn test_search_local_scene_exact_returns_registered_names() {
-        // 1.2・1.3・1.5・1.8: 書いた名前を直し、ローカルを持つ大域だけから選ぶ。
+        // 書いた名前を直し、ローカルを持つ大域だけから選ぶ。
         // 同じ大域の中の同名のローカルは順送り。
         let mut ctx = create_local_search_context();
         let got: Vec<LocalSceneMatch> = (0..3)
@@ -1051,7 +1051,7 @@ mod tests {
 
     #[test]
     fn test_search_local_scene_exact_alias_applies_to_global_only() {
-        // 1.5: 大域の名前にだけ別名が当たる
+        // 大域の名前にだけ別名が当たる
         let mut ctx = create_local_search_context();
         assert_eq!(
             ctx.search_local_scene_exact("会話", "挨拶").unwrap(),
@@ -1074,7 +1074,7 @@ mod tests {
 
     #[test]
     fn test_search_local_scene_exact_not_found_cases() {
-        // 5.2: 大域が無い／大域はあるがローカルが無い。前方一致はしない。
+        // 大域が無い／大域はあるがローカルが無い。前方一致はしない。
         let mut ctx = create_local_search_context();
         assert_eq!(
             ctx.search_local_scene_exact("存在しない", "挨拶").unwrap(),

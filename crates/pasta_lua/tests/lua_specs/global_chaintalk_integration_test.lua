@@ -1,6 +1,5 @@
 -- ============================================================================
 -- GLOBAL チェイントーク統合テスト - EVENT.fire 経由のコルーチン分割検証
--- Requirements: 3.1, 3.2, 3.3
 -- ============================================================================
 
 local describe = require("lua_test.test").describe
@@ -54,7 +53,7 @@ describe("Integration - GLOBAL chaintalk via EVENT.fire", function()
         return STORE.co_scene
     end
 
-    -- Req 3.1: yield 1回でコルーチンが2回 resume される
+    -- yield 1回でコルーチンが2回 resume される
     test("chaintalk yield splits coroutine into 2 resumes via EVENT.fire", function()
         setup()
         local resume_count = 0
@@ -83,7 +82,7 @@ describe("Integration - GLOBAL chaintalk via EVENT.fire", function()
         expect(STORE.co_scene):toBe(nil)
     end)
 
-    -- Req 3.2: 1回目 resume の中間出力検証
+    -- 1回目 resume の中間出力検証
     test("first resume returns only pre-yield tokens as intermediate output", function()
         setup()
 
@@ -103,7 +102,7 @@ describe("Integration - GLOBAL chaintalk via EVENT.fire", function()
         expect(response1:find("最終出力テスト")):toBe(nil)
     end)
 
-    -- Req 3.3: 2回目 resume の最終出力検証
+    -- 2回目 resume の最終出力検証
     test("second resume returns post-yield tokens as final output", function()
         setup()
 
@@ -138,7 +137,7 @@ describe("Integration - GLOBAL chaintalk via EVENT.fire", function()
         expect(STORE.co_scene):toBe(nil)
     end)
 
-    -- Req 3.1: STORE.co_scene のライフサイクル
+    -- STORE.co_scene のライフサイクル
     test("STORE.co_scene lifecycle: suspended after 1st resume, nil after 2nd", function()
         setup()
 

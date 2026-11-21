@@ -1,14 +1,11 @@
 //! Integration tests for pasta.shiori.event.virtual_dispatcher module.
-//!
-//! Tests for core dispatch functionality: module loading, req.date handling,
-//! OnHour dispatch, and OnTalk dispatch.
 
 use crate::common;
 
 use common::create_runtime_with_pasta_path;
 
 // ============================================================================
-// Task 4.1: Module Loading Tests
+// Module Loading Tests
 // ============================================================================
 
 #[test]
@@ -55,7 +52,7 @@ fn test_virtual_dispatcher_exports_required_functions() {
 }
 
 // ============================================================================
-// Task 4.2: req.date Absence Tests
+// req.date Absence Tests
 // ============================================================================
 
 #[test]
@@ -84,7 +81,7 @@ fn test_dispatch_without_req_date_returns_nil() {
 }
 
 // ============================================================================
-// Task 4.3: OnHour Dispatch Tests
+// OnHour Dispatch Tests
 // ============================================================================
 
 #[test]
@@ -214,7 +211,7 @@ fn test_onhour_priority_over_ontalk() {
 }
 
 // ============================================================================
-// Task 4.4: OnTalk Dispatch Tests
+// OnTalk Dispatch Tests
 // ============================================================================
 
 #[test]

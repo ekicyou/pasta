@@ -96,4 +96,5 @@ Skills are located in `.claude/skills/*/SKILL.md` (mostly `kiro-*`)
 - Exceptions, always kept:
   - Every `unsafe` block has a `// SAFETY:` comment stating the invariants it relies on.
   - Public API doc comments (`///`, `//!`) are out of scope for this rule. Keep them accurate and concise.
-- When cleaning up, touch only comments added or changed in the current diff. Never alter code logic as part of comment cleanup. Use `/comment-cleanup`.
+  - The `//!` module header and the first line of a `pub` item's doc comment (and the leading paragraph / public function's first doc line in Lua, JS/TS and PowerShell) stay, as one Japanese line in the project's terms: identifiers are English, so these are what `git grep <日本語の語>` finds.
+- When cleaning up, touch only comments added or changed in the current diff, unless the developer names a wider target (files, a crate, the whole codebase). Never alter code logic as part of comment cleanup. Use `/comment-cleanup`.

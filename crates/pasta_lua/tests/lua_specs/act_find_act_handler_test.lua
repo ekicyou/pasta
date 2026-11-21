@@ -1,6 +1,5 @@
 -- ACT_IMPL.find_act_handler / find_handler 単体テスト
--- Task 1.3: 各フォールバックレベル・mode切り替えを検証する
--- Requirements: 1.4, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11
+-- 各フォールバックレベル・mode切り替えを検証する
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect

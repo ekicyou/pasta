@@ -1,43 +1,27 @@
 //! E2E integration tests for the finalize_scene() function.
-//!
-//! These tests verify the complete flow:
-//! 1. Transpile .pasta source to Lua
-//! 2. Execute Lua code (registers scenes/words in Lua registries)
-//! 3. Call finalize_scene() to build SearchContext from Lua registries
-//! 4. Verify search operations work correctly
-//!
-//! # Requirements Coverage
-//! - Req 1.1, 1.2, 1.4, 8.2, 8.4: Scene dictionary collection E2E
-//! - Req 2.1, 2.2, 2.6, 2.7, 9.3, 9.5: Word dictionary collection E2E
-//! - Req 1.3, 6.1, 6.2, 6.3: Error handling
-//! - Req 5.2, 5.3, 5.4: Initialization timing control
 
 use crate::common;
 use common::e2e_helpers::{create_runtime_with_finalize, transpile};
 use std::path::PathBuf;
 
 // ============================================================================
-// Task 8.1: Scene Dictionary Collection E2E Tests
+// Scene Dictionary Collection E2E Tests
 // ============================================================================
 
-/// Test 8.1.1: Basic scene collection and search using existing fixture
+/// Basic scene collection and search using existing fixture
 #[test]
 fn test_scene_collection_basic() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Use sample.pasta fixture (known good format)
     let pasta_source = include_str!("../fixtures/sample.pasta");
     let lua_code = transpile(pasta_source);
 
-    // Execute transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Call finalize_scene
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Verify scene can be searched
     let result: (String, String) = lua
         .load(
             r#"
@@ -56,24 +40,20 @@ fn test_scene_collection_basic() {
     assert_eq!(result.1, "__start__", "Local name should be '__start__'");
 }
 
-/// Test 8.1.2: Multiple global scenes with same name (counter test)
+/// Multiple global scenes with same name (counter test)
 #[test]
 fn test_scene_collection_multiple_global_scenes() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Use sample.pasta which has multiple "会話分岐" scenes (global + local)
     let pasta_source = include_str!("../fixtures/sample.pasta");
     let lua_code = transpile(pasta_source);
 
-    // Execute transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Call finalize_scene
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Verify 会話分岐 scene is registered
     let result: (String, String) = lua
         .load(
             r#"
@@ -84,7 +64,6 @@ fn test_scene_collection_multiple_global_scenes() {
         .eval()
         .unwrap();
 
-    // Should find scene with name containing '会話分岐'
     assert!(
         result.0.contains("会話分岐"),
         "Should find scene with name containing '会話分岐', got: {}",
@@ -92,24 +71,20 @@ fn test_scene_collection_multiple_global_scenes() {
     );
 }
 
-/// Test 8.1.3: Local scenes under global scene
+/// Local scenes under global scene
 #[test]
 fn test_scene_collection_local_scenes() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Use sample.pasta which has local scenes like "グローバル単語呼び出し"
     let pasta_source = include_str!("../fixtures/sample.pasta");
     let lua_code = transpile(pasta_source);
 
-    // Execute transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Call finalize_scene
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Verify @pasta_search module is available
     let search_exists: bool = lua
         .load(
             r#"
@@ -123,10 +98,7 @@ fn test_scene_collection_local_scenes() {
     assert!(search_exists, "@pasta_search module should be available");
 }
 
-/// Test: Local scene search via finalize path (Req 4.2, 4.3)
-///
-/// Verifies that after transpile → execute → finalize_scene(),
-/// local scenes can be resolved via search_scene with a parent scope.
+/// Local scene search via finalize path
 #[test]
 fn test_scene_collection_local_scene_search() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -139,7 +111,6 @@ fn test_scene_collection_local_scene_search() {
         .exec()
         .unwrap();
 
-    // Search for local scene "グローバル単語呼び出し" within parent "メイン"
     // Note: PASTA.create_scene("メイン") generates global_name "メイン_1"
     let result: (String, String) = lua
         .load(
@@ -165,10 +136,7 @@ fn test_scene_collection_local_scene_search() {
     );
 }
 
-/// Test: Local scene prefix search via finalize path (Req 4.2)
-///
-/// Verifies that register_global_raw → SceneTable prefix matching
-/// correctly resolves local scenes with a shared prefix.
+/// Local scene prefix search via finalize path
 #[test]
 fn test_scene_collection_local_scene_prefix_search() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -181,7 +149,6 @@ fn test_scene_collection_local_scene_prefix_search() {
         .exec()
         .unwrap();
 
-    // Prefix search "会話分岐" should find one of the local scenes (会話分岐_1 or 会話分岐_2)
     // Note: PASTA.create_scene("メイン") generates global_name "メイン_1"
     let result: (String, String) = lua
         .load(
@@ -208,27 +175,23 @@ fn test_scene_collection_local_scene_prefix_search() {
 }
 
 // ============================================================================
-// Task 8.2: Word Dictionary Collection E2E Tests
+// Word Dictionary Collection E2E Tests
 // ============================================================================
 
-/// Test 8.2.1: Global word collection
+/// Global word collection
 #[test]
 fn test_word_collection_global() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Use sample.pasta which has global word "挨拶"
     let pasta_source = include_str!("../fixtures/sample.pasta");
     let lua_code = transpile(pasta_source);
 
-    // Execute transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Call finalize_scene
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Verify word can be searched
     let result: mlua::Value = lua
         .load(
             r#"
@@ -248,24 +211,20 @@ fn test_word_collection_global() {
     );
 }
 
-/// Test 8.2.2: Local word collection
+/// Local word collection
 #[test]
 fn test_word_collection_local() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Use sample.pasta which has local word "場所"
     let pasta_source = include_str!("../fixtures/sample.pasta");
     let lua_code = transpile(pasta_source);
 
-    // Execute transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Call finalize_scene
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Verify @pasta_search is available after finalize
     let search_available: bool = lua
         .load(
             r#"
@@ -282,12 +241,11 @@ fn test_word_collection_local() {
     );
 }
 
-/// Test 8.2.3: Builder pattern API (method chaining)
+/// Builder pattern API (method chaining)
 #[test]
 fn test_word_builder_pattern() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Test builder pattern directly in Lua
     let result: bool = lua
         .load(
             r#"
@@ -312,15 +270,14 @@ fn test_word_builder_pattern() {
 }
 
 // ============================================================================
-// Task 8.3: Error Handling Tests
+// Error Handling Tests
 // ============================================================================
 
-/// Test 8.3.1: Empty registry finalize (warning log + empty SearchContext)
+/// Empty registry finalize (warning log + empty SearchContext)
 #[test]
 fn test_empty_registry_finalize() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Call finalize_scene without any scenes or words
     let result: bool = lua
         .load(
             r#"
@@ -336,7 +293,6 @@ fn test_empty_registry_finalize() {
         "finalize_scene should return true even with empty registry"
     );
 
-    // Verify @pasta_search is available
     let search_available: bool = lua
         .load(
             r#"
@@ -353,12 +309,11 @@ fn test_empty_registry_finalize() {
     );
 }
 
-/// Test 8.3.2: Scene not found returns nil
+/// Scene not found returns nil
 #[test]
 fn test_scene_not_found() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Use sample.pasta then search for non-existent scene
     let pasta_source = include_str!("../fixtures/sample.pasta");
     let lua_code = transpile(pasta_source);
 
@@ -381,12 +336,11 @@ fn test_scene_not_found() {
     assert!(result, "Non-existent scene search should return nil");
 }
 
-/// Test 8.3.3: Word not found returns nil
+/// Word not found returns nil
 #[test]
 fn test_word_not_found() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Finalize empty registry
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
@@ -406,15 +360,14 @@ fn test_word_not_found() {
 }
 
 // ============================================================================
-// Task 8.4: Initialization Timing Control Tests (Optional)
+// Initialization Timing Control Tests (Optional)
 // ============================================================================
 
-/// Test 8.4.1: Multiple finalize_scene calls (SearchContext rebuild)
+/// Multiple finalize_scene calls (SearchContext rebuild)
 #[test]
 fn test_multiple_finalize_calls() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // First: create word via PASTA API and finalize
     lua.load(
         r#"
         local PASTA = require("pasta")
@@ -425,7 +378,6 @@ fn test_multiple_finalize_calls() {
     .exec()
     .unwrap();
 
-    // Verify word A is searchable
     let word_a_found: bool = lua
         .load(
             r#"
@@ -439,7 +391,6 @@ fn test_multiple_finalize_calls() {
 
     assert!(word_a_found, "単語A should be found after first finalize");
 
-    // Second: create another word and finalize again
     lua.load(
         r#"
         local PASTA = require("pasta")
@@ -450,7 +401,6 @@ fn test_multiple_finalize_calls() {
     .exec()
     .unwrap();
 
-    // Verify both words are searchable after rebuild
     let both_found: bool = lua
         .load(
             r#"
@@ -469,7 +419,7 @@ fn test_multiple_finalize_calls() {
     );
 }
 
-/// Test 8.4.2: @pasta_search not available before finalize_scene
+/// @pasta_search not available before finalize_scene
 #[test]
 fn test_search_unavailable_before_finalize() {
     use mlua::{Lua, StdLib};
@@ -477,7 +427,6 @@ fn test_search_unavailable_before_finalize() {
     // Create fresh Lua without finalize_scene registration
     let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
 
-    // Configure package.path
     let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("pasta_scripts")
         .to_string_lossy()
@@ -491,7 +440,6 @@ fn test_search_unavailable_before_finalize() {
     .exec()
     .unwrap();
 
-    // Try to require @pasta_search before any setup
     let result: bool = lua
         .load(
             r#"
@@ -508,24 +456,20 @@ fn test_search_unavailable_before_finalize() {
     );
 }
 
-/// Test 8.4.3: Full E2E flow with transpiled pasta
+/// Full E2E flow with transpiled pasta
 #[test]
 fn test_full_e2e_flow() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Use sample.pasta for complete E2E test
     let pasta_source = include_str!("../fixtures/sample.pasta");
     let lua_code = transpile(pasta_source);
 
-    // Execute transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Call finalize_scene
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Verify everything is searchable
     let all_ok: bool = lua
         .load(
             r#"
@@ -548,7 +492,7 @@ fn test_full_e2e_flow() {
 }
 
 // ============================================================================
-// scene-name-alias task 4.2: 別名表がランタイムの 2 つの登録点へ渡る
+// 別名表がランタイムの 2 つの登録点へ渡る
 // ============================================================================
 
 /// `SEARCH:search_scene(name)`（範囲指定なし）が返すグローバルの登録名。見つからなければ `None`。
@@ -624,7 +568,7 @@ fn search_kaiwa_before_and_after_finalize(
     (before, after)
 }
 
-/// 既定表を持つ設定のランタイムでは、確定の前後どちらでも「会話」が OnTalk に解決される（4.3〜4.6・6.2）。
+/// 既定表を持つ設定のランタイムでは、確定の前後どちらでも「会話」が OnTalk に解決される。
 #[test]
 fn test_scene_alias_table_reaches_both_search_registrations() {
     let (before, after) = search_kaiwa_before_and_after_finalize(
@@ -644,7 +588,7 @@ fn test_empty_scene_alias_table_keeps_search_unchanged() {
 }
 
 // ============================================================================
-// scene-attribute-store 4.4: 辞書確定で Lua の倉から Rust のシーン表へ属性を運ぶ
+// 辞書確定で Lua の倉から Rust のシーン表へ属性を運ぶ
 // ============================================================================
 
 const ATTR_SOURCE: &str = "＆＄＊経験値≧500＆背景：教室
@@ -763,7 +707,7 @@ fn attrs_of<'a>(
         .attributes
 }
 
-/// 5.3・4.2: Rust の表の属性は Lua の倉と同じ。整数の値になる小数は整数、項目は 3 種に写る。
+/// Rust の表の属性は Lua の倉と同じ。整数の値になる小数は整数、項目は 3 種に写る。
 /// 辞書確定は倉を書き換えない（2 回確定しても倉は同じ）。
 #[test]
 fn test_scene_attrs_reach_rust_table_same_as_lua_store() {
@@ -814,7 +758,7 @@ fn test_scene_attrs_reach_rust_table_same_as_lua_store() {
     );
 }
 
-/// 1.7: 同じ宣言名の 2 つの宣言の属性は混ざらない
+/// 同じ宣言名の 2 つの宣言の属性は混ざらない
 #[test]
 fn test_scene_attrs_same_name_declarations_do_not_mix() {
     use pasta_core::registry::{CmpOp, SceneAttr, SceneAttrValue};
@@ -844,7 +788,7 @@ fn test_scene_attrs_same_name_declarations_do_not_mix() {
     );
 }
 
-/// 5.4: 属性の有無でシーンの数（と並び）が変わらない
+/// 属性の有無でシーンの数（と並び）が変わらない
 #[test]
 fn test_scene_attrs_do_not_change_scene_count() {
     let order = |r: &pasta_core::registry::SceneRegistry| -> Vec<(String, Option<String>)> {
@@ -859,7 +803,7 @@ fn test_scene_attrs_do_not_change_scene_count() {
     assert_eq!(with_attrs.all_scenes().len(), 3);
 }
 
-/// 5.6: アクター辞書の配下の属性は倉にも Rust の表のどのシーンにも入らない
+/// アクター辞書の配下の属性は倉にも Rust の表のどのシーンにも入らない
 #[test]
 fn test_actor_dictionary_attrs_go_nowhere() {
     let lua = finalized(ATTR_SOURCE);

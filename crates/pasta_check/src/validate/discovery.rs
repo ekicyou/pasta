@@ -1,9 +1,9 @@
-//! pasta.dll と同じ辞書ファイルと辞書モジュールを選び出す段（2.1〜2.3・2.6〜2.8・11.8）。
+//! pasta.dll と同じ辞書ファイルと辞書モジュールを選び出す段。
 //!
 //! pasta.dll（`loader/discovery.rs`・`process.rs`）は Windows で `glob::glob` を使う。その振る舞いを
 //! ファイルの一覧の上で写す: ワイルドカードの無い成分はパターンの綴りでファイルシステムを引くので
 //! 大文字・小文字を区別せず、ある成分は `Pattern::matches`（既定の MatchOptions）で区別する。
-//! `glob::glob` はフォルダにも一致し、pasta.dll はそのフォルダを辞書として読もうとして失敗する（2.1）。
+//! `glob::glob` はフォルダにも一致し、pasta.dll はそのフォルダを辞書として読もうとして失敗する。
 
 use glob::Pattern;
 

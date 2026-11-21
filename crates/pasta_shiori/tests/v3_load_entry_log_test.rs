@@ -1,9 +1,9 @@
-//! 版 3 の入口の読み込みの終わりの行（仕様 `debug-mcp-runtime`・要件 10.1〜10.4）。
+//! 版 3 の入口の読み込みの終わりの行。
 //!
 //! `[logging]` を絞ったゴーストでも、`pasta.log` に `SHIORI load entry completed` の行が
 //! `entry`・`loaded` の欄を付けて 1 行出て、ほかの info は出ないことを確かめる。
 //!
-//! `mod common;` は `PASTA_DEBUG` / `PASTA_LOG` を main 前に中和する `#[ctor]` を取り込む（要件 9.3）。
+//! `mod common;` は `PASTA_DEBUG` / `PASTA_LOG` を main 前に中和する `#[ctor]` を取り込む。
 
 mod common;
 

@@ -1,7 +1,6 @@
-//! Task 9: Lua API トークン保全テスト
+//! Lua API トークン保全テスト
 //!
 //! `act:get_property()` がトークンバッファを退避・復元することを検証する。
-//! Requirements: 3.5, 4.4
 
 mod common;
 
@@ -16,7 +15,6 @@ use common::create_runtime_with_pasta_path;
 fn test_get_property_does_not_contaminate_yielded_script() {
     let runtime = create_runtime_with_pasta_path();
 
-    // Setup: reset modules
     runtime
         .exec(
             r#"
@@ -26,7 +24,6 @@ fn test_get_property_does_not_contaminate_yielded_script() {
         )
         .unwrap();
 
-    // Create coroutine and first resume (runs until get_property yields)
     let result = runtime
         .exec(
             r#"

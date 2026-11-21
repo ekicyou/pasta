@@ -1,5 +1,5 @@
 -- pasta.act - word / expr_fn ポストプロセス・call nil キーガードのテスト
--- review-improvement-loop cell 3.46 (G1): 既存 act_find_act_handler_test は検索段のみを
+-- 既存 act_find_act_handler_test は検索段のみを
 -- カバーしており、act:word / act:expr_fn のポストプロセス分岐と
 -- act:call の nil キーガードが未カバーだった
 local describe = require("lua_test.test").describe

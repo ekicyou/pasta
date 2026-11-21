@@ -1,6 +1,5 @@
 -- ============================================================================
--- Task 5: OnSecondChange ハンドラのthread橋渡しテスト
--- Requirements: 3.3
+-- OnSecondChange ハンドラのthread橋渡しテスト
 -- ============================================================================
 
 local describe = require("lua_test.test").describe
@@ -117,8 +116,7 @@ describe("OnSecondChange handler - thread passthrough", function()
 end)
 
 -- ============================================================================
--- tutorial-ssp-gaps 3.2: 何も出さない毎秒の回に読み取りを返す
--- Requirements: 2.1, 3.2, 7.5
+-- 何も出さない毎秒の回に読み取りを返す
 -- ============================================================================
 
 describe("OnSecondChange handler - 仮想時刻の読み取り", function()

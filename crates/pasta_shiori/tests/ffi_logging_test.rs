@@ -1,10 +1,9 @@
-//! FFI 入口から通したログがゴーストのログファイルに残ることの E2E 検証
-//! （仕様 `pasta-toml-logging-consistency`・design.md Testing Strategy > E2E Tests）。
+//! FFI 入口から通したログがゴーストのログファイルに残ることの E2E 検証。
 //!
 //! 出荷 extern "C" 入口（`loadu`・`load`・`request`・`unload`）を C ABI で駆動し、
 //! `unload` の後（ロガーが破棄されフラッシュされた後）にログファイルの中身を読む。
 //!
-//! # 1 本の直列テストにする理由（design.md D3）
+//! # 1 本の直列テストにする理由
 //! ログの経路はプロセス全域の状態（購読者・フィルタ・登録簿）を使い、FFI の
 //! `LEGACY`・`loadu` 初期化フラグもプロセスグローバルである。本ファイルは全段を
 //! 1 つの `#[test]` に直列に詰め、ゴーストを 1 つずつ順に読む（登録簿は常に 0 個か 1 個）。
@@ -139,7 +138,7 @@ fn assert_log_contains(log: &str, needle: &str, why: &str) {
 
 #[test]
 fn ffi_logs_reach_the_ghost_log_file() {
-    // --- 段 1: ロガー無し（最初の読み込みの前・4.7、4.8、7.5） ---
+    // --- 段 1: ロガー無し（最初の読み込みの前） ---
     // ログは捨てられ、panic せず、戻り値は従来どおり。
     let mut len: c_long = 123;
     let res = request(std::ptr::null_mut(), &mut len);
@@ -152,7 +151,7 @@ fn ffi_logs_reach_the_ghost_log_file() {
     );
     assert_eq!(unload(), 1, "unload before load returns true");
 
-    // --- 段 2〜4: `request` 入口・アクタースレッド・`load` の無視（4.1、4.2、4.5、7.3） ---
+    // --- 段 2〜4: `request` 入口・アクタースレッド・`load` の無視 ---
     let ghost = install_ghost("[logging]\nlevel = \"trace\"\n");
     assert!(drive_loadu(ghost.path()), "loadu must load the ghost");
     assert_eq!(
@@ -169,10 +168,10 @@ fn ffi_logs_reach_the_ghost_log_file() {
     assert_eq!(unload(), 1, "unload returns true");
 
     let log = read_log(ghost.path(), DEFAULT_LOG);
-    // 文脈の無い FFI 入口スレッドのログ（「文脈なし→唯一のロガー」の規則で届く・4.1）。
+    // 文脈の無い FFI 入口スレッドのログ（「文脈なし→唯一のロガー」の規則で届く）。
     assert_log_contains(&log, "utf8 decode failed", "request entry warn (4.1)");
     assert_log_contains(&log, "seam=\"actor.try_send\"", "marshaling trace (4.1)");
-    // アクタースレッドのメッセージループの観測ログ（4.2）。
+    // アクタースレッドのメッセージループの観測ログ。
     assert_log_contains(&log, "actor received Stop", "actor stop log (4.2)");
     assert_log_contains(
         &log,
@@ -180,7 +179,7 @@ fn ffi_logs_reach_the_ghost_log_file() {
         "ignored load warn (4.5)",
     );
 
-    // --- 段 5: 終了処理（4.3、7.3） ---
+    // --- 段 5: 終了処理 ---
     // 永続化保存のログ（debug）は `[persistence] debug_mode = true` のときだけ出る。
     let ghost = install_ghost("[logging]\nlevel = \"trace\"\n\n[persistence]\ndebug_mode = true\n");
     assert!(drive_loadu(ghost.path()), "loadu must load the ghost");
@@ -198,7 +197,7 @@ fn ffi_logs_reach_the_ghost_log_file() {
         "teardown logs must be ordered unload -> save -> unregister\nlog:\n{log}"
     );
 
-    // --- 段 6: 不正な `file_path`（5.1、5.2、5.3、7.4） ---
+    // --- 段 6: 不正な `file_path` ---
     let ghost = install_ghost("[logging]\nlevel = \"trace\"\nfile_path = \"profile.log\"\n");
     assert!(
         drive_loadu(ghost.path()),
@@ -218,7 +217,7 @@ fn ffi_logs_reach_the_ghost_log_file() {
         .unwrap_or_else(|| panic!("fallback warn missing (5.1)\nlog:\n{log}"));
     let warn_line = log.lines().find(|l| l.contains(FALLBACK_WARN)).unwrap();
     assert_log_contains(warn_line, "profile.log", "fallback warn names file_path");
-    // warn の後のログ（ロード・request・終了処理）も既定のログファイルへ届く（5.2）。
+    // warn の後のログ（ロード・request・終了処理）も既定のログファイルへ届く。
     assert_log_contains(
         &log[warned..],
         "Unregistering logger",
@@ -229,7 +228,7 @@ fn ffi_logs_reach_the_ghost_log_file() {
         "invalid file_path must not be created (5.3)"
     );
 
-    // --- 段 7: 同じゴーストの `file_path` を直して再読み込み（5.4） ---
+    // --- 段 7: 同じゴーストの `file_path` を直して再読み込み ---
     const CUSTOM_LOG: &str = "profile/pasta/logs/custom.log";
     set_extra_toml(
         ghost.path(),
@@ -243,7 +242,7 @@ fn ffi_logs_reach_the_ghost_log_file() {
     let log = read_log(ghost.path(), CUSTOM_LOG);
     assert_log_contains(&log, "Unregistering logger", "fixed file_path log (5.4)");
 
-    // --- 段 8: teardown の待ち時間切れ（4.4） ---
+    // --- 段 8: teardown の待ち時間切れ ---
     // `SHIORI.unload` が 1 秒待つゴーストをアクタースレッドで起こし、送信側から短い待ち時間で
     // teardown する（FFI の `unload` は 5 秒固定なので使わない）。待ち時間切れの warn は文脈の
     // 無いこのスレッドから出て、まだ登録中のロガーへ「文脈なし→唯一のロガー」で届く。

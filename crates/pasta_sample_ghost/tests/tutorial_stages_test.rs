@@ -1,4 +1,4 @@
-//! 入門ガイドの段階検証（hello-pasta-tutorial-stages）。
+//! 入門ガイドの段階検証。
 //!
 //! 段階表の正本 `STAGES.md` の 2 つの表（`## 段階表`・`## 検証イベント表`）を読み、
 //! 配布辞書 `ghosts/hello-pasta/ghost/master/dic/` との対応を検査する。
@@ -236,7 +236,7 @@ fn assert_responds(stage: u8, file: &str, id: &str, response: &str) {
 }
 
 /// 段階表の「追加するファイル」の集合 ＝ `dic/*.pasta` の集合、各ファイル名の番号 ＝ 段階、
-/// 1 段 1 ファイルで 14 段目だけファイルが無い（Req 2.3・4.3）。
+/// 1 段 1 ファイルで 14 段目だけファイルが無い。
 #[test]
 fn stage_table_matches_dic_files() {
     let markdown = read_stages_md();
@@ -322,7 +322,7 @@ return table.concat(t, "\n")"#;
     labels
 }
 
-/// 応答に失敗表記の種類の名前が 1 つも含まれないことを確かめる（要件 10.4）
+/// 応答に失敗表記の種類の名前が 1 つも含まれないことを確かめる
 fn assert_no_failure_notation(stage: u8, file: &str, id: &str, response: &str, labels: &[String]) {
     let found: Vec<&str> = labels
         .iter()
@@ -336,8 +336,8 @@ fn assert_no_failure_notation(stage: u8, file: &str, id: &str, response: &str, l
 }
 
 /// N = 1〜13 で段階の辞書を組み立てて実ローダーで読み込み、OnBoot と検証イベント表の
-/// 該当行を送って応答を確かめる（Req 1.6・2.1・2.6・3.9・4.1・4.2・4.2a・4.4・4.5・4.6）。
-/// 応答に失敗表記が無いことも確かめる（failure-output-unification 要件 10.4）。
+/// 該当行を送って応答を確かめる。
+/// 応答に失敗表記が無いことも確かめる。
 /// 仮想イベント（ランダムトーク・時報）は送らない。
 #[test]
 fn every_stage_loads_and_responds() {
@@ -368,7 +368,7 @@ fn every_stage_loads_and_responds() {
 }
 
 /// 7 段目の辞書は `＞transfer_req_to_var` を書かず、イベントのシーンに最初から入っている
-/// Reference0 を `＄ｒ０` で OnGhostChanged の台詞に出す（scene-condition-attributes 要件 6.1・9.7）。
+/// Reference0 を `＄ｒ０` で OnGhostChanged の台詞に出す。
 #[test]
 fn stage7_greeting_reads_reference_without_transfer() {
     const FILE: &str = "07-greeting.pasta";
@@ -415,7 +415,7 @@ fn stage7_update_complete_picks_scene_by_reference0() {
 }
 
 /// 13 段目: `calendar.csv` の各名前に `＊行事_名前` があり、`＊行事_なし` があり、
-/// `＞「行事_」＆＄行事` で振り分ける場面がある（date-var-calendar 要件 10.1・10.2）。
+/// `＞「行事_」＆＄行事` で振り分ける場面がある。
 #[test]
 fn stage13_calendar_has_event_scenes() {
     const FILE: &str = "13-calendar.pasta";
@@ -486,7 +486,7 @@ fn global_scene_names_skip_lua_and_trailers() {
 }
 
 /// 全 `dic/*.pasta` のグローバルシーン名について、異なる 2 つの名前のどちらも他方で始まらない
-/// ことを確かめる（Req 2.5・5.3）。
+/// ことを確かめる。
 /// `＊会話` は別名で OnTalk になるが、書いた名前 `会話` のまま検査する。
 /// 組み込みの飛び先（`GLOBAL` のキー）と同じ名前のシーンは、ここでは確かめない。
 /// `validate` の `scene-shadowed-by-builtin` が、hello-pasta の注意 0 件のテスト

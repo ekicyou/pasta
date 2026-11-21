@@ -1,4 +1,4 @@
-//! touch-poke-shortcuts: 実ローダーで一時ゴーストを読み込み、つつき・撫でのショートカットを確かめる。
+//! 実ローダーで一時ゴーストを読み込み、つつき・撫でのショートカットを確かめる。
 //!
 //! PASTA_DEBUG の中和は `tests/common/mod.rs` の `#[ctor]` ガードが担う。
 
@@ -72,7 +72,7 @@ fn search_global(runtime: &PastaLuaRuntime, name: &str) -> Option<(String, Strin
 }
 
 // ============================================================================
-// 空のシーン（要件 7.1）
+// 空のシーン
 // ============================================================================
 
 /// 本文の無い `＊つっつき反応Head` と、本文のある `＊つっつき反応その他` を置いた辞書。
@@ -118,7 +118,7 @@ fn empty_global_scene_is_registered_and_yields_no_output() {
 }
 
 // ============================================================================
-// 既存の既定ハンドラはゴーストの登録を上書きしない（要件 8.7）
+// 既存の既定ハンドラはゴーストの登録を上書きしない
 // ============================================================================
 
 /// 既定ハンドラを持つ 3 つのイベント。
@@ -198,7 +198,7 @@ end
 }
 
 // ============================================================================
-// 完全一致でグローバルシーンをコルーチンにする（要件 6.2）
+// 完全一致でグローバルシーンをコルーチンにする
 // ============================================================================
 
 /// 頭が同じ長い名前のシーンと、ローカルシーン・`GLOBAL` の関数を置いた辞書。
@@ -267,7 +267,7 @@ fn co_exec_exact_runs_only_exactly_named_global_scene() {
 }
 
 // ============================================================================
-// つつき・撫での既定のハンドラ（要件 1.3・3.3・8.1）
+// つつき・撫での既定のハンドラ
 // ============================================================================
 
 /// `extra` を足したリクエストで `EVENT.fire` を呼ぶ（`extra` は Lua の表の中身。例: `reference = { [3] = "0" }`）。
@@ -295,7 +295,7 @@ fn poke_runs_shortcut_scene() {
     );
 }
 
-/// ショートカットが無ければ、つつき・移動は今までどおりイベント名のシーンへ（要件 8.1）。
+/// ショートカットが無ければ、つつき・移動は今までどおりイベント名のシーンへ。
 #[test]
 fn mouse_events_fall_back_to_event_name_scene() {
     let (_temp, runtime) = load_ghost(
@@ -306,14 +306,14 @@ fn mouse_events_fall_back_to_event_name_scene() {
     assert!(response.contains("ダブルクリック"), "{response:?}");
     let response = fire_with(&runtime, "OnMouseMove", refs);
     assert!(response.contains("移動"), "{response:?}");
-    // どれも無いイベントは 204（要件 1.3）
+    // どれも無いイベントは 204
     let (_temp, runtime) = load_ghost("");
     let response = fire_with(&runtime, "OnMouseDoubleClick", refs);
     assert!(response.starts_with("SHIORI/3.0 204"), "{response:?}");
 }
 
 // ============================================================================
-// つつきの段々・完全一致・抽選・空のシーン・チェイントーク（要件 1・4.4・6.2・6.3・7・8.1）
+// つつきの段々・完全一致・抽選・空のシーン・チェイントーク
 // ============================================================================
 
 /// アクター名を引けるように `pasta.toml` に足すアクター（スポット 0・1）。
@@ -364,7 +364,7 @@ fn assert_rung(response: &str, n: usize, ctx: &str) {
     }
 }
 
-/// 段 k から下だけを置いたゴーストで、いつも段 k（書いた中で一番上）が選ばれる（要件 1.1）。
+/// 段 k から下だけを置いたゴーストで、いつも段 k（書いた中で一番上）が選ばれる。
 #[test]
 fn poke_picks_highest_written_rung() {
     for top in 1..=9 {
@@ -381,7 +381,7 @@ fn poke_picks_highest_written_rung() {
 }
 
 /// 全段を置いたゴーストで、部位が空なら部位の段（1・2・5・6）を、
-/// アクター名が決まらなければアクターの段（1〜4）を飛ばす（要件 1.4・1.5・4.4）。
+/// アクター名が決まらなければアクターの段（1〜4）を飛ばす。
 #[test]
 fn poke_skips_rungs_without_part_or_actor() {
     let (_temp, runtime) = load_ghost_full(&rung_dic(1..=9), None, ACTORS_TOML);
@@ -401,7 +401,7 @@ fn poke_skips_rungs_without_part_or_actor() {
             &format!("scope={scope:?} part={part:?}"),
         );
     }
-    // スコープ番号そのものを入れた名前（つっつき反応0Head）は探さない（要件 4.4）
+    // スコープ番号そのものを入れた名前（つっつき反応0Head）は探さない
     let (_temp, runtime) = load_ghost_full(
         "＊つっつき反応0Head\n　女の子：番号の段です\n",
         None,
@@ -412,7 +412,7 @@ fn poke_skips_rungs_without_part_or_actor() {
 }
 
 /// `＊OnMouseDoubleClick` だけのゴーストは、既定のハンドラが無かったとき（イベント名のシーンを
-/// そのまま探す `EVENT.no_entry`）と同じ応答を返す（要件 6.3・8.1）。
+/// そのまま探す `EVENT.no_entry`）と同じ応答を返す。
 #[test]
 fn poke_with_only_event_scene_matches_previous_behavior() {
     const DIC: &str = "＊OnMouseDoubleClick\n　女の子：ダブルクリックです\n";
@@ -429,7 +429,7 @@ REG.OnMouseDoubleClick = function(act) return require("pasta.shiori.event").no_e
     }
 }
 
-/// `＊つっつき反応胸右` だけのゴーストで部位 `胸` をつついても `胸右` は選ばれない（要件 6.2・1.3）。
+/// `＊つっつき反応胸右` だけのゴーストで部位 `胸` をつついても `胸右` は選ばれない。
 #[test]
 fn poke_does_not_pick_longer_part_name() {
     let (_temp, runtime) = load_ghost_full(
@@ -444,7 +444,7 @@ fn poke_does_not_pick_longer_part_name() {
     assert!(response.contains("胸右です"), "{response:?}");
 }
 
-/// 同じ名前の 2 シーンは、2 回のつつきで 1 回ずつ出る（要件 1.2）。
+/// 同じ名前の 2 シーンは、2 回のつつきで 1 回ずつ出る。
 #[test]
 fn poke_draws_same_named_scenes_in_turn() {
     let (_temp, runtime) = load_ghost_full(
@@ -462,7 +462,7 @@ fn poke_draws_same_named_scenes_in_turn() {
 }
 
 /// 本文の無い `＊つっつき反応Head` があると部位 `Head` のつつきは 204 で、
-/// `その他` は呼ばれない。ほかの部位は `その他` に届く（要件 7.1）。
+/// `その他` は呼ばれない。ほかの部位は `その他` に届く。
 #[test]
 fn empty_shortcut_scene_stops_lower_rungs() {
     let (_temp, runtime) = load_ghost_full(EMPTY_HEAD_DIC, None, ACTORS_TOML);
@@ -473,7 +473,7 @@ fn empty_shortcut_scene_stops_lower_rungs() {
     assert!(response.contains("その他の反応です"), "{response:?}");
 }
 
-/// ショートカットのシーンの中で `＞transfer_req_to_var` が Reference を変数へ移す（要件 7.2）。
+/// ショートカットのシーンの中で `＞transfer_req_to_var` が Reference を変数へ移す。
 #[test]
 fn transfer_req_to_var_works_in_shortcut_scene() {
     let (_temp, runtime) = load_ghost_full(
@@ -496,7 +496,7 @@ return before .. "|" .. tostring(ok) .. "|" .. tostring(value) .. "|" .. tostrin
 "#;
 
 /// チェイントークを含むショートカットのシーンの、応答と継続の扱いが
-/// `＊OnMouseDoubleClick` で書いたときと同じ（要件 7.4）。
+/// `＊OnMouseDoubleClick` で書いたときと同じ。
 #[test]
 fn chain_talk_after_shortcut_matches_event_scene() {
     const BODY: &str = "　女の子：前半です\n　＞チェイントーク\n　女の子：後半です\n";
@@ -523,7 +523,7 @@ fn chain_talk_after_shortcut_matches_event_scene() {
 }
 
 // ============================================================================
-// 撫でと抑止（要件 2.1・2.6・3.1・3.3・5.1・5.3・5.4・5.5・8.1・8.5）
+// 撫でと抑止
 // ============================================================================
 
 /// 撫でのシーンとイベント名のシーンを置いた辞書。
@@ -632,7 +632,7 @@ fn stroke_without_shortcut_always_runs_event_scene() {
 }
 
 // ============================================================================
-// 自前のハンドラは登録の前後にかかわらず優先する（要件 8.2・8.3・8.6）
+// 自前のハンドラは登録の前後にかかわらず優先する
 // ============================================================================
 
 /// つつき・撫での両方のショートカットのシーンを置いたゴーストで、自前のハンドラを

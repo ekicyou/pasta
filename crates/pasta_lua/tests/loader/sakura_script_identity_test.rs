@@ -2,7 +2,7 @@
 //!
 //! 本番の読み込み（`PastaLoader::load`）で登録されたモジュールと、新しい VM で
 //! `sakura_script::register` を直に呼んだモジュールが、同じ入力でバイト単位で
-//! 同じ出力を返すことを固める（ponytail-lua-loader Requirement 5.3）。
+//! 同じ出力を返すことを固める。
 
 use crate::common;
 

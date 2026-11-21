@@ -5,7 +5,6 @@ use tempfile::TempDir;
 fn create_test_structure(temp: &TempDir) -> PathBuf {
     let base = temp.path();
 
-    // Create dic structure
     fs::create_dir_all(base.join("dic/greeting")).unwrap();
     fs::create_dir_all(base.join("dic/conversation")).unwrap();
     fs::write(base.join("dic/greeting/hello.pasta"), "# hello").unwrap();
@@ -96,7 +95,6 @@ fn test_discover_empty_directory() {
     let temp = TempDir::new().unwrap();
     let base_dir = temp.path();
 
-    // Create empty dic structure
     fs::create_dir_all(base_dir.join("dic/empty")).unwrap();
 
     let patterns = vec!["dic/*/*.pasta".to_string()];
@@ -110,7 +108,6 @@ fn test_discover_multiple_patterns() {
     let temp = TempDir::new().unwrap();
     let base_dir = temp.path();
 
-    // Create structures for multiple patterns
     fs::create_dir_all(base_dir.join("dic/sub")).unwrap();
     fs::create_dir_all(base_dir.join("extra")).unwrap();
     fs::write(base_dir.join("dic/sub/a.pasta"), "# a").unwrap();
@@ -296,7 +293,6 @@ fn test_discover_skips_junction_directory() {
 
 // --- Recursive default pattern (`dic/**/*.pasta`) tests ---
 //
-// Task 1.2 changed the default discovery glob to `dic/**/*.pasta` (recursive).
 // These tests pin the recursive-glob behavior for flat / one-level /
 // multi-level placements, fix the existing nested layout as a
 // non-destructive regression, and confirm exclusion rules (profile/,

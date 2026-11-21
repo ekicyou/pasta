@@ -1,6 +1,4 @@
 //! Transpiler configuration for Lua code generation.
-//!
-//! This module provides configuration options for the transpilation process.
 
 use pasta_core::SceneAliasTable;
 

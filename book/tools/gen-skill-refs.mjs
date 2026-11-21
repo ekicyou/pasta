@@ -1,31 +1,16 @@
-// gen-skill-refs.mjs — マニュアル章からスキル references/ を生成する（manual-ssot-authority）
-// タスク 3.3（要件 5.1, 5.2, 5.8, 5.9, 1.7 / design「GenSkillRefs」）: 対応表・出力名・口調判定・本文抽出。
+// gen-skill-refs.mjs — マニュアル章からスキル references/ を生成する。
 //
-// export:
-//   GENERATION_MAP  … 対応表（24 エントリ・順序固定）。入力の定義はこれだけ（設定ファイルなし）。
-//   outName         … 章パス → references/ 内の出力名（index.md は直近の親ディレクトリ名付き）。
-//   VOICE_MARKERS   … 口調マーカー（verify-content.mjs から移設）。普通文体と衝突する 3 語だけ否定先読み。
-//   findVoice       … 一致したマーカーの語を返す（空なら口調なし）。
-//   chapterRegions  … 章テキスト → { lines, intro, body, outro }（0 始まり・end 排他）。構造違反で bad-structure。
-//                     （manual-claudia-theme タスク 3.2・要件 4.3）
-//   extractBody     … 章テキスト → { title, body }。構造違反・本文の台詞・本文散文の口調で GenError を投げる。
-//   readChapter     … book/src から章を読む。無ければ missing-chapter。
-//   GenError        … kind: missing-chapter / bad-structure / talk-in-body / voice-in-body / unresolvable-link。
-// タスク 3.4（要件 5.3–5.7, 7.1–7.4, 7.7）:
-//   rewriteLinks    … フェンス外・インラインコード外のインラインリンクを書き換える（同一スキル宛て → 兄弟ファイル名、
-//                     非生成章・別スキル宛て → 公開 URL、絶対 URL・#anchor 不変、画像・非 .md・book/src 外 → unresolvable-link）。
-//   renderEntry     … 固定 2 行ヘッダ＋H1＋本文（LF・末尾改行 1 つ・BOM なし・時刻／環境値なし）。
-//   generateAll     … 全エントリをメモリ上で生成（リポジトリ相対パス → 内容）。最初の GenError で投げる。
-//   writeAll        … 全生成の成功後に書き出す。LF 正規化後に同一なら書き換えない。
-//   checkAll        … { stale, orphans, fixCommand }（LF 正規化して比較・孤立は 1 行目の固定ヘッダで判定）。
+// GENERATION_MAP（対応表・順序固定）が入力の定義のすべてで、設定ファイルは無い。
+// 構造違反・本文の台詞・本文散文の口調・解決できないリンクは GenError（kind で区別）として投げる。
+// リンクは、同一スキル宛て → 兄弟ファイル名、非生成章・別スキル宛て → 公開 URL に書き換える（絶対 URL・#anchor は不変）。
+// 出力は決定論的（LF・末尾改行 1 つ・BOM なし・時刻／環境値なし）。
 //
 // CLI: node book/tools/gen-skill-refs.mjs        … 書き出し（exit 0）
 //      node book/tools/gen-skill-refs.mjs --check … 照合（不一致・孤立を全件列挙して exit 1／一致で exit 0）
 //      GenError → 標準エラーへ章パス付きで exit 1 ／ 予期しない例外・不明な引数 → exit 2。
 //
-// 依存: link-check.mjs の LINK_RE・maskFences（規則を二重化しない）、talk/talk.mjs の TALK_LINE_RE・scanTalk
-// （台詞の判定を二重化しない。talk.mjs は本ファイルを import しない）と Node 標準のみ。
-// import しただけでは何も実行しない。
+// 依存: link-check.mjs の LINK_RE・maskFences、talk/talk.mjs の TALK_LINE_RE・scanTalk（規則を二重化しない。
+// talk.mjs は本ファイルを import しない）と Node 標準のみ。import しただけでは何も実行しない。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -112,7 +97,7 @@ export function readChapter(chapter, repoRoot) {
 // インラインコード `…`（同数のバッククォートで閉じる）。
 const INLINE_CODE_RE = /(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g;
 
-// 章を導入・本文・締めの領域に分ける（manual-claudia-theme タスク 3.2 / design「ChapterStructure」）。
+// 章を導入・本文・締めの領域に分ける。
 // 範囲はすべて 0 始まり・end 排他の行番号。lines は LF に直した全行。
 //   intro … H1 の次行〜最初のフェンス外の `---`
 //   body  … 最初と最後のフェンス外の `---` の間から、前後の空行を除いた範囲（extractBody の本文）
@@ -145,8 +130,7 @@ export function extractBody(chapterText, chapter) {
   const { lines, body: { start, end } } = chapterRegions(chapterText, chapter);
   const masked = maskFences(chapterText).split('\n');
 
-  // 本文（フェンス外）の台詞の開始行（manual-claudia-theme タスク 3.2 / 要件 4.4）。生成対象章と内部設計章
-  // （verify-content の I-structure）は、台詞を導入・締めにだけ置ける。口調より先に見る（台詞は口調を含むため）。
+  // 本文（フェンス外）の台詞の開始行。生成対象章と内部設計章（verify-content の I-structure）は、台詞を導入・締めにだけ置ける。口調より先に見る（台詞は口調を含むため）。
   // TALK_LINE_RE は行頭・字下げの台詞だけを拾い、入れ子の引用・リストの中（`> > 【`・`- > 【`）は拾わない。
   // そこは scanTalk の nested-talk（字下げ・リスト・入れ子の台詞の開始行で必ず出る）で補う。
   const talk = new Set();
@@ -174,7 +158,7 @@ export function extractBody(chapterText, chapter) {
   return { title: lines[0].slice(2).trim(), body: lines.slice(start, end).join('\n') };
 }
 
-// ---- タスク 3.4: リンク書き換え・ヘッダ・書き出し・照合 ----
+// ---- リンク書き換え・ヘッダ・書き出し・照合 ----
 
 const GENERATED_MARK = '<!-- GENERATED FROM PASTA MANUAL - DO NOT EDIT -->';
 const FIX_COMMAND = 'node book/tools/gen-skill-refs.mjs';
@@ -184,7 +168,7 @@ const toHtml = (chapter) => chapter.replace(/\.md$/, '.html');
 const relOutPath = (e) => `.claude/skills/${e.skill}/references/${outName(e.chapter)}`;
 const lf = (s) => s.replace(/\r\n?/g, '\n');
 
-// 1 つのリンク先を書き換える（design「リンク書き換え規則」1–3）。
+// 1 つのリンク先を書き換える。
 function rewriteTarget(target, entry) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('#')) return target;
   const hash = target.indexOf('#');
@@ -236,7 +220,7 @@ export function renderEntry(entry, repoRoot) {
   ].join('\n');
 }
 
-// 全エントリをメモリ上で生成する（最初の GenError で投げる）。リポジトリ相対パス → 内容。
+// 全エントリをメモリ上で生成する（最初の GenError で投げる）。
 export function generateAll(repoRoot) {
   return new Map(GENERATION_MAP.map((e) => [relOutPath(e), renderEntry(e, repoRoot)]));
 }

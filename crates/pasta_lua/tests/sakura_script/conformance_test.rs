@@ -1,11 +1,11 @@
-//! タグの読み取りの適合テスト（paragraph-break-tag-only-talk 要件 10.1・10.4）
+//! タグの読み取りの適合テスト
 //!
 //! 1 つの事例の表 `CASES` を、タグの読み取りを持つ 3 か所に通す。
 //! - Rust: `Tokenizer::tokenize`（正。`SAKURA_TAG_PATTERN`）
 //! - Lua: `pasta.shiori.appearance` の `tag_at`（写し）
 //! - DSL: `grammar.pest` のアクション行（写し）
 //!
-//! 期待値は新しい規則（要件 7〜9）で書く。3 つの読み取りが全事例を通る。
+//! 期待値は新しい規則で書く。3 つの読み取りが全事例を通る。
 
 use mlua::prelude::*;
 use pasta_dsl::parser::{Action, FileItem, LocalSceneItem, parse_str};
@@ -28,7 +28,7 @@ use K::*;
 enum Dsl {
     /// 3 つの読み取りと同じ並び
     Same,
-    /// パースエラー（要件 10.3）
+    /// パースエラー
     ParseError,
 }
 
@@ -46,7 +46,7 @@ use Dsl::*;
 
 #[rustfmt::skip]
 const CASES: &[Case] = &[
-    // 要件 10.4 の 19 件
+    // 主な事例
     case(r"\nHello", &[(Tag, r"\n"), (Text, "Hello")], Same),
     case(r"\w9OK", &[(Tag, r"\w9"), (Text, "OK")], Same),
     case(r"\w0", &[(Tag, r"\w"), (Text, "0")], Same),
@@ -66,7 +66,7 @@ const CASES: &[Case] = &[
     case(r"\+", &[(Tag, r"\+")], Same),
     case(r"\*", &[(Tag, r"\*")], Same),
     case(r"\&[amp]", &[(Tag, r"\&[amp]")], Same),
-    // 設計の TagPattern の表のその他の事例
+    // その他の事例
     case(r"\s3[x]", &[(Tag, r"\s3"), (Text, "[x]")], Same),
     case(r"\_", &[(Text, r"\_")], ParseError),
     case(r"\n!?", &[(Tag, r"\n"), (Text, "!?")], Same),

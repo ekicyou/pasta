@@ -1,9 +1,9 @@
-//! scene-name-alias task 6.3: pasta.toml の別名表だけを変えて読み直すキャッシュの結合テスト。
+//! pasta.toml の別名表だけを変えて読み直すキャッシュの結合テスト。
 //!
 //! 同じゴーストディレクトリ（キャッシュが残る）を、`.pasta` を触らずに pasta.toml だけを
 //! 「既定 → `[scene.alias]` の `OnTalk = []` → 削除」と変えて 3 回読み直し、各段で登録名と
 //! `SEARCH:search_scene` の結果の両方が新しい表に切り替わること、`.scene_alias` マーカーが
-//! 新しい表の指紋に更新されることを確かめる（requirements 6.1〜6.3 / 10.4）。
+//! 新しい表の指紋に更新されることを確かめる。
 //! PASTA_DEBUG の中和は `tests/common/mod.rs` の `#[ctor]` ガードが担う。
 
 use crate::common;
@@ -63,7 +63,7 @@ fn load_and_check(base: &Path, step: &str, table: &SceneAliasTable, expected: &s
 }
 
 /// pasta.toml の別名表だけを変えて同じディレクトリを読み直すと、`.pasta` が古いままの
-/// キャッシュが残らず、宣言と検索の両方が新しい表で切り替わる（6.1・6.2・6.3・10.4）。
+/// キャッシュが残らず、宣言と検索の両方が新しい表で切り替わる。
 #[test]
 fn changing_only_alias_table_in_pasta_toml_switches_declaration_and_search() {
     let temp = create_temp_with_pasta(ALIAS_ONLY_DIC);
@@ -72,7 +72,7 @@ fn changing_only_alias_table_in_pasta_toml_switches_declaration_and_search() {
     let pasta = base.join("dic/test/hello.pasta");
     let pasta_mtime = std::fs::metadata(&pasta).unwrap().modified().unwrap();
 
-    // (1) 既定の表: ＊会話 → OnTalk_1
+    // 既定の表: ＊会話 → OnTalk_1
     load_and_check(
         base,
         "1:default",
@@ -81,7 +81,7 @@ fn changing_only_alias_table_in_pasta_toml_switches_declaration_and_search() {
         "会話_",
     );
 
-    // (2) OnTalk の既定を消す [scene.alias] を足す: ＊会話 → 会話_1
+    // OnTalk の既定を消す [scene.alias] を足す: ＊会話 → 会話_1
     std::fs::write(&toml, format!("{BASE_TOML}\n[scene.alias]\nOnTalk = []\n")).unwrap();
     load_and_check(
         base,
@@ -91,7 +91,7 @@ fn changing_only_alias_table_in_pasta_toml_switches_declaration_and_search() {
         "OnTalk",
     );
 
-    // (3) [scene.alias] を削除: 既定へ戻り ＊会話 → OnTalk_1
+    // [scene.alias] を削除: 既定へ戻り ＊会話 → OnTalk_1
     std::fs::write(&toml, BASE_TOML).unwrap();
     load_and_check(
         base,

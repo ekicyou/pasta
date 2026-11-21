@@ -1,26 +1,18 @@
 // talk.mjs — 台詞部品（Claudia とアンソニーの掛け合い）の登録簿と記法の解析。
-// manual-claudia-theme タスク 1.1（要件 3.2, 3.3, 3.4, 3.8, 4.2, 4.8, 10.7 / design「TalkCore」）。
 //
 // 登録簿（SPEAKERS）は話し手と表情の唯一の定義。話し手や表情の追加はこの配列の変更と
 // 顔画像（book/src/img/<配役>/）の追加で完結する。
 // 配役（cast）: 章が使う話し手の組。debug/ の章は emo2（むらさき・エモ）、ほかの章は claudia（クローディア・アンソニー）。
 //   1 つの章で配役を混ぜない（scanTalk に配役を渡すと、配役の外の話し手を unknown-speaker にする）。
 //
-// 記法（design「データモデル / 記法の文法」）:
+// 記法:
 //   > 【表情】本文            … 既定の話し手（Claudia）の表情
 //   > 【話し手】本文          … その話し手の「素」
 //   > 【話し手：表情】本文    … 区切りは全角コロン「：」のみ
 //   話し手名は登録簿の日本語名だけ（別名・欧文名なし）。
 //
-// 共用 export（talk-html.mjs・gen-skill-refs.mjs・verify-content.mjs などが import する）:
-//   SPEAKERS / DEFAULT_SPEAKER_ID / DEFAULT_FACE / faceDir / castOf / MAX_FACE_BYTES / TALK_LINE_RE / NO_TALK_CHAPTERS
-//   parseTalkTag(inner) … 【】の内側を解析
-//   faceFilePath(speaker, face) … 顔画像への相対パス（book/src と出力根から）
-//
-//   scanTalk(markdown, cast?) … フェンス外の台詞ブロックの列挙と不正の全件列挙（cast を渡すと配役の外の話し手も不正）
-//   checkRegion(blocks, lines, range, opts) … 導入・締めの範囲の検査
-//   faceStats(blocksByChapter, regionsByChapter) … 表情の集計表
-//
+// 共用 export は talk-html.mjs・gen-skill-refs.mjs・verify-content.mjs などが import する。
+// scanTalk(markdown, cast?) はフェンス外の台詞ブロックの列挙と不正の全件列挙（cast を渡すと配役の外の話し手も不正）。
 // 純関数のみ・入出力なし（--stats CLI を除く）。
 
 import fs from 'node:fs';
@@ -121,10 +113,9 @@ export function faceFilePath(sp, face) {
   return `${faceDir(sp.cast)}/${sp.faces[face]}.png`;
 }
 
-// ---- 章の Markdown の走査（タスク 1.2 / 要件 3.7, 4.1, 4.3, 4.7, 10.3） ----
+// ---- 章の Markdown の走査 ----
 // フェンス外の台詞ブロックを列挙し、不正を行番号付きで全件返す（最初の 1 件で止めない）。
 // フェンス判定は link-check の maskFences（フェンス内の行を空行にする・行数は保つ・LF 正規化）。
-// design「台詞ブロックの判定（Markdown 側）」の流れに従う。
 
 // 引用の行: 字下げ・リスト記号・引用記号の並び・内容に分ける。
 const QUOTE_RE = /^(\s*)((?:[-*+]|\d{1,9}[.)])\s+)?((?:>\s?)+)(.*)$/;
@@ -260,7 +251,7 @@ export function checkRegion(blocks, markdownLines, range, opts) {
   return errors;
 }
 
-// ---- 表情の集計（--stats / 要件 4.6 の人のレビューを支える表示。合否は出さない） ----
+// ---- 表情の集計（--stats。人のレビューを支える表示で、合否は出さない） ----
 // blocksByChapter: 章 → 台詞ブロック。regionsByChapter: 章 → { intro, outro }（0 始まり・end 排他）。
 const faceLabel = (b) => `${b.tag.speaker.name}：${b.tag.face}`;
 

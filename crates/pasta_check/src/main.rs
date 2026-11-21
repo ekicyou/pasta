@@ -358,7 +358,7 @@ mod tests {
         assert!(err.to_string().contains("--target"), "{err}");
     }
 
-    /// validate に release 用のオプションを渡すと、そのオプション名を理由に誤り（Req 1.4）
+    /// validate に release 用のオプションを渡すと、そのオプション名を理由に誤り
     #[test]
     fn test_validate_rejects_release_options() {
         for (opt, val) in [("--release", "r"), ("--nar", "n"), ("--copy", "c")] {

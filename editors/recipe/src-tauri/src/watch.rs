@@ -31,7 +31,7 @@ pub fn start(
                 .iter()
                 .map(|s| s.to_string_lossy().into_owned())
                 .collect();
-            // master そのもの・最上位の profile の下（11.4）は知らせない
+            // master そのもの・最上位の profile の下は知らせない
             if parts
                 .first()
                 .is_some_and(|p| !p.eq_ignore_ascii_case("profile"))

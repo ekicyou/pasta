@@ -1,13 +1,11 @@
 // link-check.mjs — マニュアル（book/src）のリンク切れ検出（git 非依存）
-// manual-ssot-authority タスク 3.1（要件 8.1, 8.4 / design「LinkCheck」）。
 //
 // 検出（book/src/**/*.md のフェンス外を走査）:
 //   (a) book 内相対 .md リンクが実在ファイルを指すか、
-//   (b) リポジトリ内を指す GitHub blob/tree URL が
-//       ローカルに実在するか（オフラインでローカル照合）、
+//   (b) リポジトリ内を指す GitHub blob/tree URL がローカルに実在するか（オフラインでローカル照合）、
 //   (c) (a)(b) とも repoRoot 外へ脱出するパス（トラバーサル）は実在しても違反。
 //
-// 本の中のリンクの見出しの照合（manual-link-anchor-check タスク 2.1・2.2・要件 1.1〜1.5, 2.1, 2.2, 3.1〜3.6, 5.1〜5.5）:
+// 本の中のリンクの見出しの照合:
 //   (a) のリンクのうち見出しを指すもの（`章.md#見出し`・同じ章の中の `#見出し`）を detectBrokenLinks で
 //   リンク先の章のアンカーの集合（フェンス外の見出しの slug ∪ `<a id|name>` の明示アンカー）と照合し、
 //   無ければ [1] の区分に internal-anchor として報告する（行番号は付けない）。
@@ -15,38 +13,31 @@
 //   章のファイルが無いときは internal-md の 1 件だけで、見出しの違反を重ねない。
 //   集合は、スキル・公開 URL の検査と同じ読み手（anchorReader）から取る（照合の規則は 1 つ）。
 //
-// 内部設計章のパス実在検査（pasta-runtime-internals-doc タスク 1.1・要件 3.7）:
+// 内部設計章のパス実在検査:
 //   book/src/internals/**/*.md のフェンス外インラインコードに書いたリポジトリ内パスを
 //   checkInternalsPaths で検査し、[1] の区分に internals-path として報告する。
 //
-// 読者に届く文書のマニュアル URL 実在検査（同タスク 1.2・要件 7.5, 7.8 /
-// manual-link-anchor-check タスク 3.1・3.2・要件 4.1〜4.7）:
+// 読者に届く文書のマニュアル URL 実在検査:
 //   crates/*/README.md → ルートの README.md → doc/SOUL.md → 3 スキルの Markdown（生成ファイルも含む）の順に、
 //   フェンス外のリンクと裸の URL のうち公開マニュアル（MANUAL_URL）を指すものを
 //   checkReadmeManualLinks で book/src の章・見出しへ写像して照合し、[1] の区分に readme-manual-url として報告する
 //   （区分と文面は、どの文書でも同じ）。裸の URL は、空白・半角の括弧のほか、全角の括弧と句読点でも終わる。
 //
-// 最新版の固定リンクの名前の照合（manual-download-page タスク 2.4・要件 2.3, 7.1, 7.8）:
+// 最新版の固定リンクの名前の照合:
 //   book/src/**/*.md と読者に届く文書（上と同じ readerDocs）のフェンス外の
 //   `https://github.com/ekicyou/pasta/releases/latest/download/<名前>` を checkReleaseAssetLinks で拾い、
 //   名前が .github/workflows/release.yml の添付（`release/<名前>` の行）に無ければ [1] の区分に release-asset として報告する。
 //   添付の一覧が読めないときは release.yml の 1 件だけを返す。
 //
-// スキル自己完結検査（タスク 3.2・要件 5.3, 6.1, 6.4, 6.5, 10.2, 2.4）:
+// スキル自己完結検査:
 //   .claude/skills/{pasta-ghost-authoring,pasta-lua-coding}/**/*.md を checkSkillSelfContained で
 //   検査する（skill-escape / skill-missing / skill-anchor / skill-forbidden-ref / skill-unlisted）。
-//   アンカーは GitHub 方式の headingSlug（生成対象 24 章で mdBook の id と一致を確認済み）と
-//   `<a id|name>` の明示アンカーで照合する。
+//   アンカーは GitHub 方式の headingSlug と `<a id|name>` の明示アンカーで照合する。
 //
-// 共用 export（gen-skill-refs.mjs が import する）:
-//   LINK_RE    … インラインリンク `[text](target)` の正規表現（先頭キャプチャ=リンク先）
-//   maskFences … CommonMark 準拠でコードフェンス内の行を空行に置換（行数は保つ）
-// 共用 export（自己テスト link-check-test.mjs が import する）:
-//   BOOK_KINDS … 報告の [1]（リンク切れ）に入る種別の一覧
-//   summaryChapters … 目次（SUMMARY.md）の章のパスを目次の順・重複なしで返す
+// 共用 export: LINK_RE・maskFences は gen-skill-refs.mjs が、BOOK_KINDS・summaryChapters は自己テストが import する。
 //
-// ビルドした出力（book/book/）は読まない。出力の有無で結果は変わらない（manual-link-anchor-check 要件 6.2）。
-// 見出しの id を出力と突き合わせる確かめは、自己テスト（link-check-test.mjs の節 I）が持つ（同 要件 3.7, 7.6〜7.8）。
+// ビルドした出力（book/book/）は読まない。出力の有無で結果は変わらない。
+// 見出しの id を出力と突き合わせる確かめは、自己テスト（link-check-test.mjs の節 I）が持つ。
 //
 // 終了コード: 違反あり → exit 1 / 無し → exit 0 / 予期しない例外 → exit 2。
 // 冪等・決定論的（同一入力 → 同一結果）。book/src は読み取りのみ。
@@ -398,7 +389,6 @@ export function checkSkillSelfContained(repoRoot = REPO_ROOT) {
 }
 
 // ---- 内部設計章のリポジトリ内パス実在検査（internals-path） ----
-// pasta-runtime-internals-doc タスク 1.1（要件 3.2, 3.7, 1.6）。
 // book/src/internals/**/*.md のフェンス外インラインコード（同数のバッククォートで閉じる区間）の
 // 中身（前後空白除去）のうち、空白を含まず REPO_PATH_PREFIXES で始まるものを repoRoot 基準で照合する。
 // 違反: repoRoot 外へ解決される（トラバーサル）、実在しない（末尾 `/` はディレクトリとして実在すること）。
@@ -430,7 +420,6 @@ export function checkInternalsPaths(repoRoot = REPO_ROOT) {
 }
 
 // ---- 読者に届く文書の公開マニュアル URL 実在検査（readme-manual-url） ----
-// pasta-runtime-internals-doc タスク 1.2（要件 7.5, 7.8, 1.6）・manual-link-anchor-check タスク 3.2（要件 4.4〜4.6）。
 // 対象: crates/*/README.md（名前順）・ルートの README.md・doc/SOUL.md・3 スキル（CHECKED_SKILLS）の Markdown（パス順。生成ファイルも含む）。
 // 対象のフェンス外・インラインコード外のインラインリンクと裸の URL のうち MANUAL_URL で始まるものを
 // 写像する: 残りが空・index.html → 合格（末尾 `/` は index.html を補う）。`<path>.html[#anchor]` → book/src/<path>.md が
@@ -495,7 +484,6 @@ export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
 }
 
 // ---- 最新版の固定リンクの名前の照合（release-asset） ----
-// manual-download-page タスク 2.4（要件 2.3, 7.1, 7.8）。
 // 対象: book/src/**/*.md（パス順）と読者に届く文書（readerDocs）のフェンス外。リンク記法・`<…>`・裸の URL のどれも拾う。
 // 名前は [\w.-]* で取り、末尾の . を落とす。空の名前も違反。添付の名前の正は release.yml。
 const LATEST_DOWNLOAD_RE = new RegExp(`https://github\\.com/${REPO_SLUG}/releases/latest/download/([\\w.-]*)`, 'g');

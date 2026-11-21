@@ -1,6 +1,4 @@
 //! ファイル属性の受け継ぎと宣言の重なりの決まり（`merge_attrs`・`PastaFile::global_scene_attrs`）
-//!
-//! Requirements 1.4, 3.1, 3.2, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 5.2
 
 use pasta_dsl::parser::*;
 

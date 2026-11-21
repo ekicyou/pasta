@@ -12,7 +12,7 @@ local WORD = require("pasta.word")
 local FAILURE = require("pasta.failure")
 
 -- ============================================================================
--- グループ化ローカル関数（actor-talk-grouping feature）
+-- グループ化ローカル関数
 -- ============================================================================
 
 --- 話者のトークンか（talk・sakura_script・アクター付きの raw_script＝未登録アクターの目印）。
@@ -39,7 +39,6 @@ local function group_by_actor(tokens)
     for _, token in ipairs(tokens) do
         local t = token.type
 
-        -- アクター属性設定トークン: 独立して出力
         if t == "spot" then
             -- spot はグループを閉じない
             table.insert(result, token)
@@ -50,9 +49,7 @@ local function group_by_actor(tokens)
             current_actor = nil
         elseif is_speaker_token(token) then
             local talk_actor = token.actor
-            -- アクター変更検出（最初のtalkまたはアクター変更時）
             if current_actor_token == nil or talk_actor ~= current_actor then
-                -- 新しい type="actor" トークンを開始
                 current_actor_token = {
                     type = "actor",
                     actor = talk_actor,
@@ -63,7 +60,6 @@ local function group_by_actor(tokens)
             end
             table.insert(current_actor_token.tokens, token)
         elseif t == "raw_script" then
-            -- アクターの無い raw_script: ハイブリッド分類
             -- アクターグループ存在時はグループ内に追加、不在時はresultに直接追加
             if current_actor_token then
                 table.insert(current_actor_token.tokens, token)
@@ -71,8 +67,6 @@ local function group_by_actor(tokens)
                 table.insert(result, token)
             end
         else
-            -- アクター行動トークン（surface, wait, newline, clear, choice, choice_timeout）
-            -- 現在のアクターグループ内に追加
             -- 現在のグループが無い場合（出力の先頭や clear_spot の後で、発言より先に積まれた場合）は
             -- アクター nil（アクター未指定）のグループを開いて入れ、切替タグなしで積んだ位置に出す
             -- yield 直後の act:surface(…) など、1 回の出力の先頭に積むと起きる
@@ -110,7 +104,6 @@ local function merge_consecutive_talks(grouped)
 
     for _, token in ipairs(grouped) do
         if token.type == "actor" then
-            -- type="actor" トークン内のtalkを統合
             local merged_tokens = {}
             local pending_talk = nil
 
@@ -130,7 +123,6 @@ local function merge_consecutive_talks(grouped)
                         }
                     end
                 else
-                    -- 非talkトークン: pending_talkをフラッシュ
                     if pending_talk then
                         table.insert(merged_tokens, pending_talk)
                         pending_talk = nil
@@ -139,7 +131,6 @@ local function merge_consecutive_talks(grouped)
                 end
             end
 
-            -- 最後のpending_talkをフラッシュ
             if pending_talk then
                 table.insert(merged_tokens, pending_talk)
             end
@@ -150,7 +141,6 @@ local function merge_consecutive_talks(grouped)
                 tokens = merged_tokens
             })
         else
-            -- spot, clear_spot はそのまま出力
             table.insert(result, token)
         end
     end
@@ -174,7 +164,6 @@ end
 --- @field line_map string|nil 実行中のシーンの行の対応（読み解かずに控えるだけ）
 local ACT = {}
 
---- ACT実装メタテーブル
 local ACT_IMPL = {}
 
 --- __indexメタメソッド: メソッド検索とアクタープロキシ動的生成
@@ -182,11 +171,9 @@ local ACT_IMPL = {}
 --- @param key string キー名
 --- @return any メソッドまたはプロキシ
 function ACT_IMPL.__index(self, key)
-    -- 1. ACT_IMPLメソッドを検索
     local method = ACT_IMPL[key]
     if method then return method end
 
-    -- 2. アクター名としてプロキシ生成
     local actor = self.actors[key]
     if actor then
         return ACTOR.create_proxy(actor, self)
@@ -253,7 +240,7 @@ function ACT_IMPL.line(self)
     return self
 end
 
---- talkトークン蓄積（状態レス化: actorトークン/spot_switch生成を削除）
+--- talkトークン蓄積
 --- @param self Act アクションオブジェクト
 --- @param actor Actor アクターオブジェクト
 --- nil は空文字扱い（talk を積まない。変数参照由来なら値の無い変数の失敗表記を積む）。nil 以外は tostring する。
@@ -394,12 +381,9 @@ end
 --- @return any|nil 見つかったハンドラー（関数または値）、またはnil
 --- @return "unmet"|nil miss どの段にも無く、L2・L5 のどちらかが条件漏れだったとき "unmet"
 function ACT_IMPL.find_act_handler(self, mode, key, skip_methods)
-    -- @pasta_search 可用性チェック（オプショナルモジュールのため呼び出し毎に pcall で確認。
-    -- require はロード済みキャッシュを返すため低コスト）
     local ok, SEARCH = pcall(require, "@pasta_search")
     if not ok then SEARCH = nil end
 
-    -- L1: current_scene[key] 完全一致（skip_methods 時は表自身のフィールドだけ）
     local scene = self.current_scene
     if scene then
         local value
@@ -407,7 +391,6 @@ function ACT_IMPL.find_act_handler(self, mode, key, skip_methods)
         if value ~= nil then return value end
     end
 
-    -- L2: ローカル辞書前方一致（@pasta_search 利用可能かつ scene_name あり時のみ）
     -- 条件漏れ（unmet）でも L3〜L5 へ進む
     local scene_name = self.current_scene and self.current_scene.__global_name__
     local result, unmet
@@ -416,7 +399,6 @@ function ACT_IMPL.find_act_handler(self, mode, key, skip_methods)
         if result ~= nil then return result end
     end
 
-    -- L3: self[key] function型のみ（act.XX / SHIORI_ACT_IMPL 継承チェーンを含む。skip_methods 時は飛ばす）
     if not skip_methods then
         local method = self[key]
         if type(method) == "function" then
@@ -424,12 +406,10 @@ function ACT_IMPL.find_act_handler(self, mode, key, skip_methods)
         end
     end
 
-    -- L4: GLOBAL[key] 完全一致（全モード共通）
     if GLOBAL[key] ~= nil then
         return GLOBAL[key]
     end
 
-    -- L5: グローバル辞書前方一致（@pasta_search 利用可能時のみ・key をグローバル検索）
     if SEARCH then
         local miss
         result, miss = search_dictionary(SEARCH, mode, key, nil, self)
@@ -595,8 +575,8 @@ local function arith_value_text(v)
 end
 
 --- 算術の被演算子を数値にする（算術式の生成コードが PASTA.num として呼ぶ）。
---- number はそのまま、string は tonumber（変更前の暗黙変換と同じ範囲）、nil は黙って 0、
---- それ以外は警告（act:arith - …、従来の算術の文言）を 1 行と、実行中の act（FAILURE.running_act）へ表記を出して 0
+--- number はそのまま、string は tonumber、nil は黙って 0、
+--- それ以外は警告（act:arith - …）を 1 行と、実行中の act（FAILURE.running_act）へ表記を出して 0
 --- （act が見つからなければログだけ）。メタメソッドは呼ばない。act のメソッドではない
 --- @param op string 警告に出す演算子（"+" | "-" | "*" | "/" | "%"）
 --- @param v any 被演算子
@@ -622,7 +602,7 @@ end
 
 --- 連結の被演算子を文字列にする（連結式の生成コードが PASTA.str として呼ぶ）。
 --- string はそのまま、number は tostring（アクション行の表示と同じ表記）、nil は黙って空文字列、
---- それ以外は警告（act:concat - …、従来の連結の文言）を 1 行と、実行中の act（FAILURE.running_act）へ表記を出して空文字列
+--- それ以外は警告（act:concat - …）を 1 行と、実行中の act（FAILURE.running_act）へ表記を出して空文字列
 --- （act が見つからなければログだけ）。メタメソッドは呼ばない。act のメソッドではない
 --- @param v any 被演算子
 --- @param desc string|nil 警告に出す被演算子の説明（変数パス・関数名）
@@ -661,23 +641,21 @@ function ACT_IMPL.build(self)
     local tokens = self.token
     self.token = {}
 
-    -- 早期リターン: 出すものが無いときはnilを返す (act-build-early-return)。
+    -- 出すものが無いときは nil を返す。
     -- 失敗表記を出さない設定で未登録アクターの空の目印だけが残ったときも含む
     if is_all_empty_raw_script(tokens) then
         return nil
     end
 
-    -- Phase 1: アクター切り替え境界でグループ化
     local grouped = group_by_actor(tokens)
 
-    -- Phase 2: 連続talkを統合
     local merged = merge_consecutive_talks(grouped)
 
     return merged
 end
 
 --- build()結果をyield
---- 自動トークを止めている間に呼ばれたら、警告を 1 行出して再開してから区切る（ontalk-suppression 2.8）。
+--- 自動トークを止めている間に呼ばれたら、警告を 1 行出して再開してから区切る。
 --- @param self Act アクションオブジェクト
 --- @return Act self メソッドチェーン用
 function ACT_IMPL.yield(self)
@@ -723,7 +701,6 @@ end
 --- @param ... any 可変長引数（ハンドラーに渡す）
 --- @return any ハンドラーの戻り値、またはnil
 function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
-    -- nil ガード: 式評価結果が nil の場合（未定義変数等）
     if key == nil then
         return FAILURE.report(self, {
             label = FAILURE.LABEL.BAD_NAME,
@@ -738,7 +715,6 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
 
     local handler, miss = self:find_handler("scene", key)
 
-    -- scene ポストプロセス
     if type(handler) == "function" then
         return handler(self, ...)
     end
@@ -832,7 +808,7 @@ function ACT_IMPL.failure(self, text, warning)
     return FAILURE.report(self, { label = text, warning = warning })
 end
 
---- スポット設定トークン生成（状態レス化）
+--- スポット設定トークン生成
 --- @param self Act アクションオブジェクト
 --- @param name string アクター名
 --- @param number integer 位置
@@ -844,7 +820,7 @@ function ACT_IMPL.set_spot(self, name, number)
     end
 end
 
---- 全スポットクリアトークン生成（状態レス化）
+--- 全スポットクリアトークン生成
 --- @param self Act アクションオブジェクト
 --- @return nil
 function ACT_IMPL.clear_spot(self)

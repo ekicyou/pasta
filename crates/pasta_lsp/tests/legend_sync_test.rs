@@ -1,4 +1,4 @@
-//! 解析器と拡張の凡例の並びが食い違ったら落とすテスト（要件 7.1）
+//! 解析器と拡張の凡例の並びが食い違ったら落とすテスト
 //!
 //! 拡張の `semanticTokensProvider.ts` の `PASTA_TOKEN_TYPES`・`PASTA_TOKEN_MODIFIERS` を読み、
 //! 解析器の `TOKEN_TYPES`・`TOKEN_MODIFIERS` と数・順・文字列を比べる。

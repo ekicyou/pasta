@@ -4,13 +4,12 @@
 
 use pasta_lua::mlua::Lua;
 
-/// Test helper: Create a Lua instance for testing
 fn create_test_lua() -> Lua {
     Lua::new()
 }
 
 // ============================================================================
-// Task 7.2: lua_date function tests
+// lua_date function tests
 // ============================================================================
 
 mod lua_date_tests {

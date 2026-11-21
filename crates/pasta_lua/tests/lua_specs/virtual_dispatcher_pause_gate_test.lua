@@ -1,6 +1,5 @@
 -- virtual_dispatcher_pause_gate_test.lua
--- 止める門（DispatcherGate）と時計の決め直し（TimerRestart）のテスト (ontalk-suppression 2.1)
--- Requirements: 2.1, 2.2, 2.3, 2.4, 2.7, 3.1, 3.2, 3.3, 5.1
+-- 止める門（DispatcherGate）と時計の決め直し（TimerRestart）のテスト
 --
 -- dispatch は pasta.store を require するため、テスト側 STORE と dispatcher 側 STORE を
 -- 同一インスタンスにそろえて一括新規ロードする。
@@ -74,7 +73,7 @@ describe("DispatcherGate - 止めている間は時報・トーク・続きを�
         STORE.auto_talk_paused = false
         dispatcher.restart_timers(act_at(BASE + HOUR + 60))
         expect(dispatcher.dispatch(act_at(BASE + HOUR + 61))):toBe(nil)
-        -- 次の正時からは今どおり（3.3）
+        -- 次の正時からは今どおり
         expect(type(dispatcher.dispatch(act_at(BASE + 2 * HOUR)))):toBe("thread")
     end)
 end)

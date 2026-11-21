@@ -1,12 +1,11 @@
-//! 芯の型 [`ActorInstance`] の後始末の決まりの試験（仕様 `shiori4-v3-portable`・4.2・4.4・7.6）。
+//! 芯の型 [`ActorInstance`] の後始末の決まりの試験。
 //!
 //! 芯の型を直に起こし、`TeardownReport` の `acked`・`joined` で後始末の決まりを確かめる:
-//! - 後始末は ack あり・join 済み（4.4）。
-//! - ack が上限の中に来なければ ack なし・join なしで返り、手放しの警告を出す（4.2）。
-//!
-//! - 同じディレクトリの 2 つ目のインスタンスは使用中の誤りになり、占有している側のログに理由を出す（6.2）。
+//! - 後始末は ack あり・join 済み。
+//! - ack が上限の中に来なければ ack なし・join なしで返り、手放しの警告を出す。
+//! - 同じディレクトリの 2 つ目のインスタンスは使用中の誤りになり、占有している側のログに理由を出す。
 //! - 旧来の窓口で、片付けが打ち切りに終わった直後に同じディレクトリを読み直すと占有を引き継ぎ、
-//!   手放した古いスレッドがあとで片付けを終えても新しいインスタンスの登録と占有が残る（7.1・7.2）。
+//!   手放した古いスレッドがあとで片付けを終えても新しいインスタンスの登録と占有が残る。
 //!
 //! ゴーストは `tests/fixtures/v3_probe` を試験ごとに一時ディレクトリへ写して使う。
 
@@ -42,7 +41,7 @@ fn wait_log_contains(ghost: &Path, needle: &str, deadline: Duration) -> String {
 }
 
 /// 試験用のゴーストが読めて、呼ばれた回数と壊れた開始行をそのまま返すこと。
-/// その後の「ack の後に join」の後始末が、ack あり・join 済みで返ること（4.4）。
+/// その後の「ack の後に join」の後始末が、ack あり・join 済みで返ること。
 #[test]
 fn shutdown_join_after_ack_is_acked_and_joined() {
     let ghost = copy_fixture_to_temp("v3_probe");
@@ -69,7 +68,7 @@ fn shutdown_join_after_ack_is_acked_and_joined() {
 }
 
 /// 回り続ける ID を NOTIFY で積み、上限を 100 ミリ秒に注入した後始末は、
-/// ack なし・join なしで返り、手放しの警告（`seam = "instance.abandon"`）を出す（4.2）。
+/// ack なし・join なしで返り、手放しの警告（`seam = "instance.abandon"`）を出す。
 #[test]
 fn shutdown_times_out_on_spinning_actor_and_warns_abandon() {
     let ghost = copy_fixture_to_temp("v3_probe");
@@ -99,7 +98,7 @@ fn shutdown_times_out_on_spinning_actor_and_warns_abandon() {
 }
 
 /// 同じディレクトリで 2 つ目のインスタンスを起こすと使用中の誤りになり、占有している側の
-/// ログに理由の行（`seam = "instance.claim"`）が出る（6.2・2.5）。1 つ目は動き続ける。
+/// ログに理由の行（`seam = "instance.claim"`）が出る。1 つ目は動き続ける。
 #[test]
 fn second_instance_on_same_dir_is_dir_in_use_and_logged() {
     let ghost = copy_fixture_to_temp("v3_probe");
@@ -133,7 +132,7 @@ fn second_instance_on_same_dir_is_dir_in_use_and_logged() {
 
 /// 旧来の窓口で、回り続けるアクターの片付けが打ち切りに終わった直後に同じディレクトリを読むと
 /// 成功し（占有を引き継ぐ）、手放された古いスレッドがあとで片付けを終えても、新しいインスタンスの
-/// ログの登録と占有が残る（7.1・7.2）。
+/// ログの登録と占有が残る。
 #[test]
 fn legacy_reload_after_timed_out_teardown_takes_over_claim() {
     let ghost = copy_fixture_to_temp("v3_probe");
@@ -182,7 +181,7 @@ fn legacy_reload_after_timed_out_teardown_takes_over_claim() {
         "the new instance must answer: {count:?}"
     );
 
-    // 旧来の unload の窓口は「ack の後に join」（7.6）。
+    // 旧来の unload の窓口は「ack の後に join」。
     let report = lifecycle::teardown_actor();
     assert!(report.acked && report.joined, "{report:?}");
     assert!(

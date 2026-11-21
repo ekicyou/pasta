@@ -1,11 +1,11 @@
-// 開始の画面（1.5）と、ツールバーの「最近開いたもの」メニュー（3.3）。開くのは自分でせず onOpen に渡す（7.1 の開く流れ・3.5 の消す処理はそちら）。
+// 開始の画面と、ツールバーの「最近開いたもの」メニュー。開くのは自分でせず onOpen に渡す。
 // 名前・パスはディスクから来るので textContent だけで書く。
 import { open as pickFolder } from "@tauri-apps/plugin-dialog";
 import { recentList, type RecentEntry } from "./ipc.ts";
 
 export type OpenOrigin = "recent" | "dialog";
 
-/** ボタンの読み上げの名前。名前とフルパスの両方（3.4） */
+/** ボタンの読み上げの名前。名前とフルパスの両方 */
 export const recentLabel = (e: RecentEntry): string => `${e.name}（${e.master}）`;
 
 export class StartView {
@@ -154,5 +154,5 @@ export class StartView {
   }
 }
 
-/** 記録が読めないときも画面は止めない（Rust 側も壊れた記録は空として返す・3.8） */
+/** 記録が読めないときも画面は止めない（Rust 側も壊れた記録は空として返す） */
 const list = (): Promise<RecentEntry[]> => recentList().catch(() => []);

@@ -1,5 +1,4 @@
 // RunScene - 読み込み直しの後、OnPastaSceneAt を送り、スクリプトを取り出す
-// （vscode-mcp-client の設計の RunScene。要件 4.4〜4.10）
 //
 // vscode に触らない純粋なモジュール。時計を持たず、待ちは ctx.sleep の回数で数える。
 
@@ -7,15 +6,15 @@ import { type CallResult, type LogEntry, callTool, describeResult, lastLogId, pa
 import { DEBUG_HINT, openLogCursor, parsePastaLogLine, readNewLines } from './ghostFiles.ts';
 import { type FlowContext, type ReloadOutcome, blocksPlayback, formatReload, reloadAndWait } from './reloadShiori.ts';
 
-/** [fsPath, String(line1)]。line1 は 1 から数えた行（4.6）。locals（TOML のインライン表）があれば 3 つ目に付ける（8.3・8.5） */
+/** [fsPath, String(line1)]。line1 は 1 から数えた行。locals（TOML のインライン表）があれば 3 つ目に付ける */
 export function sceneReferences(fileFsPath: string, line1: number, locals?: string): readonly string[] {
   return locals === undefined ? [fileFsPath, String(line1)] : [fileFsPath, String(line1), locals];
 }
 
 export type SceneOutcome =
-  | { kind: 'notPlayed'; reload: ReloadOutcome }                                 // 4.4・4.5
-  | { kind: 'played'; script: string; viaLog: boolean; reload: ReloadOutcome }   // 4.7・4.8
-  | { kind: 'noScript'; reasons: readonly string[]; reload: ReloadOutcome }      // 4.10（pasta.log の OnPastaSceneAt: の警告）
+  | { kind: 'notPlayed'; reload: ReloadOutcome }
+  | { kind: 'played'; script: string; viaLog: boolean; reload: ReloadOutcome }
+  | { kind: 'noScript'; reasons: readonly string[]; reload: ReloadOutcome }      // pasta.log の OnPastaSceneAt: の警告
   | { kind: 'unconfirmed'; detail: string; reload: ReloadOutcome }               // 4.9
   | { kind: 'failed'; result: CallResult; reload: ReloadOutcome };               // 7.3
 
@@ -58,7 +57,7 @@ export async function runScene(ctx: FlowContext, fileFsPath: string, line1: numb
     }
   }
 
-  // 応答が無い（4.8）: 送る前の番号より後のスクリプトの記録を上限まで引き直す
+  // 応答が無い: 送る前の番号より後のスクリプトの記録を上限まで引き直す
   let last = reply.detail;
   const maxSleeps = Math.ceil(timing.scriptLogWaitMs / timing.pollIntervalMs);
   for (let slept = 0; ; slept++) {

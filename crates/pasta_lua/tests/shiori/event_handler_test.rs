@@ -1,8 +1,4 @@
 //! Integration tests for pasta.shiori.event module – scene fallback & specific handlers.
-//!
-//! Tests verify scene function fallback dispatching and specific SHIORI event
-//! handlers (OnFirstBoot, OnBoot, OnClose, OnGhostChanged, OnSecondChange,
-//! OnMinuteChange, OnMouseDoubleClick).
 
 use crate::common;
 
@@ -13,14 +9,13 @@ use common::{
 use pasta_lua::PastaLuaRuntime;
 
 // ============================================================================
-// Task 1.1, 2.5: Scene Function Fallback Tests
+// Scene Function Fallback Tests
 // ============================================================================
 
 /// Tests that EVENT.no_entry attempts scene function fallback search
 /// and EVENT.fire correctly resumes the returned coroutine
 #[test]
 fn test_no_entry_attempts_scene_fallback() {
-    // Create context with a scene registered for event fallback
     let mut ctx = create_empty_context();
     // register_global returns (global_name, counter), e.g., ("OnTestEvent", 1)
     // The Lua side must use "OnTestEvent_1" as the global_name for SCENE.register
@@ -127,7 +122,6 @@ fn test_scene_fallback_returns_204_when_not_found() {
 /// Tests that scene function errors are caught and return 500
 #[test]
 fn test_scene_fallback_catches_errors() {
-    // Create context with a scene registered for error testing
     let mut ctx = create_empty_context();
     // register_global returns (global_name, counter), e.g., ("OnErrorScene", 1)
     let (_, counter) = ctx
@@ -166,7 +160,7 @@ fn test_scene_fallback_catches_errors() {
             "#,
         )
         .expect("Failed to mock @pasta_sakura_script");
-    // 表記を出さない設定では今の 500 のまま（runtime-error-balloon 6.5）
+    // 表記を出さない設定では今の 500 のまま
     pin_balloon_warning_off(&runtime);
 
     let result = runtime.exec(&format!(
@@ -197,7 +191,7 @@ fn test_scene_fallback_catches_errors() {
 }
 
 // ============================================================================
-// Task 2.1: OnFirstBoot / OnBoot / OnClose Tests
+// OnFirstBoot / OnBoot / OnClose Tests
 // ============================================================================
 
 /// Tests OnFirstBoot handler registration and Reference0 access
@@ -319,7 +313,7 @@ fn test_onclose_handler_with_reference() {
 }
 
 // ============================================================================
-// Task 2.2: OnGhostChanged / OnSecondChange / OnMinuteChange Tests
+// OnGhostChanged / OnSecondChange / OnMinuteChange Tests
 // ============================================================================
 
 /// Tests OnGhostChanged handler with Reference0/1
@@ -441,7 +435,7 @@ fn test_onminutechange_handler_with_references() {
 }
 
 // ============================================================================
-// Task 2.3: OnMouseDoubleClick Tests
+// OnMouseDoubleClick Tests
 // ============================================================================
 
 /// Tests OnMouseDoubleClick handler with Reference0/4

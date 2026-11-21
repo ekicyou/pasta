@@ -212,21 +212,12 @@ fn lua_tostring(lua: &Lua, value: &Value) -> String {
 /// - `info(value)` - Log at INFO level
 /// - `warn(value)` - Log at WARN level
 /// - `error(value)` - Log at ERROR level
-///
-/// # Arguments
-/// * `lua` - The Lua state to register the module with
-///
-/// # Returns
-/// * `Ok(Table)` - The module table
-/// * `Err(e)` - Registration failed
 pub fn register(lua: &Lua) -> LuaResult<Table> {
     let module = lua.create_table()?;
 
-    // Set module metadata
     module.set("_VERSION", VERSION)?;
     module.set("_DESCRIPTION", DESCRIPTION)?;
 
-    // Register log level functions
     module.set("trace", lua.create_function(log_trace)?)?;
     module.set("debug", lua.create_function(log_debug)?)?;
     module.set("info", lua.create_function(log_info)?)?;

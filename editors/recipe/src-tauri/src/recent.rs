@@ -25,14 +25,14 @@ fn same(a: &str, b: &str) -> bool {
     a.to_uppercase() == b.to_uppercase()
 }
 
-/// 壊れていれば空（3.8）
+/// 壊れていれば空
 pub fn parse(text: &str) -> Vec<String> {
     toml::from_str::<RecentFile>(text)
         .map(|f| f.ghosts)
         .unwrap_or_default()
 }
 
-/// 先頭へ・大文字小文字を区別しない重なりを消す・10 件（3.1・3.2）
+/// 先頭へ・大文字小文字を区別しない重なりを消す・10 件
 pub fn push(list: Vec<String>, master: &str) -> Vec<String> {
     let mut out = vec![master.to_string()];
     out.extend(remove(list, master));
@@ -44,7 +44,7 @@ pub fn remove(list: Vec<String>, master: &str) -> Vec<String> {
     list.into_iter().filter(|m| !same(m, master)).collect()
 }
 
-/// 人が読める TOML（3.7）
+/// 人が読める TOML
 pub fn render(list: &[String]) -> String {
     let body = toml::to_string(&RecentFile {
         ghosts: list.to_vec(),
@@ -53,7 +53,7 @@ pub fn render(list: &[String]) -> String {
     format!("# pasta-recipe が最近開いたゴースト（新しい順・最大 10 件）\n{body}")
 }
 
-/// 読めなければ空（3.8）
+/// 読めなければ空
 pub fn load(dir: &Path) -> Vec<String> {
     fs::read_to_string(dir.join(FILE))
         .map(|t| parse(&t))

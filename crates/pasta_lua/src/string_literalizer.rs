@@ -1,7 +1,6 @@
 //! StringLiteralizer - Lua string literal conversion.
 //!
 //! This module provides functionality to convert strings to optimal Lua literal format.
-//! Implements Requirement 2: Lua文字列リテラル形式の標準化.
 
 use super::error::TranspileError;
 use pasta_dsl::parser::Span;

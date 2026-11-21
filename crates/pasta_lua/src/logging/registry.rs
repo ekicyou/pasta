@@ -125,19 +125,12 @@ pub struct ClaimToken {
 /// Each application instance registers its PastaLogger with load_dir as key.
 /// The registry routes log output based on the current thread's load_dir context
 /// (see the module-level routing rules).
-///
-/// This is useful for:
-/// - SHIORI DLLs with multiple ghost instances
-/// - CLI tools managing multiple projects
-/// - Any application needing instance-specific logging
 #[derive(Clone)]
 pub struct GlobalLoggerRegistry {
-    /// Map of load_dir -> entry (logger, filter, generation)
     table: Arc<Mutex<Table>>,
 }
 
 impl GlobalLoggerRegistry {
-    /// Create a new empty registry.
     fn new() -> Self {
         Self {
             table: Arc::new(Mutex::new(Table::default())),
@@ -149,7 +142,6 @@ impl GlobalLoggerRegistry {
         REGISTRY.get_or_init(GlobalLoggerRegistry::new)
     }
 
-    /// Lock the table, recovering from a poisoned mutex.
     fn table(&self) -> MutexGuard<'_, Table> {
         self.table
             .lock()
@@ -293,7 +285,6 @@ impl Write for RoutingWriter {
         if let Some(ref logger) = self.logger {
             logger.write(buf)
         } else {
-            // No-op: silently discard
             Ok(buf.len())
         }
     }
@@ -316,9 +307,6 @@ impl<'a> MakeWriter<'a> for GlobalLoggerRegistry {
     }
 }
 
-// Thread-local storage for the current load_dir context.
-//
-// Set this before logging to route logs to the correct file.
 thread_local! {
     static CURRENT_LOAD_DIR: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
 }
@@ -368,20 +356,16 @@ mod tests {
     fn test_registry_singleton() {
         let r1 = GlobalLoggerRegistry::instance();
         let r2 = GlobalLoggerRegistry::instance();
-        // Same address
         assert!(std::ptr::eq(r1, r2));
     }
 
     #[test]
     fn test_load_dir_context() {
-        // Initially None
         assert!(get_current_load_dir().is_none());
 
-        // Set and get
         set_current_load_dir(Some(PathBuf::from("/test/path")));
         assert_eq!(get_current_load_dir(), Some(PathBuf::from("/test/path")));
 
-        // Clear
         set_current_load_dir(None);
         assert!(get_current_load_dir().is_none());
     }
@@ -395,16 +379,13 @@ mod tests {
             assert_eq!(get_current_load_dir(), Some(PathBuf::from("/guarded")));
         }
 
-        // Restored after guard drops
         assert_eq!(get_current_load_dir(), Some(PathBuf::from("/original")));
 
-        // Cleanup
         set_current_load_dir(None);
     }
 
     #[test]
     fn test_load_dir_guard_nested() {
-        // Nested guards must restore the previous context level by level.
         set_current_load_dir(None);
 
         {
@@ -416,11 +397,9 @@ mod tests {
                 assert_eq!(get_current_load_dir(), Some(PathBuf::from("/inner")));
             }
 
-            // Inner guard restores outer context
             assert_eq!(get_current_load_dir(), Some(PathBuf::from("/outer")));
         }
 
-        // Outer guard restores the original (None) context
         assert!(get_current_load_dir().is_none());
     }
 
@@ -475,7 +454,7 @@ mod tests {
 
     #[test]
     fn test_resolve_context_unregistered_does_not_fall_back() {
-        // Another ghost's logger is the only one registered: still discard (4.6).
+        // Another ghost's logger is the only one registered: still discard.
         let registry = GlobalLoggerRegistry::new();
         let (dir, logger) = temp_logger();
         registry.register(dir.path().to_path_buf(), logger);
@@ -534,8 +513,6 @@ mod tests {
 
     #[test]
     fn test_make_writer_routes_to_registered_logger() {
-        // End-to-end: register a logger, set the context, write through the
-        // MakeWriter interface, then verify the bytes reached the log file.
         let registry = GlobalLoggerRegistry::new();
         let (dir, logger) = temp_logger();
         let load_dir = dir.path().to_path_buf();
@@ -549,7 +526,7 @@ mod tests {
             writer.flush().unwrap();
         }
 
-        // Drop the last Arc reference so the worker guard flushes on drop.
+        // Drop the last Arc reference so the logger flushes.
         registry.unregister(&load_dir);
 
         let content = std::fs::read_to_string(&log_path).unwrap();
@@ -560,7 +537,7 @@ mod tests {
         );
     }
 
-    // ---- 占有（6.2） ----
+    // ---- 占有 ----
 
     #[test]
     fn test_try_claim_only_first_time_and_again_after_release() {
@@ -626,12 +603,12 @@ mod tests {
         assert!(registry.try_claim(key).is_none(), "今の持ち主の占有は残る");
     }
 
-    // ---- 量の設定と項目の選び方（5.3・5.4） ----
+    // ---- 量の設定と項目の選び方 ----
 
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tracing_subscriber::layer::{Context, Filter, Layer, SubscriberExt};
 
-    /// 試験用: 登録の項目で判定するフィルタ（3.2 の購読者のフィルタと同じ形）
+    /// 試験用: 登録の項目で判定するフィルタ（購読者のフィルタと同じ形）
     struct TestFilter(GlobalLoggerRegistry);
 
     impl<S: tracing::Subscriber> Filter<S> for TestFilter {

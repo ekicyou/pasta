@@ -1,47 +1,37 @@
-// link-check-test.mjs — link-check の自動検証（manual-ssot-authority タスク 3.1・3.2 / 要件 8.4, 5.3, 6.1, 6.4, 6.5, 10.2, 2.4）。
+// link-check-test.mjs — link-check の自動検証。
 //
-// 検証方針:
-//   book/src を恒久変更しないため、検証は
-//   (A) 実リポジトリ現状でのクリーン判定（exit 0 相当）と、
-//   (B) 一時サンドボックス（tmp ディレクトリへ最小フィクスチャを構築）への
-//       リンク切れ注入で行う。
-//   サンドボックスは runLinkCheck(repoRoot) の repoRoot を差し替えて使う
-//   （本物の book/src には一切書き込まない）。
+// book/src を恒久変更しないため、検証は (A) 実リポジトリ現状でのクリーン判定（exit 0 相当）と、
+// (B) 一時サンドボックス（tmp ディレクトリへ最小フィクスチャを構築）へのリンク切れ注入で行う。
+// サンドボックスは runLinkCheck(repoRoot) の repoRoot を差し替えて使う（本物の book/src には書き込まない）。
 //
-// 観測する完了条件（design「LinkCheck」Validation）:
+// 観測すること:
 //   - クリーン（リンク健全）→ failed=false。
 //   - book 内 .md リンク切れ / 存在しない GitHub blob URL / トラバーサル → 検出＆ failed=true。
 //   - 同一入力 → 同一結果（決定性）。
 //   - maskFences が CommonMark 準拠でフェンス内の行を空行に置換する（行数は保つ）。
-//   - headingSlug が GitHub 方式の slug を返し、重複見出しを -1・-2 と付番する（3.2）。
+//   - headingSlug が GitHub 方式の slug を返し、重複見出しを -1・-2 と付番する。
 //   - checkSkillSelfContained が 3 スキルの規則 (a)〜(d) 違反を種別付きで検出し、
-//     https・実在アンカー・明示アンカー（#s6-6）は許可する（3.2）。
-//   実リポジトリのスキル検査は P4（タスク 4.x）完了まで違反ありでよいため、
-//   (A)・(B-13) は book 部分（internal-md / github-repo-path / internals-path / readme-manual-url）が
-//   0 件であることだけを確かめる。
+//     https・実在アンカー・明示アンカー（#s6-6）は許可する。
+//     実リポジトリのスキル検査は違反ありでもよいので、(A)・(B-13) は book 部分
+//     （internal-md / github-repo-path / internals-path / readme-manual-url）が 0 件であることだけを確かめる。
 //   - checkInternalsPaths が内部設計章のフェンス外インラインコードのリポジトリ内パスについて、
 //     実在しない・`:行番号` 付き・トラバーサル・末尾 `/` なのにディレクトリでないものを
-//     internals-path として行番号付きで検出し、フェンス内・接頭辞外・内部設計章以外は対象外とする
-//     （pasta-runtime-internals-doc タスク 1.1 / 要件 3.2, 3.7, 1.6）。
+//     internals-path として行番号付きで検出し、フェンス内・接頭辞外・内部設計章以外は対象外とする。
 //   - checkReadmeManualLinks が crates/*/README.md のフェンス外のリンクと裸の URL のうち公開マニュアルを
 //     指すものについて、写像先の章・見出し（日本語見出し・パーセントエンコード・明示アンカー）の実在を照合し、
 //     存在しない章・アンカー・トラバーサル・章に写像できない URL を readme-manual-url として行番号付きで検出する。
-//     インラインコード内は対象外（対象の文書は下のタスク 3.2 の項）。manual.yml は crates/*/README.md の変更でも起動する
-//     （pasta-runtime-internals-doc タスク 1.2 / 要件 7.5, 7.8, 1.6）。
+//     インラインコード内は対象外。manual.yml は crates/*/README.md の変更でも起動する。
 //   - detectBrokenLinks が本の中のリンク（`章.md#見出し`・`#見出し`）の見出しをリンク先の章のアンカーの集合と照合し、
-//     無ければ internal-anchor として報告する（行番号なし）。章のファイルが無いときは internal-md の 1 件だけ
-//     （manual-link-anchor-check タスク 2.1 / 要件 1.1〜1.5, 2.1, 2.2, 3.1〜3.6, 5.1, 5.5, 7.1〜7.3）。
+//     無ければ internal-anchor として報告する（行番号なし）。章のファイルが無いときは internal-md の 1 件だけ。
 //   - checkReadmeManualLinks がクレートの README に加えて、ルートの README.md・doc/SOUL.md・3 スキルの Markdown の
 //     公開マニュアルの URL も、同じ区分（readme-manual-url）・同じ文面で検出する。対象の順は固定。
-//     .kiro/steering/roadmap.md は対象外（manual-link-anchor-check タスク 3.2 / 要件 4.4〜4.6, 5.5, 7.1）。
+//     .kiro/steering/roadmap.md は対象外。
 //   - 自己テストの中の compareHeadingIds が、章ごとに headingSlugs の導く id の並びと、ビルドした出力（book/book/）の
 //     見出しの id の並びを順番まで比べる。出力のフォルダが無ければ null、出力が無い章・出力が章より古い章は飛ばす。
-//     見本は一時フォルダに置く（I-1）。link-check.mjs は book/book/ を読まず、出力の有無で結果が変わらない
-//     （manual-link-anchor-check タスク 4.1 / 要件 6.2, 7.5, 7.6, 7.7）。
+//     見本は一時フォルダに置く（I-1）。link-check.mjs は book/book/ を読まず、出力の有無で結果が変わらない。
 //   - I-2 が、実リポジトリに compareHeadingIds をかける。CI の外では、出力が無ければ飛ばして確かめの数に入れず、
 //     在れば食い違い 0 を確かめて、突き合わせた章の数と飛ばした章を表示する。CI の中（環境変数 CI）では、
-//     出力が無いか、飛ばした章が 1 つでも在れば失敗にする。食い違いはどちらでも失敗。判定の枝は見本の結果で確かめる
-//     （manual-link-anchor-check タスク 4.2 / 要件 3.7, 7.6, 7.7, 7.8）。
+//     出力が無いか、飛ばした章が 1 つでも在れば失敗にする。食い違いはどちらでも失敗。判定の枝は見本の結果で確かめる。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -241,7 +231,7 @@ log('\n== (B-13) CLI 結線（exit code / RESULT 出力） ==');
 
 // ============================================================
 log('\n== (B-14) パストラバーサル拒否（repoRoot 外を指すリンクは実在しても broken） ==');
-// ハードニング境界（cell 3.59 / R3.2, R3.3）:
+// ハードニング境界:
 //   `..` 等で repoRoot の外へ脱出するリンク（blob URL・相対 .md とも）は、
 //   解決先が実在しても「リンク切れ」として報告する（リポジトリ外の存在プローブ防止）。
 //   一方、repoRoot 「内」に留まる `..` 相対参照は従来どおり実在チェックのみ（正常系不変）。
@@ -789,7 +779,7 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
     check('G-4 実リポジトリで readme-manual-url 0 件', broken.length === 0, JSON.stringify(broken));
   }
 
-  // G-5: manual.yml は push・pull_request の両方で crates/*/README.md の変更でも起動する（7.8）。
+  // G-5: manual.yml は push・pull_request の両方で crates/*/README.md の変更でも起動する。
   {
     const yml = fs.readFileSync(path.join(REPO_ROOT, '.github/workflows/manual.yml'), 'utf8');
     const n = (yml.match(/^\s*-\s*'crates\/\*\/README\.md'\s*$/gm) || []).length;
@@ -797,7 +787,6 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
   }
 
   // G-6: 広げた対象（ルートの README・doc/SOUL.md・2 スキルの Markdown）の公開 URL
-  // （manual-link-anchor-check タスク 3.2 / 要件 4.4〜4.6, 5.5, 7.1）。
   {
     const root = makeSandbox();
     try {
@@ -1165,7 +1154,7 @@ log('\n== (I) 見出しの id の突き合わせ（ビルドした出力が在�
     }
   }
 
-  // I-1: 出力のフォルダが無ければ null。出力のフォルダの有無で、リンク検証の結果は変わらない（6.2）。
+  // I-1: 出力のフォルダが無ければ null。出力のフォルダの有無で、リンク検証の結果は変わらない。
   {
     const root = makeSandbox();
     try {

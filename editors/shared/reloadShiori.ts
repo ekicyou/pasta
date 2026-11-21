@@ -1,7 +1,6 @@
 // ReloadShiori - SHIORI を読み込み直し、pasta.log の印で終わりを待ち、増えた誤りと警告を集める
-// （vscode-mcp-client の設計の ReloadShiori。要件 4.3・4.4・4.5・5.3・5.4・5.5・5.7・5.8・5.9）
 //
-// vscode に触らない純粋なモジュール。再生は頼まない（5.9）。時計を持たず、待ちは ctx.sleep の回数で数える。
+// vscode に触らない純粋なモジュール。再生は頼まない。時計を持たず、待ちは ctx.sleep の回数で数える。
 
 import { CALL_TIMEOUT_MS, type CallResult, type Endpoint, callTool, describeResult, lastLogId, parseLogEntries } from './mcpClient.ts';
 import type { GhostIO } from './ghostIO.ts';
@@ -64,7 +63,7 @@ export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
   let pastaLogReadable = false;
   const maxSleeps = Math.ceil(timing.loadTimeoutMs / timing.pollIntervalMs);
   for (let slept = 0; ; slept++) {
-    const read = await readNewLines(io, cursor); // 無い間も引き直し、最後の結果で「読めない」を決める（5.7）
+    const read = await readNewLines(io, cursor); // 無い間も引き直し、最後の結果で「読めない」を決める
     pastaLogReadable = read !== undefined;
     for (const line of read?.lines ?? []) {
       const mark = loadCompletion(line);

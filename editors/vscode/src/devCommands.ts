@@ -1,6 +1,6 @@
-// DevCommands - 5 つのコマンドの vscode の糊（vscode-mcp-client の設計の DevCommands）
+// DevCommands - 5 つのコマンドの vscode の糊
 //
-// 対象の文書（2.5）・ゴースト（2.4）を決め、画面（出力・通知・選ぶ窓・進み具合）と保存を DevHost として DevSession へ渡す。
+// 対象の文書・ゴーストを決め、画面（出力・通知・選ぶ窓・進み具合）と保存を DevHost として DevSession へ渡す。
 // 相手の選び方と覚え・重なりの止め・見出し・保存の手順・通知の分けは共有の devSession。流れの中身は reloadShiori・runSceneAtCursor・dumpVariables・debugToggle。
 
 import * as path from 'path';
@@ -117,7 +117,7 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps: Part
       for (const l of lines) {
         output.appendLine(l);
       }
-      output.show(true); // フォーカスを奪わない（7.1）
+      output.show(true); // フォーカスを奪わない
     },
     notify: (level, text) => {
       void (level === 'error' ? vscode.window.showErrorMessage(text) : vscode.window.showWarningMessage(text));
@@ -129,7 +129,7 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps: Part
   const session = new DevSession(host);
 
   async function execute(cmd: Command, args: readonly unknown[]): Promise<void> {
-    // この await は重なりの確かめ（session.execute の頭）より前（7.5 の決まりは崩れない）
+    // この await は重なりの確かめ（session.execute の頭）より前（重なりを 1 つずつにする決まりは崩れない）
     const target = await resolveTarget(args);
     const doc = target?.document;
     if (!target || !doc || doc.uri.scheme !== 'file' || doc.isUntitled || !cmd.accepts(doc)) {

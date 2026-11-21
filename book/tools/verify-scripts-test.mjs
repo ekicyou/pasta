@@ -1,15 +1,12 @@
 // verify-scripts-test.mjs — verify 系スクリプトの回帰スモークテスト
-// （review-improvement-loop セル 3.58 / G1 テスト網羅・要件 2.2）。
 //
 // 背景:
-//   verify-content.mjs（タスク 7.4）は
-//   import 時に検証本体を即実行する構造のため、本体を改変せずに関数単体テストは
-//   できない。代わりに子プロセスとして実行し、
+//   verify-content.mjs は import 時に検証本体を即実行する構造のため、本体を改変せずに関数単体テストはできない。
+//   代わりに子プロセスとして実行し、
 //     - exit 0 で完走する（結線・構文・依存の回帰検出）
 //     - 実際に多数のチェックを実行している（退化・空回りでない）
 //     - 失敗 0 件で RESULT: OK を出力する
-//   を機械的にアサートする。スクリプト本体や検証対象（book/src・steering）が
-//   壊れればこのスモークが fail する。
+//   を機械的にアサートする。スクリプト本体や検証対象（book/src・steering）が壊れればこのスモークが fail する。
 //
 // 対象外（根拠）:
 //   verify-static.mjs / verify-search.mjs は mdbook ビルド（外部コマンド・

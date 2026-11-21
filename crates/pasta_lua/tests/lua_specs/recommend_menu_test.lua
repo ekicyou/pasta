@@ -1,4 +1,4 @@
--- recommend-menu-scenes: おすすめメニューの既定のハンドラと組み込みのテスト
+-- おすすめメニューの既定のハンドラと組み込みのテスト
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -34,7 +34,7 @@ local function menu_act(id)
 end
 
 -- ============================================================================
--- 3.1: ＞おすすめ項目・＞おすすめ区切り
+-- ＞おすすめ項目・＞おすすめ区切り
 -- ============================================================================
 
 describe("recommend_menu - 組み込みの名前", function()
@@ -185,7 +185,7 @@ describe("recommend_menu - 誤った項目", function()
 end)
 
 -- ============================================================================
--- 3.2: メニューの問い合わせ（MenuReceiver・その場で動かす最小の道）
+-- メニューの問い合わせ（MenuReceiver・その場で動かす最小の道）
 -- STORE.scenes はスイート間で共有されるため、一意プレフィックス "rms_" を使う。
 -- ============================================================================
 
@@ -410,7 +410,7 @@ describe("recommend_menu - EVENT.fire を通す", function()
 end)
 
 -- ============================================================================
--- 3.3: ほかの状態に触れずにその場で 1 回だけ動かす（InPlaceRun）
+-- ほかの状態に触れずにその場で 1 回だけ動かす（InPlaceRun）
 -- 依存閉包を同一インスタンス集合として読み直す（chain_talk_interrupt_test と同じ）。
 -- ============================================================================
 
@@ -588,7 +588,7 @@ describe("recommend_menu - ほかの状態に触れない", function()
 end)
 
 -- ============================================================================
--- 3.4: OnRecommendsiteChoice（ChoiceReceiver）
+-- OnRecommendsiteChoice（ChoiceReceiver）
 -- 依存閉包を読み直し、メニューを SHIORI.request で開いてから選ぶ。
 -- ============================================================================
 
@@ -831,7 +831,7 @@ describe("recommend_menu - 選んだときの割り込みと受け手", function
 end)
 
 -- ============================================================================
--- 3.5: ボタンの名前の問い合わせ（CaptionReceiver）
+-- ボタンの名前の問い合わせ（CaptionReceiver）
 -- ============================================================================
 
 local CAPTION_IDS = { "sakura.recommendbuttoncaption", "kero.recommendbuttoncaption", "sakura.portalbuttoncaption" }

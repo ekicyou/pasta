@@ -1,6 +1,5 @@
 -- ============================================================================
 -- GLOBAL チェイントーク関数の登録と call 解決テスト
--- Requirements: 2.1, 2.2, 2.3, 2.4
 -- ============================================================================
 
 local describe = require("lua_test.test").describe
@@ -21,7 +20,7 @@ local function create_mock_ctx()
 end
 
 -- ============================================================================
--- Task 2.1: GLOBAL 関数登録の検証テスト
+-- GLOBAL 関数登録の検証テスト
 -- ============================================================================
 
 describe("GLOBAL chaintalk function registration", function()
@@ -37,7 +36,7 @@ describe("GLOBAL chaintalk function registration", function()
 end)
 
 -- ============================================================================
--- Task 2.2: L3 解決と yield 動作の検証
+-- L3 解決と yield 動作の検証
 -- ============================================================================
 
 describe("GLOBAL chaintalk L3 resolution and yield", function()

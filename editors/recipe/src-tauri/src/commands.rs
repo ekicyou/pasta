@@ -1,5 +1,5 @@
 //! 画面と Rust の唯一の接点（Tauri のコマンドの表と開いているゴーストの状態）。
-//! 相対パスを取るコマンドは、状態の master と paths::resolve_rel（files の各関数の中）を必ず通す（11.2）。
+//! 相対パスを取るコマンドは、状態の master と paths::resolve_rel（files の各関数の中）を必ず通す。
 
 use crate::files::{self, EntryKind, TextFile, TreeListing};
 use crate::{check, layout, paths, recent, variables, watch};
@@ -10,14 +10,14 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use tauri::{AppHandle, Emitter, Manager, State};
 
-/// 開いているゴースト。watcher を落とすと見張りが止まる（2.10）
+/// 開いているゴースト。watcher を落とすと見張りが止まる
 pub struct Ghost {
     pub master: PathBuf,
     pub watcher: watch::Watcher,
 }
 
 /// 1 つの窓に 1 つ。ロックはパスを取り出す・置き換える間だけ持つ。
-/// 2 つ目は進んでいる開発の操作の master（dev_begin が覚え、dev_end が消す。5.2）
+/// 2 つ目は進んでいる開発の操作の master（dev_begin が覚え、dev_end が消す）
 #[derive(Default)]
 pub struct AppState(Mutex<Option<Ghost>>, Mutex<Option<PathBuf>>);
 
@@ -59,7 +59,7 @@ impl AppState {
     }
 }
 
-/// 画面に登録するコマンドの表（設計の API Contract）
+/// 画面に登録するコマンドの表
 pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
         initial_path,
@@ -88,7 +88,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static 
     ]
 }
 
-/// 画面の入力と別のスレッドで走らせ、パニックを `Err` に写す（7.7・6.5）
+/// 画面の入力と別のスレッドで走らせ、パニックを `Err` に写す
 pub(crate) async fn run_blocking<T: Send + 'static>(
     what: &str,
     work: impl FnOnce() -> T + Send + 'static,
@@ -98,14 +98,14 @@ pub(crate) async fn run_blocking<T: Send + 'static>(
         .map_err(|e| format!("{what}に失敗しました: {e}"))
 }
 
-/// 起動の引数の最初の 1 つ（2.1）
+/// 起動の引数の最初の 1 つ
 #[tauri::command]
 pub async fn initial_path() -> Option<String> {
     let arg = std::env::args_os().nth(1)?;
     Some(abs_string(Path::new(&arg)))
 }
 
-/// 2 つ目の起動の argv[1] を、その起動の cwd と結んだ絶対パスにする（2.11）
+/// 2 つ目の起動の argv[1] を、その起動の cwd と結んだ絶対パスにする
 pub fn second_launch_path(argv: &[String], cwd: &str) -> Option<String> {
     argv.get(1).map(|a| abs_string(&Path::new(cwd).join(a)))
 }
@@ -135,7 +135,7 @@ pub struct Resolved {
     file: Option<String>,
 }
 
-/// master の外のパスの有無を見る唯一のコマンド（11.1 の例外）
+/// master の外のパスの有無を見る唯一のコマンド（master の門の例外）
 #[tauri::command]
 pub async fn resolve_ghost(path: String) -> Result<Resolved, String> {
     let found = paths::find_master(Path::new(&path))?;
@@ -163,7 +163,7 @@ fn ghost_name(master: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// ゴーストのルート（master の 2 つ上。master と同じ綴りなので読み取りの門の strip_prefix が通る。3.2）
+/// ゴーストのルート（master の 2 つ上。master と同じ綴りなので読み取りの門の strip_prefix が通る）
 fn ghost_root(master: &Path) -> String {
     master
         .parent()
@@ -173,7 +173,7 @@ fn ghost_root(master: &Path) -> String {
 }
 
 /// 画面の言う master を信じず find_master で確かめ、見張りを始めて状態を置き換える。
-/// ゴーストでない・見張れないときは状態を変えずに Err（11.1・11.2：任意のフォルダを範囲の根にさせない）
+/// ゴーストでない・見張れないときは状態を変えずに Err（任意のフォルダを範囲の根にさせない）
 fn open_in(
     state: &AppState,
     master: &str,
@@ -189,7 +189,7 @@ fn open_in(
     Ok(found)
 }
 
-/// 状態を置き換え、題名を変え、最近開いたものに記録する（1.6・2.9・2.10・3.1）
+/// 状態を置き換え、題名を変え、最近開いたものに記録する
 #[tauri::command]
 pub async fn open_ghost(
     app: AppHandle,
@@ -211,7 +211,7 @@ pub async fn open_ghost(
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_title(&format!("{} - pasta-recipe {}", info.name, info.version));
     }
-    // 記録だけの失敗では開く操作を止めない（Error Handling）
+    // 記録だけの失敗では開く操作を止めない
     if let Ok(dir) = app.path().app_data_dir() {
         let _ = recent::save(&dir, &recent::push(recent::load(&dir), &info.master));
     }
@@ -282,20 +282,20 @@ pub async fn rename_entry(
     do_rename_entry(&state, &rel, &new_name)
 }
 
-/// 重いので画面の入力と別のスレッドで。検査できない理由はそのまま Err（9.10）
+/// 重いので画面の入力と別のスレッドで。検査できない理由はそのまま Err
 #[tauri::command]
 pub async fn check_ghost(state: State<'_, AppState>) -> Result<Report, String> {
     let master = state.master()?;
     run_blocking("検査", move || check::check_ghost(&master)).await?
 }
 
-/// `variables.toml` の文を保存変数の表の行に（6.1・6.5）
+/// `variables.toml` の文を保存変数の表の行に
 #[tauri::command]
 pub async fn variable_rows(text: String) -> Result<Vec<variables::VarRow>, String> {
     variables::variable_rows(&text)
 }
 
-/// ローカル変数の組をインライン表に組む（8.3〜8.8）
+/// ローカル変数の組をインライン表に組む
 #[tauri::command]
 pub async fn build_locals(pairs: Vec<variables::LocalPair>) -> variables::LocalsOutcome {
     variables::build_locals(&pairs)
@@ -343,7 +343,7 @@ pub async fn layout_save(app: AppHandle, layout: layout::Layout) {
     }
 }
 
-/// 文書 1 つを解析する。値は拡張の WASM と同じ形のまま返す（13.4）
+/// 文書 1 つを解析する。値は拡張の WASM と同じ形のまま返す
 #[tauri::command]
 pub async fn analyze(source: String) -> Result<AnalysisResult, String> {
     run_blocking("解析", move || AnalysisEngine::analyze(&source)).await
@@ -356,7 +356,7 @@ pub struct Legend {
     token_modifiers: &'static [&'static str],
 }
 
-/// セマンティックトークンの凡例（正本は pasta_lsp の 1 か所・6.3）
+/// セマンティックトークンの凡例（正本は pasta_lsp の 1 か所）
 #[tauri::command]
 pub async fn legend() -> Legend {
     Legend {

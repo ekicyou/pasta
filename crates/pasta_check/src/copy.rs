@@ -30,7 +30,6 @@ fn copy_dir_inner(src: &Path, dst: &Path, count: &mut u64) -> io::Result<()> {
             .file_type()
             .map_err(|e| path_error(e, "read", &src_path))?;
 
-        // シンボリックリンクはスキップ（Req 2.1）
         if file_type.is_symlink() {
             continue;
         }
@@ -80,7 +79,6 @@ mod tests {
         let src = temp.path().join("src");
         let dst = temp.path().join("dst");
 
-        // ソースにファイルを配置
         fs::create_dir_all(src.join("sub")).unwrap();
         fs::write(src.join("a.txt"), "aaa").unwrap();
         fs::write(src.join("sub/b.txt"), "bbb").unwrap();

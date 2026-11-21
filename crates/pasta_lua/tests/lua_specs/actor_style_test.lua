@@ -1,6 +1,5 @@
 -- actor_style_test.lua
 -- pasta.shiori.actor_style 装いの出し入れ（状態表・出し直し・素通し）テスト
--- actor-display-style Task 2.3 (Requirements: 2.2, 2.3, 2.6, 2.8, 2.9, 3.1, 3.2, 4.2, 4.3, 5.1, 5.2)
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect

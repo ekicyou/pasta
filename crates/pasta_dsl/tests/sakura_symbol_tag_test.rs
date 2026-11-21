@@ -2,7 +2,6 @@
 //!
 //! ukadoc公式タグリストに記載された記号文字タグが
 //! パーサーで正しくAction::SakuraScriptとして認識されることを検証。
-//! Requirements: 2.1, 2.2, 2.3, 2.4, 4.2
 
 use pasta_dsl::parser::{FileItem, parse_str};
 
@@ -28,7 +27,6 @@ fn parse_actions(source: &str) -> Vec<pasta_dsl::parser::Action> {
         .next()
         .expect("ローカルシーンが存在すべし");
 
-    // items の中から ActionLine を取得
     let action_line = local
         .items
         .into_iter()
@@ -204,8 +202,7 @@ fn test_parse_existing_tags_no_regression() {
 }
 
 // ============================================================
-// SSP と同じ読み方（paragraph-break-tag-only-talk）
-// Requirements: 7.1〜7.9, 8.1, 8.4, 9.1, 9.4, 9.5, 10.3, 10.7, 10.8
+// SSP と同じ読み方
 // ============================================================
 
 /// アクションを `S:`（さくらスクリプト）・`T:`（台詞）・`E:`（エスケープ）の並びに要約する
@@ -258,7 +255,7 @@ fn s(v: &[&str]) -> Vec<String> {
     v.iter().map(|x| x.to_string()).collect()
 }
 
-/// 名前の後ろの字はタグに含めない（7.1〜7.4）
+/// 名前の後ろの字はタグに含めない
 #[test]
 fn test_tag_name_does_not_swallow_following_text() {
     assert_eq!(actions_of(r"\nHello"), s(&[r"S:\n", "T:Hello"]));
@@ -266,13 +263,13 @@ fn test_tag_name_does_not_swallow_following_text() {
     assert_eq!(actions_of(r"\s12"), s(&[r"S:\s1", "T:2"]));
 }
 
-/// `\%` はエスケープとして 1 単位（8.1, 8.4）
+/// `\%` はエスケープとして 1 単位
 #[test]
 fn test_percent_escape() {
     assert_eq!(actions_of(r"100\%です"), s(&["T:100", r"E:\%", "T:です"]));
 }
 
-/// 同じ行で閉じる囲みは全体で 1 つのさくらスクリプト、中の `＠w` は展開しない（9.1, 9.5）
+/// 同じ行で閉じる囲みは全体で 1 つのさくらスクリプト、中の `＠w` は展開しない
 #[test]
 fn test_closed_literal_is_single_sakura_script() {
     assert_eq!(
@@ -282,13 +279,13 @@ fn test_closed_literal_is_single_sakura_script() {
     assert_eq!(actions_of(r"\_!a\_?b\_!"), s(&[r"S:\_!a\_?b\_!"]));
 }
 
-/// 閉じない `\_?` は単独のタグ（9.4）
+/// 閉じない `\_?` は単独のタグ
 #[test]
 fn test_unclosed_literal_is_single_tag() {
     assert_eq!(actions_of(r"\_?abc"), s(&[r"S:\_?", "T:abc"]));
 }
 
-/// 引数の中の `\` ＋ 1 文字と、引数の先頭の引用（7.5〜7.7）
+/// 引数の中の `\` ＋ 1 文字と、引数の先頭の引用
 #[test]
 fn test_args_escape_pair_and_leading_quote() {
     assert_eq!(actions_of(r"\s[a\]b]"), s(&[r"S:\s[a\]b]"]));
@@ -299,7 +296,7 @@ fn test_args_escape_pair_and_leading_quote() {
     assert_eq!(actions_of(r#"\q[5"x,OnX]"#), s(&[r#"S:\q[5"x,OnX]"#]));
 }
 
-/// 引数の途中の `"` は引用を開かない（7.7）
+/// 引数の途中の `"` は引用を開かない
 #[test]
 fn test_mid_arg_quote_does_not_open_quote() {
     assert_eq!(
@@ -308,7 +305,7 @@ fn test_mid_arg_quote_does_not_open_quote() {
     );
 }
 
-/// 閉じない先頭の引用は引数にならず、名前までがタグ（7.8）
+/// 閉じない先頭の引用は引数にならず、名前までがタグ
 #[test]
 fn test_unclosed_leading_quote() {
     assert_eq!(
@@ -317,14 +314,14 @@ fn test_unclosed_leading_quote() {
     );
 }
 
-/// 引数は行をまたがない（7.8, 10.8）
+/// 引数は行をまたがない
 #[test]
 fn test_args_do_not_cross_lines() {
     let lines = all_action_lines("＊test\n　Alice：\\s[0\n　Alice：]\n");
     assert_eq!(lines, vec![s(&[r"S:\s", "T:[0"]), s(&["T:]"])]);
 }
 
-/// 単語の値: さくらスクリプトで始まる値はそのコマンド 1 個で終わる（10.7）
+/// 単語の値: さくらスクリプトで始まる値はそのコマンド 1 個で終わる
 #[test]
 fn test_word_value_sakura_script_is_single_command() {
     assert!(word_values(r"＠x：\nOK").is_err(), "\\nOK はパースエラー");
@@ -336,7 +333,7 @@ fn test_word_value_sakura_script_is_single_command() {
     assert_eq!(word_values(r"＠x：\s[0]").unwrap(), s(&[r"\s[0]"]));
 }
 
-/// 名前の形にもエスケープにも囲みにも合わない `\` はパースエラー（10.3）
+/// 名前の形にもエスケープにも囲みにも合わない `\` はパースエラー
 #[test]
 fn test_invalid_backslash_is_parse_error() {
     for line in [r"\_", r"\あ"] {

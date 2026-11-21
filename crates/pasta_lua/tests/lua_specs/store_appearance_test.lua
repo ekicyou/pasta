@@ -1,6 +1,5 @@
 -- store_appearance_test.lua
 -- STORE.appearance（外見状態のセッション常駐）フィールドテスト
--- actor-surface-restore Task 1.3 (Requirements: 4.1, 4.2, 4.3)
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect

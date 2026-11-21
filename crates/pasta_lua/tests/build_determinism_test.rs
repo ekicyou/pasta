@@ -1,13 +1,13 @@
-//! ビルド決定論テスト（pasta-scripts-self-deploy Task 5.2 / Req 4.3, 4.4, 4.5）。
+//! ビルド決定論テスト。
 //!
 //! build.rs と同一のパッキングロジック（`build_zip.rs`）を直接 include して再実行し、
 //! 「再現実装」ではなく **実際に dll へ埋め込まれるコード** の決定論を検証する。
 //!
 //! 検証内容:
-//! - 決定論（4.3/4.4）: 同一ソースから2回生成した zip がバイト同一・MD5 同一。
+//! - 決定論: 同一ソースから2回生成した zip がバイト同一・MD5 同一。
 //! - 埋め込みとの整合: 生成 zip の MD5 が build.rs の `PASTA_SCRIPTS_MD5` と一致
 //!   （= リファクタが出力バイトを1バイトも変えていない証拠）。
-//! - 変化反映（4.5）: ソースツリーのコピーで MD5 が原本と一致し、1ファイル変更で MD5 が変化。
+//! - 変化反映: ソースツリーのコピーで MD5 が原本と一致し、1ファイル変更で MD5 が変化。
 
 // build.rs と共有する純粋パッカーを include（cargo:/OUT_DIR 非依存）。
 #[path = "../build_zip.rs"]
@@ -40,7 +40,7 @@ fn md5_hex(bytes: &[u8]) -> String {
     format!("{:x}", md5::compute(bytes))
 }
 
-/// 4.3/4.4: 同一ソースから2回生成した zip がバイト同一・MD5 同一であること。
+/// 同一ソースから2回生成した zip がバイト同一・MD5 同一であること。
 #[test]
 fn zip_is_byte_and_md5_deterministic() {
     let root = scripts_root();
@@ -83,7 +83,7 @@ fn zip_md5_matches_embedded_expected() {
     );
 }
 
-/// 4.5: ソースのコピーでは MD5 が原本と一致し、1ファイル変更で MD5 が変化すること。
+/// ソースのコピーでは MD5 が原本と一致し、1ファイル変更で MD5 が変化すること。
 /// 実ソースツリーは一切変更しない（tempdir 上のコピーのみ操作する）。
 #[test]
 fn md5_changes_when_a_single_file_changes() {
@@ -131,7 +131,7 @@ fn zip_entry_names(zip_bytes: &[u8]) -> Vec<String> {
     names
 }
 
-/// R8.1: 旧 luasocket デバッグ資産（撤去対象の4ファイル）が埋め込み zip に同梱されないこと。
+/// 旧 luasocket デバッグ資産（撤去対象の4ファイル）が埋め込み zip に同梱されないこと。
 /// build.rs と同一のパッカーで生成した zip のエントリ一覧を直接検査する
 /// （= 実際に dll へ埋め込まれるバイト列の内容を検証する）。
 #[test]
@@ -139,7 +139,7 @@ fn legacy_luasocket_debug_assets_absent_from_zip() {
     let zip = build_zip::build_deterministic_zip(&scripts_root());
     let names = zip_entry_names(&zip);
 
-    // requirements 8.1 / design "Removed Files (R8)" が名指しする厳密な4資産。
+    // 撤去対象の厳密な4資産。
     let removed = [
         "vscode-debuggee.lua",
         "socket/core.dll",

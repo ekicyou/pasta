@@ -1,4 +1,4 @@
-//! pasta.toml の [loader] と [scene] を pasta.dll と同じ厳しさで読む段（2.2・2.4・2.5・2.10）。
+//! pasta.toml の [loader] と [scene] を pasta.dll と同じ厳しさで読む段。
 
 use std::collections::BTreeMap;
 

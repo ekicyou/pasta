@@ -1,7 +1,4 @@
-//! Task 4.4 — ランタイムへの集約ソースマップ受け渡し（統合）。
-//!
-//! 仕様参照: requirements.md 3.5・3.6（有効なときだけ読み込みでシーンマップを作り、
-//! ランタイムが持つ）。
+//! ランタイムへの集約ソースマップ受け渡し（統合）。
 //!
 //! # 観測可能な「done」
 //!
@@ -58,12 +55,12 @@ fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// 3.1: デバッグ有効時、トランスパイル後に構築した集約 `Arc<SourceMap>` がランタイムへ
+/// デバッグ有効時、トランスパイル後に構築した集約 `Arc<SourceMap>` がランタイムへ
 /// 到達・保持される。
 #[test]
 fn enabled_debug_runtime_holds_aggregated_source_map_in_order() {
     let temp = tempfile::TempDir::new().unwrap();
-    // 古い `port` のキーは読み飛ばされる（3.3）。
+    // 古い `port` のキーは読み飛ばされる。
     make_base_dir(
         temp.path(),
         "\
@@ -79,18 +76,15 @@ port = 0
     let runtime = PastaLoader::load_with_config(temp.path(), RuntimeConfig::new())
         .expect("loader must build an enabled-debug runtime");
 
-    // (1) デバッグが有効である（シーンマップを持つ）。
     assert!(
         runtime.debug_enabled(),
         "3.1: enabled [debug] must enable debug"
     );
 
-    // (2) 集約ソースマップがランタイムに保持されている。
     let map = runtime
         .debug_source_map()
         .expect("3.1: enabled debug runtime must hold the aggregated Arc<SourceMap>");
 
-    // (3) マップはその `.pasta` のシーンを引ける（空のマップではない）。
     let pasta_file = temp.path().join("dic/test/hello.pasta");
     assert!(
         map.scene_at(&pasta_file.to_string_lossy(), 2).is_some(),
@@ -99,7 +93,7 @@ port = 0
     );
 }
 
-/// 3.1/7.1: デバッグ無効（[debug] 無し）ではマップを構築・保持しない（None）。
+/// デバッグ無効（[debug] 無し）ではマップを構築・保持しない（None）。
 #[test]
 fn disabled_debug_runtime_holds_no_source_map() {
     let temp = tempfile::TempDir::new().unwrap();

@@ -1,5 +1,5 @@
 //! ツリーの一覧・テキストの読み書き（BOM）・作成・名前の変更。
-//! 削除の処理は持たない（4.17）。読み書きの範囲は paths の門を必ず通す。
+//! 削除の処理は持たない。読み書きの範囲は paths の門を必ず通す。
 
 use crate::paths::{check_name, resolve_rel};
 use pasta_check::{ghost_files, validate::msg};
@@ -32,7 +32,7 @@ pub enum EntryKind {
 /// ghost_files::list の相対パスから、最初の要素が profile（大文字・小文字を区別しない）のものを除く
 pub fn list_tree(master: &Path) -> Result<TreeListing, String> {
     let listing = ghost_files::list(master)?;
-    // ghost_files は綴りが profile のものだけ飛ばすので、Profile なども範囲の門と同じく除く（4.3・11.4）
+    // ghost_files は綴りが profile のものだけ飛ばすので、Profile なども範囲の門と同じく除く
     let keep = |rel: &String| {
         !rel.split('/')
             .next()
@@ -63,7 +63,7 @@ pub fn read_text(master: &Path, rel: &str) -> Result<TextFile, String> {
     Ok(TextFile { text, bom })
 }
 
-/// bom なら BOM を前に付けて書く。改行は受け取ったまま。作業用のファイルを作らない（11.3）
+/// bom なら BOM を前に付けて書く。改行は受け取ったまま。作業用のファイルを作らない
 pub fn write_text(master: &Path, rel: &str, text: &str, bom: bool) -> Result<(), String> {
     let path = resolve_rel(master, rel)?;
     let head: &[u8] = if bom { BOM } else { b"" };
@@ -165,7 +165,7 @@ mod tests {
             write_text(&master, "dic/a.pasta", &t.text, t.bom).unwrap();
             assert_eq!(fs::read(&path).unwrap(), bytes);
         }
-        // 作業用のファイルを残さない（11.3）
+        // 作業用のファイルを残さない
         assert_eq!(fs::read_dir(master.join("dic")).unwrap().count(), 1);
     }
 

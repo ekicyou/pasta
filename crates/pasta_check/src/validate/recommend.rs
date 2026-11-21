@@ -1,4 +1,4 @@
-//! ＞おすすめ項目 の引数と、メニューのシーンの本体の台詞を検査する段（10.3〜10.6）。
+//! ＞おすすめ項目 の引数と、メニューのシーンの本体の台詞を検査する段。
 
 use pasta_core::{SceneAliasTable, SceneRegistry};
 use pasta_dsl::PastaFile;
@@ -80,7 +80,7 @@ fn check_item(
             msg::recommend_item_arg_count(args.len()),
         ));
     }
-    // 文字列だけの式でなければ実行時まで分からないので見ない（10.5）。
+    // 文字列だけの式でなければ実行時まで分からないので見ない。
     // 名前つきの引数もキーを捨てて位置で渡る（expr_gen の generate_args_string）
     let (Some(Arg::Positional(expr)) | Some(Arg::Keyword { value: expr, .. })) = args.get(2) else {
         return;

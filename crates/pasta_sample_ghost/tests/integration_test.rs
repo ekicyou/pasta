@@ -9,16 +9,11 @@ fn ghost_dir() -> PathBuf {
 
 /// pasta.toml 内容検証テスト（ghosts/hello-pasta 直接読み込み）
 ///
-/// 仕様準拠: pasta-config-restructure R4（`[package]` のエンジンプロファイル化と除去）。
-/// 旧サンプルゴースト仕様の「Req 7.1」が要求していた `[package]` の存在期待は、
-/// 本仕様 R4.4 が上書きする（cross-spec 改訂を pasta-config-restructure が所有）。
+/// `[package]` はエンジンプロファイル専用で、サンプルには置かない。
 #[test]
 fn test_pasta_toml_content() {
     let content = std::fs::read_to_string(ghost_dir().join("ghost/master/pasta.toml")).unwrap();
 
-    // [package] 不在確認 (R4.3, R4.4)
-    // `[package]` は SHIORI 用途では不要な「エンジンプロファイル専用」として
-    // サンプルから除去された。name/version/edition も併せて不在であること。
     assert!(
         !content.contains("[package]"),
         "[package] セクションが残っています（R4.4: サンプルから除去されているべき）"
@@ -36,7 +31,6 @@ fn test_pasta_toml_content() {
         "package edition が残っています（R4.4: 除去されているべき）"
     );
 
-    // 後方互換のため維持される他セクション確認
     assert!(
         content.contains("[loader]"),
         "[loader] セクションがありません"
@@ -50,7 +44,6 @@ fn test_pasta_toml_content() {
         "[persistence] セクションがありません"
     );
 
-    // [loader] セクション内容確認 (Req 7.1, 7.2)
     assert!(
         content.contains(r#"pasta_patterns = ["dic/*.pasta"]"#),
         "pasta_patterns がありません"
@@ -63,19 +56,14 @@ fn test_pasta_toml_content() {
         content.contains(r#""profile/pasta/save/lua""#),
         "lua_search_paths の順序1がありません"
     );
-    // Req 6.4: フレームワーク標準ランタイムの検索パスが自己展開先を指すことを確認
-    // （旧 ghost/master 直下の同梱 pasta_scripts は廃止し、dll 自己展開先
-    //   profile/pasta/pasta_scripts へ一本化）
     assert!(
         content.contains(r#""profile/pasta/pasta_scripts""#),
         "lua_search_paths に自己展開先 profile/pasta/pasta_scripts がありません"
     );
-    // 旧方式（ghost/master 直下の同梱）の検索パスエントリが残っていないことを確認
     assert!(
         !content.contains(r#""pasta_scripts","#) && !content.contains(r#""pasta_scripts"]"#),
         "lua_search_paths に旧 pasta_scripts エントリが残っています"
     );
-    // ユーザーカスタム層 scripts が依然として優先層として存在することを確認
     assert!(
         content.contains(r#""scripts""#),
         "lua_search_paths に scripts がありません"
@@ -93,7 +81,6 @@ fn test_pasta_toml_content() {
         "transpiled_output_dir がありません"
     );
 
-    // [ghost] セクション内容確認 (Req 7.1)
     assert!(
         content.contains("talk_interval_min = 45"),
         "talk_interval_min = 45 がありません"
@@ -103,7 +90,6 @@ fn test_pasta_toml_content() {
         "talk_interval_max = 75 がありません"
     );
 
-    // 教育的コメント確認 (Req 7.3)
     assert!(
         content.contains("教育的サンプル"),
         "教育的コメントがありません"
@@ -112,13 +98,10 @@ fn test_pasta_toml_content() {
 }
 
 /// ukadoc 設定ファイル検証テスト（ghosts/hello-pasta 直接読み込み）
-///
-/// 仕様準拠: requirements.md Requirement 9.1-9.4
 #[test]
 fn test_ukadoc_files() {
     let ghost_dir = ghost_dir();
 
-    // install.txt (Req 9.1)
     let install = std::fs::read_to_string(ghost_dir.join("install.txt")).unwrap();
     // pasta_check release は install.txt の charset,UTF-8 宣言を必須とする
     assert_eq!(
@@ -139,7 +122,6 @@ fn test_ukadoc_files() {
         "install.txt に directory がありません"
     );
 
-    // ghost descript.txt (Req 9.2)
     let ghost_desc = std::fs::read_to_string(ghost_dir.join("ghost/master/descript.txt")).unwrap();
     assert!(
         ghost_desc.contains("charset,UTF-8"),
@@ -174,7 +156,6 @@ fn test_ukadoc_files() {
         "ghost descript.txt に homeurl がありません"
     );
 
-    // shell descript.txt (Req 9.3)
     let shell_desc = std::fs::read_to_string(ghost_dir.join("shell/master/descript.txt")).unwrap();
     assert!(
         shell_desc.contains("charset,UTF-8"),

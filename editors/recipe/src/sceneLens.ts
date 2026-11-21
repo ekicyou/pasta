@@ -1,4 +1,4 @@
-// タブの .pasta の見出しの上に「▶ シーンを実行」「値を入れて実行…」を出す（1.2・8.1・11.4）。
+// タブの .pasta の見出しの上に「▶ シーンを実行」「値を入れて実行…」を出す。
 // 並びはそのタブの今の解析から mapping.ts の sceneTargets で作る。キーボードでは F1 の「Show CodeLens Commands For Current Line」で届く。
 import { monaco, semanticSource } from "./editor.ts";
 import { sceneTargets, type SceneTarget } from "./mapping.ts";

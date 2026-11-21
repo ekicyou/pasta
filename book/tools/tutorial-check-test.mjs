@@ -1,15 +1,13 @@
-// tutorial-check-test.mjs — tutorial-check の自動検証（要件 9.8 / design「ツール層 > TutorialCheck」）。
+// tutorial-check-test.mjs — tutorial-check の自動検証。
 //
-// 検証方針:
-//   book/src・crates を恒久変更しないため、検証は
-//   (A) 実リポジトリ現状でのクリーン判定（exit 0 相当・全 dic が同じ名前の章と逐語一致）と、
-//   (B) 一時サンドボックス（tmp）へ「辞書 1 つにつき章 1 枚」のフィクスチャを構築し、
-//       食い違いを注入して失敗を確認、で行う。
-//   サンドボックスは runTutorialCheck(repoRoot) の repoRoot を差し替えて使う
-//   （本物の book/src・crates には一切書き込まない）。
-//   実リポジトリの場合（A・B-9）は、入門の章と辞書がそろっていることが前提（そろう前は落ちる）。
+// book/src・crates を恒久変更しないため、検証は
+// (A) 実リポジトリ現状でのクリーン判定（exit 0 相当・全 dic が同じ名前の章と逐語一致）と、
+// (B) 一時サンドボックス（tmp）へ「辞書 1 つにつき章 1 枚」のフィクスチャを構築し、
+//     食い違いを注入して失敗を確認、で行う。
+// サンドボックスは runTutorialCheck(repoRoot) の repoRoot を差し替えて使う（本物の book/src・crates には書き込まない）。
+// 実リポジトリの場合（A・B-9）は、入門の章と辞書がそろっていることが前提。
 //
-// 観測する完了条件（design「自己テスト」の表）:
+// 観測すること:
 //   - 実リポジトリ: 全 dic が verbatim-match・problems が空 → ok=true。
 //   - 段ごとの照合の成功 → ok=true。
 //   - 章の作例の不一致 → その辞書が no-matching-block・そのブロックが not-in-dic。
@@ -720,7 +718,7 @@ log('\n== (B-8e) ユニット: findProseParagraphs（台詞以外の段落が指
       'シーンを書く。シーンを呼ぶ。', ''].join('\n'),
     ['25:イベントは知らせである。', '28:シーンを書く。シーンを呼ぶ。']);
 
-  // --- 画像の行（1 行に、空でない代わりの文を持つ画像 1 つだけの段落。要件 5.3〜5.5） ---
+  // --- 画像の行 ---
   const IMG = '![女の子の吹き出しに「やっほー。」と出ている画面](../img/getting-started/01-boot.png)';
   same('画像の行だけの段落は返さない', `${IMG}\n`, []);
   same('代わりの文が空の画像の行は返す', '![](x.png)\n', ['1:![](x.png)']);

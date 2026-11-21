@@ -1,11 +1,11 @@
-//! chain-talk-interrupt の結合テスト（task 3.4）。
+//! チェイントークの中断の結合テスト。
 //!
 //! ゴーストを一時フォルダに作って `PastaLoader::load_with_config` で読み込み、
 //! DSL の変換・名前の完全一致の検索・組み立てを本物のまま、`SHIORI.request` で確かめる。
 //!
-//! - 台詞を出さないシーンの後は、次の自然なおしゃべりで後半が出る（要件 1.1・7.1）
-//! - 台詞を出すシーンの後は中断の台詞だけが 1 本で返り、後半も出ない（要件 3.1・3.6・3.11）
-//! - `＊チェイントーク中断ごっこ` だけを書いたゴーストでは中断の台詞が付かない（要件 3.4）
+//! - 台詞を出さないシーンの後は、次の自然なおしゃべりで後半が出る
+//! - 台詞を出すシーンの後は中断の台詞だけが 1 本で返り、後半も出ない
+//! - `＊チェイントーク中断ごっこ` だけを書いたゴーストでは中断の台詞が付かない
 //!
 //! 次の自然なおしゃべりは、`scene_play_event_test.rs` と同じく、OnTalk の時機に
 //! `STORE.co_scene` を返すハンドラ（`OnTestContinue`）で流す。
@@ -137,7 +137,7 @@ fn start_chain(runtime: &PastaLuaRuntime) {
     );
 }
 
-/// 1.1・7.1: 台詞を出さないシーンの後も続きが残り、次の自然なおしゃべりで後半が出る。
+/// 台詞を出さないシーンの後も続きが残り、次の自然なおしゃべりで後半が出る。
 #[test]
 fn quiet_scene_keeps_continuation() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -160,7 +160,7 @@ fn quiet_scene_keeps_continuation() {
     );
 }
 
-/// 3.1・3.6・3.11: 台詞を出すシーンの反応の代わりに中断の台詞だけが 1 本で返り、後半は出ない。
+/// 台詞を出すシーンの反応の代わりに中断の台詞だけが 1 本で返り、後半は出ない。
 #[test]
 fn speaking_scene_returns_interrupt_line_and_drops_continuation() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -193,7 +193,7 @@ fn speaking_scene_returns_interrupt_line_and_drops_continuation() {
     assert_204(&request(&runtime, "OnTestContinue"));
 }
 
-/// 3.4: `＊チェイントーク中断ごっこ` だけのゴーストでは中断の台詞が付かず、反応がそのまま返る。
+/// `＊チェイントーク中断ごっこ` だけのゴーストでは中断の台詞が付かず、反応がそのまま返る。
 #[test]
 fn lookalike_name_is_not_used_as_interrupt_scene() {
     let temp = tempfile::TempDir::new().unwrap();

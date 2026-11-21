@@ -1,24 +1,17 @@
 //! Integration tests for the pasta_search module.
-//!
-//! These tests verify that the @pasta_search Lua module works correctly
-//! with PastaLuaRuntime and SearchContext.
 
 use pasta_lua::{PastaLuaRuntime, TranspileContext};
 
-/// Helper to create a TranspileContext with test data.
 fn create_test_context() -> TranspileContext {
     let mut ctx = TranspileContext::new();
 
-    // Register global scenes
     ctx.scene_registry.register_global("挨拶", Vec::new());
     ctx.scene_registry.register_global("会話", Vec::new());
 
-    // Register a local scene under 会話
     let (_, counter) = ctx.scene_registry.register_global("メイン", Vec::new());
     ctx.scene_registry
         .register_local("選択肢", "メイン", counter, 1, Vec::new());
 
-    // Register global words
     ctx.word_registry.register_global(
         "挨拶",
         vec![
@@ -30,7 +23,6 @@ fn create_test_context() -> TranspileContext {
     ctx.word_registry
         .register_global("場所", vec!["東京".to_string(), "大阪".to_string()]);
 
-    // Register local words
     ctx.word_registry
         .register_local("メイン_1", "挨拶", vec!["やあ".to_string()]);
 
@@ -49,7 +41,6 @@ fn test_require_pasta_search() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // Test that @pasta_search can be required
     let result = runtime.exec(
         r#"
         local SEARCH = require "@pasta_search"
@@ -67,7 +58,6 @@ fn test_search_scene_global() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // Test global scene search
     let result = runtime.exec(
         r#"
         local SEARCH = require "@pasta_search"
@@ -89,7 +79,6 @@ fn test_search_scene_not_found() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // Test scene not found returns nil
     let result = runtime.exec(
         r#"
         local SEARCH = require "@pasta_search"
@@ -108,7 +97,6 @@ fn test_search_word_global() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // Test global word search
     let result = runtime.exec(
         r#"
         local SEARCH = require "@pasta_search"
@@ -146,7 +134,6 @@ fn test_search_word_not_found() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // Test word not found returns nil
     let result = runtime.exec(
         r#"
         local SEARCH = require "@pasta_search"
@@ -165,7 +152,6 @@ fn test_set_scene_selector() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // Test set_scene_selector doesn't error
     let result = runtime.exec(
         r#"
         local SEARCH = require "@pasta_search"
@@ -182,7 +168,6 @@ fn test_set_word_selector() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // Test set_word_selector doesn't error
     let result = runtime.exec(
         r#"
         local SEARCH = require "@pasta_search"
@@ -199,7 +184,6 @@ fn test_set_selector_reset() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // Test reset selector (no args)
     let result = runtime.exec(
         r#"
         local SEARCH = require "@pasta_search"
@@ -214,14 +198,12 @@ fn test_set_selector_reset() {
 
 #[test]
 fn test_multiple_runtime_instances() {
-    // Create two independent contexts
     let ctx1 = create_test_context();
     let ctx2 = create_test_context();
 
     let runtime1 = PastaLuaRuntime::new(ctx1).unwrap();
     let runtime2 = PastaLuaRuntime::new(ctx2).unwrap();
 
-    // Both should work independently
     let result1 = runtime1.exec(
         r#"
         local SEARCH = require "@pasta_search"
@@ -245,7 +227,6 @@ fn test_require_returns_same_instance() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // Multiple requires should return the same instance
     let result = runtime.exec(
         r#"
         local SEARCH1 = require "@pasta_search"
@@ -264,7 +245,6 @@ fn test_set_selector_invalid_argument() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // Test that non-integer argument causes error
     let result = runtime.exec(
         r#"
         local SEARCH = require "@pasta_search"

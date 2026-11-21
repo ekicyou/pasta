@@ -1,16 +1,15 @@
-// scope-map.mjs — ScopeClassMapper（タスク 2.1 / 要件 1.2, 1.3, 2.1, 2.2, 2.3, 6.1）。
+// scope-map.mjs — ScopeClassMapper。
 //
 // TextMate スコープスタックを highlight.js 互換クラスへ写像する文法非依存の純関数。
 // pasta 文法（source.pasta）も vendor lua 文法（source.lua）も、前方一致ゆえ同一テーブルで
 // 6色グループへ写る（入れ子 lua の着色を追加コードなしで担保）。
 //
-// 写像の根拠: research §8.2（実 CSS 色グループ検証済み）・design.md ScopeClassMapper（L292）。
 // 採用は light/navy 両テーマで確実に着色され色が衝突しない6スロットのみ:
 //   gray=hljs-comment / purple=hljs-keyword / blue,aqua=hljs-title /
 //   orange=hljs-built_in,hljs-literal,hljs-number / green=hljs-string /
 //   red=hljs-variable,hljs-attr,hljs-tag
 // 禁止: hljs-symbol（navy 無色）・hljs-section/hljs-name（同色衝突）は使わない。
-// 色は焼き込まず（2.3）クラス名のみ返す。配色は mdBook テーマ CSS に委ねる。
+// 色は焼き込まずクラス名のみ返す。配色は mdBook テーマ CSS に委ねる。
 
 /**
  * スコープ前方一致テーブル（SSOT・一点集約）。
@@ -66,7 +65,6 @@ const SCOPE_CLASS_TABLE = Object.freeze({
 function classForScope(scope) {
   if (typeof scope !== 'string' || scope.length === 0) return null;
   const parts = scope.split('.');
-  // 長い前方一致を優先: フルスコープ → 末尾セグメントを1つずつ落とす。
   for (let len = parts.length; len > 0; len--) {
     const prefix = parts.slice(0, len).join('.');
     const cls = SCOPE_CLASS_TABLE[prefix];
@@ -80,7 +78,7 @@ function classForScope(scope) {
  *
  * `scopes` の末尾（最特定）から先頭へ走査し、各スコープを `.` 区切り前方一致で
  * テーブル探索する。最初にヒットしたクラスを返す。空配列・全て未マッチは null
- * （要件 6.1 のプレーン継続）。文法非依存（pasta も lua も同一テーブル）。
+ *。文法非依存（pasta も lua も同一テーブル）。
  *
  * @param {string[]} scopes tokenizeLine 由来のスコープスタック（外→内・末尾が最特定）。空配列可。
  * @returns {string | null} 確定マッピング表のいずれか、または null。

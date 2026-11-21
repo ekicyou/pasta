@@ -1,15 +1,8 @@
-// build-index-test.mjs — bigram 索引ビルダ本実装の自動検証（タスク 3.1 / 要件 2.4）。
+// build-index-test.mjs — bigram 索引ビルダの自動検証。
 //
-// 目的:
-//   本番フルコンテンツ（book/src 配下に執筆済みの introduction / getting-started /
-//   grammar / lua / reference 全章）の mdBook 出力に対し、ビルダが searchindex を
-//   2-gram 索引へ再生成し、語中 2 文字検索がヒットすることを実機で証明する。
-//
-//   - tokenize の単体の検査（索引・クエリの正準規則）。
-//   - GREEN: ビルダ実行後の bigram 索引 ＋ 共有 tokenize でクエリすると、
-//            語中 2 文字が当該語を含むページにヒットする。
-//   - 索引サイズが 10MB 閾値未満であることを実測出力する。
-//   - 再生成が決定論的（同一入力 → 同一バイト列）であることを確認する。
+// 本番フルコンテンツの mdBook 出力に対し、ビルダが searchindex を 2-gram 索引へ再生成し、
+// 語中 2 文字検索がヒットすること、索引サイズが 10MB 閾値未満であること、再生成が決定論的であることを確かめる。
+// tokenize 単体（索引・クエリの正準規則）の検査も含む。
 //
 // 検索の設定は索引の search_options（ブラウザの searcher と同じ）を使う。
 // 公開の出力（book/book）には書かない。書く検査は一時のフォルダの写しに対して行い、
@@ -107,12 +100,11 @@ log('--- tokenize unit ---');
 log('');
 
 // =========================================================================
-// UNIT: extractJsonLiteral / serializeSearchIndex / resolveHashed（3.63 G1 追加）
+// UNIT: extractJsonLiteral / serializeSearchIndex / resolveHashed
 //   フィクスチャ非依存の純関数・IO 関数を直接検証する。
 // =========================================================================
 log('--- UNIT (extract / serialize / resolve) ---');
 {
-  // 例外を捕捉して message を返す（throw しなければ null）。
   const thrown = (fn) => {
     try { fn(); return null; } catch (e) { return String(e && e.message ? e.message : e); }
   };
@@ -126,7 +118,7 @@ log('--- UNIT (extract / serialize / resolve) ---');
       src.slice(open, close) === '{"a":1}', `open=${open} close=${close}`);
   }
 
-  // 動機ケース（1.2 申し送り①）: JSON 本文中の `))` で過少切り出しされない。
+  // JSON 本文中の `))` で過少切り出しされない。
   {
     const payload = '{"code":"f(g(x)))) end"}';
     const src = `JSON.parse('${payload}'));`;
@@ -293,7 +285,6 @@ log('');
 // =========================================================================
 log('--- ROUND-TRIP (write -> re-read) ---');
 {
-  // 実ファイルへ書き出してから読み戻す（buildBigramIndex の write 経路）。
   const res = buildBigramIndex(workDir, { write: true });
   log(`  written: ${path.basename(res.searchIndexFile)} size=${res.sizeBytes} overThreshold=${res.overThreshold}`);
   check('ROUND-TRIP: buildBigramIndex の報告サイズが閾値未満', !res.overThreshold,
@@ -305,7 +296,6 @@ log('--- ROUND-TRIP (write -> re-read) ---');
     reread.doc_urls.length === original.doc_urls.length,
     `re=${reread.doc_urls.length} orig=${original.doc_urls.length}`);
 
-  // 再パース索引でも語中片がヒットすること（実ファイル経由の最終確認）。
   const savedTok = elasticlunr.tokenizer;
   elasticlunr.tokenizer = (s) => tokenize(s);
   try {
@@ -319,7 +309,7 @@ log('--- ROUND-TRIP (write -> re-read) ---');
 log('');
 
 // =========================================================================
-// DRY-RUN & CLI 契約（3.63 G1/G3 追加）
+// DRY-RUN & CLI 契約
 // =========================================================================
 log('--- DRY-RUN (write:false) & CLI contract ---');
 {

@@ -16,11 +16,9 @@ fn create_test_lua() -> Lua {
 fn test_inspect_stack_level_verification() -> LuaResult<()> {
     let lua = create_test_lua();
 
-    // Create a Rust function that tests different stack levels
     let test_fn = lua.create_function(|lua_ctx, _: Value| {
         let mut results = Vec::new();
 
-        // Try levels 0..=3
         for level in 0..=3 {
             let info = lua_ctx.inspect_stack(level, |debug| {
                 let source_info = debug.source();
@@ -54,7 +52,6 @@ fn test_inspect_stack_level_verification() -> LuaResult<()> {
 
     lua.globals().set("test_stack", test_fn)?;
 
-    // Test 1: Direct call from main chunk
     let result: String = lua
         .load(
             r#"
@@ -64,7 +61,6 @@ fn test_inspect_stack_level_verification() -> LuaResult<()> {
         .eval()?;
     println!("=== Direct call ===\n{}", result);
 
-    // Test 2: Call from a named function
     let result2: String = lua
         .load(
             r#"
@@ -77,7 +73,6 @@ fn test_inspect_stack_level_verification() -> LuaResult<()> {
         .eval()?;
     println!("\n=== Function call ===\n{}", result2);
 
-    // Test 3: Call from nested function
     let result3: String = lua
         .load(
             r#"
@@ -102,7 +97,6 @@ fn test_inspect_stack_level_verification() -> LuaResult<()> {
 fn test_stack_level_gives_lua_caller() -> LuaResult<()> {
     let lua = create_test_lua();
 
-    // Create a function that captures caller info at different levels
     let capture_fn = lua.create_function(|lua_ctx, _: Value| {
         let info_l0 = lua_ctx.inspect_stack(0, |debug| {
             let source_info = debug.source();
@@ -144,7 +138,6 @@ fn test_stack_level_gives_lua_caller() -> LuaResult<()> {
 
     lua.globals().set("capture_info", capture_fn)?;
 
-    // Call from a named Lua function at a known line
     let result: (bool, String, i64, String, bool, String, i64, String) = lua
         .load(
             r#"

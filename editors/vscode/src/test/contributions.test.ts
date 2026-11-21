@@ -1,16 +1,16 @@
-// Contribution-shape characterization tests for package.json (Task 6.4).
+// Contribution-shape characterization tests for package.json .
 //
-// These tests pin the *config* (command/menu) SHAPE that the behavior tests in
-// 5.1/5.2 cannot reach: the "right-click top display (.pasta)" + "command
+// These tests pin the *config* (command/menu) SHAPE that the behavior tests
+// cannot reach: the "right-click top display (.pasta)" + "command
 // registration / menu contribution" acceptance items. They read package.json
 // directly (no vscode mock needed) and assert the contribution surface:
 //   - contributes.commands has pasta.runSceneAtCursor + pasta.reloadShiori.
 //   - editor/context: runSceneAtCursor ALWAYS shown for .pasta (NOT debug-gated)
-//     and ordered first in the navigation group (top display) — R1.1 / R6.1.
+//     and ordered first in the navigation group (top display).
 //   - no DAP declarations: debuggers, breakpoints, onDebug, debug/toolBar,
-//     debugType, toggleSourcePresentation (vscode-mcp-client R1.1-1.4 / R8.3).
+//     debugType, toggleSourcePresentation.
 //   - the OLD pasta.debug.playScene is ABSENT from commands and all menus
-//     (sole position-based 動線) — R5.1 / R5.2.
+//     (sole position-based 動線).
 //
 // Plain node test: no mock-vscode, no extension import. Mirrors the
 // async-aware sequential runner used by the sibling command tests.
@@ -118,7 +118,6 @@ test('editor/context runSceneAtCursor is shown for .pasta and is NOT debug-gated
 
 // =============================================================================
 // The 3 dev commands: declarations, right-click order and conditions, palette
-// (vscode-mcp-client R1.4 / R4.1 / R5.1 / R6.1 / R8.3)
 // =============================================================================
 
 const DUMP_COMMAND = 'pasta.showSaveVariables';
@@ -161,7 +160,7 @@ test('activationEvents is only onLanguage:pasta', () => {
 });
 
 // =============================================================================
-// DAP declarations fully removed (vscode-mcp-client R1.1-1.4 / R8.3)
+// DAP declarations fully removed
 // =============================================================================
 
 test('contributes has no debuggers and no breakpoints (R1.1/R1.2)', () => {
@@ -198,7 +197,7 @@ test('pasta.debug.toggleSourcePresentation is absent from commands and menus (R1
 });
 
 // =============================================================================
-// Old scene-name-input 動線 fully removed (R5.1 / R5.2)
+// Old scene-name-input 動線 fully removed
 // =============================================================================
 
 test('old pasta.debug.playScene is ABSENT from contributes.commands (R5.1)', () => {

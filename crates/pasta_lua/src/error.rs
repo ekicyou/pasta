@@ -1,6 +1,4 @@
 //! Error types for Pasta Lua transpiler.
-//!
-//! This module defines error types for the Lua code generation process.
 
 use pasta_dsl::parser::Span;
 use std::fmt;
@@ -43,19 +41,19 @@ pub enum TranspileError {
     #[error("Unsupported feature: {feature} at {span}")]
     Unsupported { feature: String, span: SpanDisplay },
 
-    /// `＆優先` の値が整数でない（要件 5.6）。value は書いた値
+    /// `＆優先` の値が整数でない。value は書いた値
     #[error("`＆優先` の値は整数で書く: `{value}` at {span}")]
     InvalidPriority { value: String, span: SpanDisplay },
 
-    /// `＆重み` の値が 1 以上の整数でない（scene-pick-modes 要件 4.2）。value は書いた値
+    /// `＆重み` の値が 1 以上の整数でない。value は書いた値
     #[error("`＆重み` の値は 1 以上の整数で書く: `{value}` at {span}")]
     InvalidWeight { value: String, span: SpanDisplay },
 
-    /// `＆順番` の値が整数でない（scene-pick-modes 要件 4.4）。value は書いた値
+    /// `＆順番` の値が整数でない。value は書いた値
     #[error("`＆順番` の値は整数で書く: `{value}` at {span}")]
     InvalidOrder { value: String, span: SpanDisplay },
 
-    /// 同じシーンに `＆重み` と `＆順番` の両方（scene-pick-modes 要件 3.2）。span は順番の属性
+    /// 同じシーンに `＆重み` と `＆順番` の両方。span は順番の属性
     #[error("`＆重み` と `＆順番` は同じシーンに書けない at {span}")]
     WeightWithOrder { span: SpanDisplay },
 
@@ -302,12 +300,10 @@ mod tests {
     fn test_transpile_error_string_literal_constructor_display() {
         let span = Span::new(4, 1, 4, 30, 0, 29);
         let err = TranspileError::string_literal_error(&span, "\\bad]==========text");
-        // The Display message reports the span and the danger-pattern diagnosis.
         let msg = format!("{}", err);
         assert!(msg.contains("String literal cannot be converted"));
         assert!(msg.contains("dangerous pattern detected"));
         assert!(msg.contains("[L4:1-L4:30]"));
-        // The offending text is preserved on the variant for programmatic access.
         match err {
             TranspileError::StringLiteralError { text, .. } => {
                 assert_eq!(text, "\\bad]==========text");
@@ -333,7 +329,7 @@ mod tests {
         // The message must enumerate valid library names to guide the user.
         assert!(msg.contains("std_all"));
         assert!(msg.contains("std_bit"));
-        // Only std_ names are listed; the six removed module names are not (1.6).
+        // Only std_ names are listed.
         let valid = msg.split_once("Valid libraries: ").unwrap().1;
         for name in valid.split(", ") {
             assert!(name.starts_with("std_"), "non-std_ name listed: {name}");

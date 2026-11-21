@@ -1,9 +1,4 @@
 //! Persistence Integration Tests
-//!
-//! Tests for the store-save-persistence feature:
-//! - Runtime persistence load/save roundtrip
-//! - Drop-time auto-save
-//! - pasta.toml configuration integration
 
 use pasta_lua::loader::PersistenceConfig;
 use pasta_lua::runtime::persistence;
@@ -17,7 +12,6 @@ fn test_persistence_toml_roundtrip() {
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("save.toml");
 
-    // Save data
     let data: toml::Table = toml::from_str(
         r#"
 player_name = "Alice"
@@ -29,7 +23,6 @@ tutorial_complete = true
     .unwrap();
     persistence::save_to_file(&data, &file_path, false).unwrap();
 
-    // Load and verify
     let loaded = persistence::load_from_file(&file_path).unwrap();
     assert_eq!(loaded["player_name"].as_str(), Some("Alice"));
     assert_eq!(loaded["score"].as_integer(), Some(1000));
@@ -42,7 +35,6 @@ fn test_persistence_obfuscated_roundtrip() {
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("save.dat");
 
-    // Save with obfuscation
     let data: toml::Table = toml::from_str(
         r#"
 secret = "hidden_value"
@@ -58,13 +50,12 @@ inventory = ["sword", "shield", "potion"]
     assert_eq!(raw[0], 0x1f);
     assert_eq!(raw[1], 0x8b);
 
-    // Load and verify
     let loaded = persistence::load_from_file(&file_path).unwrap();
     assert_eq!(loaded["secret"].as_str(), Some("hidden_value"));
     assert_eq!(loaded["inventory"][0].as_str(), Some("sword"));
 }
 
-/// Test PersistenceConfig effective_file_path conversion (3.1〜3.4)
+/// Test PersistenceConfig effective_file_path conversion
 #[test]
 fn test_persistence_config_effective_path() {
     // Default (non-obfuscated): save.toml
@@ -121,14 +112,12 @@ fn test_persistence_creates_directories() {
 fn test_lua_persistence_module() {
     let lua = common::e2e_helpers::create_runtime_with_finalize().unwrap();
 
-    // Test load returns empty table when file doesn't exist
     let result: mlua::Table = lua
         .load(r#"return require("@pasta_persistence").load()"#)
         .eval()
         .unwrap();
     assert_eq!(result.len().unwrap(), 0);
 
-    // Test save and load roundtrip
     lua.load(
         r#"
         local p = require("@pasta_persistence")
@@ -155,14 +144,12 @@ fn test_lua_persistence_module() {
 fn test_pasta_save_ctx_integration() {
     let lua = common::e2e_helpers::create_runtime_with_finalize().unwrap();
 
-    // pasta.save should return a table
     let save_type: String = lua
         .load(r#"return type(require("pasta.save"))"#)
         .eval()
         .unwrap();
     assert_eq!(save_type, "table");
 
-    // act.save should reference pasta.save
     lua.load(
         r#"
         local SAVE = require("pasta.save")
@@ -194,12 +181,7 @@ fn test_store_save_deprecated() {
 }
 
 // ============================================================================
-// Lua モジュール境界のエラーパス（review-improvement-loop セル 3.16 / G1 追加）
-//
-// src/runtime/persistence.rs の #[cfg(test)] は load_from_file/save_to_file の
-// Rust 関数レベルのエラーと、モジュール経由の正常系のみを検証している。
-// ここでは load()/save() Lua 関数の劣化動作（壊れたファイル → 空テーブル、
-// 保存失敗 → (nil, err)）とモジュール経由の gzip 往復を検証する。
+// Lua モジュール境界のエラーパス
 // ============================================================================
 
 /// 指定した file_path・obfuscate でモジュールを登録した (Lua, base_dir) を作る。
@@ -325,7 +307,7 @@ fn test_persistence_save_failure_returns_nil_and_message() {
 }
 
 // ============================================================================
-// TOML のセーブの結合テスト（toml-serialization タスク 4）
+// TOML のセーブの結合テスト
 // ============================================================================
 
 /// モジュールの `save(data)` を呼び、成功を確かめる。
@@ -335,7 +317,7 @@ fn call_save(module: &mlua::Table, data: mlua::Table) {
     assert_eq!(ok, Some(true), "save should succeed: {err:?}");
 }
 
-/// Lua から save() した素の TOML のファイルを load_from_file で読み戻す（1.1・1.3・4.5）。
+/// Lua から save() した素の TOML のファイルを load_from_file で読み戻す。
 #[test]
 fn test_lua_save_writes_plain_toml_file() {
     let temp_dir = TempDir::new().unwrap();
@@ -357,7 +339,7 @@ fn test_lua_save_writes_plain_toml_file() {
     assert_eq!(parsed["flags"]["on"].as_bool(), Some(true));
 }
 
-/// Lua から save() した gzip のファイルを load_from_file で読み戻す（1.2・1.3・2.2）。
+/// Lua から save() した gzip のファイルを load_from_file で読み戻す。
 #[test]
 fn test_lua_save_writes_gzip_toml_file() {
     let temp_dir = TempDir::new().unwrap();
@@ -379,7 +361,7 @@ fn test_lua_save_writes_gzip_toml_file() {
     assert_eq!(parsed["items"][2].as_integer(), Some(3));
 }
 
-/// obfuscate の設定と逆の形のファイルも load() で読める（1.4）。
+/// obfuscate の設定と逆の形のファイルも load() で読める。
 #[test]
 fn test_load_reads_file_of_opposite_form() {
     let data: toml::Table = toml::from_str(r#"name = "逆""#).unwrap();
@@ -399,7 +381,7 @@ fn test_load_reads_file_of_opposite_form() {
     }
 }
 
-/// `file_path = "save.json"` の古い JSON は save.json.broken に移り、次の保存で save.json に TOML が書かれる（2.3・5.1・5.2）。
+/// `file_path = "save.json"` の古い JSON は save.json.broken に移り、次の保存で save.json に TOML が書かれる。
 #[test]
 fn test_old_json_at_configured_path_is_moved_aside_then_toml_written() {
     let temp_dir = TempDir::new().unwrap();
@@ -427,7 +409,7 @@ fn test_old_json_at_configured_path_is_moved_aside_then_toml_written() {
     assert_eq!(std::fs::read_to_string(&broken).unwrap(), old);
 }
 
-/// 既定の設定では古い save.json は読まれず、中身も名前も変わらない（2.1・2.2）。
+/// 既定の設定では古い save.json は読まれず、中身も名前も変わらない。
 #[test]
 fn test_default_config_ignores_old_save_json() {
     let temp_dir = TempDir::new().unwrap();
@@ -458,7 +440,7 @@ fn test_default_config_ignores_old_save_json() {
     assert_eq!(saved["name"].as_str(), Some("new"));
 }
 
-/// obfuscate = true の古い gzip の JSON の save.dat は save.dat.broken に移る（5.1・5.2）。
+/// obfuscate = true の古い gzip の JSON の save.dat は save.dat.broken に移る。
 #[test]
 fn test_old_gzip_json_save_dat_is_moved_aside() {
     use std::io::Write;
@@ -480,7 +462,7 @@ fn test_old_gzip_json_save_dat_is_moved_aside() {
     );
 }
 
-/// 混ざった表は外され、警告が出る。ほかのキーは保存される（3.4・4.6）。
+/// 混ざった表は外され、警告が出る。ほかのキーは保存される。
 #[tracing_test::traced_test]
 #[test]
 fn test_mixed_table_key_is_dropped_with_warning() {
@@ -500,7 +482,7 @@ fn test_mixed_table_key_is_dropped_with_warning() {
     assert!(!saved.contains_key("混ざり"));
 }
 
-/// ゴーストを読み込んだランタイムを落とすと save.toml に TOML が書かれ、書けない値のキーだけが外れる（4.9）。
+/// ゴーストを読み込んだランタイムを落とすと save.toml に TOML が書かれ、書けない値のキーだけが外れる。
 #[test]
 fn test_drop_writes_toml_and_drops_only_unwritable_key() {
     let temp = common::create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
@@ -528,7 +510,7 @@ fn test_drop_writes_toml_and_drops_only_unwritable_key() {
     );
 }
 
-/// 読めず移せないセーブがあると、落とすときの自動保存は何も書かずエラーを残す（5.5）。
+/// 読めず移せないセーブがあると、落とすときの自動保存は何も書かずエラーを残す。
 #[cfg(windows)]
 #[tracing_test::traced_test]
 #[test]

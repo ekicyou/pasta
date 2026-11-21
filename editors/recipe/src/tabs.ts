@@ -22,12 +22,12 @@ export function retargetTabs(tabs: readonly TabRef[], oldRel: string, newRel: st
   return out;
 }
 
-/** 未保存のタブが 1 つでもあれば 3 択で確かめる（2.8・5.9・5.10） */
+/** 未保存のタブが 1 つでもあれば 3 択で確かめる */
 export function needsConfirm(tabs: readonly TabRef[]): boolean {
   return tabs.some((t) => t.dirty);
 }
 
-/** 順に保存し、失敗した所で止める（残りは呼ばない・2.8・5.10） */
+/** 順に保存し、失敗した所で止める（残りは呼ばない） */
 export async function saveAll(tabs: readonly TabRef[], save: (t: TabRef) => Promise<boolean>): Promise<"ok" | "failed"> {
   for (const tab of tabs) {
     if (!(await save(tab))) return "failed";
@@ -35,19 +35,19 @@ export async function saveAll(tabs: readonly TabRef[], save: (t: TabRef) => Prom
   return "ok";
 }
 
-/** 3 択の後: 保存して成功・保存しない は進む。保存の失敗・取り消しは留まる（2.8・5.9・5.10） */
+/** 3 択の後: 保存して成功・保存しない は進む。保存の失敗・取り消しは留まる */
 export function afterChoice(choice: "save" | "discard" | "cancel", saved: "ok" | "failed" | null): "proceed" | "stay" {
   if (choice === "discard") return "proceed";
   return choice === "save" && saved === "ok" ? "proceed" : "stay";
 }
 
-/** 同じファイルのタブ（Rust の to_uppercase と同じく大文字に揃えて比べる・5.4） */
+/** 同じファイルのタブ（Rust の to_uppercase と同じく大文字に揃えて比べる） */
 export function findSame<T extends { rel: string }>(tabs: readonly T[], rel: string): T | undefined {
   const key = rel.toUpperCase();
   return tabs.find((t) => t.rel.toUpperCase() === key);
 }
 
-/** 開いているゴーストと同じ master か（Rust の to_uppercase と同じく大文字に揃えて比べる・2.8）。開いていなければ別のもの */
+/** 開いているゴーストと同じ master か（Rust の to_uppercase と同じく大文字に揃えて比べる）。開いていなければ別のもの */
 export function sameMaster(current: string | null, master: string): boolean {
   return current !== null && current.toUpperCase() === master.toUpperCase();
 }
@@ -56,7 +56,7 @@ export function sameMaster(current: string | null, master: string): boolean {
 export const isDirty = (tab: { deleted: boolean; savedVersionId: number; model: { getAlternativeVersionId(): number } }): boolean =>
   tab.deleted || tab.model.getAlternativeVersionId() !== tab.savedVersionId;
 
-/** 開発の操作の前に保存するファイル（.pasta・.lua・名前が pasta.toml。拡張と同じ範囲・1.5） */
+/** 開発の操作の前に保存するファイル（.pasta・.lua・名前が pasta.toml。拡張と同じ範囲） */
 export function isDevSource(rel: string): boolean {
   const name = rel.slice(rel.lastIndexOf("/") + 1).toLowerCase();
   return name.endsWith(".pasta") || name.endsWith(".lua") || name === "pasta.toml";

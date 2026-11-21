@@ -186,6 +186,16 @@ public item is legitimate even when short. `# Safety`, `# Errors`, `# Panics`
 sections, intra-doc links and every code block (doctest) are never removed or
 edited.
 
+**Search entry points are never deleted.** Identifiers are English, so the
+project's Japanese vocabulary (描画面, 当たり判定, バルーン, …) lives only in
+comments, and `git grep <日本語の語>` is how people find code. Two comment kinds
+are therefore exempt from deletion, even when they look like restatement: the
+`//!` module header (the file's leading paragraph) and the first line of a
+`pub` item's doc comment. In Lua, JS/TS and PowerShell the same holds for the
+file's leading comment paragraph and the first doc line of a public function.
+If too long, reduce them to one Japanese line that keeps the project's terms;
+never remove them.
+
 ## Output
 
 After editing, report (in Japanese, per the project's rule for user-facing text):

@@ -73,7 +73,7 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path) {
 ///
 /// 日本語・ハングル・キリル文字・ギリシャ文字・絵文字を混在させることで、
 /// 実行環境のシステムロケールがどの ANSI コードページであっても
-/// 「ANSI で表現不能」という条件が成立する（要件 6.7）。
+/// 「ANSI で表現不能」という条件が成立する。
 pub const NON_ANSI_DIR_NAME: &str = "日本語_한글_Кириллица_ελληνικά_😀";
 
 /// 深いディレクトリを掘るときに 1 段ごとに積むセグメント名（38 文字）。
@@ -95,11 +95,6 @@ pub fn make_deep_dir(root: &std::path::Path, min_len: usize) -> PathBuf {
 
 /// Copy hello-pasta ghost to a temporary directory for isolated testing.
 ///
-/// This function copies the complete hello-pasta ghost from pasta_sample_ghost
-/// to a temporary directory, enabling integration tests with real ghost definitions.
-/// Uses the existing `copy_dir_recursive()` function which automatically skips
-/// profile/ directories.
-///
 /// # Returns
 /// TempDir containing the copied hello-pasta ghost
 ///
@@ -109,13 +104,11 @@ pub fn copy_sample_ghost_to_temp() -> TempDir {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let temp = TempDir::new().expect("Failed to create temp directory");
 
-    // Navigate to pasta_sample_ghost crate
     let sample_ghost_dir = manifest_dir
         .parent()
         .expect("Failed to get parent directory")
         .join("pasta_sample_ghost/ghosts/hello-pasta/ghost/master");
 
-    // Copy ghost files using existing recursive copy (auto-skips profile/)
     copy_dir_recursive(&sample_ghost_dir, temp.path()).expect("Failed to copy hello-pasta ghost");
 
     temp
@@ -133,7 +126,6 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
         let dest_path = dst.join(entry.file_name());
 
         if path.is_dir() {
-            // Skip profile directories
             if entry.file_name() == "profile" {
                 continue;
             }

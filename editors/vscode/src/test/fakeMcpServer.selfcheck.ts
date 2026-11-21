@@ -1,4 +1,4 @@
-// Self-check for the fake MCP endpoint (task 2.1). Run under plain node:
+// Self-check for the fake MCP endpoint. Run under plain node:
 //   npx esbuild src/test/fakeMcpServer.selfcheck.ts --bundle --platform=node --format=cjs --outfile=out/test/fakeMcpServer.selfcheck.js && node out/test/fakeMcpServer.selfcheck.js
 
 import * as assert from 'assert';

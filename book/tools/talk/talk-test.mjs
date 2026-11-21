@@ -1,14 +1,14 @@
-// talk-test.mjs — 台詞部品の登録簿とタグ解析の自己テスト（manual-claudia-theme タスク 1.1 / 要件 3.2, 3.3, 3.4, 3.8, 4.2, 4.8, 10.7）。
+// talk-test.mjs — 台詞部品の登録簿とタグ解析の自己テスト。
 //
-// 観測する完了条件（design「TalkCore」Validation・「Testing Strategy / Unit Tests」）:
+// 観測すること:
 //   - 登録簿の不変条件: 各話し手が「素」を持つ／話し手名と表情名が重ならない／
 //     画像名が全話し手で一意／id が英小文字だけ／話し手名がカタカナだけ。
-//   - 登録簿の初期値（design「登録簿（初期値）」）と一致する（Claudia 14 表情・アンソニー 2 表情）。
+//   - 登録簿の初期値と一致する（Claudia 14 表情・アンソニー 2 表情）。
 //   - 全 16 表情を解析できる。話し手省略（表情だけ）・表情省略（話し手だけ）も解析できる。
 //   - 失敗の種類（malformed-tag・unknown-speaker・unknown-expression）が正しく返り、未知の名前には候補が添わる。
 //   - 顔画像の相対パスを組み立てる。
 //   - TALK_LINE_RE が台詞の開始行を見分ける。
-//   タスク 1.2（要件 3.7, 4.1, 4.3, 4.6, 4.7, 10.3, 10.7）:
+//   走査・領域検査・集計:
 //   - scanTalk がフェンス外の台詞ブロック（開始行・終了行・タグ・本文）を列挙する。
 //   - 9 種のエラーがそれぞれ正しい行番号で出る（最初の 1 件で止めない）。
 //   - フェンス内の台詞のような行は無視する。CRLF 入力を LF と同じに扱う。
@@ -181,12 +181,12 @@ log('\n== (E) 台詞の開始行 ==');
   const yes = ['> 【高笑い】さあ', '>【アンソニー】', '  > 【素】字下げ', '>  【素】'];
   const no = ['> 普通の引用', '【素】引用でない', '>> 【素】', '- > 【素】', '> > 【素】'];
   for (const l of yes) check(`E-1 開始行 ${JSON.stringify(l)}`, TALK_LINE_RE.test(l));
-  // 入れ子の引用・リスト内は TALK_LINE_RE では拾わない（走査側=タスク 1.2 で nested-talk として扱う）。
+  // 入れ子の引用・リスト内は TALK_LINE_RE では拾わない（走査側で nested-talk として扱う）。
   for (const l of no) check(`E-2 非開始行 ${JSON.stringify(l)}`, !TALK_LINE_RE.test(l));
 }
 
 // ============================================================
-// タスク 1.2: 走査・領域検査・集計
+// 走査・領域検査・集計
 const md = (...lines) => lines.join('\n');
 const has = (errors, kind, line) => errors.some((e) => e.kind === kind && e.line === line);
 const kinds = (errors) => errors.map((e) => `${e.kind}@${e.line}`).join(', ');

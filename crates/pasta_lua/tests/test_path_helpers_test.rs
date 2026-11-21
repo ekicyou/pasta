@@ -1,7 +1,7 @@
-//! テストパスヘルパ自体の自己検証（要件 6.4 / 6.6 / 6.7）。
+//! テストパスヘルパ自体の自己検証。
 //!
 //! 長パス・非 ANSI パスの一時ゴーストを、テストから構築・読み取り・破棄できることを確かめる。
-//! `#[ignore]` は付けない（要件 6.6: 常時実行）。
+//! `#[ignore]` は付けない。
 
 mod common;
 
@@ -53,7 +53,7 @@ fn deep_non_ansi_fixture_is_buildable_and_readable() {
     );
 }
 
-/// 単一 ANSI コードページで表現できない複数文字体系の混在であること（要件 6.7）。
+/// 単一 ANSI コードページで表現できない複数文字体系の混在であること。
 #[test]
 fn non_ansi_dir_name_mixes_multiple_writing_systems() {
     let has = |range: std::ops::RangeInclusive<char>| {
@@ -68,7 +68,7 @@ fn non_ansi_dir_name_mixes_multiple_writing_systems() {
     assert!(has('\u{0370}'..='\u{03ff}'), "ギリシャ文字が無い");
 }
 
-/// 一時ディレクトリの drop で深いパスごと後始末されること（M5）。
+/// 一時ディレクトリの drop で深いパスごと後始末されること。
 #[test]
 fn deep_dir_is_cleaned_up_on_drop() {
     let temp = tempfile::TempDir::new().expect("一時ディレクトリの作成に失敗");

@@ -2,7 +2,7 @@
 
 const WEBVIEW2_MISSING: &str = "pasta-recipe を動かすには Microsoft Edge WebView2 ランタイムが要ります。https://developer.microsoft.com/microsoft-edge/webview2/ から入手してください。";
 
-/// WebView2 ランタイムの確かめの結果から、出して終わるべきメッセージを決める（1.4）。
+/// WebView2 ランタイムの確かめの結果から、出して終わるべきメッセージを決める。
 /// 版が空の文字列で返る場合も「無い」と扱う。
 fn webview2_missing_message<E>(version: &Result<String, E>) -> Option<&'static str> {
     match version {

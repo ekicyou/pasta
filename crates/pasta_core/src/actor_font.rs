@@ -6,7 +6,7 @@
 
 use crate::error::{ActorFontError, FontValueProblem};
 
-/// Accepted attributes (Requirement 1.2). This order is the canonical list, not the output order.
+/// Accepted attributes. This order is the canonical list, not the output order.
 pub const FONT_ATTRIBUTES: [&str; 12] = [
     "color",
     "name",
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn content_is_not_checked() {
-        // Requirement 7.6: SSP interprets the value.
+        // SSP interprets the value.
         assert_eq!(
             tags(vec![
                 ("color", s("not a color")),

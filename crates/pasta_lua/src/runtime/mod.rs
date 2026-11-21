@@ -59,7 +59,6 @@ pub struct PastaLuaRuntime {
     /// Instance-specific logger (optional).
     /// Held so the logger lives as long as the runtime; tracing output reaches
     /// it through the GlobalLoggerRegistry entry, not through this field.
-    /// Wrapped in Arc for sharing with GlobalLoggerRegistry.
     logger: Option<Arc<PastaLogger>>,
     /// Configuration for persistence and other runtime settings.
     /// Used for Drop-time auto-save and other Rust-side operations.
@@ -79,26 +78,11 @@ impl PastaLuaRuntime {
     /// - `@pasta_log` module for the Lua→Rust tracing log bridge
     ///   (always registered, independent of `RuntimeConfig::libs`)
     /// - `@toml` module for TOML decoding (always registered)
-    ///
-    /// # Arguments
-    /// * `context` - TranspileContext from LuaTranspiler::transpile()
-    ///
-    /// # Returns
-    /// * `Ok(Self)` - Runtime initialized successfully
-    /// * `Err(e)` - Lua VM or module registration failed
     pub fn new(context: TranspileContext) -> LuaResult<Self> {
         Self::with_config(context, RuntimeConfig::new())
     }
 
     /// Create a new runtime from a TranspileContext with custom configuration.
-    ///
-    /// # Arguments
-    /// * `context` - TranspileContext from LuaTranspiler::transpile()
-    /// * `config` - Runtime configuration for library loading
-    ///
-    /// # Returns
-    /// * `Ok(Self)` - Runtime initialized successfully
-    /// * `Err(e)` - Lua VM or module registration failed
     pub fn with_config(context: TranspileContext, config: RuntimeConfig) -> LuaResult<Self> {
         // シーンマップを作るのはローダだけなので、この入口の VM はいつもデバッグが無効。
         Self::with_config_and_source_map(context, config, None)
@@ -111,7 +95,6 @@ impl PastaLuaRuntime {
         config: RuntimeConfig,
         source_map: Option<Arc<SourceMap>>,
     ) -> LuaResult<Self> {
-        // Validate configuration and emit warnings
         config.validate_and_warn();
 
         // Required libraries must be present before any VM is built.
@@ -119,12 +102,10 @@ impl PastaLuaRuntime {
             .ensure_libs()
             .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
-        // Convert libs array to StdLib flags
         let std_lib = config
             .to_stdlib()
             .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
-        // Create Lua VM with appropriate standard libraries
         // SAFETY: `Lua::unsafe_new_with` is required because mlua's safe `new` does not
         // accept custom StdLib flags. The safety invariants are upheld because:
         //  1. `std_lib` is constructed from validated `RuntimeConfig` via `to_stdlib()`,
@@ -149,12 +130,10 @@ impl PastaLuaRuntime {
                 .call::<()>(seed as f64)?;
         }
 
-        // Extract registries from context
         let scene_registry = context.scene_registry;
         let word_registry = context.word_registry;
 
-        // Register @pasta_search module (the same alias table is handed to the
-        // finalize_scene re-registration via `register_finalize_scene`)
+        // The same alias table is handed to the finalize_scene re-registration.
         crate::search::register(
             &lua,
             scene_registry,
@@ -162,13 +141,10 @@ impl PastaLuaRuntime {
             config.scene_aliases.clone(),
         )?;
 
-        // Register @pasta_log module (always available, independent of RuntimeConfig.libs)
+        // Always registered, independent of RuntimeConfig.libs. The calendar table is
+        // empty unless the loader set one.
         Self::register_log_module(&lua)?;
-
-        // Register @toml module (always available, independent of RuntimeConfig.libs)
         Self::register_toml_module(&lua)?;
-
-        // Register @pasta_calendar module (always available; empty table unless the loader set one)
         Self::register_calendar_module(&lua, config.calendar)?;
 
         Ok(Self {

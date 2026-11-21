@@ -95,7 +95,7 @@ fn pick(table: &mut SceneTable, allowed: &[usize]) -> Result<usize, SceneTableEr
     result.map(|id| id.0)
 }
 
-/// 条件も優先も無い名前は、述語の有無に依らず今と同じ順（4.1・10.2）
+/// 条件も優先も無い名前は、述語の有無に依らず今と同じ順
 #[test]
 fn test_lottery_keeps_todays_order_without_conditions_or_priority() {
     let (mut plain, shuffles) = lottery_table(&[None, None, None], vec![2, 0, 1]);
@@ -117,7 +117,7 @@ fn test_lottery_keeps_todays_order_without_conditions_or_priority() {
     assert_eq!(shuffles.load(Ordering::SeqCst), 2);
 }
 
-/// 見て満たさなかった候補はその巡で使ったものになる（4.3・4.4）
+/// 見て満たさなかった候補はその巡で使ったものになる
 #[test]
 fn test_lottery_unsatisfied_seen_candidates_are_consumed() {
     let (mut table, _) = lottery_table(&[None, None, None], vec![]);
@@ -128,7 +128,7 @@ fn test_lottery_unsatisfied_seen_candidates_are_consumed() {
     assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 0);
 }
 
-/// 末尾まで満たす候補が無ければ 1 回だけ始め直して選ぶ（4.5・4.6）
+/// 末尾まで満たす候補が無ければ 1 回だけ始め直して選ぶ
 #[test]
 fn test_lottery_restarts_round_at_most_once() {
     let (mut table, shuffles) = lottery_table(&[None, None, None], vec![]);
@@ -141,7 +141,7 @@ fn test_lottery_restarts_round_at_most_once() {
     assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 1);
 }
 
-/// 満たす候補が無ければ NoMatchingScene。並びは作らず、次の位置は末尾になる（4.6）
+/// 満たす候補が無ければ NoMatchingScene。並びは作らず、次の位置は末尾になる
 #[test]
 fn test_lottery_no_matching_then_next_call_starts_new_round() {
     let (mut table, shuffles) = lottery_table(&[None, None, None], vec![]);
@@ -166,7 +166,7 @@ fn test_lottery_no_matching_then_next_call_starts_new_round() {
     assert_eq!(shuffles.load(Ordering::SeqCst), 2);
 }
 
-/// 満たす候補の最高の優先の段だけから選び、段を使い切っても下りずに始め直す（5.1・5.2・5.7）
+/// 満たす候補の最高の優先の段だけから選び、段を使い切っても下りずに始め直す
 #[test]
 fn test_lottery_tier_monopoly() {
     // シャッフルで低い段（2）が頭に来ても、並べ替えで段の候補が前に来る
@@ -184,7 +184,7 @@ fn test_lottery_tier_monopoly() {
     assert_eq!(picked, vec![0, 1, 2]);
 }
 
-/// 高い段が満たさなくなったら、次の選択から残りの最高の段（5.8）
+/// 高い段が満たさなくなったら、次の選択から残りの最高の段
 #[test]
 fn test_lottery_tier_falls_after_high_becomes_unsatisfied() {
     let (mut table, _) = lottery_table(&[Some(1), None, None], vec![]);
@@ -193,7 +193,7 @@ fn test_lottery_tier_falls_after_high_becomes_unsatisfied() {
     assert_eq!(pick(&mut table, &[1, 2]).unwrap(), 2);
 }
 
-/// 高い段が満たすようになったら、今の巡で見た候補でも次の選択でその段から（5.9）
+/// 高い段が満たすようになったら、今の巡で見た候補でも次の選択でその段から
 #[test]
 fn test_lottery_tier_rises_even_if_seen_in_round() {
     let (mut table, shuffles) = lottery_table(&[Some(1), None, None], vec![]);
@@ -219,7 +219,6 @@ fn test_get_scene_out_of_range_returns_none() {
 
 #[test]
 fn test_replace_selector_clears_cache() {
-    // After replace_selector, sequential consumption restarts from a fresh cycle
     let selector = Box::new(MockRandomSelector::new(vec![0]));
     let mut table = SceneTable {
         labels: vec![
@@ -233,11 +232,9 @@ fn test_replace_selector_clears_cache() {
         random_selector: selector,
     };
 
-    // Consume the first candidate of the cycle
     let first = table.resolve_scene_id_unified("", "OnTalk", None).unwrap();
     assert_eq!(first, SceneId(0));
 
-    // Replace selector — cache must be cleared, cycle restarts at the beginning
     table.replace_selector(Box::new(MockRandomSelector::new(vec![0])));
     let after = table.resolve_scene_id_unified("", "OnTalk", None).unwrap();
     assert_eq!(
@@ -246,7 +243,6 @@ fn test_replace_selector_clears_cache() {
         "cache was not cleared by replace_selector"
     );
 
-    // Labels and prefix_index stay intact
     assert_eq!(table.labels.len(), 2);
 }
 
@@ -272,7 +268,6 @@ fn test_from_scene_registry_groups_same_name_scenes() {
 fn test_resolve_scene_id_unified_cache_key_includes_module() {
     use crate::registry::SceneRegistry;
 
-    // Create registry with same-named local scenes in different modules
     let mut registry = SceneRegistry::new();
     let (_, counter1) = registry.register_global("会話A", Vec::new());
     registry.register_local("選択肢", "会話A", counter1, 1, Vec::new());
@@ -282,16 +277,12 @@ fn test_resolve_scene_id_unified_cache_key_includes_module() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
 
-    // Resolve from 会話A_1
     let result_a = table.resolve_scene_id_unified("会話A_1", "選択肢", None);
     assert!(result_a.is_ok());
 
-    // Resolve from 会話B_1 - should use different cache key
     let result_b = table.resolve_scene_id_unified("会話B_1", "選択肢", None);
     assert!(result_b.is_ok());
 
-    // Both should succeed (different cache keys)
-    // The scenes should be different
     let scene_a = table.get_scene(result_a.unwrap()).unwrap();
     let scene_b = table.get_scene(result_b.unwrap()).unwrap();
     assert_ne!(scene_a.fn_name, scene_b.fn_name);

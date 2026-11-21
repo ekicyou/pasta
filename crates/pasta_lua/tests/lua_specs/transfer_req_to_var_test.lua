@@ -1,6 +1,5 @@
 -- transfer_req_to_var テストスイート
 -- Tests for SHIORI_ACT.transfer_req_to_var() method
--- Requirements: 1.1-1.4, 2.1-2.2, 3.1-3.5, 4.2-4.3, 5.1-5.3
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -21,8 +20,7 @@ local function new_act(req)
 end
 
 -- ============================================================================
--- Task 2.1: 基本転記テスト
--- Requirements: 1.1, 1.3, 2.1, 2.2
+-- 基本転記テスト
 -- ============================================================================
 
 describe("SHIORI_ACT - transfer_req_to_var() 基本転記", function()
@@ -99,8 +97,7 @@ describe("SHIORI_ACT - transfer_req_to_var() 基本転記", function()
 end)
 
 -- ============================================================================
--- Task 2.2: 境界条件・ガード句テスト
--- Requirements: 1.2, 1.4, 3.5
+-- 境界条件・ガード句テスト
 -- ============================================================================
 
 describe("SHIORI_ACT - transfer_req_to_var() 境界条件", function()
@@ -154,8 +151,7 @@ describe("SHIORI_ACT - transfer_req_to_var() 境界条件", function()
 end)
 
 -- ============================================================================
--- Task 2.3: 統合・副作用テスト
--- Requirements: 3.2, 3.4, 5.1, 5.2
+-- 統合・副作用テスト
 -- ============================================================================
 
 describe("SHIORI_ACT - transfer_req_to_var() 統合テスト", function()

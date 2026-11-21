@@ -1,4 +1,4 @@
-//! R5: String Buffer の在ることの実機検証（本番同一経路）
+//! String Buffer の在ることの実機検証（本番同一経路）
 //!
 //! `pasta.shiori.sakura_builder` は LuaJIT の String Buffer Library（`string.buffer`）を
 //! 代わりの実装なしで直接使う。本テストはそれが対象ランタイムで使えることを

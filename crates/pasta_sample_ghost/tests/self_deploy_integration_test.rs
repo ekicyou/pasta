@@ -1,14 +1,13 @@
 //! サンプルゴースト統合テスト（起動・検索パス・失敗継続）。
 //!
-//! pasta-scripts-self-deploy Task 5.3 / Req 1.3, 3.1, 3.2, 5.5, 6.2, 6.3, 6.5。
 //!
 //! 実際のサンプルゴースト（`ghosts/hello-pasta/ghost/master`）を一時ディレクトリへ
 //! コピーし、本物の `PastaLoader::load` で駆動して以下を観測・検証する:
 //! - フレッシュ初回起動で自己展開先（`profile/pasta/pasta_scripts/`）が生成され、
-//!   フレームワークモジュールが `require` で解決すること（Req 1.3 / 5.5 / 6.3）。
-//! - `scripts/` 上書きが自己展開先より優先されること（Req 6.2 / 6.5）。
+//!   フレームワークモジュールが `require` で解決すること。
+//! - `scripts/` 上書きが自己展開先より優先されること。
 //! - 自己展開先のスワップを書込不可（排他ロック）にしても、ERROR ログを出しつつ
-//!   起動が継続すること（Req 3.1 / 3.2）。
+//!   起動が継続すること。
 //!
 //! # 汚染ガード
 //! フィクスチャはコミット済みのため絶対にその場でロードしない。常に tempdir へコピーし、
@@ -33,7 +32,7 @@ const SELF_DEPLOY_REL: &str = "profile/pasta/pasta_scripts";
 const MARKER_NAME: &str = ".md5";
 
 // ============================================================================
-// 1. フレッシュ初回起動: 自己展開 + require 解決（Req 1.3 / 5.5 / 6.3）
+// 1. フレッシュ初回起動: 自己展開 + require 解決
 // ============================================================================
 
 #[test]
@@ -52,7 +51,7 @@ fn fresh_first_boot_self_deploys_and_require_resolves() {
     // 本物のローダーで駆動（Phase 2.5 が自己展開を実施するはず）。
     let runtime = PastaLoader::load(base).expect("load fresh ghost");
 
-    // 自己展開先が生成され、既知の内蔵ファイルとマーカーが存在すること（Req 1.3 / 5.5）。
+    // 自己展開先が生成され、既知の内蔵ファイルとマーカーが存在すること。
     assert!(
         target.exists(),
         "self-deploy target must exist after load: {}",
@@ -75,7 +74,7 @@ fn fresh_first_boot_self_deploys_and_require_resolves() {
         ".md5 marker must be written with a digest"
     );
 
-    // package.path に自己展開先が含まれること（Req 6.3）。
+    // package.path に自己展開先が含まれること。
     let pkg_path = runtime
         .exec("return package.path")
         .expect("exec package.path");
@@ -87,8 +86,8 @@ fn fresh_first_boot_self_deploys_and_require_resolves() {
     );
 
     // フレームワークのコアモジュール（pasta: pasta/init.lua）が
-    // 自己展開先から require で解決できること（Req 6.3 / 5.5）。
-    // 注: 旧 probe の `dkjson` は luasocket デバッグ資産撤去（pasta-vscode-lua-debug R8）で
+    // 自己展開先から require で解決できること。
+    // 注: 旧 probe の `dkjson` は luasocket デバッグ資産撤去で
     // 内蔵 zip から除去されたため、常設のフレームワークコア `pasta` を probe に用いる。
     let resolved = runtime
         .exec("return (require('pasta') ~= nil)")
@@ -112,7 +111,7 @@ fn fresh_first_boot_self_deploys_and_require_resolves() {
 }
 
 // ============================================================================
-// 2. scripts/ 上書きが自己展開先より優先（Req 6.2 / 6.5）
+// 2. scripts/ 上書きが自己展開先より優先
 // ============================================================================
 
 #[test]
@@ -154,7 +153,7 @@ fn scripts_override_takes_priority() {
         "dkjson must resolve under scripts/ (higher priority), got: {where_resolved}"
     );
 
-    // SHIORI 起動挙動が不変であること（Req 6.5）: ロード成功し runtime が使用可能。
+    // SHIORI 起動挙動が不変であること: ロード成功し runtime が使用可能。
     let ok = runtime.exec("return 1+1").expect("exec arithmetic");
     assert_eq!(
         ok.as_i64(),
@@ -164,10 +163,10 @@ fn scripts_override_takes_priority() {
 }
 
 // ============================================================================
-// 3. 自己展開先が書込不可でも ERROR ログを出して起動継続（Req 3.1 / 3.2）
+// 3. 自己展開先が書込不可でも ERROR ログを出して起動継続
 // ============================================================================
 //
-// Req 3.2 の「既存スクリプトで起動継続」を忠実に再現するため、まず一度フレッシュに
+// 「既存スクリプトで起動継続」を忠実に再現するため、まず一度フレッシュに
 // ロードして**実際に動く**自己展開先を生成する（= 既存の正常な版が存在する状態）。
 // その後 `.md5` を stale に書き換えて再展開を強制し、live 内のファイルへ排他
 // （no-share）ハンドルを開いたまま再ロードする。production の swap 手順
@@ -176,8 +175,8 @@ fn scripts_override_takes_priority() {
 //
 // 注: 真にフレッシュ（自己展開先が空）な状態で自己展開が失敗すると、フレームワーク
 // スクリプトがどこにも存在せず `require('pasta')` が解決できないため、起動継続は
-// 成立しない。これは「既存スクリプトで継続（version drift unresolved）」という Req 3.2
-// の前提どおりの挙動であり、本テストはその前提（既存の正常な版あり）を満たす。
+// 成立しない。これは「既存スクリプトで継続（version drift unresolved）」という
+// 前提どおりの挙動であり、本テストはその前提（既存の正常な版あり）を満たす。
 #[cfg(windows)]
 #[test]
 #[tracing_test::traced_test]
@@ -214,11 +213,10 @@ fn write_failure_logs_error_and_continues() {
     // rename(live → backup) は live 配下に share_mode 0 のハンドルが 1 つでもあれば共有違反で
     // 失敗するため、どのファイルを掴んでも自己展開失敗を誘発する効果は同じである。
     //
-    // 注意: ここを main.lua へ「戻して」はならない。lua-require-robustness Requirement 5.2 に
-    // より、起動モジュール `main` のロード失敗は致命（`load` が Err）へ変更された。サンプル
+    // 注意: ここを main.lua へ「戻して」はならない。起動モジュール `main` のロード失敗は致命（`load` が Err）なので、サンプル
     // ゴーストの `scripts/` に main.lua は無く `main` は自己展開先からしか解決できないため、
-    // main.lua を排他ロックすると起動自体が落ち、本テストが守るべき pasta-scripts-self-deploy
-    // Req 3.2（自己展開失敗は非致命・既存スクリプトで起動継続）を検証できなくなる。
+    // main.lua を排他ロックすると起動自体が落ち、本テストが守る
+    // 「自己展開失敗は非致命・既存スクリプトで起動継続」を検証できなくなる。
     // README.md は require の探索パターン（`?.lua` 等）に一致せず、起動シーケンス
     // （main → pasta.shiori.entry → pasta.scene_dic）にも本テストの `require('pasta')` にも
     // 関与しないため、起動を妨げずにスワップだけを失敗させられる。
@@ -233,7 +231,7 @@ fn write_failure_logs_error_and_continues() {
         .open(&locked)
         .expect("open exclusive handle inside live dir");
 
-    // 自己展開が失敗しても、既存スクリプトで起動は継続（load は Ok）しなければならない（Req 3.2）。
+    // 自己展開が失敗しても、既存スクリプトで起動は継続（load は Ok）しなければならない。
     let runtime = PastaLoader::load(base).expect("load must continue despite self-deploy failure");
 
     // 起動継続の裏取り: runtime が使用可能で、既存フレームワークが依然解決すること。
@@ -252,7 +250,7 @@ fn write_failure_logs_error_and_continues() {
         "existing framework must still resolve after failed self-deploy (continue with existing)"
     );
 
-    // 自己展開失敗の ERROR ログが出ていること（Req 3.1）。
+    // 自己展開失敗の ERROR ログが出ていること。
     assert!(
         logs_contain("Self-deploy failed"),
         "an ERROR about self-deploy failure must be logged (Req 3.1)"

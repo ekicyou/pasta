@@ -1,4 +1,4 @@
--- 生成コードが呼ぶ存在確認付き act メソッドのランタイムテスト (dsl-codegen-runtime-safety)
+-- 生成コードが呼ぶ存在確認付き act メソッドのランタイムテスト
 -- act:global_fn: ＠＊名前（…）の呼び出し（未定義・関数でないときは警告して値なし）
 -- act:actor_proxy: アクション行のアクター解決（未登録は目印付きのその場限りのアクター）
 local describe = require("lua_test.test").describe

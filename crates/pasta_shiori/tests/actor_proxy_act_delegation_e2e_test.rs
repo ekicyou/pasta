@@ -1,11 +1,8 @@
 //! アクション行から呼ぶ組み込み関数（`yield`・`チェイントーク`・`ゴースト終了`）の SHIORI 経由 E2E テスト
-//!
-//! 仕様 `actor-proxy-act-delegation` task 1.3（requirements 1.1–1.7, 4.1, 4.2, 4.4）。
-//!
 //! フィクスチャ `tests/fixtures/actor_proxy_act_delegation/` のシーンを SHIORI リクエストの
 //! イベント ID（シーン関数フォールバック）で起動し、500 にならないこと、継続トークの残りが
 //! 次の OnTalk の機会に出ること、`\-` が行の外の `＞ゴースト終了` と同じ形で出ることを固定する。
-//! 各シーンは登録済みのアクター（さくら）と未登録のアクター（未登録さん）の両方の行で用意する（1.7）。
+//! 各シーンは登録済みのアクター（さくら）と未登録のアクター（未登録さん）の両方の行で用意する。
 //! フィクスチャは埋め込みの標準ランタイムと本番 entry.lua を通す（理由は pasta.toml のコメント）。
 
 mod common;
@@ -51,7 +48,7 @@ fn fire(event_id: &str) -> String {
     ok_value(resp, event_id)
 }
 
-/// `前＠…後` のシーン：最初の応答は「前」まで、「後」は次の OnTalk の機会の応答に出る（1.1, 1.5, 1.6）
+/// `前＠…後` のシーン：最初の応答は「前」まで、「後」は次の OnTalk の機会の応答に出る
 fn assert_yield_continues(event_id: &str) {
     let mut env = ShioriTestEnv::new(FIXTURE);
 
@@ -72,7 +69,7 @@ fn assert_yield_continues(event_id: &str) {
     assert!(!resumed.contains("table:"), "{event_id}: resumed={resumed}");
 }
 
-/// アクション行のゴースト終了が `\-` を含み、行の外の `＞ゴースト終了` のシーンと同じ出力になる（1.2–1.6）
+/// アクション行のゴースト終了が `\-` を含み、行の外の `＞ゴースト終了` のシーンと同じ出力になる
 fn assert_close_same_as_outside(event_id: &str, outside_id: &str) {
     let value = fire(event_id);
     assert!(value.contains(r"\-"), "{event_id}: {value}");
@@ -81,7 +78,6 @@ fn assert_close_same_as_outside(event_id: &str, outside_id: &str) {
 }
 
 /// 比較に使う行の外のシーンそのもの：ミリ秒なしは `\-`、ミリ秒ありは待ちに続く `\-` を出す
-/// （修正前の実装でも通る比較基準）
 #[test]
 fn test_outside_close_ghost_is_the_baseline() {
     for (id, tail) in [
@@ -95,7 +91,7 @@ fn test_outside_close_ghost_is_the_baseline() {
     }
 }
 
-/// シーンごとに 1 テストを作る（修正前の実装でどのシーンが落ちるかを個別に見られるようにする）
+/// シーンごとに 1 テストを作り、落ちたシーンを個別に見られるようにする
 macro_rules! yield_tests {
     ($($name:ident => $id:literal,)*) => {
         $( #[test] fn $name() { assert_yield_continues($id); } )*
@@ -108,7 +104,7 @@ macro_rules! close_tests {
     };
 }
 
-// ＠yield・＠チェイントーク（単語参照と関数呼び出しの形）と、値が yield の ＠＄x・＠＄x（）（1.1, 1.4, 1.7, 4.1, 4.2）
+// ＠yield・＠チェイントーク（単語参照と関数呼び出しの形）と、値が yield の ＠＄x・＠＄x（）
 yield_tests! {
     test_yield_word => "OnYieldWord",
     test_chain_word => "OnChainWord",
@@ -125,7 +121,6 @@ yield_tests! {
 }
 
 // ＠ゴースト終了・＠ゴースト終了（）・＠ゴースト終了（500）と、値がゴースト終了の ＠＄x・＠＄x（…）
-// （1.2, 1.3, 1.4, 1.7, 4.1, 4.2）
 close_tests! {
     test_close_word => "OnCloseWord" vs "OnCloseOutsidePlain",
     test_close_call => "OnCloseCallPlain" vs "OnCloseOutsidePlain",

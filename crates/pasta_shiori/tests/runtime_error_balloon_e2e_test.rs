@@ -1,15 +1,11 @@
 //! 止まるエラー（Lua のエラーでシーン・ハンドラが止まった）がバルーンの表記になることの SHIORI 経由 E2E テスト
 //!
-//! 仕様 `runtime-error-balloon` task 6.1（requirements 1.1, 1.6, 1.7, 2.2, 2.4, 2.5, 2.6, 3.3, 3.4, 3.6,
-//! 4.1, 4.2, 4.3, 5.6, 6.4）。
-//!
 //! フィクスチャ `tests/fixtures/runtime_error_balloon/` の pasta.toml の末尾に
 //! `[logging] balloon_warning` を書き足して（書かない・false・型違い）、
 //! 別名 `＊会話` のローカルシーンの Lua のブロック・作者の `scripts/天気.lua`・REG のハンドラ・
 //! `On` で始まらない ID・NOTIFY で止まる場合を起こす。
 //!
-//! 仕様 `debug-mcp-runtime` task 7.3（requirements 6.1, 6.2, 6.3, 9.2）で、別の `.pasta`
-//! （`dic/別ファイル.pasta`）の `GLOBAL` 関数と `dic/道具.lua` の関数で止まる場合を足した。
+//! 別の `.pasta`（`dic/別ファイル.pasta`）の `GLOBAL` 関数と `dic/道具.lua` の関数で止まる場合も起こす。
 
 mod common;
 
@@ -128,12 +124,12 @@ fn get(balloon_warning: Option<&str>, id: &str) -> Run {
 /// （200・理由の行が出さない設定の 500 と同じ・途中の台詞の後に表記・生成コードとランタイムの場所が無い）。
 /// 表記（Value の中の `【…】`）を返す
 fn expect_notation(on: &ShioriResponse, off: &ShioriResponse, before: &str) -> String {
-    // 出さない設定は今と同じ: 500・理由の行・Value が無い（4.2）
+    // 出さない設定は今と同じ: 500・理由の行・Value が無い
     assert_eq!(off.status_code, 500, "{:?}", off.value);
     assert!(off.value.is_none(), "{:?}", off.value);
     let reason = off.headers.get("X-Error-Reason").expect("reason line");
 
-    // 出す設定は 200 ＋ Value ＋ 出さない設定と同じ理由の行（3.3・3.6）
+    // 出す設定は 200 ＋ Value ＋ 出さない設定と同じ理由の行
     assert_eq!(on.status_code, 200, "{} {:?}", on.status_text, on.value);
     assert_eq!(
         on.headers.get("X-Error-Reason").map(|s| mask_temp(s)),
@@ -141,7 +137,7 @@ fn expect_notation(on: &ShioriResponse, off: &ShioriResponse, before: &str) -> S
     );
     let value = on.value.clone().expect("Value header must exist");
 
-    // 途中の台詞が表記の前にある（3.4）
+    // 途中の台詞が表記の前にある
     let start = value
         .find('【')
         .unwrap_or_else(|| panic!("no notation: {value}"));
@@ -152,7 +148,7 @@ fn expect_notation(on: &ShioriResponse, off: &ShioriResponse, before: &str) -> S
     assert!(before_pos < start, "{value}");
     assert_eq!(value.matches('【').count(), 1, "{value}");
 
-    // 変換した Lua のキャッシュ・標準ランタイムの場所が無い（2.5・2.6）
+    // 変換した Lua のキャッシュ・標準ランタイムの場所が無い
     let notation = value[start..end].to_string();
     for hidden in ["cache", "pasta_scripts", "init.lua", "entry.lua", "[string"] {
         assert!(!notation.contains(hidden), "{hidden} in {notation}");
@@ -160,14 +156,14 @@ fn expect_notation(on: &ShioriResponse, off: &ShioriResponse, before: &str) -> S
     notation
 }
 
-/// 警告は 1 行で、変換した Lua のパスを含まない（5.6）
+/// 警告は 1 行で、変換した Lua のパスを含まない
 fn expect_one_warning(run: &Run, body: &str) {
     assert_eq!(run.warns.len(), 1, "{:#?}", run.warns);
     assert_eq!(run.warns[0], body, "{:#?}", run.warns);
     assert!(!run.warns[0].contains("cache"), "{:#?}", run.warns);
 }
 
-/// 別名 `＊会話` のローカルシーンの Lua のブロックで止まると、書いた名前と `.pasta` の行が出る（2.2・2.4・2.5）
+/// 別名 `＊会話` のローカルシーンの Lua のブロックで止まると、書いた名前と `.pasta` の行が出る
 #[test]
 fn test_alias_scene_lua_block_error_shows_pasta_location() {
     let on = get(UNSET, "OnTalk");
@@ -182,11 +178,11 @@ fn test_alias_scene_lua_block_error_shows_pasta_location() {
     let body = "スクリプトのエラー：＊会話・雨の日（dic\\runtime_error_balloon.pasta:11: \
                 attempt to index local 'data' (a nil value)）";
     expect_one_warning(&on, body);
-    // 警告は出さない設定でも同じ（4.2・5.6）
+    // 警告は出さない設定でも同じ
     assert_eq!(off.warns, on.warns);
 }
 
-/// シーンから呼んだ作者の `scripts/天気.lua` で止まると、`scripts\天気.lua:N:` が出る（2.5）
+/// シーンから呼んだ作者の `scripts/天気.lua` で止まると、`scripts\天気.lua:N:` が出る
 #[test]
 fn test_author_lua_error_shows_script_location() {
     let on = get(UNSET, "OnWeather");
@@ -205,7 +201,7 @@ fn test_author_lua_error_shows_script_location() {
     );
 }
 
-/// REG のハンドラで止まると、要求の ID を対象にし、ハンドラの途中の台詞の後に表記が出る（2.2・3.4）
+/// REG のハンドラで止まると、要求の ID を対象にし、ハンドラの途中の台詞の後に表記が出る
 #[test]
 fn test_handler_error_shows_request_id() {
     let on = get(UNSET, "OnHandlerFail");
@@ -221,7 +217,7 @@ fn test_handler_error_shows_request_id() {
     );
 }
 
-/// 型違いの値は書かれていないときと同じ（表記を出す）（4.3）
+/// 型違いの値は書かれていないときと同じ（表記を出す）
 #[test]
 fn test_mistyped_value_shows_notation() {
     for id in ["OnTalk", "OnWeather", "OnHandlerFail"] {
@@ -232,7 +228,7 @@ fn test_mistyped_value_shows_notation() {
     }
 }
 
-/// `On` で始まらない ID は、どの設定でも今と同じ 500（理由の行・Value が無い）。警告は 1 行出る（1.6・5.6）
+/// `On` で始まらない ID は、どの設定でも今と同じ 500（理由の行・Value が無い）。警告は 1 行出る
 #[test]
 fn test_non_on_id_stays_500() {
     let off = get(OFF, "plain_fail");
@@ -251,7 +247,7 @@ fn test_non_on_id_stays_500() {
     );
 }
 
-/// NOTIFY で止まっても応答は今と同じ（即 204）。警告は 1 行出る（1.7・5.6）
+/// NOTIFY で止まっても応答は今と同じ（即 204）。警告は 1 行出る
 #[test]
 fn test_notify_response_unchanged() {
     let off = run(OFF, &[("NOTIFY", "OnHandlerFail")]);
@@ -267,7 +263,7 @@ fn test_notify_response_unchanged() {
     );
 }
 
-/// 表記を出した次の要求は普通の応答になる（1.1）
+/// 表記を出した次の要求は普通の応答になる
 #[test]
 fn test_next_request_after_notation_is_normal() {
     let on = run(UNSET, &[("GET", "OnTalk"), ("GET", "OnFine")]);
@@ -280,7 +276,7 @@ fn test_next_request_after_notation_is_normal() {
     assert!(!value.contains('【'), "{value}");
 }
 
-/// 1 つ目のファイルの ＊OnCross から呼んだ、別の `.pasta` の `GLOBAL` 関数で止まると、場所を出さない（6.2）。
+/// 1 つ目のファイルの ＊OnCross から呼んだ、別の `.pasta` の `GLOBAL` 関数で止まると、場所を出さない。
 /// 止まった Lua の行の番号が ＊OnCross の行の対応にも入ることを先に確かめる（番号が重なっても違うファイルの行を出さない）
 #[test]
 fn test_global_fn_in_other_pasta_shows_no_location() {
@@ -319,7 +315,7 @@ fn test_global_fn_in_other_pasta_shows_no_location() {
     );
 }
 
-/// シーンから呼んだ `dic/道具.lua` の関数で止まると、`dic\道具.lua:N:` が出る（6.3）
+/// シーンから呼んだ `dic/道具.lua` の関数で止まると、`dic\道具.lua:N:` が出る
 #[test]
 fn test_dic_lua_error_shows_its_location() {
     let on = get(UNSET, "OnTool");

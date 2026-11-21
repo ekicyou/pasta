@@ -1,5 +1,5 @@
 -- ACT_IMPL.call 4段階検索テスト
--- Task 3: ACT_IMPL.call本体実装のユニットテスト
+-- ACT_IMPL.call本体実装のユニットテスト
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -17,7 +17,7 @@ local function create_mock_ctx()
     }
 end
 
--- Task 3.1: Level 1検索の単体テスト
+-- Level 1検索の単体テスト
 describe("ACT_IMPL.call - Level 1 (current_scene)", function()
     test("current_scene[key]から正しくハンドラーを取得できる", function()
         local ctx = create_mock_ctx()
@@ -68,7 +68,7 @@ describe("ACT_IMPL.call - Level 1 (current_scene)", function()
     end)
 end)
 
--- Task 3.3: Level 3検索の単体テスト
+-- Level 3検索の単体テスト
 describe("ACT_IMPL.call - Level 3 (pasta.global)", function()
     test("pasta.global[key]から正しくハンドラーを取得できる", function()
         local ctx = create_mock_ctx()
@@ -119,7 +119,7 @@ describe("ACT_IMPL.call - Level 3 (pasta.global)", function()
     end)
 end)
 
--- Task 3.5: 優先順位検証テスト
+-- 優先順位検証テスト
 describe("ACT_IMPL.call - Priority", function()
     test("複数レベルに同じキーが存在する場合、Level 1が優先される", function()
         local ctx = create_mock_ctx()
@@ -160,7 +160,7 @@ describe("ACT_IMPL.call - Priority", function()
     end)
 end)
 
--- Task 3.6: ハンドラー未発見時の動作テスト
+-- ハンドラー未発見時の動作テスト
 describe("ACT_IMPL.call - Handler Not Found", function()
     test("すべてのレベルでnilの場合、nilを返却する", function()
         local ctx = create_mock_ctx()
@@ -187,7 +187,7 @@ describe("ACT_IMPL.call - Handler Not Found", function()
     end)
 end)
 
--- Task 3.7: ハンドラー実行と戻り値のテスト
+-- ハンドラー実行と戻り値のテスト
 describe("ACT_IMPL.call - Handler Execution", function()
     test("可変長引数が正しくハンドラーに渡される", function()
         local ctx = create_mock_ctx()

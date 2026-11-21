@@ -1,13 +1,12 @@
-//! 設置パスの形に依存しない応答バイト一致の E2E 検証（task 3.6）。
+//! 設置パスの形に依存しない応答バイト一致の E2E 検証。
 //!
-//! 設計「Testing Strategy > E2E Tests（pasta_shiori・本番リクエスト経路）」項 2 の
-//! 検証である。同一のゴーストを
+//! 同一のゴーストを
 //!
 //!   A: 通常の設置先（短い ASCII の一時ディレクトリ）
 //!   B: 300 文字超かつ非 ANSI 名（[`common::NON_ANSI_DIR_NAME`]）を含む設置先
 //!
 //! の 2 箇所へ設置し、**同一のリクエスト列**を本番のリクエスト経路へ流して、
-//! 応答がバイト単位で一致することを確認する（要件 1.2 / 2.2 / 3.5 / 6.1 / 6.2）。
+//! 応答がバイト単位で一致することを確認する。
 //!
 //! # 本番のリクエスト経路
 //! `lifecycle::spawn_actor`（FFI `load` / `loadu` が呼ぶ初期化）→
@@ -30,7 +29,7 @@
 //! （既存 `load_failure_visibility_test.rs` / `ffi_actor_lifecycle_test.rs` と同方式）。
 //!
 //! `mod common;` は `PASTA_DEBUG` を main 前に中和する `#[ctor]` を
-//! 取り込むためにも必須である（要件 6.4）。`#[ignore]` は付けない（要件 6.6）。
+//! 取り込むためにも必須である。`#[ignore]` は付けない。
 
 mod common;
 
@@ -145,10 +144,6 @@ fn assert_baseline_is_healthy(responses: &[String]) {
 }
 
 /// 長パスかつ非 ANSI の設置先と通常の設置先で、同一リクエスト列の応答がバイト一致する。
-///
-/// 要件 1.2（260 文字超でも同一の起動シーケンス・同一のロード成否）／
-/// 要件 2.2（長パス＋非 ANSI）／要件 3.5（通常の設置パスでの応答バイト不変）／
-/// 要件 6.1・6.2（長パス・非 ANSI の常時実行検証）。
 #[test]
 fn responses_are_byte_identical_between_ordinary_and_long_non_ansi_installs() {
     // --- A: 通常の設置先（短い ASCII） ---
@@ -163,7 +158,7 @@ fn responses_are_byte_identical_between_ordinary_and_long_non_ansi_installs() {
     std::fs::create_dir_all(&non_ansi_root).expect("非 ANSI ディレクトリの作成に失敗");
     let long_non_ansi_dir = make_deep_dir(&non_ansi_root, 300);
 
-    // 将来の改修で B が短い ASCII パスへ退化しても気付けるようにしておく（要件 6.1 / 6.2）。
+    // 将来の改修で B が短い ASCII パスへ退化しても気付けるようにしておく。
     assert!(
         long_non_ansi_dir.display().to_string().chars().count() > 300,
         "[B] 設置先が 300 文字を超えていない: {}",

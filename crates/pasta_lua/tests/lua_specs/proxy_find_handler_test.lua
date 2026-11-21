@@ -1,6 +1,5 @@
 -- PROXY_IMPL.find_actor_handler / find_handler 単体テスト
--- Task 2.1, 2.2: find_actor_handler (word限定) と find_handler (委譲) を検証する
--- Requirements: 1.2, 1.3, 2.1, 2.2, 2.3
+-- find_actor_handler (word限定) と find_handler (委譲) を検証する
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect

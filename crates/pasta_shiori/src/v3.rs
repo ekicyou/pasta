@@ -1,4 +1,4 @@
-//! 版 3 の口（shiori4-v3-portable）: `shiori_get_api` と `PastaV3`。
+//! 版 3 の口: `shiori_get_api` と `PastaV3`。
 //!
 //! ABI の検査（`copy_from_slice` の有無・UTF-8・パニックの捕捉・応答の写し）は `shiori4_abi` が
 //! 行う。ここは要求の見分けと `ActorInstance` への受け渡しだけを持つ。
@@ -17,10 +17,10 @@ use tracing::{debug, info, warn};
 use crate::actor::instance::ActorInstance;
 use crate::actor::marshaling::{RequestKind, classify_request};
 
-/// 版 3 のテーブル（プロセスの間ずっと同じ static・1.4）。
+/// 版 3 のテーブル（プロセスの間ずっと同じ static）。
 static API_V3: ShioriApi = ShioriApi::new::<PastaV3, { SHIORI_ABI_VERSION_3 }>();
 
-/// shiori4 のホストが最初に呼ぶ口。版 3 だけにテーブルを返し、ほか（4 を含む）は NULL（1.1〜1.4）。
+/// shiori4 のホストが最初に呼ぶ口。版 3 だけにテーブルを返し、ほか（4 を含む）は NULL。
 #[unsafe(no_mangle)]
 pub extern "C" fn shiori_get_api(requested: u32) -> *const ShioriApi {
     if requested == SHIORI_ABI_VERSION_3 {
@@ -51,15 +51,15 @@ impl Shiori for PastaV3 {
             // 版 4 のテーブルは出さないので来ない。守りだけ。
             return Err(SHIORI_E_UNSUPPORTED);
         }
-        // カレントディレクトリに頼らない（2.2）。この段の NULL はログを出さない。
+        // カレントディレクトリに頼らない。この段の NULL はログを出さない。
         let load_dir = PathBuf::from(dir);
         if !load_dir.is_absolute() || !load_dir.is_dir() {
             return Err(SHIORI_E_INVALID_ARG);
         }
-        // 立ち上がれない理由のログは spawn が出す（2.4・2.5）。
+        // 立ち上がれない理由のログは spawn が出す。
         let instance =
             ActorInstance::spawn(load_dir.clone()).map_err(|_| SHIORI_500_INTERNAL_SERVER_ERROR)?;
-        // 辞書・Lua・SHIORI.load の失敗でもインスタンスを返す（2.7）。入口の記録は旧来の入口と同じく
+        // 辞書・Lua・SHIORI.load の失敗でもインスタンスを返す。入口の記録は旧来の入口と同じく
         // load_dir の文脈を張り直して出す（入口スレッドにはアクタースレッドの文脈が及ばない）。
         let loaded = instance.loaded();
         let _log_context = LoadDirGuard::new(load_dir);
@@ -89,7 +89,7 @@ impl Shiori for PastaV3 {
     }
 
     fn notify(&mut self, req: &str) -> ShioriStatus {
-        // GET・2.x・読めない要求はアクターへ送らない（3.4〜3.6）。
+        // GET・2.x・読めない要求はアクターへ送らない。
         let reason = match classify_request(req) {
             Ok(RequestKind::Notify) => {
                 self.instance.notify(req);
@@ -111,7 +111,7 @@ impl Shiori for PastaV3 {
 const REASON_SHIORI2: &str = "SHIORI/2.x is not supported";
 const REASON_UNREADABLE: &str = "unreadable request";
 
-/// 応答の開始行 `SHIORI/3.0 NNN` の NNN。読めなければ 500（本文は変えない・3.7）。
+/// 応答の開始行 `SHIORI/3.0 NNN` の NNN。読めなければ 500（本文は変えない）。
 fn status_of(response: &str) -> ShioriStatus {
     let line = response.lines().next().unwrap_or("");
     let code = line.strip_prefix("SHIORI/3.0 ").filter(|rest| {
@@ -144,7 +144,6 @@ fn bad_request(reason: &str) -> String {
 mod tests {
     use super::*;
 
-    /// 開始行の読み取り（3.1・3.7）。
     #[test]
     fn status_of_reads_start_line() {
         assert_eq!(
@@ -180,7 +179,7 @@ mod tests {
         assert!(body.ends_with("\r\n\r\n"));
     }
 
-    /// 版 3 だけにテーブルを返し、同じポインタ（1.2〜1.4）。
+    /// 版 3 だけにテーブルを返し、同じポインタ。
     #[test]
     fn get_api_returns_v3_table_only() {
         let a = shiori_get_api(SHIORI_ABI_VERSION_3);
@@ -191,7 +190,7 @@ mod tests {
         }
     }
 
-    /// 版 4・相対パス・ディレクトリでないは立ち上げずに弾く（2.2・2.4）。
+    /// 相対パス・ディレクトリでないは立ち上げずに弾く。
     #[test]
     fn load_rejects_relative_and_missing_dir() {
         assert_eq!(

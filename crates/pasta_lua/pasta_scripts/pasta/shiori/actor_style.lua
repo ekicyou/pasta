@@ -1,5 +1,5 @@
 --- @module pasta.shiori.actor_style
---- アクターの装い（`actor.font`）の出し入れモジュール（actor-display-style）
+--- アクターの装い（`actor.font`）の出し入れモジュール
 ---
 --- 話者の切り替えで出す戻すタグ（`\f[default]`）と装いのタグを返し（switch）、
 --- 内側のトークンの変換後の文字列で、引数の無い `\c`・`\x` の直後に装いを出し直す（through）。

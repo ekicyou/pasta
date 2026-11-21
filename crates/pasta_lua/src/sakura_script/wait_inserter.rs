@@ -123,7 +123,6 @@ pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues) -> String {
         }
     }
 
-    // Flush any remaining pending punctuation
     flush_pending(&mut result, &mut pending_text, &mut pending_max_wait);
 
     result

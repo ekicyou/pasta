@@ -6,10 +6,4 @@
 
 local AREKA = {}
 
--- 将来の拡張ポイント（仕様プレースホルダ・未実装）:
--- - ghost_name(): ゴースト名取得
--- - user_name(): ユーザー名取得
--- - current_time(): 現在時刻取得
--- - random(min, max): 乱数生成
-
 return AREKA

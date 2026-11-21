@@ -1,13 +1,11 @@
 //! Integration tests for pasta.shiori.event.virtual_dispatcher module.
-//!
-//! Tests for configuration, state management, and second_change integration.
 
 use crate::common;
 
 use common::create_runtime_with_pasta_path;
 
 // ============================================================================
-// Task 4.5: Config and Status Tests
+// Config and Status Tests
 // ============================================================================
 
 #[test]
@@ -38,7 +36,7 @@ fn test_config_default_values() {
     assert!(result.unwrap().as_boolean().unwrap_or(false));
 }
 
-/// 数で有限でない hour_margin は既定の 30、有限の数はそのまま（要件 1.1・1.4・1.5・1.6）
+/// 数で有限でない hour_margin は既定の 30、有限の数はそのまま
 #[test]
 fn test_hour_margin_finite_number_or_default() {
     let runtime = create_runtime_with_pasta_path();
@@ -106,7 +104,7 @@ fn test_skip_when_talking() {
 }
 
 // ============================================================================
-// Task 4.6: State Management Tests
+// State Management Tests
 // ============================================================================
 
 #[test]
@@ -217,7 +215,7 @@ fn test_onsecondchange_handler_registered() {
 }
 
 // ============================================================================
-// Task 3.1: SAVE優先・実行時変更・部分設定テスト
+// SAVE優先・実行時変更・部分設定テスト
 // ============================================================================
 
 #[test]
@@ -361,14 +359,14 @@ fn test_partial_save_configuration_max_only() {
 }
 
 // ============================================================================
-// Task 3.2: tomlフォールバック・ハードコードデフォルトテスト
+// tomlフォールバック・ハードコードデフォルトテスト
 // ============================================================================
 
 #[test]
 fn test_toml_fallback_values() {
     let runtime = create_runtime_with_pasta_path();
 
-    // 案B: インラインモックで @pasta_config を差し込む
+    // インラインモックで @pasta_config を差し込む
     runtime
         .exec(
             r#"
@@ -424,7 +422,7 @@ fn test_hardcoded_default_values() {
 }
 
 // ============================================================================
-// Task 3.3: バリデーション（非数値・min>max補正）テスト
+// バリデーション（非数値・min>max補正）テスト
 // ============================================================================
 
 #[test]
@@ -484,7 +482,7 @@ fn test_min_greater_than_max_correction() {
 }
 
 // ============================================================================
-// 検証レポート P1: 値バリデーション強化テスト
+// 値バリデーション強化テスト
 // ============================================================================
 
 #[test]

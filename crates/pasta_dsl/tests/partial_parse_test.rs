@@ -39,7 +39,7 @@ fn test_valid_multiple_global_scenes() {
 }
 
 // ============================================================================
-// 区切り（要件 3.2）
+// 区切り
 // ============================================================================
 
 /// 字下げしたアクター指定・単語定義・選択肢・属性の行を含むシーンは割れない
@@ -66,7 +66,7 @@ fn test_indented_markers_do_not_split_scene() {
     assert_eq!(result.failed_lines, vec![7..9]);
 }
 
-/// 誤りのシーンの行だけが失敗の範囲に入る（要件 3.3）
+/// 誤りのシーンの行だけが失敗の範囲に入る
 #[test]
 fn test_only_error_scene_lines_fail() {
     let source = concat!(
@@ -93,7 +93,7 @@ fn test_only_error_scene_lines_fail() {
     );
 }
 
-/// 名前の無い `＊` の行は前のシーンと一緒に解ける（D2）
+/// 名前の無い `＊` の行は前のシーンと一緒に解ける
 #[test]
 fn test_lone_star_parses_with_previous_scene() {
     let source = concat!(

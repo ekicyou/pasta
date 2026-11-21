@@ -9,11 +9,7 @@ use tracing::{debug, error, info, trace, warn};
 
 /// PastaShiori - SHIORI implementation using pasta_lua engine.
 ///
-/// Manages the lifecycle of the Pasta script engine, including:
-/// - Runtime initialization via PastaLoader
-/// - SHIORI protocol handling
-///
-/// Note: Before loading, PastaShiori registers a default logger and initializes
+/// Before loading, PastaShiori registers a default logger and initializes
 /// tracing (Stage 1); PastaLoader then replaces it with the configured logger
 /// (Stage 1.5). PastaShiori unregisters the logger on reload and drop.
 #[derive(Default)]
@@ -21,19 +17,15 @@ pub struct PastaShiori {
     /// Base directory for ghost scripts (master/ directory)
     load_dir: Option<PathBuf>,
 
-    /// Pasta Lua runtime instance (contains logger internally)
     runtime: Option<PastaLuaRuntime>,
 
     /// Error message from last failed load (for X-ERROR-REASON)
     last_load_error: Option<String>,
 
-    /// Cached SHIORI.load function
     load_fn: Option<Function>,
 
-    /// Cached SHIORI.request function
     request_fn: Option<Function>,
 
-    /// Cached SHIORI.unload function
     unload_fn: Option<Function>,
 
     /// ディレクトリの占有の札（持ち主が外から渡す）。在れば VM の片付けで札で外し、無ければディレクトリで外す
@@ -42,22 +34,17 @@ pub struct PastaShiori {
 
 impl PastaShiori {
     /// ディレクトリの占有の札を渡す。VM の片付けは、札の世代が今の世代のときだけ登録を外す
-    /// （手放された古い VM が、占有を引き継いだ新しい持ち主の登録を消さない・7.1・7.2）。
+    /// （手放された古い VM が、占有を引き継いだ新しい持ち主の登録を消さない）。
     pub fn set_claim(&mut self, claim: Option<ClaimToken>) {
         self.claim = claim;
     }
 }
 
-// 旧来の `unsafe impl Send for PastaShiori` / `unsafe impl Sync` は task 5.1（R8.1/R8.3）で
-// **撤去**した。VM（`!Send` な mlua ランタイム）は本番アクタースレッド（`actor::thread`）へ
-// pin され、`static LEGACY`（`actor::lifecycle`）越しのメッセージ送信でのみアクセスされる。
-// `PastaShiori` がスレッドを越境しない構造的不変条件によりスレッド安全性を担保するため、
-// `unsafe` の健全性仮定（「ホストのメインスレッドからのみ呼ばれる」運用前提）は不要になった。
-// `PastaShiori` は `!Send`（mlua 由来）のままでよい——アクタースレッド上でのみ構築・所有される。
+// `PastaShiori` は `!Send`（mlua 由来）のままでよい。アクタースレッド（`actor::thread`）上でのみ
+// 構築・所有され、スレッドを越境しない。`unsafe impl Send/Sync` を足さないこと。
 
 impl Drop for PastaShiori {
     fn drop(&mut self) {
-        // Call SHIORI.unload if available (before runtime drop)
         self.call_lua_unload();
         self.release_runtime();
     }
@@ -65,24 +52,21 @@ impl Drop for PastaShiori {
 
 impl PastaShiori {
     pub fn load<S: AsRef<OsStr>>(&mut self, load_dir: S) -> MyResult<bool> {
-        // Convert load_dir to PathBuf
         let load_dir_path: PathBuf = load_dir.as_ref().into();
 
-        // If already loaded, cleanup previous instance
         if self.runtime.is_some() {
             info!("Releasing existing runtime for reload");
             self.release_runtime();
             self.last_load_error = None;
         }
 
-        // Save load_dir（有無を確かめる前に覚える。ディレクトリが無いときも、
-        // VM の片付けでそのディレクトリのログの登録・占有が外れるように）
+        // 有無を確かめる前に覚える。ディレクトリが無いときも、
+        // VM の片付けでそのディレクトリのログの登録・占有が外れるように。
         self.load_dir = Some(load_dir_path.clone());
 
-        // Validate load_dir exists
         if !load_dir_path.exists() {
             error!(path = %load_dir_path.display(), "Load directory not found");
-            // 以後の GET の 500 の理由に、探したパス（入口がデコードした形）を出す（ponytail-shiori 2.2・2.4）。
+            // 以後の GET の 500 の理由に、探したパス（入口がデコードした形）を出す。
             self.last_load_error = Some(format!(
                 "load directory not found: {}",
                 load_dir_path.display()
@@ -90,15 +74,13 @@ impl PastaShiori {
             return Ok(false);
         }
 
-        // Stage 1: Early logger initialization (before PastaLoader::load)
-        // Create a default logger so all load-phase logs are captured to file
+        // Stage 1: a default logger so all load-phase logs are captured to file
         if let Ok(logger) = pasta_lua::PastaLogger::new(&load_dir_path, None) {
             let logger = std::sync::Arc::new(logger);
             GlobalLoggerRegistry::instance().register(load_dir_path.clone(), logger);
         }
         pasta_lua::init_tracing();
 
-        // Set load_dir context for logging
         let _guard = LoadDirGuard::new(load_dir_path.clone());
 
         info!(
@@ -106,16 +88,14 @@ impl PastaShiori {
             "Starting PastaShiori load"
         );
 
-        // Load runtime via PastaLoader (Stage 1.5 logger update happens inside)
+        // Stage 1.5 logger update happens inside.
         match PastaLoader::load_with_config(&load_dir_path, RuntimeConfig::new()) {
             Ok(runtime) => {
-                // Cache SHIORI functions (load/request/unload)
                 self.cache_lua_functions(&runtime);
 
                 self.runtime = Some(runtime);
                 self.last_load_error = None;
 
-                // Call SHIORI.load if available (using cached function)
                 if !self.call_lua_load(&load_dir_path) {
                     return Ok(false);
                 }
@@ -136,7 +116,6 @@ impl PastaShiori {
     }
 
     pub fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
-        // Check if runtime is initialized, with detailed error on load failure
         let runtime = self
             .runtime
             .as_ref()
@@ -145,13 +124,11 @@ impl PastaShiori {
                 None => MyError::NotInitialized,
             })?;
 
-        // Set load_dir context for logging
         let _guard = self.load_dir.as_ref().map(|p| LoadDirGuard::new(p.clone()));
 
         let req = req.as_ref();
         trace!(request_len = req.len(), "Processing SHIORI request");
 
-        // Call SHIORI.request using cached function
         self.call_lua_request(runtime, req)
     }
 
@@ -161,13 +138,11 @@ impl PastaShiori {
         self.runtime.as_ref()
     }
 
-    /// Cache SHIORI.load, SHIORI.request, and SHIORI.unload functions from Lua runtime.
-    /// This eliminates the need for hash table lookups on each request.
+    /// Cache SHIORI.load, SHIORI.request, and SHIORI.unload so each request skips the table lookup.
     fn cache_lua_functions(&mut self, runtime: &PastaLuaRuntime) {
         let lua = runtime.lua();
         let globals = lua.globals();
 
-        // Get SHIORI table
         let shiori_table: Result<Table, _> = globals.get("SHIORI");
         match shiori_table {
             Ok(table) => {
@@ -223,19 +198,15 @@ impl PastaShiori {
         }
     }
 
-    /// Clear all cached SHIORI functions.
-    /// Called before reload or when runtime is released.
     fn clear_cached_lua_functions(&mut self) {
         self.load_fn = None;
         self.request_fn = None;
         self.unload_fn = None;
     }
 
-    /// Call SHIORI.load function with hinst (always 0) and load_dir using cached function.
-    /// Returns true if successful or if function doesn't exist (skip).
-    /// Returns false if function returns false or errors.
+    /// Returns true if successful or if SHIORI.load doesn't exist (skip).
+    /// Returns false if it returns false or errors.
     fn call_lua_load(&self, load_dir: &Path) -> bool {
-        // Use cached load_fn directly
         let load_fn = match &self.load_fn {
             Some(f) => f,
             None => {
@@ -244,7 +215,7 @@ impl PastaShiori {
             }
         };
 
-        // Call SHIORI.load(hinst, load_dir)。SHIORI の load は hinst を渡さないので、作者への約束どおり 0 を渡す
+        // SHIORI の load は hinst を渡さないので、作者への約束どおり 0 を渡す
         let load_dir_str = load_dir.to_string_lossy().to_string();
         match load_fn.call::<bool>((0, load_dir_str)) {
             Ok(true) => {
@@ -262,12 +233,9 @@ impl PastaShiori {
         }
     }
 
-    /// Call SHIORI.request function using cached function.
-    /// Parses request text and passes parsed table to Lua.
-    /// Returns 204 response if function doesn't exist.
+    /// Returns 204 response if SHIORI.request doesn't exist.
     /// Returns 400 Bad Request if request parsing fails.
     fn call_lua_request(&self, runtime: &PastaLuaRuntime, request: &str) -> MyResult<String> {
-        // Use cached request_fn directly
         let request_fn = match &self.request_fn {
             Some(f) => f,
             None => {
@@ -278,7 +246,6 @@ impl PastaShiori {
 
         let lua = runtime.lua();
 
-        // Parse request text to Lua table
         let req_table = match lua_request::parse_request(lua, request) {
             Ok(table) => table,
             Err(e) => {
@@ -287,10 +254,8 @@ impl PastaShiori {
             }
         };
 
-        // Call SHIORI.request(req) with parsed table
         match request_fn.call::<String>(req_table) {
             Ok(response) => {
-                // Log request/response at DEBUG level for non-204 responses
                 if !response.starts_with("SHIORI/3.0 204 No Content") {
                     debug!(request = %request, "### SHIORI request ###\n");
                     debug!(response = %response, "### SHIORI response###\n");
@@ -305,7 +270,6 @@ impl PastaShiori {
         }
     }
 
-    /// Call SHIORI.unload function using cached function.
     /// Logs warning on error but does not propagate (safe for Drop).
     fn call_lua_unload(&self) {
         // unload_fn が在るのは VM が在るときだけ（release_runtime が VM より先に消す）
@@ -317,10 +281,8 @@ impl PastaShiori {
             }
         };
 
-        // Set load_dir context for logging
         let _guard = self.load_dir.as_ref().map(|p| LoadDirGuard::new(p.clone()));
 
-        // Call SHIORI.unload()
         if let Err(e) = unload_fn.call::<()>(()) {
             warn!(error = %e, "SHIORI.unload failed");
         } else {

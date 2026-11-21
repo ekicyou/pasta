@@ -57,7 +57,6 @@ local PROBE_SCRIPT = "\\![get,property,OnPastaClock,system.year,system.month,sys
 ---@class VirtualClock
 local M = {}
 
--- Module-local state
 local _offset = 0
 local _probe_armed = false
 local _prev_now = nil      -- 前回の OnSecondChange の「今」

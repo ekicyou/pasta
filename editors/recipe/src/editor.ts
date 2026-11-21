@@ -50,7 +50,7 @@ export async function createEditor(container: HTMLElement): Promise<monaco.edito
   shikiToMonaco(highlighter, monaco);
 
   const { tokenTypes, tokenModifiers } = await legend();
-  // テーマごとの「規則のある種類の番号」。規則の無い種類は下地の色を消すので渡さない（6.6）
+  // テーマごとの「規則のある種類の番号」。規則の無い種類は下地の色を消すので渡さない
   const styled = new Map(
     [lightPlus, darkPlus].map((t) => {
       const kinds = new Set(semanticRules(t as TmTheme, scopes).map((r) => r.scope));
@@ -64,7 +64,7 @@ export async function createEditor(container: HTMLElement): Promise<monaco.edito
     onDidChange: semanticSource.changed.event,
     provideDocumentSemanticTokens(model) {
       const tokens = semanticSource.tokensOf(model);
-      // 今の版の結果が無い間（解析待ち・解析の失敗）は「busy」で答え、Monaco に今の色を残させる（null だと色が消える・6.5）
+      // 今の版の結果が無い間（解析待ち・解析の失敗）は「busy」で答え、Monaco に今の色を残させる（null だと色が消える）
       if (!tokens) throw new Error("busy");
       const kept = styled.get(theme)!;
       return { data: tokensToData(keepTokens(tokens, (t) => kept.has(t))) };

@@ -1,6 +1,6 @@
 // ESLint flat config for the Pasta VSCode extension (`npm run lint` = `eslint src`).
 //
-// Dev-only tooling (review-improvement-loop cell 3.56 / G2): lints the
+// Dev-only tooling: lints the
 // TypeScript sources with the typescript-eslint recommended rule set.
 // Build outputs and vendored artifacts are ignored.
 import tseslint from 'typescript-eslint';

@@ -36,18 +36,14 @@ impl PastaLogger {
     pub fn new(base_dir: &Path, config: Option<&LoggingConfig>) -> io::Result<Self> {
         let config = config.cloned().unwrap_or_default();
 
-        // Compute absolute log path
         let log_path = base_dir.join(&config.file_path);
 
-        // Validate path is within profile directory
         Self::validate_path(base_dir, &log_path)?;
 
-        // Create log directory if needed
         if let Some(parent) = log_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
 
-        // Get directory and filename for the appender
         let log_dir = log_path
             .parent()
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid log path"))?;
@@ -56,7 +52,6 @@ impl PastaLogger {
             .and_then(|s| s.to_str())
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid log filename"))?;
 
-        // Create file appender with no rotation (fixed filename)
         let appender = RollingFileAppender::builder()
             .rotation(Rotation::NEVER)
             .filename_prefix(log_file_name)
@@ -74,7 +69,6 @@ impl PastaLogger {
     /// Prevents path traversal attacks by ensuring the log path
     /// stays under the profile/ directory.
     fn validate_path(base_dir: &Path, log_path: &Path) -> io::Result<()> {
-        // The log path should be within profile/ directory
         let relative = log_path.strip_prefix(base_dir).map_err(|_| {
             io::Error::new(
                 io::ErrorKind::PermissionDenied,
@@ -95,7 +89,6 @@ impl PastaLogger {
             ));
         }
 
-        // Check for path traversal attempts
         if relative_str.contains("..") {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
@@ -137,7 +130,6 @@ impl PastaLogger {
 
 impl Drop for PastaLogger {
     fn drop(&mut self) {
-        // Flush remaining logs before dropping
         let _ = self.flush();
     }
 }
@@ -152,7 +144,6 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let base_dir = temp_dir.path();
 
-        // Create profile directory structure
         std::fs::create_dir_all(base_dir.join("profile/pasta/logs")).unwrap();
 
         let config = LoggingConfig::default();
@@ -201,11 +192,9 @@ mod tests {
 
         let logger = PastaLogger::new(base_dir, None).unwrap();
 
-        // Write something to trigger file creation
         logger.write(b"test log line\n").unwrap();
         logger.flush().unwrap();
 
-        // Check that the log file is exactly "pasta.log" with no date suffix
         let log_dir = base_dir.join("profile/pasta/logs");
         let entries: Vec<_> = std::fs::read_dir(&log_dir)
             .unwrap()
@@ -218,7 +207,6 @@ mod tests {
             "Log file should be exactly 'pasta.log', found: {:?}",
             entries
         );
-        // No date-suffixed files should exist
         let date_files: Vec<_> = entries
             .iter()
             .filter(|n| n.starts_with("pasta.log.") && n.len() > "pasta.log".len())
@@ -232,8 +220,6 @@ mod tests {
 
     #[test]
     fn test_logger_custom_file_path_under_profile() {
-        // A custom file_path under profile/ is accepted and the directory
-        // tree is created automatically.
         let temp_dir = TempDir::new().unwrap();
         let base_dir = temp_dir.path();
 
@@ -250,8 +236,6 @@ mod tests {
 
     #[test]
     fn test_path_validation_rejects_traversal_within_profile() {
-        // Even when the path starts with "profile", a ".." component must
-        // be rejected (path traversal branch of validate_path).
         let temp_dir = TempDir::new().unwrap();
         let base_dir = temp_dir.path();
 
@@ -268,7 +252,6 @@ mod tests {
         }
     }
 
-    /// Judgment table of design.md `LogFilePathValidation` (requirement 5.5).
     #[test]
     fn test_validate_path_judgment_table() {
         let temp_dir = TempDir::new().unwrap();
@@ -312,8 +295,6 @@ mod tests {
 
     #[test]
     fn test_logger_write_content_persisted_after_drop() {
-        // Bytes written through the writer must reach the log file once the
-        // logger is dropped.
         let temp_dir = TempDir::new().unwrap();
         let base_dir = temp_dir.path();
 
@@ -323,7 +304,6 @@ mod tests {
         let written = logger.write(b"persisted log line\n").unwrap();
         assert_eq!(written, b"persisted log line\n".len());
 
-        // Dropping flushes the writer.
         drop(logger);
 
         let content = std::fs::read_to_string(&log_path).unwrap();

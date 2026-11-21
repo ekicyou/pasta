@@ -1,6 +1,4 @@
-//! Phase A: analysis.rs のインラインテストを外部化
-//!
-//! get_line_text, line_byte_offset: pub に昇格
+//! 解析エンジン（トークン・診断・行テキスト・コメント行）のテスト
 
 use pasta_lsp::analysis::{
     AnalysisEngine, RawToken, encode_tokens, get_line_text, line_byte_offset, token_type,
@@ -103,7 +101,6 @@ fn test_analyze_crlf_does_not_panic() {
     // CRLF line endings must not cause panics (e.g., byte offset miscalculation)
     let source = "＃コメント\r\n＊挨拶\r\n  Alice：こんにちは\r\n";
     let result = AnalysisEngine::analyze(source);
-    // Should produce tokens without panicking
     assert!(
         !result.tokens.is_empty(),
         "CRLF input should produce tokens"
@@ -114,7 +111,6 @@ fn test_analyze_crlf_does_not_panic() {
 fn test_analyze_crlf_actor_scope() {
     let source = "＃アクター辞書\r\n％さくら\r\n　＠通常：\\s[0]\r\n";
     let result = AnalysisEngine::analyze(source);
-    // Must not panic; may produce tokens or diagnostics
     let _total = result.tokens.len() + result.diagnostics.len();
 }
 

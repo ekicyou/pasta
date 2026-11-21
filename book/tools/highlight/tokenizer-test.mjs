@@ -1,23 +1,18 @@
-// tokenizer-test.mjs — PastaTokenizer 本実装の自動検証（タスク 2.2 / 要件 1.1, 1.3, 5.1, 5.2, 5.3, 6.2）。
+// tokenizer-test.mjs — PastaTokenizer の自動検証。
 //
-// 目的:
-//   pasta 文法（source.pasta・SSOT・読み取り専用）と vendor lua 文法（source.lua）を
-//   実物の oniguruma WASM でロードし、実テキストを行単位トークナイズすることを実機で証明する。
+// pasta 文法（source.pasta・SSOT・読み取り専用）と vendor lua 文法（source.lua）を実物の oniguruma WASM でロードし、
+// 実テキストを行単位トークナイズする。
 //
-//   - 基本トークナイズ（1.1）: 実在の pasta 構文 fixture を行単位でトークナイズし、
-//       行数＝返り配列長／各行被覆／代表トークンが期待 pasta スコープを持つ。
-//   - 入れ子 lua の二段化（核心・1.3）: pasta パス単独では lua 本体が
-//       meta.embedded.block.lua.content 止まりだが、二段化後は lua スコープ
-//       （keyword.*.lua / string.*.lua / comment.*.lua / constant.*.lua 等）が付く。
-//       この「差」を検証する。
+//   - 基本トークナイズ: 実在の pasta 構文 fixture を行単位でトークナイズし、
+//     行数＝返り配列長／各行被覆／代表トークンが期待 pasta スコープを持つ。
+//   - 入れ子 lua の二段化: pasta パス単独では lua 本体が meta.embedded.block.lua.content 止まりだが、
+//     二段化後は lua スコープ（keyword.*.lua / string.*.lua / comment.*.lua / constant.*.lua 等）が付く。その差を検証する。
 //   - 複数行 lua ブロック跨ぎ: lua 側の行間 ruleStack 継続（複数行文字列）を検証。
 //   - オフセット正規化: lua 区間トークンの startIndex/endIndex が元行内の正しい位置を指す。
-//   - 文法不在で例外（6.2）: 存在しないパスで load() がリジェクトされる。
-//   - 決定論（6.4 を支える）: 同一 text を 2 回トークナイズして同一結果。
+//   - 文法不在で例外: 存在しないパスで load() がリジェクトされる。
+//   - 決定論: 同一 text を 2 回トークナイズして同一結果。
 //
-// 一連の `node book/tools/highlight/tokenizer-test.mjs` が exit 0（全 PASS）を目指す。
-// 本テストは ScopeClassMapper（scope-map.mjs・タスク 2.1）に依存しない。トークナイズ結果の
-// スコープ検証はスコープ文字列を直接 assert する（境界は PastaTokenizer のみ）。
+// 本テストは ScopeClassMapper（scope-map.mjs）に依存しない。スコープ文字列を直接 assert する（境界は PastaTokenizer のみ）。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -120,7 +115,7 @@ async function run() {
   log('');
 
   // -----------------------------------------------------------------------
-  // 文法不在で例外（6.2）— load() の前に検証（実物ロード前のガード）。
+  // 文法不在で例外— load() の前に検証（実物ロード前のガード）。
   // -----------------------------------------------------------------------
   {
     const t = createPastaTokenizer();
@@ -157,7 +152,7 @@ async function run() {
   await tok.load({ pasta: PASTA_GRAMMAR, lua: LUA_GRAMMAR });
 
   // -----------------------------------------------------------------------
-  // 基本トークナイズ（1.1）: 行数一致・各行被覆・代表 pasta スコープ。
+  // 基本トークナイズ: 行数一致・各行被覆・代表 pasta スコープ。
   // -----------------------------------------------------------------------
   {
     const lines = PASTA_FIXTURE.split('\n');
@@ -195,7 +190,7 @@ async function run() {
   log('');
 
   // -----------------------------------------------------------------------
-  // 動的単語参照（dynamic-word-reference 6.4, 7.10・ponytail-editor-tooling 5.4）: ＠ から変数名までが
+  // 動的単語参照: ＠ から変数名までが
   // 1 つの単語参照スコープの span になる。動的な関数呼び出しも名前だけ（VSCode 拡張と同じ色分け）。
   // -----------------------------------------------------------------------
   {
@@ -373,7 +368,7 @@ async function run() {
   log('');
 
   // -----------------------------------------------------------------------
-  // load 引数バリデーション: paths 欠落・非文字列パスで例外/リジェクト（6.2）。
+  // load 引数バリデーション: paths 欠落・非文字列パスで例外/リジェクト。
   // -----------------------------------------------------------------------
   {
     const cases = [
@@ -396,7 +391,7 @@ async function run() {
   log('');
 
   // -----------------------------------------------------------------------
-  // scopeName 欠落文法で例外（6.2）: JSON としては妥当だが TextMate 文法でない
+  // scopeName 欠落文法で例外: JSON としては妥当だが TextMate 文法でない
   // ファイルを一時ディレクトリに置いて load がリジェクトされることを確認。
   // -----------------------------------------------------------------------
   {

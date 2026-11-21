@@ -1,4 +1,4 @@
-//! 2 つのインスタンスの隔たりの試験（仕様 `shiori4-v3-portable`・4.3・4.4・5.1〜5.4・6.1・6.3・6.4）。
+//! 2 つのインスタンスの隔たりの試験。
 //!
 //! `shiori_get_api(3)` のテーブルを `shiori4_abi` で呼び、2 つのゴースト（別の一時ディレクトリ）を
 //! 並べて、変数・チェイントークの続き・ログの出し先と量が
@@ -71,8 +71,8 @@ fn levels(log: &str) -> Vec<&str> {
         .collect()
 }
 
-/// 2 つの版 3 のインスタンスを別々のスレッドで読み、変数とチェイントークの続きが混ざらない
-/// （5.1・5.2・6.1・6.3）。両方が書いてから読み、両方が前半を出してから後半を出す。
+/// 2 つの版 3 のインスタンスを別々のスレッドで読み、変数とチェイントークの続きが混ざらない。
+/// 両方が書いてから読み、両方が前半を出してから後半を出す。
 #[test]
 fn variables_and_chain_talk_do_not_mix_across_threads() {
     let _serial = serial();
@@ -126,7 +126,7 @@ fn on_pasta_scene(scene: &str) -> String {
 }
 
 /// デバッグを有効にした 2 体が並び、どちらも開発用のイベントを許し、待ち受けのログを出さない
-/// （debug-mcp-runtime 1.1・1.3・1.5）。`[logging]` の出し先と量は自分のログだけに効く（5.3・5.4）。
+/// `[logging]` の出し先と量は自分のログだけに効く。
 /// 有効の行はログの量に左右されずに出るので、A と B の量を変えても 1 行ずつある。
 #[test]
 fn two_debug_enabled_instances_stand_side_by_side() {
@@ -137,7 +137,7 @@ fn two_debug_enabled_instances_stand_side_by_side() {
     let b = ghost("\n[logging]\nlevel = \"info\"\n\n[debug]\nenabled = true\n");
     let mut inst_b = load(b.path()).expect("the later instance must still load");
 
-    // どちらも OnPastaScene に 200 で自分のシーンを返し、変数は自分の VM にだけ残る（1.3）。
+    // どちらも OnPastaScene に 200 で自分のシーンを返し、変数は自分の VM にだけ残る。
     for (inst, mark, other) in [(&mut inst_a, "甲", "乙"), (&mut inst_b, "乙", "甲")] {
         let (status, body) = request(inst, &on_pasta_scene(&format!("印{mark}")));
         assert_eq!(status, 200, "{mark}: {body:?}");
@@ -159,7 +159,7 @@ fn two_debug_enabled_instances_stand_side_by_side() {
     let log_b = read_log(b.path());
 
     for (name, log) in [("A", &log_a), ("B", &log_b)] {
-        // 有効の info が 1 行あり、待ち受けのログが無い（1.1・1.5）。
+        // 有効の info が 1 行あり、待ち受けのログが無い。
         let enabled: Vec<&str> = log.lines().filter(|l| l.contains(ENABLED)).collect();
         assert!(
             enabled.len() == 1 && enabled[0].contains("INFO"),
@@ -172,7 +172,7 @@ fn two_debug_enabled_instances_stand_side_by_side() {
         );
     }
 
-    // 出し先: それぞれのファイルに相手のディレクトリの行が無い（5.3）。
+    // 出し先: それぞれのファイルに相手のディレクトリの行が無い。
     let (dir_a, dir_b) = (
         a.path().display().to_string(),
         b.path().display().to_string(),
@@ -186,13 +186,13 @@ fn two_debug_enabled_instances_stand_side_by_side() {
         "B:\n{log_b}"
     );
 
-    // 量（5.4）: A は debug を書き、B は debug を書かない。
+    // 量: A は debug を書き、B は debug を書かない。
     assert!(levels(&log_a).contains(&"DEBUG"), "A logs debug:\n{log_a}");
     assert!(!levels(&log_b).contains(&"DEBUG"), "B:\n{log_b}");
 }
 
 /// 旧来の窓口のインスタンスと版 3 のインスタンスが並び、片方の unload がもう片方の応答を
-/// 変えない（4.3・6.4）。
+/// 変えない。
 #[test]
 fn legacy_and_v3_side_by_side_unload_one_keeps_the_other() {
     let _serial = serial();
@@ -217,7 +217,7 @@ fn legacy_and_v3_side_by_side_unload_one_keeps_the_other() {
     assert_eq!(request(&mut v3, &get("印を見る")).1, v3_before);
 }
 
-/// 版 3 の unload が返った時点で、そのアクタースレッドは終わっている（4.4）。
+/// 版 3 の unload が返った時点で、そのアクタースレッドは終わっている。
 /// `SHIORI.unload` を 0.3 秒回らせ、終わりを待たずに返ればスレッドが残るようにする。
 // macOS はスレッド名で数え上げる簡単な API が無いので除く（join 自体は actor_instance_test の `joined` が全 OS で確かめる）。
 #[cfg(any(windows, target_os = "linux"))]
@@ -241,7 +241,7 @@ fn v3_unload_leaves_no_actor_thread() {
     );
 }
 
-/// ack を待たずに手放したアクタースレッドは、遅れて片付けを終えると自分で参照を返して終わる（1.1・1.2）。
+/// ack を待たずに手放したアクタースレッドは、遅れて片付けを終えると自分で参照を返して終わる。
 /// 約束を待ったまま残らないこと（数え上げから 3 秒以内に消える）を確かめる。
 #[cfg(any(windows, target_os = "linux"))]
 #[test]

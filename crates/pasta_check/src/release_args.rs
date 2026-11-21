@@ -204,7 +204,7 @@ mod tests {
         assert_eq!(fs::read_to_string(&f.nar).unwrap(), "old nar");
     }
 
-    /// 無い・フォルダでない入力を、関係より先に断る（1.7・1.8）。目印と前回の nar が残る
+    /// 無い・フォルダでない入力を、関係より先に断る。目印と前回の nar が残る
     #[test]
     fn test_rejects_missing_or_file_inputs() {
         let f = fixture();
@@ -251,7 +251,7 @@ mod tests {
         }
     }
 
-    /// 再現 B: --release が --target と同じ（1.1）
+    /// 再現 B: --release が --target と同じ
     #[test]
     fn test_rejects_release_same_as_target() {
         let f = fixture();
@@ -264,7 +264,7 @@ mod tests {
         assert_rejected(&a, &f, expected);
     }
 
-    /// 再現 A: --release が --target の親（1.1）
+    /// 再現 A: --release が --target の親
     #[test]
     fn test_rejects_release_containing_target() {
         let f = fixture();
@@ -277,7 +277,7 @@ mod tests {
         assert_rejected(&a, &f, expected);
     }
 
-    /// 再現 D: --nar が --release の中（1.5）
+    /// 再現 D: --nar が --release の中
     #[test]
     fn test_rejects_nar_inside_release() {
         let f = fixture();
@@ -291,7 +291,7 @@ mod tests {
         assert_rejected(&a, &f, expected);
     }
 
-    /// 再現 F: --nar が --target の中の作者のファイル（1.6）
+    /// 再現 F: --nar が --target の中の作者のファイル
     #[test]
     fn test_rejects_nar_author_file_inside_target() {
         let f = fixture();
@@ -305,7 +305,7 @@ mod tests {
         assert_rejected(&a, &f, expected);
     }
 
-    /// --release と --copy の 3 つの関係（1.2・1.4）
+    /// --release と --copy の 3 つの関係
     #[test]
     fn test_rejects_release_vs_copy() {
         let f = fixture();
@@ -326,7 +326,7 @@ mod tests {
         }
     }
 
-    /// --nar と --release・--target・--copy の同じ・中にある（1.5・1.6）
+    /// --nar と --release・--target・--copy の同じ・中にある
     #[test]
     fn test_rejects_nar_same_or_inside() {
         let f = fixture();
@@ -362,7 +362,7 @@ mod tests {
         }
     }
 
-    /// 再現 C: --release が --target の中（1.3）。前は無限の入れ子でスタックあふれ
+    /// 再現 C: --release が --target の中。前は無限の入れ子でスタックあふれ
     #[test]
     fn test_rejects_release_inside_target() {
         let f = fixture();
@@ -377,7 +377,7 @@ mod tests {
         assert!(!release.exists());
     }
 
-    /// `..` を含む形で --target と同じ場所（2.1・7.3）
+    /// `..` を含む形で --target と同じ場所
     #[test]
     fn test_rejects_dotdot_form() {
         let f = fixture();
@@ -391,7 +391,7 @@ mod tests {
         assert_rejected(&a, &f, expected);
     }
 
-    /// 大文字にした形で --target と同じ場所（2.1・7.3）
+    /// 大文字にした形で --target と同じ場所
     #[cfg(windows)]
     #[test]
     fn test_rejects_uppercase_form() {
@@ -406,7 +406,7 @@ mod tests {
         assert_rejected(&a, &f, expected);
     }
 
-    /// まだ無い --release と --nar で、大文字と小文字だけ違う残りの部品（2.2・7.3）
+    /// まだ無い --release と --nar で、大文字と小文字だけ違う残りの部品
     #[cfg(windows)]
     #[test]
     fn test_rejects_case_differing_missing_parts() {
@@ -423,7 +423,7 @@ mod tests {
         assert!(!release.exists());
     }
 
-    /// 8.3 の短い名前で --target の中（2.1・7.6）。そのボリュームで 8.3 が無効なら何もせずに通す
+    /// 8.3 の短い名前で --target の中。そのボリュームで 8.3 が無効なら何もせずに通す
     #[cfg(windows)]
     #[test]
     fn test_rejects_short_name_form() {
@@ -452,7 +452,7 @@ mod tests {
         );
     }
 
-    /// 断らない組: 名前の頭が同じ隣・--copy が --target の中・--nar が --release の隣（4.1）
+    /// 断らない組: 名前の頭が同じ隣・--copy が --target の中・--nar が --release の隣
     #[test]
     fn test_accepts_unrelated_pairs() {
         let f = fixture();
@@ -486,7 +486,7 @@ mod tests {
         }
     }
 
-    /// 断ったとき、まだ無い --release・--nar の親を作らない（2.3）
+    /// 断ったとき、まだ無い --release・--nar の親を作らない
     #[test]
     fn test_rejection_creates_no_parents() {
         let f = fixture();

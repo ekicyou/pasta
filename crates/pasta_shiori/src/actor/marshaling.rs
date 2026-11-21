@@ -1,54 +1,28 @@
-//! 本番 marshaling 層（task 3.4・design.md「MarshalingLayer」コンポーネント）。
+//! 本番 marshaling 層。
 //!
-//! SHIORI スレッド（producer）とアクタースレッド（task 3.3・VM pin・consumer）の間の
-//! **同期契約 marshaling** を本番化する。SHIORI/3.0 の「GET は応答を要する／NOTIFY は
-//! 応答不要」という同期意味論を、スレッド分離後も byte-invariant に保つ:
+//! SHIORI/3.0 の「GET は応答を要する／NOTIFY は応答不要」という同期意味論を、
+//! SHIORI スレッドとアクタースレッドの分離後も byte-invariant に保つ:
 //!
-//! - **GET（R5.1）**: flume `bounded(1)` の reply tx を [`ActorMsg::Get`] に同梱して
+//! - **GET**: flume `bounded(1)` の reply tx を [`ActorMsg::Get`] に同梱して
 //!   `try_send`、同期 [`Receiver::recv_timeout`]`(GET_TIMEOUT)` でブロック受信。
 //!   `Ok(応答)`→応答文字列（VM 応答、またはリクエスト処理エラー由来の 500 応答）、
 //!   `Timeout`/`Disconnected`→204。
-//! - **NOTIFY（R5.2）**: 応答経路なしで `try_send`、アクター完了を待たず **即 204**。
-//! - **drop→204（R5.3）**: アクターが reply を **送れない**（スレッド消滅・panic 等）まま
-//!   drop すると、受信側の `recv_timeout` が `Disconnected` を観測し 204。flume の
-//!   move/drop 意味論で exactly-once（独自 `Responder` 不要）。なお **リクエスト処理の
-//!   エラーは drop ではなく 500 応答**として返る（仕様 `lua-require-robustness` 4.3/4.4/4.8・
-//!   `thread.rs` の GET アーム）。204 はあくまで「応答を返せなかった」場合の安全網である
-//!   （4.10・本モジュールのコードは無変更）。
-//! - **異常→204（R5.6）**: `try_send` 失敗（チャネル閉鎖＝アクター不在/異常）や未初期化
-//!   は 204。SHIORI スレッドを無限待機させない（デッドロック経路を作らない）。
-//! - **timeout→204＋コルーチン保存（R5.7）**: 閾値超過で 204 を返し SHIORI スレッドの
-//!   待機を打ち切る。LuaJIT はプリエンプション不可ゆえ **アクタースレッドの Lua 実行は
-//!   止めない**。タイムアウトした GET の処理はアクタースレッドで最後まで続き、その応答は
-//!   受信側が無いため捨てられる。`STORE.co_scene` などの VM 内状態はその処理の結果どおりに
-//!   更新され、後続のイベントは通常どおり処理される。
+//! - **NOTIFY**: 応答経路なしで `try_send`、アクター完了を待たず **即 204**。
+//! - **drop→204**: アクターが reply を **送れない**（スレッド消滅・panic 等）まま
+//!   drop すると、受信側の `recv_timeout` が `Disconnected` を観測し 204。
+//!   リクエスト処理のエラーは drop ではなく 500 応答として返る（`thread.rs` の GET アーム）。
+//!   204 は「応答を返せなかった」場合の安全網である。
+//! - **異常→204**: `try_send` 失敗（チャネル閉鎖＝アクター不在/異常）や未初期化
+//!   は 204。SHIORI スレッドを無限待機させない。
+//! - **timeout→204**: 閾値超過で 204 を返し SHIORI スレッドの待機を打ち切る。
+//!   LuaJIT はプリエンプション不可ゆえ **アクタースレッドの Lua 実行は止めない**。
+//!   タイムアウトした GET の処理はアクタースレッドで最後まで続き、その応答は捨てられる。
+//!   `STORE.co_scene` などの VM 内状態はその処理の結果どおりに更新される。
 //!
-//! # 呼び出し経路
-//! - marshaling 自由関数は **呼び出し側が渡した `Sender`** に対して動作する。出荷経路では
-//!   `lifecycle::marshal_request` が `static LEGACY` の芯の型 `ActorInstance` から読んだ `Sender` を
-//!   `classify_request`・[`marshal_get`]・[`marshal_notify`] に渡す（`windows.rs` の
-//!   `request` から呼ばれる）。テストは `spawn_actor_thread_with` に渡した mailbox の
-//!   `Sender` を [`marshal_get`]・[`marshal_notify`] へ直接渡して契約を隔離検証する。
-//!
-//! # GET タイムアウト閾値（R5.8/R5.9・RN4 決定）
-//! [`GET_TIMEOUT`] は **通常運転で決して発火しない安全網**である（R5.8: 通常経路バイト不変）。
-//! task 5.1 で FFI 出荷経路がアクター経路へ切り替わり、ゴールデンスイートが実 GET をこの
-//! タイムアウト越しに駆動するようになった。PoC 申し送りの 6.68ms は **実測レイテンシ**であって
-//! 安全なハードタイムアウト値ではない——デバッグビルドのコールド VM や OS スケジューリング揺れで
-//! 容易に超過し、通常 GET が 204 に化けてバイト不変が壊れる。したがって RN4 の決定として、
-//! 閾値を実 GET が決して接近しない **秒オーダーの安全網**（[`GET_TIMEOUT`] = 5 秒）へ引き上げる。
-//! これは「病的ブロッキング／デバッガ停止で SHIORI スレッドが無限ハングするのを防ぐ最後の砦」
-//! であって、タイトな SLA ではない。タイムアウトは **デバッガ停止中も抑止しない**（R5.9）——
-//! 停止中の GET は 204 になり、再開後に完了したその応答は捨てられる。実機 SSP での更なる
-//! チューニング（必要なら短縮）は後続の実測作業に委ねる（design.md OPEN QUESTION 3）。
-//!
-//! # panic-free 正常経路（R5.10）/ abort プロファイル割り切り（R5.11）
-//! 本モジュールの非テストコードは正常経路で `unwrap`/`expect`/境界外索引を **一切使わない**
-//! （fallible 操作は `Result`/`Option`/`let else` で扱う）。これは
-//! `actor_marshaling_has_no_unwrap_on_normal_path` テストで静的に確認する。drop→204 ガードが
-//! panic 経路の保険として効くのは unwind プロファイル（dev/test）に限られる前提であり、
-//! リリース（`panic=abort`）では既存 `windows.rs` の `catch_unwind` 同様「到達不能の dev/test
-//! 向け保険」として扱う（リリースのビルドプロファイルは変更しない・R5.11）。
+//! # panic-free 正常経路
+//! 本モジュールの非テストコードは正常経路で `unwrap`/`expect`/境界外索引を使わない。
+//! `actor_marshaling_has_no_unwrap_on_normal_path` テストがソースを静的に確かめる。
+//! drop→204 が panic の保険として効くのは unwind プロファイル（dev/test）だけである。
 
 use std::time::Duration;
 
@@ -60,21 +34,16 @@ use pest::Parser as _;
 use pest::Position;
 use pest::error::ErrorVariant;
 
-/// GET の block-on-reply タイムアウト閾値（R5.8・RN4 決定値 = 5 秒）。
+/// GET の block-on-reply タイムアウト閾値。
 ///
-/// **通常運転では決して発火しない安全網**。実 GET はこの値の遥か手前で完了するため、出荷
-/// 経路のゴールデンが 204 に化けることはない（R5.8 通常経路バイト不変）。PoC 申し送りの
-/// 6.68ms は実測レイテンシであり安全なハードタイムアウトではないため、RN4 として実 GET が
-/// 決して接近しない秒オーダーへ引き上げた（病的ブロッキング／デバッガ停止で SHIORI スレッドを
-/// 無限ハングさせないための最後の砦であって、タイトな SLA ではない）。デバッガ停止中も抑止
-/// しない（R5.9）。実機 SSP での更なるチューニングは後続作業（design.md OPEN QUESTION 3）。
+/// **通常運転では決して発火しない安全網**で、タイトな SLA ではない。ミリ秒オーダーに
+/// すると、デバッグビルドのコールド VM やスケジューリングの揺れで通常の GET が 204 に化ける。
+/// デバッガ停止中も抑止しない（停止中の GET は 204 になり、再開後の応答は捨てられる）。
 pub const GET_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// SHIORI スレッド側で決定する SHIORI メソッド（marshaling 分岐点・R5.5）。
+/// SHIORI スレッド側で **VM 投入前**に決定する SHIORI メソッド。
 ///
-/// GET/NOTIFY のメソッド判定は **VM 投入前**に Rust 側で決定論的に確定する（Lua 意味論は
-/// 不変）。`lua_request.rs` と同じ `Rule::get`/`Rule::notify` を、Lua テーブルを介さず
-/// 出荷 pest パーサ（読み取り専用再利用）から取り出す。
+/// `lua_request.rs` と同じ `Rule::get`/`Rule::notify` を、Lua テーブルを介さず pest パーサから取り出す。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ShioriMethod {
     /// GET（SHIORI/3.0 同期契約・block-on-reply）。
@@ -83,21 +52,10 @@ pub(crate) enum ShioriMethod {
     Notify,
 }
 
-/// 既定の 204 No Content 応答（marshaling の安全網フォールバック）。
+/// 既定の 204 No Content 応答。Rust の側で作る 204 はこれ 1 つ。
 ///
-/// バイト列は **リファクタ前の出荷 NOTIFY/204 経路が返していた VM 産 204**
-/// （`pasta_scripts/pasta/shiori/res.lua` の `RES.no_content` → `RES.build`）と
-/// バイト同一であり、標準ヘッダ 3 種（`Charset`/`Sender`/`SecurityLevel: local`）を
-/// すべて含む。すなわち `byte_invariant_test` の `GOLDEN_NOTIFY_204` /
-/// `GOLDEN_ON_SECOND_CHANGE_204`（外部観測点で固定された特性化ゴールデン）と一致する。
-///
-/// これにより NOTIFY の即 204（R5.2）も、GET の timeout/drop/異常/未初期化フォールバック
-/// （R5.3/R5.6/R5.7）も、**唯一の正準 204** を返し、出荷経路が R1.1（外部 SHIORI 挙動
-/// バイト不変）を満たす。SHIORI.request 未登録時の `PastaShiori::call_lua_request` も
-/// この 204 を返す（ponytail-shiori 5.1・5.2。Rust の側で作る 204 はこれ 1 つ）。
-///
-/// timeout/drop/異常/未初期化のいずれでも SHIORI スレッドへ必ずこの応答を返し、
-/// 無限待機を生じさせない。
+/// `pasta_scripts/pasta/shiori/res.lua` の `RES.no_content` と同じバイト列に保つ
+/// （`byte_invariant_test` の `GOLDEN_NOTIFY_204` / `GOLDEN_ON_SECOND_CHANGE_204` が固定する）。
 pub fn default_204() -> String {
     "SHIORI/3.0 204 No Content\r\n\
      Charset: UTF-8\r\n\
@@ -107,7 +65,7 @@ pub fn default_204() -> String {
         .to_string()
 }
 
-/// 要求の見分け（判定 1 つ・7.4）。2.x を Lua へ届けるか 400 にするかは入口が決める。
+/// 要求の見分け。2.x を Lua へ届けるか 400 にするかは入口が決める。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RequestKind {
     /// `GET SHIORI/3.0`。
@@ -118,9 +76,8 @@ pub(crate) enum RequestKind {
     Shiori2(ShioriMethod),
 }
 
-/// 要求のメソッドを **VM 投入前**に判定する（旧来と版 3 の入口で 1 つ・3.5・7.4）。
+/// 要求のメソッドを **VM 投入前**に判定する（旧来と版 3 の入口で共通）。
 ///
-/// 出荷 pest パーサ（`Rule::req`）で 1 回なめ、`Rule::get`／`Rule::notify` でメソッドを覚え、
 /// `Rule::header2` なら `Shiori2(メソッド)` を返す。解けなければ pest の誤り（位置つき）を返す。
 /// 解けたのにメソッドが無い（文法上起きない）ときも panic せず誤りを返す。
 pub(crate) fn classify_request(request: &str) -> Result<RequestKind, Box<ParseError>> {
@@ -153,36 +110,25 @@ pub(crate) fn classify_request(request: &str) -> Result<RequestKind, Box<ParseEr
     })
 }
 
-/// GET marshaling（R5.1/R5.3/R5.6/R5.7）。
+/// GET marshaling。**必ず文字列を返し無限待機しない**。
 ///
-/// flume `bounded(1)` の reply tx を [`ActorMsg::Get`] に同梱して `try_send`、同期
-/// [`Receiver::recv_timeout`]`(GET_TIMEOUT)` でブロックする。アクターが値を送れば応答
-/// 文字列（VM 応答、またはリクエスト処理エラー由来の 500 応答）、reply を送れず drop
-/// されれば `Disconnected`→204、閾値超過なら `Timeout`→204、
-/// `try_send` 失敗（アクター不在/満杯）なら即 204。**必ず文字列を返し無限待機しない**。
-///
-/// `GET_TIMEOUT` を用いる本番エントリ。タイムアウトを差し替えた検証は
-/// [`marshal_get_with_timeout`] を使う。
+/// アクターが値を送れば応答文字列（VM 応答、またはリクエスト処理エラー由来の 500 応答）、
+/// reply を送れず drop されれば 204、[`GET_TIMEOUT`] 超過なら 204、
+/// `try_send` 失敗（アクター不在/満杯）なら即 204。
 pub fn marshal_get(tx: &Sender<ActorMsg>, req: MailboxRequest) -> String {
     marshal_get_with_timeout(tx, req, GET_TIMEOUT)
 }
 
-/// [`marshal_get`] の閾値注入版。
-///
-/// 本番は [`marshal_get`]（`GET_TIMEOUT`）を使う。タイムアウト→204 を決定論的に検証する
-/// ため（実 VM の wall-clock に依存しないため）、テストから短い `timeout` と遅延アクターを
-/// 与えて 204 経路を炙り出すのに用いる（R5.7 の隔離テスト）。
+/// [`marshal_get`] の閾値注入版（テストから短い `timeout` を与える口）。
 pub fn marshal_get_with_timeout(
     tx: &Sender<ActorMsg>,
     req: MailboxRequest,
     timeout: Duration,
 ) -> String {
-    // flume・同期 recv_timeout で受ける reply 経路（exactly-once は move/drop 意味論）。
     let (reply_tx, reply_rx) = bounded::<String>(1);
 
     let seq = req.seq;
-    // try_send 失敗＝アクタースレッド不在/異常/満杯（R5.6）。reply_tx はここで drop され、
-    // 受信側を作らないため無限待機は生じない。安全側として 204 を返す。
+    // try_send 失敗＝アクタースレッド不在/異常/満杯。reply_tx はここで drop されるので待たない。
     if tx
         .try_send(ActorMsg::Get {
             req,
@@ -190,7 +136,6 @@ pub fn marshal_get_with_timeout(
         })
         .is_err()
     {
-        // 観測ログ点（R10.4・無効時ゼロコスト）: GET の try_send が失敗（アクター不在/満杯）。
         tracing::debug!(
             seam = "actor.try_send",
             method = "get",
@@ -200,7 +145,6 @@ pub fn marshal_get_with_timeout(
         );
         return default_204();
     }
-    // 観測ログ点（R10.4）: GET を mailbox へ投入し reply を待つ。
     tracing::trace!(
         seam = "actor.try_send",
         method = "get",
@@ -209,12 +153,9 @@ pub fn marshal_get_with_timeout(
         "GET enqueued; awaiting reply"
     );
 
-    // アクター側は同期 recv() で待っており、送信がそれを起こす（手動 wake 不要）。
     // 同期 recv_timeout ゆえ flume の cancel 欠陥に無関係。
     match reply_rx.recv_timeout(timeout) {
-        // 値到達: アクター VM が構築した応答文字列を返す（R5.1・通常経路バイト不変 R5.8）。
         Ok(s) => {
-            // 観測ログ点（R10.4）: reply 値が SHIORI スレッドへ到達（exactly-once の move 側）。
             tracing::trace!(
                 seam = "actor.reply",
                 method = "get",
@@ -223,9 +164,7 @@ pub fn marshal_get_with_timeout(
             );
             s
         }
-        // Disconnected（reply drop・R5.3）: アクターが reply を送らず drop → 204。
         Err(flume::RecvTimeoutError::Disconnected) => {
-            // 観測ログ点（R10.4）: reply drop（exactly-once の drop 側）→ 204。
             tracing::debug!(
                 seam = "actor.drop",
                 method = "get",
@@ -234,9 +173,8 @@ pub fn marshal_get_with_timeout(
             );
             default_204()
         }
-        // Timeout（R5.7）: 閾値超過。SHIORI 待機を打ち切るが Lua（co_scene）は止めない。
+        // SHIORI 待機を打ち切るが Lua（co_scene）は止めない。
         Err(flume::RecvTimeoutError::Timeout) => {
-            // 観測ログ点（R10.4）: timeout で SHIORI 待機を打ち切り 204（アクターは継続）。
             tracing::debug!(
                 seam = "actor.timeout",
                 method = "get",
@@ -249,16 +187,10 @@ pub fn marshal_get_with_timeout(
     }
 }
 
-/// NOTIFY marshaling（R5.2）。
-///
-/// 応答経路を持たない [`ActorMsg::Notify`] を `try_send` し、アクターの完了を **待たず**
-/// 即 204 を返す（fire-and-forget）。`try_send` の成否に関わらず SHIORI スレッドは
-/// ブロックしない（アクター不在でも即 204・無限待機なし）。
+/// NOTIFY marshaling。アクターの完了を待たず、`try_send` の成否に関わらず即 204 を返す。
 pub fn marshal_notify(tx: &Sender<ActorMsg>, req: MailboxRequest) -> String {
     let seq = req.seq;
-    // 送信失敗（アクター不在）でも契約上 SSP 側はブロックしない。即 204 で終結する。
     let ok = tx.try_send(ActorMsg::Notify { req }).is_ok();
-    // 観測ログ点（R10.4・無効時ゼロコスト）: NOTIFY を fire-and-forget で投入し即 204。
     tracing::trace!(
         seam = "actor.try_send",
         method = "notify",
@@ -276,7 +208,7 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    /// classify_request（判定 1 つ・7.4）: 7 通りが期待どおりに分かれる。
+    /// 7 通りが期待どおりに分かれる。
     /// 知らないメソッド（PUT）は今の文法で読めないので誤り。誤りは位置（行と列）を持つ。
     #[test]
     fn classify_request_splits_seven_cases() {
@@ -319,7 +251,7 @@ mod tests {
         }
     }
 
-    /// `Key:`（値が空）と `Key:value`（空白なし）を含む要求も解ける（3.1・3.3・3.5）。
+    /// `Key:`（値が空）と `Key:value`（空白なし）を含む要求も解ける。
     #[test]
     fn classify_request_accepts_empty_and_unspaced_values() {
         let req = "NOTIFY SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnInitialize\r\n\
@@ -327,10 +259,7 @@ mod tests {
         assert_eq!(classify_request(req).ok(), Some(RequestKind::Notify));
     }
 
-    /// default_204（R5.6 等）: 安全網 204 のバイト列が **リファクタ前 VM 産 204** と同一で
-    /// あること（標準ヘッダ 3 種・`SecurityLevel: local` を含む）。これは
-    /// `byte_invariant_test` の `GOLDEN_NOTIFY_204`/`GOLDEN_ON_SECOND_CHANGE_204` と
-    /// バイト同一であり、出荷経路の R1.1（外部 SHIORI 挙動バイト不変）を保証する正準 204。
+    /// 安全網 204 のバイト列が VM 産 204 と同一（標準ヘッダ 3 種・`SecurityLevel: local` を含む）。
     #[test]
     fn default_204_matches_shipping_bytes() {
         let expected = "SHIORI/3.0 204 No Content\r\n\
@@ -341,14 +270,11 @@ mod tests {
         assert_eq!(default_204().as_bytes(), expected.as_bytes());
     }
 
-    /// GET 正常（R5.1）: アクター役が reply を送れば、その値が marshal_get の戻り値になる。
-    /// 単一スレッドで決定論的に検証する（実 VM 非依存）: 別スレッドのアクター役が
-    /// mailbox を drain して reply を返す。
+    /// アクター役が reply を送れば、その値が marshal_get の戻り値になる。
     #[test]
     fn marshal_get_returns_actor_reply_value() {
         let (tx, rx) = mailbox();
 
-        // アクター役: GET を drain し、req.raw をそのまま値として reply する。
         let actor = thread::spawn(move || {
             if let Ok(ActorMsg::Get { req, reply }) = rx.recv() {
                 let _ = reply.send(format!("echo:{}", req.raw));
@@ -367,8 +293,7 @@ mod tests {
         actor.join().expect("actor role thread must not panic");
     }
 
-    /// NOTIFY（R5.2）: 即 204 を返し、アクターの完了を待たない。投入されたメッセージは
-    /// 後から drain でき（fire-and-forget の証跡）、Notify variant であること。
+    /// NOTIFY は即 204 を返し、アクターの完了を待たない。メッセージは後から drain できる。
     #[test]
     fn marshal_notify_returns_204_immediately_without_awaiting() {
         let (tx, rx) = mailbox();
@@ -380,7 +305,6 @@ mod tests {
             "NOTIFY must return 204 immediately (fire-and-forget)"
         );
 
-        // 待たずに 204 が返ったが、メッセージは mailbox に積まれている（後追い処理可能）。
         match rx.try_recv() {
             Ok(ActorMsg::Notify { req }) => {
                 assert_eq!(req.raw, "NOTIFY-BODY");
@@ -390,16 +314,13 @@ mod tests {
         }
     }
 
-    /// drop→204（R5.3）: アクター役が reply を送らず drop すると、受信側の recv_timeout が
-    /// Disconnected を観測し 204 になる（無限待機なし）。
+    /// アクター役が reply を送らず drop すると 204 になる（無限待機なし）。
     #[test]
     fn marshal_get_reply_drop_yields_204() {
         let (tx, rx) = mailbox();
 
-        // アクター役: GET を drain するが reply を送らず drop（応答を返せない異常の模擬）。
         let actor = thread::spawn(move || {
             if let Ok(ActorMsg::Get { req: _, reply }) = rx.recv() {
-                // reply を送らずスコープ離脱 → drop → 受信側 Disconnected。
                 drop(reply);
             }
         });
@@ -414,12 +335,10 @@ mod tests {
         actor.join().expect("actor role thread must not panic");
     }
 
-    /// try_send 失敗→204（R5.6）: receiver がドロップ済み（アクター不在/異常）の mailbox へ
-    /// GET を送ると try_send が失敗し、即 204 を返す（デッドロックなし）。
+    /// receiver がドロップ済み（アクター不在/異常）の mailbox への GET は即 204 を返す。
     #[test]
     fn marshal_get_closed_channel_yields_204() {
         let (tx, rx) = mailbox();
-        // receiver を落としてチャネルを閉じる（アクタースレッド消滅の模擬）。
         drop(rx);
 
         let resp =
@@ -431,7 +350,7 @@ mod tests {
         );
     }
 
-    /// NOTIFY も try_send 失敗で即 204（R5.6・R5.2）: アクター不在でもブロックしない。
+    /// NOTIFY もアクター不在でブロックせず即 204。
     #[test]
     fn marshal_notify_closed_channel_returns_204() {
         let (tx, rx) = mailbox();
@@ -440,16 +359,8 @@ mod tests {
         assert_eq!(resp.as_bytes(), default_204().as_bytes());
     }
 
-    /// timeout→204＋coroutine 保存（R5.7）: 閾値超過時に 204 を返しつつ、アクター（Lua）の
-    /// in-flight work は **打ち切らない**ことを決定論的に示す。実 VM の wall-clock に
-    /// 依存しないよう、テストが門を開くまで reply しないアクター役を注入する。
-    ///
-    /// - Round1（slow GET）: アクター役が門で待ってから reply するため、
-    ///   marshal_get は timeout で 204 を返す（SHIORI 待機の打ち切り）。
-    /// - 重要: timeout は SHIORI 側の待機を切るだけで、アクター役（Lua 実行相当）は
-    ///   その後も処理を続行し reply を **完了** する（co_scene 保存の構造的根拠）。
-    /// - Round2（recovery）: 後続 GET が同一 mailbox の FIFO で処理され、アクター役が
-    ///   通常速度で reply するため値が返る（次 tick による回復に相当）。
+    /// 閾値超過時に 204 を返しつつ、アクター（Lua）の in-flight work は打ち切らず、
+    /// 後続の GET は値を返す。
     #[test]
     fn marshal_get_timeout_yields_204_but_actor_work_survives_and_recovers() {
         let (tx, rx) = mailbox();
@@ -457,21 +368,17 @@ mod tests {
         // 遅延を sleep でなく門で作る（混んだ macOS ランナーでは sleep が閾値を追い越した）。
         let (release_tx, release_rx) = bounded::<()>(1);
 
-        // アクター役: 2 件の GET を順に drain する単一直列ループ（FIFO・単一 consumer）。
         let actor = thread::spawn(move || {
-            // Round1: SHIORI が打ち切った後に門が開くまで reply しない。
-            //         work は失われず最後まで完走する（co_scene 保存の構造的模擬）。
+            // SHIORI が打ち切った後に門が開くまで reply しない。
             if let Ok(ActorMsg::Get { req: _, reply }) = rx.recv() {
                 let _ = release_rx.recv();
                 let _ = reply.send("late-but-completed".to_string());
             }
-            // Round2: 通常速度で reply（次 tick での回復に相当）。
             if let Ok(ActorMsg::Get { req, reply }) = rx.recv() {
                 let _ = reply.send(format!("recovered:{}", req.raw));
             }
         });
 
-        // Round1: 短い閾値で待つ → アクター役が遅延中ゆえ timeout → 204。
         let round1 = marshal_get_with_timeout(&tx, MailboxRequest::new(1, "R1"), short_timeout);
         assert_eq!(
             round1.as_bytes(),
@@ -482,8 +389,7 @@ mod tests {
             .send(())
             .expect("actor role must be waiting at the gate");
 
-        // Round2: 通常速度で待つ → 値が返る（後続 tick による回復）。アクター役の Round1
-        // work が打ち切られていれば Round2 の FIFO が崩れ、この assert が落ちる。
+        // Round1 の work が打ち切られていれば FIFO が崩れ、この assert が落ちる。
         let round2 =
             marshal_get_with_timeout(&tx, MailboxRequest::new(2, "R2"), Duration::from_secs(10));
         assert_eq!(
@@ -494,13 +400,11 @@ mod tests {
         actor.join().expect("actor role thread must not panic");
     }
 
-    /// FIFO/順序保存（R6 横断・marshaling 経由でも順序不変）: 複数 GET を順に投入すると、
-    /// 単一 consumer が投入順に処理し、各応答が対応する req の値を返す。
+    /// 複数 GET を順に投入すると、各応答が対応する req の値を順に返す。
     #[test]
     fn marshal_get_preserves_fifo_order() {
         let (tx, rx) = mailbox();
 
-        // アクター役: GET を drain し続け、req.raw を echo する単一直列ループ。
         let actor = thread::spawn(move || {
             while let Ok(msg) = rx.recv() {
                 match msg {
@@ -537,14 +441,11 @@ mod tests {
         actor.join().expect("actor role thread must not panic");
     }
 
-    /// panic-free 正常経路の静的確認（R5.10）: marshaling モジュールの **非テストコード**に
-    /// `unwrap(`/`expect(`/`panic!(`/`unreachable!(` が現れないことを、ソースを読み取って
-    /// 静的に保証する。`#[cfg(test)]` 以下（本テストモジュール）は対象外とするため、
-    /// `mod tests` 出現位置以降を除外して走査する。
+    /// 非テストコード（`mod tests` より前）に `unwrap(`/`expect(`/`panic!(`/`unreachable!(` が
+    /// 現れない。コメントも走査されるので、上のコメントにもこれらを書かない。
     #[test]
     fn actor_marshaling_has_no_unwrap_on_normal_path() {
         let src = include_str!("marshaling.rs");
-        // テストモジュール開始位置以降を切り落とし、本番（非テスト）コードのみを検査する。
         let prod = match src.find("mod tests") {
             Some(idx) => &src[..idx],
             None => src,

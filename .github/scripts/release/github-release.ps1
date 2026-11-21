@@ -57,7 +57,7 @@ function Invoke-Gh([string[]]$GhArgs) {
 }
 
 # タグの Release（下書きも tag 名で見つかる）。無ければ $null。
-# 「無い」以外の失敗は状態を判定できないので transient で失敗する（7.4）。
+# 「無い」以外の失敗は状態を判定できないので transient で失敗する。
 function Get-Release {
     $r = Invoke-Gh @('release', 'view', $Tag, '--json', 'isDraft,assets,url,name')
     if ($r.Code -eq 0) { return ($r.Out | ConvertFrom-Json) }
@@ -68,7 +68,7 @@ function Get-Release {
 try {
     if ($Tag -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+\z') { Complete failed publish "タグ ``$Tag`` が vX.Y.Z の形でない" }
 
-    # (1) 9 つの添付（配布物 8 つと詳しいリリースノート）がそろっていることを先に検査する（6.2）
+    # (1) 9 つの添付（配布物 8 つと詳しいリリースノート）がそろっていることを先に検査する
     $names = @('pasta.dll.zip', 'hello-pasta.nar', 'pasta-starter.nar', "pasta-vscode-$($Tag.Substring(1)).vsix", 'pasta_check.zip', 'pasta-skills.zip', 'pasta-recipe.x64.zip', 'pasta-recipe.arm64.zip', "release-notes-$Tag.md")
     $files = @{}
     foreach ($n in $names) {
@@ -85,7 +85,7 @@ try {
     $uploaded = @($assets | Where-Object state -eq 'uploaded' | ForEach-Object name)
     $missing = @($names | Where-Object { $uploaded -notcontains $_ })
 
-    # 公開済み・9 つ添付済み → 飛ばす。題名・ノートは触らない（6.4・7.3）
+    # 公開済み・9 つ添付済み → 飛ばす。題名・ノートは触らない
     if ($rel -and -not $rel.isDraft -and -not $missing) { Complete skipped '' '公開済みで 9 つ（配布物 8 つと詳しいリリースノート）が添付済みのため飛ばした' }
 
     # (3) 行う操作を組み立てる
@@ -95,12 +95,12 @@ try {
         $ops.Add(@('release', 'create', $Tag, '--draft', '--verify-tag', '--title', $Title, '--notes-file', $NotesFile))
     }
     elseif ($rel.isDraft) {
-        # 下書き → 未完了（state が uploaded でない）の添付を消して付け直す。公開済みの添付には行わない（7.6）
+        # 下書き → 未完了（state が uploaded でない）の添付を消して付け直す。公開済みの添付には行わない
         foreach ($a in $assets | Where-Object state -ne 'uploaded') { $ops.Add(@('release', 'delete-asset', $Tag, $a.name, '--yes')) }
     }
-    # 足りないものだけを添付する。--clobber は使わない（7.6）
+    # 足りないものだけを添付する。--clobber は使わない
     if ($missing) { $ops.Add(@('release', 'upload', $Tag) + @($missing | ForEach-Object { $files[$_] })) }
-    # 8 つがそろってから公開する（6.5）。公開済みの Release には行わない
+    # 8 つがそろってから公開する。公開済みの Release には行わない
     if (-not $rel -or $rel.isDraft) { $ops.Add(@('release', 'edit', $Tag, '--draft=false')) }
 
     if ($DryRun) {

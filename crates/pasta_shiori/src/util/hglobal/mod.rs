@@ -47,9 +47,8 @@ impl ShioriString {
     }
 
     /// GMEM_FIXEDブロックを確保し、失敗（null）を明示エラーで返します。
-    /// 3.37 (G3): GlobalAlloc は失敗時に null を返す（プロセス終了はしない）。
-    /// 旧実装は null を `from_raw_parts_mut` へ渡しており未定義動作だった。
-    /// エラーは既存の `MyError::Script` に載せる。
+    /// GlobalAlloc は失敗時に null を返す（プロセス終了はしない）。null を
+    /// `from_raw_parts_mut` へ渡すと未定義動作になる。
     fn alloc_global(len: usize) -> MyResult<HGLOBAL> {
         // SAFETY: GlobalAlloc has no preconditions; the null (failure)
         // return is checked before any pointer use.
@@ -157,12 +156,8 @@ impl ShioriString {
     }
 }
 
-/// 3.37 (G3): GlobalAlloc failure must surface as an explicit Err, never as
-/// a null pointer flowing into `from_raw_parts_mut` (undefined behavior).
+/// GlobalAlloc failure must surface as an explicit Err, never as a null pointer.
 /// A near-address-space-sized request makes GlobalAlloc fail deterministically.
-/// The error rides on the existing `Script` variant.
-/// RED evidence: with the null check removed (mutation), alloc_global returns
-/// Ok(null) and this assertion fails.
 #[test]
 fn alloc_global_failure_returns_explicit_error() {
     match ShioriString::alloc_global(usize::MAX >> 1) {
@@ -177,8 +172,7 @@ fn alloc_global_failure_returns_explicit_error() {
     drop(ShioriString::capture(h, 0));
 }
 
-/// G1 (3.35): to_utf8_str error path was untested — invalid UTF-8 bytes from
-/// the host must surface as MyError::EncodeUtf8, not panic.
+/// Invalid UTF-8 bytes from the host must surface as MyError::EncodeUtf8, not panic.
 #[test]
 fn to_utf8_str_invalid_bytes_returns_encode_utf8_error() {
     // 0xC0 0xAF is an over-long encoding — always invalid UTF-8.
@@ -189,9 +183,8 @@ fn to_utf8_str_invalid_bytes_returns_encode_utf8_error() {
     }
 }
 
-/// G1 (3.35): zero-length boundary. A Lua script returning "" produces an
-/// empty response payload through clone_from_str_nofree, so the empty
-/// allocation path is reachable in production.
+/// A Lua script returning "" produces an empty response payload through
+/// clone_from_str_nofree, so the empty allocation path is reachable in production.
 #[test]
 fn empty_payload_roundtrip() {
     let src = ShioriString::clone_from_slice_impl(b"", true).unwrap();
@@ -212,12 +205,11 @@ fn shiori_string_test() {
         assert_eq!(dst.to_utf8_str().unwrap(), text);
     }
     {
-        // 3.39 (G5): CP932 (Shift_JIS) bytes decode to the text only when the
-        // system ANSI code page is 932 (Japanese); on any other ACP the block is
-        // skipped to keep the test locale-independent. The production decode
-        // path (to_ansi_str) is locale-faithful by design: it always uses CP_ACP.
+        // CP932 bytes decode to the text only when the system ANSI code page is 932;
+        // on any other ACP the block is skipped (to_ansi_str always uses CP_ACP).
         // 「適当なShioriString」の CP932 表現（適=93 4B・当=93 96・な=82 C8）。
         const SJIS: &[u8] = b"\x93\x4B\x93\x96\x82\xC8ShioriString";
+        // SAFETY: GetACP has no preconditions.
         let acp = unsafe { windows_sys::Win32::Globalization::GetACP() };
         if acp == 932 {
             let text = "適当なShioriString";

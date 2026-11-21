@@ -2,8 +2,6 @@
 //!
 //! These tests verify the complete SHIORI load/request pipeline
 //! using the actual hello-pasta ghost from pasta_sample_ghost.
-//!
-//! Related specification: `.kiro/specs/completed/shiori-integration-test/`
 
 mod common;
 
@@ -11,11 +9,10 @@ use common::copy_sample_ghost_to_temp;
 use pasta::PastaShiori;
 
 // ========================================================================
-// Task 3.2: PastaShiori::load のテスト
+// PastaShiori::load のテスト
 // ========================================================================
 
 /// Test that PastaShiori::load successfully initializes with hello-pasta ghost.
-/// Requirements: 4.1, 4.2, 4.3
 #[test]
 fn test_load_hello_pasta() {
     let temp = copy_sample_ghost_to_temp();
@@ -27,11 +24,10 @@ fn test_load_hello_pasta() {
 }
 
 // ========================================================================
-// Task 3.3: OnBoot リクエストのテスト
+// OnBoot リクエストのテスト
 // ========================================================================
 
 /// Test that OnBoot request returns expected SakuraScript response.
-/// Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6
 #[test]
 fn test_onboot_response() {
     let temp = copy_sample_ghost_to_temp();
@@ -58,21 +54,21 @@ fn test_onboot_response() {
     println!("=== Response ===");
     println!("{}", response);
 
-    // 5.1: Verify 200 OK status
+    // Verify 200 OK status
     assert!(
         response.contains("SHIORI/3.0 200 OK"),
         "Response should contain '200 OK', got: {}",
         response
     );
 
-    // 5.2: Verify Value header exists
+    // Verify Value header exists
     assert!(
         response.contains("Value:"),
         "Response should contain 'Value:' header, got: {}",
         response
     );
 
-    // 5.3: Verify spot switching tag \p[0] (女の子 = spot 0)
+    // Verify spot switching tag \p[0] (女の子 = spot 0)
     // Note: pasta uses \p[n] format instead of \0/\1.
     // OnBoot (dic/01-boot.pasta) has no expression, so \s[n] is not emitted.
     assert!(
@@ -81,14 +77,14 @@ fn test_onboot_response() {
         response
     );
 
-    // 5.4: Verify wait tag (\_w[) from pasta.toml [talk] section
+    // Verify wait tag (\_w[) from pasta.toml [talk] section
     assert!(
         response.contains("\\_w["),
         "Response should contain wait tag '\\_w[', got: {}",
         response
     );
 
-    // 5.5: Verify text content from OnBoot scene (dic/01-boot.pasta)
+    // Verify text content from OnBoot scene (dic/01-boot.pasta)
     assert!(
         response.contains("本日のおすすめは"),
         "Response should contain OnBoot greeting text, got: {}",

@@ -1,20 +1,19 @@
-// theme-test.mjs — Claudia テーマ（book/theme/claudia.css）の配色トークンの対比テスト
-// （manual-claudia-theme タスク 2.2 / 要件 1.1, 2.2, 2.4, 3.5, 8.3、design「ThemeTest」「テーマトークン契約」）。
+// theme-test.mjs — Claudia テーマ（book/theme/claudia.css）の配色トークンの対比テスト。
 //
+// 観測すること:
 // 観測する完了条件:
 //   - claudia.css の最上位ブロック `.light, html:not(.js)` と `.navy` から `--name: #rrggbb;` を読む。
 //   - 両ブロックに mdBook のテーマ変数 40 個と Claudia のトークンがすべてある（欠けたら失敗）。
-//   - 設計の「テーマトークン契約」で決めた文字色と背景色の組ごとに、WCAG の対比が 4.5 以上。
+//   - テーマトークン契約で決めた文字色と背景色の組ごとに、WCAG の対比が 4.5 以上。
 //     対象のトークンが欠けている、または 16 進色（#rrggbb）でない場合も失敗。
-//   - 部品の層（タスク 2.3 / 要件 1.2, 1.4, 1.8, 9.3、design「ClaudiaTheme」の意匠）:
+//   - 部品の層:
 //       * 色は直書きしない（カスタムプロパティの定義を除く宣言に 16 進色・rgb() 等・色名が無い）。
 //       * 角丸は 14px・10px・4px の 3 段（円の 50% と 0・inherit は可）。影は --claudia-shadow-1/-2 だけ。
 //       * 影のトークンが :root・light・navy にある。本文と見出しに字体トークンを当てている。
 //       * サイドバーと上部バーの規則は色と字体だけを変える（幅・開閉・折りたたみ・切り替え点に触れない）。
 //       * highlight.js の兄弟クラス（mdBook の highlight.css の 6 群）を、light・navy・JS 無効の
 //         3 つの範囲で同じ群の --claudia-hl-* で塗る（実行時に着色する lua・toml・json 等の対比を守る）。
-//   - 台詞部品・扉・クレジット・狭い画面・印刷の層（タスク 2.4 / 要件 2.3, 3.1, 3.5, 3.8, 3.9, 3.10,
-//     6.4, 9.1, 9.2、design「ClaudiaTheme / State Management」の 4・6・7、「出力 HTML 契約」）:
+//   - 台詞部品・扉・クレジット・狭い画面・印刷の層:
 //       * 出力 HTML 契約と扉・クレジットのクラス契約のクラスを規則で使い、扉の契約を冒頭のコメントに書いている。
 //       * 台詞本文は --claudia-font-talk、名札は --claudia-font-latin。顔は 56px（扉は 84px）の円。
 //       * 話し手ごとのトークン（--talk-claudia-*・--talk-anthony-*）を部品に当てている。
@@ -22,8 +21,8 @@
 //       * 印刷では、どのテーマでも light の値（全トークンを light ブロックと同じ値で再定義）を使い、
 //         台詞と扉の途中で改ページせず、区切り線は罫線で描き、コードの着色もどのテーマでも 6 群にそろえる。
 //       * 印刷では mdBook の目次・メニュー・前後の矢印を隠し、本文の枠を紙幅に広げる（P-7・P-8。
-//         manual-print-page-removal 要件 1.3。mdBook の印刷用の CSS を読み込まなくなったので、テーマが受け持つ）。
-//   - テーマメニューの隠し規則（タスク 2.5 / 要件 2.1、design「ThemeMenu」）:
+//         mdBook の印刷用の CSS を読み込まなくなったので、テーマが受け持つ）。
+//   - テーマメニューの隠し規則:
 //       * 最上位の規則で #mdbook-theme-rust・-coal・-ayu のボタンを display: none にする。
 //       * Auto（#mdbook-theme-default_theme）・Light・Navy は隠さない。
 //   - Node 標準のみ・ビルド不要。問題は全件列挙してから exit 1。
@@ -35,13 +34,13 @@ import { SPEAKERS } from './talk/talk.mjs';
 export const CSS_PATH = fileURLToPath(new URL('../theme/claudia.css', import.meta.url));
 export const MIN_CONTRAST = 4.5;
 
-// テーマごとのブロックのセレクタ（design「ClaudiaTheme / State Management」の 2・3）
+// テーマごとのブロックのセレクタ
 export const THEME_SELECTORS = {
   light: '.light, html:not(.js)',
   navy: '.navy',
 };
 
-// mdBook 0.5 の variables.css がテーマごとに持つ 40 変数（research.md RN6 の一覧。0.5.4 の出力で実測）
+// mdBook 0.5 の variables.css がテーマごとに持つ 40 変数
 export const MDBOOK_VARS = [
   '--bg', '--fg', '--sidebar-bg', '--sidebar-fg', '--sidebar-non-existant', '--sidebar-active',
   '--sidebar-spacer', '--scrollbar', '--icons', '--icons-hover', '--links', '--inline-code-color',
@@ -83,7 +82,7 @@ export const CONTRAST_PAIRS = [
   ['--links', '--claudia-paper2'],
   ['--claudia-ink2', '--bg'],
   ...SPEAKER_IDS.flatMap((id) => [[`--talk-${id}-ink`, '--talk-bubble'], [`--talk-${id}-name`, '--talk-bubble']]),
-  // 吹き出し・扉・パート案内のカードに載る文字（タスク 2.4。リンク・案内の文字・欧文添え字）
+  // 吹き出し・扉・パート案内のカードに載る文字
   ['--links', '--talk-bubble'],
   ['--claudia-ink', '--talk-bubble'],
   ['--claudia-ink2', '--talk-bubble'],
@@ -173,12 +172,12 @@ export function checkTheme(css) {
   return results;
 }
 
-// --- 部品の層の検査（タスク 2.3） ---
+// --- 部品の層の検査 ---
 
 // 影のトークン（墨色の淡い 2 段）。:root（rust・coal・ayu 用の既定値）・light・navy の 3 か所に置く
 export const SHADOW_TOKENS = ['--claudia-shadow-1', '--claudia-shadow-2'];
 
-// 角丸の許容値（design「意匠」: 紙 14px・カード 10px・部品 4px。顔の円の 50%、角を立てる 0、継承）
+// 角丸の許容値
 export const ALLOWED_RADII = new Set(['14px', '10px', '4px', '50%', '0', 'inherit']);
 
 // mdBook 0.5.x の highlight.css（light 用）の色の群。実行時に hljs 10.1.1 が付けるクラスのうち
@@ -195,19 +194,19 @@ export const HLJS_GROUPS = {
 // 着色を上書きする範囲（light・navy と、JS 無効時の既定）
 export const HLJS_SCOPES = ['.light', '.navy', 'html:not(.js)'];
 
-// 出力 HTML 契約（design「データモデル / 出力 HTML 契約」）の台詞部品のクラス
+// 出力 HTML 契約の台詞部品のクラス
 export const TALK_CLASSES = ['talk', ...SPEAKER_IDS.map((id) => `talk-${id}`), 'talk-left', 'talk-right',
   'talk-face', 'talk-bubble', 'talk-name'];
-// 扉とクレジットのクラス契約（タスク 2.4 で決め、タスク 5.1 の introduction.md が使う）
+// 扉とクレジットのクラス契約
 export const HERO_CLASSES = ['claudia-hero', 'hero-corner', 'hero-corner-tl', 'hero-corner-tr',
   'hero-corner-bl', 'hero-corner-br', 'hero-latin', 'hero-faces', 'hero-face', 'hero-face-anthony',
   'hero-toc', 'claudia-credit'];
 // 印刷で light の値に置き換える範囲（mdBook はテーマのクラスを html に付ける。JS 無効時は html:not(.js)）
 export const PRINT_SCOPES = ['html.light', 'html.navy', 'html.rust', 'html.coal', 'html.ayu', 'html:not(.js)'];
-// 印刷で隠す mdBook の要素（目次・メニュー・前後の矢印の PC 用と携帯用。manual-print-page-removal 要件 1.3）
+// 印刷で隠す mdBook の要素
 export const PRINT_HIDDEN = ['#mdbook-sidebar', '#mdbook-menu-bar', '.nav-chapters', '.mobile-nav-chapters'];
 
-// サイドバーと上部バーの規則（色と字体だけ。要件 1.8・9.3）
+// サイドバーと上部バーの規則
 // サイドバーの開閉で本文を押し出す仕組み（.page-wrapper・#mdbook-body-container）も同じ扱い
 const CHROME_SELECTOR_RE = /\.sidebar|#mdbook-sidebar|\.chapter|#mdbook-menu-bar|\.menu-bar|\.menu-title|\.page-wrapper|#mdbook-page-wrapper|#mdbook-body-container/;
 const CHROME_PROP_RE = /^(color|background-color|font-family|font-weight|font-style|letter-spacing|border(-block-end|-block-start|-inline-start|-inline-end)?-color)$/;
@@ -272,7 +271,7 @@ export function checkComponents(css) {
     for (const t of SHADOW_TOKENS) add(tokens.has(t), `C-5 ${where} にトークン ${t} がある`, '欠けている');
   }
 
-  // 字体トークンの適用（本文ゴシック・見出し明朝。要件 1.3・1.4）。
+  // 字体トークンの適用。
   // 本文は html か body の規則に、見出しは h1〜h6 をすべて含む規則に当てていること
   const fontRule = (token, covers) => rules.some((r) => !r.nested
     && r.decls.some(([p, v]) => p === 'font-family' && v === `var(${token})`)
@@ -305,7 +304,7 @@ export function checkComponents(css) {
   return results;
 }
 
-// --- 台詞部品・扉・クレジット・狭い画面・印刷の層の検査（タスク 2.4） ---
+// --- 台詞部品・扉・クレジット・狭い画面・印刷の層の検査 ---
 
 // セレクタ（カンマ区切りの 1 つ）が、最後の複合セレクタでクラス cls を対象にしているか（疑似要素は除く）
 const targets = (sel, cls) => !sel.includes('::') && new RegExp(`\\.${cls}(?![\\w-])[^\\s>+~]*$`).test(sel.trim());
@@ -332,7 +331,7 @@ export function checkTalk(css) {
     add(new RegExp(`(^|[^\\w-])${cls}(?![\\w-])`).test(head), `C-10 扉の契約 ${cls} を冒頭のコメントに書いている`, '冒頭のコメントに無い');
   }
 
-  // 字体（要件 1.4）と顔の大きさ（要件 3.1・6.1）
+  // 字体と顔の大きさ
   add(has(top, 'talk-bubble', 'font-family', (v) => v === 'var(--claudia-font-talk)'),
     'C-11 台詞本文に --claudia-font-talk を当てている', '.talk-bubble の font-family が無い');
   add(has(top, 'talk-name', 'font-family', (v) => v === 'var(--claudia-font-latin)'),
@@ -343,17 +342,17 @@ export function checkTalk(css) {
     add(ok, `C-12 .${cls} は ${size}px の円`, `width・height が ${size}px、border-radius が 50% の規則が無い`);
   }
 
-  // 話し手ごとのトークン（要件 3.5）
+  // 話し手ごとのトークン
   const used = top.flatMap((r) => r.decls.map(([, v]) => v)).join(' ');
   for (const t of SPEAKER_TOKENS) add(used.includes(`var(${t})`), `C-13 ${t} を部品に当てている`, '参照が無い');
-  // 新しい話し手（.talk-<id>）は CSS を足さなくてもクラウディア相当の既定色で描かれる（design「台詞部品」）
+  // 新しい話し手（.talk-<id>）は CSS を足さなくてもクラウディア相当の既定色で描かれる
   const base = top.filter((r) => r.selector.split(',').some((s) => s.trim() === '.talk'));
   for (const k of ['ink', 'face', 'ring', 'name']) {
     add(base.some((r) => decl(r, `--talk-speaker-${k}`) === `var(--talk-claudia-${k})`),
       `C-14 .talk が既定の --talk-speaker-${k} をクラウディアの値で持つ`, '.talk の規則に無い');
   }
 
-  // 狭い画面（要件 6.4・9.1・9.2。mdBook の切り替え点 620px・420px）
+  // 狭い画面
   const n620 = inMedia(/^@media\b.*\(max-width:\s*620px\)/);
   const n420 = inMedia(/^@media\b.*\(max-width:\s*420px\)/);
   add(has(n620, 'talk-face', 'width', (v) => px(v) < 56), 'N-1 620px 以下で台詞の顔を小さくする', '@media (max-width: 620px) に .talk-face の width が無い');
@@ -363,7 +362,7 @@ export function checkTalk(css) {
   add(has(top, 'talk-bubble', 'overflow-wrap', (v) => v === 'anywhere'),
     'N-3 吹き出しは長い語でも折り返す（ページの横スクロールを出さない）', '.talk-bubble に overflow-wrap: anywhere が無い');
 
-  // 印刷（要件 3.10。どのテーマでも light の値）
+  // 印刷
   const print = inMedia(/^@media\s+print\b/);
   const light = readTokens(css, THEME_SELECTORS.light) ?? new Map();
   const tokenRule = print.find((r) => {
@@ -386,7 +385,7 @@ export function checkTalk(css) {
     'P-4 印刷の区切り線は罫線で描く', '@media print に hr の background: none と border-top が無い');
   add(print.some((r) => r.selector === '.content' && decl(r, 'overflow') === 'visible'),
     'P-6 印刷では本文の枠をスクロールの箱にしない', '@media print に .content { overflow: visible } が無い');
-  // 章の印刷で mdBook の枠を隠し、本文を紙幅に広げる（manual-print-page-removal 要件 1.3）
+  // 章の印刷で mdBook の枠を隠し、本文を紙幅に広げる
   const hidden = print.filter((r) => decl(r, 'display') === 'none').flatMap((r) => r.selector.split(',').map((s) => s.trim()));
   const shown = PRINT_HIDDEN.filter((name) => !hidden.includes(name));
   add(shown.length === 0, 'P-7 印刷では mdBook の目次・メニュー・前後の矢印を隠す', `@media print に ${shown.join('・')} の display: none が無い`);
@@ -410,9 +409,9 @@ export function checkTalk(css) {
   return results;
 }
 
-// --- テーマメニューの隠し規則の検査（タスク 2.5） ---
+// --- テーマメニューの隠し規則の検査 ---
 
-// メニューに出さないテーマと、残すテーマ（mdBook 0.5.x のボタンの id。要件 2.1、design「ThemeMenu」）
+// メニューに出さないテーマと、残すテーマ
 export const MENU_HIDDEN = ['rust', 'coal', 'ayu'];
 export const MENU_KEPT = ['default_theme', 'light', 'navy'];
 

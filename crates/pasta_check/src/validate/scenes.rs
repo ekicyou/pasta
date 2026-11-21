@@ -1,4 +1,4 @@
-//! シーンを pasta_lua のトランスパイラと同じ手順で登録し、名前の重なりを見つける段（2.4・5.1〜5.4）。
+//! シーンを pasta_lua のトランスパイラと同じ手順で登録し、名前の重なりを見つける段。
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -114,7 +114,7 @@ pub(crate) fn check(
 
     let table =
         SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![])));
-    // 実行時（pasta_lua の check_scene_orders）と同じ関数で判定する（6.1・3.3）
+    // 実行時（pasta_lua の check_scene_orders）と同じ関数で判定する
     for dup in table.duplicate_orders() {
         let (first_path, _, first_span) = positions[dup.scenes[0].0];
         for id in &dup.scenes[1..] {
@@ -149,8 +149,8 @@ pub(crate) fn check(
 /// (書いた名前, 比べる名前, パス, 位置)
 type Decl<'a> = (&'a str, &'a str, &'a str, Span);
 
-/// 照合用の名前が同じで比べる名前が違う宣言に、1 つずつ注意を付ける（5.1・5.2）。
-/// 比べる名前が同じもの（同名・別名を置き換えて同じ）は報告しない（5.3）。
+/// 照合用の名前が同じで比べる名前が違う宣言に、1 つずつ注意を付ける。
+/// 比べる名前が同じもの（同名・別名を置き換えて同じ）は報告しない。
 /// 示すほかの宣言は、比べる名前が違うもののうち最初の 1 つ
 fn collisions(findings: &mut Vec<Finding>, code: FindingKind, decls: &[Decl]) {
     let mut groups: BTreeMap<String, Vec<&Decl>> = BTreeMap::new();
@@ -216,7 +216,7 @@ pub(crate) fn scene_attrs_of(attrs: &[Attr]) -> Vec<SceneAttr> {
         .collect()
 }
 
-/// 値の型の規則（要件 4.5）: 小数は整数の値なら整数、引用の有無は区別しない
+/// 値の型の規則: 小数は整数の値なら整数、引用の有無は区別しない
 pub(crate) fn scene_attr_value(v: &AttrValue) -> SceneAttrValue {
     match v {
         AttrValue::Integer(i) => SceneAttrValue::Integer(*i),

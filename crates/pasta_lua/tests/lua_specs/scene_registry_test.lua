@@ -1,5 +1,5 @@
 -- pasta.scene（SCENE レジストリ API）単体テスト
--- review-improvement-loop cell 3.46 (G1): SCENE モジュール直接テストの欠落を補完する
+-- SCENE モジュール直接テストの欠落を補完する
 -- （既存の act_find_scene_test 等は ACT 経由のフォールバック検索のみで、
 --   レジストリ操作・カウンタ・search 型ガード・co_exec は未カバーだった）
 --

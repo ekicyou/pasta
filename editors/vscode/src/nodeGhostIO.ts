@@ -1,4 +1,4 @@
-// NodeGhostIO - 共有の流れの入出力を Node で（pasta-recipe-dev-actions の設計の NodeGhostIO）
+// NodeGhostIO - 共有の流れの入出力を Node で
 //
 // vscode に触らない。HTTP の頼み（宛先は 127.0.0.1 の固定・送り直さない）・ファイルの読み取り・パスの結びと、
 // ファイルから上ってゴーストを見つける検査（resolveGhost）を持つ。
@@ -85,7 +85,7 @@ export const MAX_ASCENT = 3;
 
 /**
  * masterPath は findGhostMaster(uri)?.fsPath。ファイルのフォルダから上へ MAX_ASCENT までの間にあり、
- * descript.txt（大文字・小文字を区別しない）を持つときだけ、その 2 つ上をルートにする（2.1）。外れたら undefined
+ * descript.txt（大文字・小文字を区別しない）を持つときだけ、その 2 つ上をルートにする。外れたら undefined
  */
 export async function resolveGhost(io: GhostIO, fileFsPath: string, masterPath: string | undefined): Promise<GhostTarget | undefined> {
   if (masterPath === undefined) {

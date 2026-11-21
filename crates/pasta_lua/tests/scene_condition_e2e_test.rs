@@ -1,18 +1,18 @@
-//! scene-condition-attributes の端から端のテスト（task 5.1）。
+//! 条件・優先属性の端から端のテスト。
 //!
 //! 条件・優先を書いた辞書で一時ゴーストを作って `PastaLoader::load_with_config` で読み込み
 //! （辞書の読み込み → 辞書確定）、`SHIORI.request` に GET のリクエストを渡して、
-//! `@pasta_search` の絞り込みから Lua の Call・イベント・選択肢の応答までを確かめる（10.3・10.4）。
+//! `@pasta_search` の絞り込みから Lua の Call・イベント・選択肢の応答までを確かめる。
 //!
-//! - `＊会話` → `＞雑談_` の経路（2.3）、`＄気分＝「高」` の後の `＞告白`（2.4）
-//! - Call の条件漏れは止まる表記・名前が無いときは今の表記・イベントは 204（3.1・3.3・3.4）、
-//!   時報の名前の通り抜け（2.5・3.6）
-//! - 並び: 外れた候補も見て使い、巡の始め直しの後に出る（4.3〜4.6）、優先の独占（5.1）
-//! - `＊OnUpdateComplete　＆優先：1　＆＄ｒ０＝「changed」` が転記の行なしで選ばれ（6.1）、
-//!   チェイントークの続きの変数は上書きされない（6.5）
-//! - 選択肢の飛び先の条件漏れ（2.6・3.2）と `OnPastaCallFunction` の条件漏れ（2.8）
+//! - `＊会話` → `＞雑談_` の経路、`＄気分＝「高」` の後の `＞告白`
+//! - Call の条件漏れは止まる表記・名前が無いときは今の表記・イベントは 204、
+//!   時報の名前の通り抜け
+//! - 並び: 外れた候補も見て使い、巡の始め直しの後に出る、優先の独占
+//! - `＊OnUpdateComplete　＆優先：1　＆＄ｒ０＝「changed」` が転記の行なしで選ばれ、
+//!   チェイントークの続きの変数は上書きされない
+//! - 選択肢の飛び先の条件漏れと `OnPastaCallFunction` の条件漏れ
 //!
-//! 並びの順は `set_scene_selector(0, 1, 2)`（シャッフルしない固定の並び）で決める。
+//! 並びの順は `set_scene_selector`（シャッフルしない固定の並び）で決める。
 //! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従う。
 
 mod common;
@@ -213,7 +213,7 @@ fn set_save(runtime: &PastaLuaRuntime, name: &str, lua_value: &str) {
         .unwrap();
 }
 
-/// 2.3: OnTalk の別名の `＊会話` から `＞雑談_` が前方一致で集めた候補を、保存変数の条件で絞る。
+/// OnTalk の別名の `＊会話` から `＞雑談_` が前方一致で集めた候補を、保存変数の条件で絞る。
 #[test]
 fn kaiwa_calls_zatsudan_prefix_filtered_by_condition() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -234,7 +234,7 @@ fn kaiwa_calls_zatsudan_prefix_filtered_by_condition() {
     assert!(value.contains("朝の雑談"), "morning talk: {value}");
 }
 
-/// 2.4: 呼び出し元が `＄気分＝「高」` を入れてから `＞告白` すると、同じローカル変数で絞る。
+/// 呼び出し元が `＄気分＝「高」` を入れてから `＞告白` すると、同じローカル変数で絞る。
 #[test]
 fn caller_local_variable_selects_callee() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -247,7 +247,7 @@ fn caller_local_variable_selects_callee() {
     }
 }
 
-/// 3.1・3.4: Call の条件漏れは止まる表記で後の行を出さず、名前が無いときは今の表記で次の行へ進む。
+/// Call の条件漏れは止まる表記で後の行を出さず、名前が無いときは今の表記で次の行へ進む。
 #[test]
 fn call_unmet_stops_and_not_found_keeps_notation() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -285,7 +285,7 @@ fn call_unmet_stops_and_not_found_keeps_notation() {
     );
 }
 
-/// 2.5・3.3: イベントのシーンが条件漏れなら 204（失敗表記を出さない）。満たせば選ばれる。
+/// イベントのシーンが条件漏れなら 204（失敗表記を出さない）。満たせば選ばれる。
 #[test]
 fn event_unmet_returns_204() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -298,7 +298,7 @@ fn event_unmet_returns_204() {
     assert!(value.contains("鍵のあるときだけ"), "met event: {value}");
 }
 
-/// 3.6: 時報は `時報15` が条件漏れなら次の名前 `OnHour15` を試す。満たせば `時報15`。
+/// 時報は `時報15` が条件漏れなら次の名前 `OnHour15` を試す。満たせば `時報15`。
 #[test]
 fn hour_signal_falls_through_unmet_name() {
     // 2023-12-15 14:00 の正時の Unix 時刻と、その 1 時間後
@@ -333,7 +333,7 @@ fn hour_signal_falls_through_unmet_name() {
     assert!(value.contains("鍵の時報"), "met hour scene: {value}");
 }
 
-/// 4.3〜4.6: 外れた候補も見て使い（その巡では満たしても出ない）、巡の始め直しの後に出る。
+/// 外れた候補も見て使い（その巡では満たしても出ない）、巡の始め直しの後に出る。
 #[test]
 fn unmet_seen_candidate_is_consumed_and_returns_next_round() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -355,7 +355,7 @@ fn unmet_seen_candidate_is_consumed_and_returns_next_round() {
     assert!(value.contains("並びB"), "next in the round: {value}");
 }
 
-/// 5.1・5.7: 優先の高い候補が条件を満たす間は、巡を使い切っても低い段へ下りない。
+/// 優先の高い候補が条件を満たす間は、巡を使い切っても低い段へ下りない。
 #[test]
 fn priority_monopolizes_selection() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -368,7 +368,7 @@ fn priority_monopolizes_selection() {
     }
 }
 
-/// 6.1・6.5: 転記の行なしで `＄ｒ０` の条件が効いて選ばれ、続きの変数は次のイベントで上書きされない。
+/// 転記の行なしで `＄ｒ０` の条件が効いて選ばれ、続きの変数は次のイベントで上書きされない。
 #[test]
 fn event_scene_condition_on_reference_with_auto_transfer() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -395,7 +395,7 @@ fn event_scene_condition_on_reference_with_auto_transfer() {
     assert!(value.contains("更新したchanged"), "priority again: {value}");
 }
 
-/// 2.6・3.2: 選択肢の飛び先が条件漏れなら止まる表記。満たせば飛び先へ進む。
+/// 選択肢の飛び先が条件漏れなら止まる表記。満たせば飛び先へ進む。
 #[test]
 fn choice_target_unmet_stops() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -420,7 +420,7 @@ fn choice_target_unmet_stops() {
     assert!(value.contains("秘密の話"), "choice met: {value}");
 }
 
-/// 2.8: `OnPastaCallFunction` の条件漏れは止めずに条件漏れの表記の応答。満たせば呼ぶ。
+/// `OnPastaCallFunction` の条件漏れは止めずに条件漏れの表記の応答。満たせば呼ぶ。
 #[test]
 fn call_function_unmet_replies_notice() {
     let temp = tempfile::TempDir::new().unwrap();

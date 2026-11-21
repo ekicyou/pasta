@@ -1,18 +1,12 @@
-//! アクター/marshaling/teardown シームの観測ログ点（tracing）検証（task 6.2・R10.4）。
+//! アクター/marshaling/teardown シームの観測ログ点（tracing）検証。
 //!
-//! 関連仕様: `.kiro/specs/completed/pasta-actor-runtime/`
-//! - 充足要件: R10.4（アクタースレッド・単一直列キュー・marshaling〈GET/NOTIFY/drop→204〉・
-//!   teardown の主要シーム〈enqueue/dispatch/応答/drop・spawn/stop/done〉に `@pasta_log`／
-//!   `tracing` の観測可能なログ点を備える。**無効時はゼロコスト維持**）。
-//! - 設計: design.md の **Monitoring**（`tracing` シーム: `actor.try_send`/`actor.recv`/
-//!   `actor.reply`/`actor.drop`/`actor.timeout`/`actor.spawn`/`actor.stop`/`actor.done`。
-//!   無効時ゼロコスト・`@pasta_log` 既存方針）。
+//! アクタースレッド・単一直列キュー・marshaling〈GET/NOTIFY/drop→204〉・teardown の主要シームに、
+//! `tracing` の観測可能なログ点（`actor.try_send`/`actor.recv`/`actor.reply`/`actor.drop`/
+//! `actor.timeout`/`actor.spawn`/`actor.stop`/`actor.done`）がある。無効時はゼロコスト。
 //!
 //! ## 検証アプローチ（tracing-capture）
 //! `tracing-test` の `#[traced_test]` を用い、テストローカルに subscriber を装着して
 //! シームが発火するイベント名（`actor.try_send` 等）を `logs_contain(..)` で観測する。
-//! これは pasta_lua 既存テスト（`tests/log/module_test.rs`・`loader/config_defaults_test.rs`）
-//! と同一の確立済み idiom（`#[tracing_test::traced_test]` + `logs_contain`）に倣う。
 //!
 //! ## ゼロコスト/バイト不変について
 //! `tracing::{trace,debug}!` は **無効時（subscriber 非装着）にゼロコスト**である（`tracing`
@@ -29,7 +23,7 @@ use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use pasta::actor::marshaling::{default_204, marshal_get_with_timeout, marshal_notify};
 use pasta::actor::teardown::teardown_via_sender;
 
-/// marshaling シーム（GET）: try_send / recv / reply（値到達）のログ点が発火する（R10.4）。
+/// marshaling シーム（GET）: try_send / recv / reply（値到達）のログ点が発火する。
 #[tracing_test::traced_test]
 #[test]
 fn get_path_emits_try_send_recv_and_reply_seams() {
@@ -56,7 +50,7 @@ fn get_path_emits_try_send_recv_and_reply_seams() {
     );
 }
 
-/// marshaling シーム（GET drop→204）: reply drop が `actor.drop` ログ点を発火する（R10.4/R5.3）。
+/// marshaling シーム（GET drop→204）: reply drop が `actor.drop` ログ点を発火する。
 #[tracing_test::traced_test]
 #[test]
 fn get_reply_drop_emits_drop_seam_and_204() {
@@ -78,7 +72,7 @@ fn get_reply_drop_emits_drop_seam_and_204() {
     );
 }
 
-/// marshaling シーム（GET timeout→204）: 閾値超過が `actor.timeout` ログ点を発火する（R10.4/R5.7）。
+/// marshaling シーム（GET timeout→204）: 閾値超過が `actor.timeout` ログ点を発火する。
 #[tracing_test::traced_test]
 #[test]
 fn get_timeout_emits_timeout_seam_and_204() {
@@ -103,7 +97,7 @@ fn get_timeout_emits_timeout_seam_and_204() {
     );
 }
 
-/// marshaling シーム（NOTIFY）: try_send ログ点が発火する（R10.4/R5.2）。
+/// marshaling シーム（NOTIFY）: try_send ログ点が発火する。
 #[tracing_test::traced_test]
 #[test]
 fn notify_path_emits_try_send_seam() {
@@ -117,7 +111,7 @@ fn notify_path_emits_try_send_seam() {
     );
 }
 
-/// teardown シーム: Stop 送信→done ack が `actor.stop` / `actor.done` ログ点を発火する（R10.4/R7）。
+/// teardown シーム: Stop 送信→done ack が `actor.stop` / `actor.done` ログ点を発火する。
 #[tracing_test::traced_test]
 #[test]
 fn teardown_emits_stop_and_done_seams() {

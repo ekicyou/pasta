@@ -2,15 +2,14 @@
 //!
 //! 3 種の設置先（300 文字超の ASCII ／ 非 ANSI ／ 両方）それぞれで、本番経路である
 //! `PastaLoader::load` が完走し、内蔵スクリプト・利用者スクリプト・トランスパイル済み
-//! シーンモジュールの 3 層が解決されることを検証する
-//! （要件 1.1 / 1.2 / 1.3 / 1.4 / 2.1 / 2.2 / 6.1 / 6.2 / 6.7）。
+//! シーンモジュールの 3 層が解決されることを検証する。
 //!
 //! あわせて、解決済みモジュールのチャンク識別子が拡張長プレフィックスを含まない
-//! 検索パス由来の UTF-8 文字列であること（要件 3.7 / 3.8）と、未検出エラーの文言が
-//! 候補パスを非 ASCII 文字ごと欠落なく含むこと（要件 1.5 / 2.3）を確認する。
+//! 検索パス由来の UTF-8 文字列であることと、未検出エラーの文言が
+//! 候補パスを非 ASCII 文字ごと欠落なく含むことを確認する。
 //!
-//! `#[ignore]` は付けない（要件 6.6: 常時実行）。`PASTA_DEBUG` の中和は
-//! `tests/common` の `#[ctor]` ガードが担う（要件 6.4）。
+//! `#[ignore]` は付けない。`PASTA_DEBUG` の中和は
+//! `tests/common` の `#[ctor]` ガードが担う。
 
 use crate::common;
 
@@ -22,7 +21,7 @@ use std::path::Path;
 /// 利用者スクリプト層の解決を確かめるために `scripts/` へ置く追加モジュール。
 const PROBE_MODULE: &str = "pasta_path_probe";
 
-/// 非 ASCII のファイル名を持つシーンソース（設計の例に従う）。
+/// 非 ASCII のファイル名を持つシーンソース。
 const NON_ASCII_SCENE_FILE: &str = "dic/会話.pasta";
 
 /// `NON_ASCII_SCENE_FILE` から生成されるモジュール名（`dic/` を落として `pasta.scene.` を冠する）。
@@ -96,11 +95,11 @@ fn assert_module_loaded(runtime: &PastaLuaRuntime, module: &str) {
     }
 }
 
-/// 設置先 `base_dir` について、本仕様が保証すべきモジュール解決の性質をすべて検証する。
+/// 設置先 `base_dir` について、モジュール解決の性質をすべて検証する。
 fn assert_module_resolution_is_path_shape_independent(base_dir: &Path) {
     install_ghost(base_dir);
 
-    // 要件 1.1 / 1.2 / 2.1 / 2.2: 本番経路のロードが設置パスの形に依存せず完走する。
+    // 本番経路のロードが設置パスの形に依存せず完走する。
     let runtime = PastaLoader::load(base_dir).unwrap_or_else(|e| {
         panic!(
             "設置パスの形に依存せずロードは成功するべき\n  設置先: {}\n  エラー: {e}",
@@ -108,23 +107,23 @@ fn assert_module_resolution_is_path_shape_independent(base_dir: &Path) {
         )
     });
 
-    // 要件 1.4: 内蔵スクリプト・シーンモジュールの 2 層は起動シーケンス中に解決される。
+    // 内蔵スクリプト・シーンモジュールの 2 層は起動シーケンス中に解決される。
     assert_module_loaded(&runtime, BUILTIN_MODULE);
     assert_module_loaded(&runtime, ASCII_SCENE_MODULE);
 
-    // 要件 2.1 / 3.8: モジュール名に非 ASCII を含むシーンも解決される。
+    // モジュール名に非 ASCII を含むシーンも解決される。
     assert_module_loaded(&runtime, NON_ASCII_SCENE_MODULE);
 
-    // 要件 1.4: 利用者スクリプト層。未ロードの追加モジュールを検索パスから解決させる。
+    // 利用者スクリプト層。未ロードの追加モジュールを検索パスから解決させる。
     let probe_source = resolve_probe_chunk_source(&runtime);
 
-    // 要件 3.7: 長パス対応のための内部表現（拡張長プレフィックス）を露出させない。
+    // 長パス対応のための内部表現（拡張長プレフィックス）を露出させない。
     assert!(
         !probe_source.contains(r"\\?\") && !probe_source.contains("//?/"),
         "チャンク識別子に拡張長プレフィックスが露出している: {probe_source}"
     );
 
-    // 要件 3.7 / 3.8: チャンク識別子は検索パス由来の UTF-8 文字列（`@` + 候補パス）である。
+    // チャンク識別子は検索パス由来の UTF-8 文字列（`@` + 候補パス）である。
     let expected_source = format!(
         "@{}/scripts/{PROBE_MODULE}.lua",
         to_search_path_string(base_dir)
@@ -134,7 +133,7 @@ fn assert_module_resolution_is_path_shape_independent(base_dir: &Path) {
         "チャンク識別子が検索パス由来の UTF-8 文字列になっていない"
     );
 
-    // 要件 1.5 / 2.3: 未検出エラーは候補パスを含み、非 ASCII 文字を欠落・置換しない。
+    // 未検出エラーは候補パスを含み、非 ASCII 文字を欠落・置換しない。
     let not_found = runtime
         .exec("return require(\"pasta_absent_module_marker\")")
         .expect_err("存在しないモジュールの `require` は失敗するべき")
@@ -156,7 +155,7 @@ fn assert_module_resolution_is_path_shape_independent(base_dir: &Path) {
     }
 }
 
-/// 要件 1.1 / 1.3 / 6.1: 300 文字超の ASCII 設置パス。
+/// 300 文字超の ASCII 設置パス。
 #[test]
 fn long_ascii_install_path_resolves_all_layers() {
     let temp = tempfile::TempDir::new().expect("一時ディレクトリの作成に失敗");
@@ -171,7 +170,7 @@ fn long_ascii_install_path_resolves_all_layers() {
     assert_module_resolution_is_path_shape_independent(&base_dir);
 }
 
-/// 要件 2.1 / 6.2 / 6.7: ANSI コードページ外の文字を含む設置パス。
+/// ANSI コードページ外の文字を含む設置パス。
 #[test]
 fn non_ansi_install_path_resolves_all_layers() {
     let temp = tempfile::TempDir::new().expect("一時ディレクトリの作成に失敗");
@@ -181,7 +180,7 @@ fn non_ansi_install_path_resolves_all_layers() {
     assert_module_resolution_is_path_shape_independent(&base_dir);
 }
 
-/// 要件 2.2 / 6.1 / 6.2: 300 文字超かつ非 ANSI を兼ねる設置パス。
+/// 300 文字超かつ非 ANSI を兼ねる設置パス。
 #[test]
 fn long_and_non_ansi_install_path_resolves_all_layers() {
     let temp = tempfile::TempDir::new().expect("一時ディレクトリの作成に失敗");
@@ -203,8 +202,7 @@ fn long_and_non_ansi_install_path_resolves_all_layers() {
     assert_module_resolution_is_path_shape_independent(&base_dir);
 }
 
-/// `package.path` の区切りの `;` を含むフォルダのゴーストは、専用の読み込みエラーになる
-/// （要件 4.1・4.4）。
+/// `package.path` の区切りの `;` を含むフォルダのゴーストは、専用の読み込みエラーになる。
 #[test]
 fn ghost_dir_with_semicolon_is_rejected() {
     let temp = tempfile::TempDir::new().expect("一時ディレクトリの作成に失敗");
@@ -229,7 +227,7 @@ fn ghost_dir_with_semicolon_is_rejected() {
     assert!(msg.contains("';'") && msg.contains(&expected_path), "{msg}");
 }
 
-/// `lua_search_paths` の項目の `;`・`?` は、専用の読み込みエラーになる（要件 4.2・4.4）。
+/// `lua_search_paths` の項目の `;`・`?` は、専用の読み込みエラーになる。
 #[test]
 fn lua_search_path_entry_with_semicolon_or_question_is_rejected() {
     for (entry, want) in [("lib;x", ';'), ("lib?", '?')] {

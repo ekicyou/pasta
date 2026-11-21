@@ -1,7 +1,4 @@
 //! Integration tests for @pasta_log module registration.
-//!
-//! These tests verify that @pasta_log is properly integrated into
-//! PastaLuaRuntime initialization sequences.
 
 use pasta_lua::context::TranspileContext;
 use pasta_lua::runtime::{PastaLuaRuntime, RuntimeConfig};
@@ -164,7 +161,6 @@ fn test_pasta_log_without_pasta_logger() {
     let runtime = PastaLuaRuntime::with_config(ctx, RuntimeConfig::new())
         .expect("Runtime creation should succeed");
 
-    // No PastaLogger set, should still work without error
     assert!(runtime.logger().is_none());
 
     runtime

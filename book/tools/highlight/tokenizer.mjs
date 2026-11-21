@@ -1,25 +1,22 @@
-// tokenizer.mjs — PastaTokenizer（タスク 2.2 / 要件 1.1, 1.3, 5.1, 5.2, 5.3, 6.2）。
+// tokenizer.mjs — PastaTokenizer。
 //
 // pasta 文法（source.pasta・SSOT・読み取り専用）と vendor lua 文法（source.lua）を
 // oniguruma WASM 上の vscode-textmate でロードし、テキストを行単位トークナイズする。
 //
-// 二段トークナイズ（核心）:
-//   pasta 文法は lua-code-block に `include: source.lua` を持たない（改変不可・5.2）。
+// 二段トークナイズ:
+//   pasta 文法は lua-code-block に `include: source.lua` を持たない（改変不可）。
 //   よって pasta パスで `meta.embedded.block.lua.content` 区間を検出し、その内部テキストを
-//   vendor lua 文法で再トークナイズして lua スコープ付きトークンへ差し替える（1.3）。
+//   vendor lua 文法で再トークナイズして lua スコープ付きトークンへ差し替える。
 //   lua 側も行間 ruleStack を引き回す（複数行 lua 文字列の跨ぎを正しく着色）。
 //   差し替え時は lua 区間トークンの行内オフセットを元行オフセットへ正規化して返す。
 //
-// 設計根拠: design.md「PastaTokenizer」Service Interface / Implementation Notes、
-//          research §8.1（vscode-textmate/oniguruma 利用法）・§8.6（二段トークナイズ採用）。
-//
-// 契約（design Service Interface）:
+// 契約:
 //   Pre : load() resolve 済み。text は改行 `\n`（`\r` を行文字列に含めない）。
 //   Post: 行数と返り配列長が一致。各 TokenSpan は行を被覆。入れ子 lua 区間は lua スコープを持つ。
-//   Inv : 同一 text → 同一トークン列（決定論・6.4 を支える）。文法ファイルを変更しない（5.2）。
+//   Inv : 同一 text → 同一トークン列（決定論）。文法ファイルを変更しない。
 //
-// 失敗（6.2）: WASM init／文法ロード／パース失敗・文法ファイル不在は例外を送出する。
-//   process.exit はしない（CLI 層＝後続 3.1 が exit 1 する設計）。
+// 失敗: WASM init／文法ロード／パース失敗・文法ファイル不在は例外を送出する。
+//   process.exit はしない（CLI 層が exit 1 する）。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,7 +38,7 @@ function getOnigLib() {
     bookDir,
     'node_modules/vscode-oniguruma/release/onig.wasm',
   );
-  // 不在時はここで例外（6.2: 必須 build-time 依存欠落）。
+  // 不在時はここで例外（必須 build-time 依存欠落）。
   const wasmBin = fs.readFileSync(wasmPath).buffer;
   onigLibPromise = oniguruma.loadWASM(wasmBin).then(() => ({
     createOnigScanner: (patterns) => new oniguruma.OnigScanner(patterns),
@@ -51,7 +48,7 @@ function getOnigLib() {
 }
 
 // *.json 文法を必ず *.json パス付きで parseRawGrammar に渡す（plist 誤判定回避）。
-// 不在・パース失敗はここで例外（6.2）。
+// 不在・パース失敗はここで例外。
 function loadRawGrammar(filePath) {
   const content = fs.readFileSync(filePath, 'utf8'); // 不在で ENOENT 例外
   const raw = vsctm.parseRawGrammar(content, filePath);
@@ -106,7 +103,7 @@ function clampSpansToLine(tokens, line, fallbackScope) {
 
 /**
  * PastaTokenizer を生成する factory。
- * `load(paths)` → `tokenizeText(text)` の契約（design Service Interface）を満たす。
+ * `load(paths)` → `tokenizeText(text)` の契約を満たす。
  *
  * @returns {{
  *   load: (paths: {pasta:string, lua:string}) => Promise<void>,
@@ -123,7 +120,7 @@ export function createPastaTokenizer() {
     if (!paths || typeof paths.pasta !== 'string' || typeof paths.lua !== 'string') {
       throw new Error('load(paths): paths.pasta と paths.lua（*.json）が必要です');
     }
-    // 不在・不正は loadRawGrammar 内で例外（6.2）。WASM init 失敗も例外。
+    // 不在・不正は loadRawGrammar 内で例外。WASM init 失敗も例外。
     const onigLib = Promise.resolve(getOnigLib());
     const rawByScope = new Map();
     const pastaRaw = loadRawGrammar(paths.pasta);
@@ -157,11 +154,6 @@ export function createPastaTokenizer() {
     }
   }
 
-  // 二段トークナイズ本体。
-  // 1) pasta 文法で全行をトークナイズ（lua ブロック begin/end の複数行 state を ruleStack で維持）。
-  // 2) meta.embedded.block.lua.content を含むトークン区間 = lua 本体を行ごとに収集。
-  // 3) lua 本体テキストを行配列として vendor lua 文法で再トークナイズ（lua 側 ruleStack 継続）。
-  // 4) 再トークナイズ結果を、元行内の lua 区間オフセットへ正規化して pasta 行へ差し戻す。
   function tokenizeText(text) {
     ensureLoaded();
     const lines = text.split('\n');

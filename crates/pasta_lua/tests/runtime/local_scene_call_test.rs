@@ -5,15 +5,12 @@
 //!    resolves local scenes correctly through the finalize path (Path B).
 //! 2. Duplicate local scenes (same name) are resolved via random selection.
 //! 3. Prefix matching correctly resolves partial local scene names.
-//!
-//! # Requirements Coverage
-//! - Req 4.1: E2E integration tests for local scene call
 
 use crate::common;
 use common::e2e_helpers::{create_runtime_with_finalize, transpile};
 
 // ============================================================================
-// Task 5.2: Simple local scene call test
+// Simple local scene call test
 // ============================================================================
 
 /// Verify that a local scene defined in DSL can be resolved and executed
@@ -35,7 +32,6 @@ fn test_local_scene_call_simple() {
         .exec()
         .unwrap();
 
-    // Verify SCENE.search finds the local scene via finalize path
     let found: bool = lua
         .load(
             r#"
@@ -55,7 +51,7 @@ fn test_local_scene_call_simple() {
 }
 
 // ============================================================================
-// Task 5.3: Duplicate local scene random selection test
+// Duplicate local scene random selection test
 // ============================================================================
 
 /// Verify that duplicate local scenes (same name) can both be resolved
@@ -79,7 +75,6 @@ fn test_local_scene_call_duplicate_random_selection() {
         .exec()
         .unwrap();
 
-    // Call multiple times — both implementations should resolve without error
     let success: bool = lua
         .load(
             r#"
@@ -104,7 +99,7 @@ fn test_local_scene_call_duplicate_random_selection() {
 }
 
 // ============================================================================
-// Task 5.4: Prefix match search test
+// Prefix match search test
 // ============================================================================
 
 /// Verify that prefix matching resolves local scenes correctly
@@ -128,7 +123,6 @@ fn test_local_scene_call_prefix_match() {
         .exec()
         .unwrap();
 
-    // Prefix search "Head" should match one of Head0_1 or Head1_1
     let success: bool = lua
         .load(
             r#"

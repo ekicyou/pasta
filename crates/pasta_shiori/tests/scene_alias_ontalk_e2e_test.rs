@@ -1,7 +1,5 @@
 //! `＊会話` だけのゴーストがランダムトークを発行する SHIORI E2E テスト
 //!
-//! 仕様 `scene-name-alias` task 6.4（requirements 1.2, 1.5, 5.6, 10.2）。
-//!
 //! フィクスチャ `tests/fixtures/scene_alias_ontalk/` は `＊会話` を 2 つだけ持ち `＊OnTalk` を持たない。
 //! SHIORI として読み込み、OnBoot の後に X-Pasta-Time で時刻を固定した OnSecondChange を送って
 //! 仮想ディスパッチャの次回トーク時刻を進め、OnTalk の機会に `＊会話` の台詞が出ることを確かめる。
@@ -53,14 +51,14 @@ fn on_second_change(shiori: &mut PastaShiori, time: &str) -> ShioriResponse {
     )
 }
 
-/// 既定の別名表：`＊会話` の 2 シーンが OnTalk の候補として順に発行される（1.2, 10.2）。
-/// 発行条件は従来どおり（初回は次回トーク時刻の設定だけ・間隔未到達では出ない。1.5）。
+/// 既定の別名表：`＊会話` の 2 シーンが OnTalk の候補として順に発行される。
+/// 発行条件は既定どおり（初回は次回トーク時刻の設定だけ・間隔未到達では出ない）。
 #[test]
 fn default_alias_table_issues_kaiwa_as_random_talk() {
     assert_kaiwa_issued_as_random_talk("");
 }
 
-/// 見出しだけの `[scene.alias]` は既定の表のまま：`＊会話` が OnTalk になる（recommend-menu-scenes 2.3）
+/// 見出しだけの `[scene.alias]` は既定の表のまま：`＊会話` が OnTalk になる
 #[test]
 fn header_only_alias_table_issues_kaiwa_as_random_talk() {
     assert_kaiwa_issued_as_random_talk("\n[scene.alias]\n");
@@ -95,7 +93,7 @@ fn assert_kaiwa_issued_as_random_talk(extra_toml: &str) {
     assert_eq!(seen, expected, "both ＊会話 scenes must be issued");
 }
 
-/// `OnTalk = []` で既定の別名を消す：`＊会話` は「会話」のままで OnTalk は発行されない（5.6）
+/// `OnTalk = []` で既定の別名を消す：`＊会話` は「会話」のままで OnTalk は発行されない
 #[test]
 fn ontalk_alias_removed_does_not_issue_ontalk() {
     let (mut shiori, _temp) = load("\n[scene.alias]\nOnTalk = []\n");

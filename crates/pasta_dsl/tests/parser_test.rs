@@ -1,6 +1,4 @@
 //! パーサーモジュールの外部テスト
-//!
-//! Phase A: parser/mod.rs のインラインテストから外部化
 
 use pasta_dsl::ParseError;
 use pasta_dsl::parser::*;
@@ -96,7 +94,6 @@ fn test_parse_continue_action_line() {
     assert_eq!(scenes.len(), 1);
     let local_scene = &scenes[0].local_scenes[0];
     assert!(local_scene.items.len() >= 2);
-    // First item should be ActionLine, second should be ContinueAction
     assert!(matches!(
         local_scene.items[0],
         LocalSceneItem::ActionLine(_)
@@ -118,7 +115,7 @@ fn test_parse_code_block() {
 }
 
 // ========================================================================
-// SceneActorItem Tests (scene-actors-ast-support)
+// SceneActorItem Tests
 // ========================================================================
 
 #[test]
@@ -171,7 +168,6 @@ fn test_parse_scene_actors_csharp_enum_numbering() {
 
 #[test]
 fn test_parse_scene_actors_fullwidth_number() {
-    // 全角数字「＝１０」が正しくパースされることを確認
     let source = "＊挨拶\n　％さくら＝１０\n  さくら：こんにちは\n";
     let result = parse_str(source, "test.pasta");
     assert!(result.is_ok());
@@ -259,7 +255,6 @@ fn test_parse_scene_actors_complex_numbering() {
 
 #[test]
 fn test_parse_scene_actors_span_valid() {
-    // SceneActorItemのSpanが有効であることを確認
     let source = "＊挨拶\n　％さくら\n  さくら：こんにちは\n";
     let result = parse_str(source, "test.pasta");
     assert!(result.is_ok());
@@ -267,6 +262,5 @@ fn test_parse_scene_actors_span_valid() {
     let scenes = get_global_scene_scopes(&file);
     assert_eq!(scenes.len(), 1);
     assert_eq!(scenes[0].actors.len(), 1);
-    // Spanが有効であることを確認
     assert!(scenes[0].actors[0].span.is_valid());
 }

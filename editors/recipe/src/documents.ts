@@ -9,7 +9,7 @@ import { confirm3, notify } from "./dialog.ts";
 
 export interface Tab {
   id: number;
-  /** master からの相対・'/' 区切り。名前の変更で書き換える（6.4） */
+  /** master からの相対・'/' 区切り。名前の変更で書き換える */
   rel: string;
   /** URI は ghost-tab:/<id>（パスに依らない。名前の変更でモデルを作り直さない） */
   model: monaco.editor.ITextModel;
@@ -21,26 +21,26 @@ export interface Tab {
   viewState: monaco.editor.ICodeEditorViewState | null;
   /** 最後に求めた保存。保存はこの後ろへつなぎ、同じファイルへの書き込みを重ねない */
   saving: Promise<boolean>;
-  /** 最後に当てた解析の結果（.pasta だけ）。解析の失敗では前のものを残す（6.5） */
+  /** 最後に当てた解析の結果（.pasta だけ）。解析の失敗では前のものを残す */
   analysis: AnalysisResult | null;
   /** analysis を求めた時の model.getVersionId() */
   analysisVersion: number;
-  /** 外で変わって「読み直す／今の中身を残す」を待っているディスクの中身（10.3）。帯はタブごとに 1 つ */
+  /** 外で変わって「読み直す／今の中身を残す」を待っているディスクの中身。帯はタブごとに 1 つ */
   pending: TextFile | null;
 }
 
 export interface DocumentsHooks {
-  /** 保存の成功の後（9.2 の検査の求め） */
+  /** 保存の成功の後（検査の求め） */
   onSaved?(tab: Tab): void;
-  /** タブを閉じた後（7.6 の診断の一覧の片付け・閉じたファイルのシーンの読み直し） */
+  /** タブを閉じた後（診断の一覧の片付け・閉じたファイルのシーンの読み直し） */
   onClosed?(tab: Tab): void;
-  /** 新しい解析の結果を当てた後（ツリーのシーン 4.10・診断の一覧 7.3） */
+  /** 新しい解析の結果を当てた後（ツリーのシーン・診断の一覧） */
   onAnalyzed?(tab: Tab): void;
-  /** 名前の変更でタブの rel・言語を付け替えた後（診断の一覧の名前と 9.8 の除外を今の rel に揃える） */
+  /** 名前の変更でタブの rel・言語を付け替えた後（診断の一覧の名前と除外を今の rel に揃える） */
   onRenamed?(): void;
 }
 
-/** 書き換えが止まってから解析するまで（7.2） */
+/** 書き換えが止まってから解析するまで */
 const ANALYZE_DELAY_MS = 200;
 
 const baseName = (rel: string) => rel.slice(rel.lastIndexOf("/") + 1);
@@ -72,7 +72,7 @@ export class Documents {
       const tab = this.tabs.find((t) => t.model === model);
       return tab?.analysis && tab.analysisVersion === model.getVersionId() ? tab.analysis.tokens : null;
     };
-    // Ctrl+S はエディタの外に焦点があっても今のタブを保存する（5.6）。自動では保存しない（5.11）
+    // Ctrl+S はエディタの外に焦点があっても今のタブを保存する。自動では保存しない
     document.addEventListener("keydown", (e) => {
       if (!e.ctrlKey || e.altKey || e.shiftKey || e.key.toLowerCase() !== "s") return;
       e.preventDefault();
@@ -82,7 +82,7 @@ export class Documents {
     });
   }
 
-  /** 同じファイルのタブがあればそこへ（5.4）。無ければ読んで開く。UTF-8 でない等は理由を出して開かない（5.3） */
+  /** 同じファイルのタブがあればそこへ。無ければ読んで開く。UTF-8 でない等は理由を出して開かない */
   async open(rel: string, pos?: monaco.IPosition): Promise<Tab | null> {
     if (this.#switching) return null;
     let tab = findSame(this.tabs, rel);
@@ -100,11 +100,11 @@ export class Documents {
       tab = findSame(this.tabs, rel);
       if (!tab) {
         const id = this.#nextId++;
-        // Monaco は中身から改行（CRLF・LF）を決め、getValue はその改行で返す（5.7）
+        // Monaco は中身から改行（CRLF・LF）を決め、getValue はその改行で返す
         const model = monaco.editor.createModel(file.text, languageOf(rel), monaco.Uri.from({ scheme: "ghost-tab", path: `/${id}` }));
         const opened: Tab = { id, rel, model, diskText: file.text, diskBom: file.bom, deleted: false, savedVersionId: model.getAlternativeVersionId(), viewState: null, saving: Promise.resolve(true), analysis: null, analysisVersion: -1, pending: null };
         const runner = new CoalescingRunner(() => this.#analyze(opened), ANALYZE_DELAY_MS, globalThis);
-        // 解析は .pasta だけ（8.3）。言語は名前の変更（6.4）で変わりうるので、そのつど見る
+        // 解析は .pasta だけ。言語は名前の変更で変わりうるので、そのつど見る
         const request = () => {
           if (model.getLanguageId() === "pasta") runner.request();
         };
@@ -140,7 +140,7 @@ export class Documents {
     this.#render();
   }
 
-  /** モデルの改行のまま・開いたときの BOM のまま書く（5.7）。失敗は理由を出し、中身と印を残す（5.8） */
+  /** モデルの改行のまま・開いたときの BOM のまま書く。失敗は理由を出し、中身と印を残す */
   save(tab: Tab): Promise<boolean> {
     // 移る途中の保存は、書く時にどちらの master かが決まらないので受けない（3 択で保存しないを選んだ後の Ctrl+S など）
     if (this.#switching) return Promise.resolve(false);
@@ -171,7 +171,7 @@ export class Documents {
     return true;
   }
 
-  /** 送った時の版と同じ結果だけを当てる。失敗は前の結果と波線を残す（6.5・7.2・7.7） */
+  /** 送った時の版と同じ結果だけを当てる。失敗は前の結果と波線を残す */
   async #analyze(tab: Tab): Promise<void> {
     if (tab.model.isDisposed()) return; // 閉じた後に残った求め
     const version = tab.model.getVersionId();
@@ -189,7 +189,7 @@ export class Documents {
     this.#hooks.onAnalyzed?.(tab);
   }
 
-  /** rename_entry の結果でタブの rel を付け替える。モデルはそのままなので未保存の書き換えと取り消しの履歴が残る（4.15） */
+  /** rename_entry の結果でタブの rel を付け替える。モデルはそのままなので未保存の書き換えと取り消しの履歴が残る */
   renamed(oldRel: string, newRel: string): void {
     const moves = retargetTabs(this.tabs.map((t) => ({ id: t.id, rel: t.rel, dirty: isDirty(t) })), oldRel, newRel);
     for (const tab of this.tabs) {
@@ -204,7 +204,7 @@ export class Documents {
     this.#hooks.onRenamed?.();
   }
 
-  /** 全タブをディスクと比べて 5.2 の判定を当てる（10.2・10.3・10.4・10.6）。呼びが重なっても 1 つずつ走る */
+  /** 全タブをディスクと比べて外の変更の判定を当てる。呼びが重なっても 1 つずつ走る */
   applyExternal(): Promise<void> {
     const run = () => this.#applyExternal();
     this.#external = this.#external.then(run, run);
@@ -215,7 +215,7 @@ export class Documents {
     let files: Promise<string[]> | null = null;
     let changed = false; // 関係の無い知らせではタブと帯を描き直さない（焦点を落とさない）
     for (const tab of [...this.tabs]) {
-      await tab.saving.catch(() => {}); // 自分の保存の途中の中身を外の変更と取り違えない（10.6）
+      await tab.saving.catch(() => {}); // 自分の保存の途中の中身を外の変更と取り違えない
       if (tab.model.isDisposed()) continue;
       let disk: DiskState;
       try {
@@ -243,7 +243,7 @@ export class Documents {
         changed ||= !!tab.pending || tab.deleted;
         tab.pending = null;
         if (tab.deleted) {
-          // 消えた後に同じ中身で戻ってきた。今のディスクの BOM で揃えて未保存でなくする（5.7）
+          // 消えた後に同じ中身で戻ってきた。今のディスクの BOM で揃えて未保存でなくする
           tab.diskText = disk.text;
           tab.diskBom = disk.bom;
           tab.deleted = false;
@@ -256,12 +256,12 @@ export class Documents {
     this.#renderNotices();
   }
 
-  /** ディスクの中身へ取り消せる形で置き換え、未保存でなくする（10.2） */
+  /** ディスクの中身へ取り消せる形で置き換え、未保存でなくする */
   #reload(tab: Tab, disk: TextFile): void {
     const model = tab.model;
     model.pushStackElement();
     model.pushEditOperations([], [{ range: model.getFullModelRange(), text: disk.text }], () => null);
-    // 外で改行が変わったら改行も揃える（pushEOL も取り消せる・5.7）
+    // 外で改行が変わったら改行も揃える（pushEOL も取り消せる）
     const eol = disk.text.includes("\r\n") ? monaco.editor.EndOfLineSequence.CRLF : monaco.editor.EndOfLineSequence.LF;
     if (model.getEndOfLineSequence() !== eol) model.pushEOL(eol);
     model.pushStackElement();
@@ -290,7 +290,7 @@ export class Documents {
     if (tab === this.active) this.#editor.focus();
   }
 
-  /** 未保存なら 3 択（5.9）。閉じたら true */
+  /** 未保存なら 3 択。閉じたら true */
   async close(tab: Tab): Promise<boolean> {
     if (needsConfirm([{ id: tab.id, rel: tab.rel, dirty: isDirty(tab) }])) {
       const choice = await confirm3(`${baseName(tab.rel)} の変更を保存しますか？`);
@@ -306,7 +306,7 @@ export class Documents {
       if (next) this.activate(next);
       else this.#editor.setModel(null);
     }
-    monaco.editor.setModelMarkers(tab.model, "pasta", []); // 波線を消す（7.6）
+    monaco.editor.setModelMarkers(tab.model, "pasta", []); // 波線を消す
     tab.model.dispose();
     tab.pending = null;
     this.#render();
@@ -315,7 +315,7 @@ export class Documents {
     return true;
   }
 
-  /** 別のゴーストを開く・窓を閉じる前の 1 回の 3 択（保存する＝未保存を全部保存し、失敗した所で止める）。進めてよければ true（2.8・5.10） */
+  /** 別のゴーストを開く・窓を閉じる前の 1 回の 3 択（保存する＝未保存を全部保存し、失敗した所で止める）。進めてよければ true */
   async confirmUnsaved(): Promise<boolean> {
     const refs = this.tabs.map((t) => ({ id: t.id, rel: t.rel, dirty: isDirty(t) }));
     if (!needsConfirm(refs)) return true;
@@ -375,7 +375,7 @@ export class Documents {
     );
   }
 
-  /** 外で変わった未保存のタブごとの帯（10.3）。名前はディスクから来るので textContent だけで書く */
+  /** 外で変わった未保存のタブごとの帯。名前はディスクから来るので textContent だけで書く */
   #renderNotices(): void {
     for (const [tab, el] of this.#noticeEls) {
       if (tab.pending && this.tabs.includes(tab)) continue;

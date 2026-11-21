@@ -7,22 +7,17 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// 除外パターン（ディレクトリ）
 const EXCLUDED_DIRS: &[&str] = &["profile", "var"];
 
-/// 除外パターン（ファイル）
 const EXCLUDED_FILES: &[&str] = &["updates2.dau", "updates.txt", "developer_options.txt"];
 
-/// ファイル情報
 #[derive(Debug, Clone)]
 struct FileEntry {
     /// 相対パス（スラッシュ区切り）
     path: String,
     /// MD5 ハッシュ（32文字小文字16進数）
     md5: String,
-    /// ファイルサイズ（バイト）
     size: u64,
-    /// ファイル更新日時
     modified: SystemTime,
 }
 
@@ -113,7 +108,6 @@ pub(crate) fn generate_update_files(
     if !entries.is_empty() {
         generate_updates_txt(root_dir, &entries)?;
 
-        // ghost/master が存在する場合、updates.txt をそこにもコピー
         let ghost_master = root_dir.join("ghost/master");
         if ghost_master.is_dir() {
             let from = root_dir.join("updates.txt");
@@ -150,7 +144,6 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
     Ok(entries)
 }
 
-/// 再帰的にファイルを収集
 fn collect_files_recursive(
     root_dir: &Path,
     current_dir: &Path,
@@ -205,8 +198,6 @@ fn collect_files_recursive(
     Ok(())
 }
 
-/// ファイルの MD5 ハッシュを計算
-///
 /// SSP 仕様準拠の非暗号学的ファイル変更検出用途。認証・署名には使用しない。
 fn calculate_md5(path: &Path) -> io::Result<String> {
     let mut context = md5::Context::new();
@@ -215,7 +206,6 @@ fn calculate_md5(path: &Path) -> io::Result<String> {
     Ok(format!("{:032x}", digest))
 }
 
-/// updates.txt を生成
 /// フォーマット (Version 3):
 ///   1行目: `charset,UTF-8`
 ///   以降: `file,<filepath>\x01<md5>\x01size=<bytes>\x01date=<YYYY-MM-DDTHH:MM:SS>\x01<CRLF>`
@@ -224,7 +214,6 @@ fn generate_updates_txt(root_dir: &Path, entries: &[FileEntry]) -> io::Result<()
     let write_err = |e| crate::path_error(e, "write", &output_path);
     let mut file = File::create(&output_path).map_err(write_err)?;
 
-    // charset ヘッダー（UTF-8 ゴースト向け）
     file.write_all(b"charset,UTF-8\r\n").map_err(write_err)?;
 
     for entry in entries {
@@ -302,8 +291,6 @@ mod tests {
 
     #[test]
     fn test_format_datetime() {
-        // 2026-03-15T16:12:47 UTC = 1773734000 + offset ... let's use a known epoch
-        // 1970-01-01T00:00:00 = 0
         assert_eq!(format_datetime(UNIX_EPOCH), "1970-01-01T00:00:00");
         // 2024-01-01T00:00:00 UTC = 1704067200
         let t = UNIX_EPOCH + std::time::Duration::from_secs(1704067200);
@@ -560,21 +547,18 @@ mod tests {
 
         generate_update_files(temp.path(), &[]).unwrap();
 
-        // ルートに生成
         assert!(temp.path().join("updates.txt").exists());
-        // ghost/master にもコピー
         assert!(
             ghost_dir.join("updates.txt").exists(),
             "updates.txt should be copied to ghost/master/"
         );
 
-        // 内容が同一であること
         let root_content = fs::read_to_string(temp.path().join("updates.txt")).unwrap();
         let copy_content = fs::read_to_string(ghost_dir.join("updates.txt")).unwrap();
         assert_eq!(root_content, copy_content);
     }
 
-    /// 回帰テスト（Req 5.2）: 自己展開先 `ghost/master/profile/pasta/pasta_scripts/`
+    /// 回帰テスト: 自己展開先 `ghost/master/profile/pasta/pasta_scripts/`
     /// 配下のフレームワークスクリプト・`.md5` マーカーが `updates.txt` の対象外であること。
     ///
     /// `EXCLUDED_DIRS` から `"profile"` が外れると、この test は
@@ -583,7 +567,6 @@ mod tests {
     fn test_updates_txt_excludes_self_deploy_dir() {
         let temp = TempDir::new().unwrap();
 
-        // 通常ファイル（同梱対象 = 含まれるべき）
         let ghost_master = temp.path().join("ghost/master");
         fs::create_dir_all(&ghost_master).unwrap();
         fs::write(ghost_master.join("descript.txt"), "desc").unwrap();
@@ -601,7 +584,6 @@ mod tests {
             .ghost_entries;
         let content = fs::read_to_string(temp.path().join("updates.txt")).unwrap();
 
-        // 通常ファイルは含まれる
         assert!(
             content.contains("file,ghost/master/descript.txt"),
             "descript.txt should be listed: {content:?}"
@@ -643,7 +625,7 @@ mod tests {
         out
     }
 
-    /// 特性化テスト（Req 8.1・8.4）: 同梱バルーンの無い固定フィクスチャについて、
+    /// 特性化テスト: 同梱バルーンの無い固定フィクスチャについて、
     /// ルートと `ghost/master` の updates.txt の全バイトが `date=` の値を除き期待値と一致する。
     ///
     /// 除外の仕組みを変える前に置き、後方互換が崩れたら落ちるようにする。
@@ -688,7 +670,7 @@ mod tests {
         }
     }
 
-    /// 相対パス完全一致の除外（Req 3.1・3.3・3.4）: `bal` を外すとルート直下の `bal/` だけが
+    /// 相対パス完全一致の除外: `bal` を外すとルート直下の `bal/` だけが
     /// 一覧から消え、`ghost/master/bal/` の同名フォルダとそれ以外のファイルは従来どおり載る。
     /// 階層付きの指定（`skin/bal2`）も同じく相対パスで一致したフォルダだけを外す。
     #[test]
@@ -735,7 +717,7 @@ mod tests {
             .collect()
     }
 
-    /// バルーン用 updates.txt（Req 3.2・4.1〜4.8・5.1・5.2）:
+    /// バルーン用 updates.txt:
     /// - `bal/updates.txt` の各行はバルーン基準の相対パスで、自分自身・`profile/`・`var/`・
     ///   `updates2.dau`・`developer_options.txt` を含まず、md5・size が実ファイルと一致する
     /// - 既存の `bal/updates.txt` は置き換わり、`bal/ghost/master/` があっても複製しない

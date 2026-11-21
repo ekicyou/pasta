@@ -1,17 +1,9 @@
-// scope-map-test.mjs — ScopeClassMapper（タスク 2.1 / 要件 1.2, 1.3, 2.1, 2.2, 2.3, 6.1）の
-// 自動検証。依存ゼロの自前 assert ハーネス（book/tools/bigram-index/build-index-test.mjs の
-// check(name, cond, detail) 様式）に倣う。
+// scope-map-test.mjs — ScopeClassMapper の自動検証。依存ゼロの自前 assert ハーネス
+// （book/tools/bigram-index/build-index-test.mjs の check(name, cond, detail) 様式）。
 //
-// 目的:
-//   scopesToClass(scopes) が TextMate スコープスタックを highlight.js 互換クラス
-//   （両テーマ light/navy で確実に着色され色衝突しない6色スロット）へ写像する純関数
-//   であることを、代表スコープ・lua スコープ・未マッチ・末尾優先・禁止クラス非使用・
-//   決定論の観点で実機検証する。
-//
-//   - RED  : scope-map.mjs 未実装ゆえ import が解決できず即失敗。
-//   - GREEN: scope-map.mjs 実装後、全ケース PASS で exit 0。
-//
-// 確定マッピングの根拠: research §8.2（実 CSS 色グループ検証済み）・design L292。
+// scopesToClass(scopes) が TextMate スコープスタックを highlight.js 互換クラス
+// （両テーマ light/navy で確実に着色され色衝突しない6色スロット）へ写像する純関数であることを、
+// 代表スコープ・lua スコープ・未マッチ・末尾優先・禁止クラス非使用・決定論の観点で検証する。
 
 import { scopesToClass, SCOPE_CLASS_TABLE } from './scope-map.mjs';
 
@@ -32,7 +24,7 @@ function check(name, cond, detail) {
 // テスト対象が公開すべき禁止クラス（navy 無色 / 同色衝突）。
 const FORBIDDEN_CLASSES = ['hljs-symbol', 'hljs-section', 'hljs-name'];
 
-// 採用が許される確実着色6スロット（design ScopeClassMapper / research §8.2）。
+// 採用が許される確実着色6スロット。
 const ALLOWED_CLASSES = new Set([
   'hljs-comment',  // gray
   'hljs-keyword',  // purple
@@ -47,7 +39,7 @@ const ALLOWED_CLASSES = new Set([
 ]);
 
 // =========================================================================
-// 1. 代表 pasta スコープ → 期待クラス（6色グループ・research §8.2 確定表）
+// 1. 代表 pasta スコープ → 期待クラス
 // =========================================================================
 log('--- pasta 代表スコープ → 期待クラス ---');
 // 各ケースは [説明, スコープ単体, 期待クラス]。tokenizeLine 由来は外→内のスタックだが
@@ -124,7 +116,7 @@ for (const [desc, scope, expected] of LUA_CASES) {
 log('');
 
 // =========================================================================
-// 4. 未マッチ → null（要件 6.1 プレーン）
+// 4. 未マッチ → null
 // =========================================================================
 log('--- 未マッチ → null（プレーン継続・6.1） ---');
 const NULL_CASES = [

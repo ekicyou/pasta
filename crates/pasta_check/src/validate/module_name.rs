@@ -1,4 +1,4 @@
-//! モジュール名を作り、辞書ファイル・辞書モジュールの重なりを分類する段（4.1〜4.4）。
+//! モジュール名を作り、辞書ファイル・辞書モジュールの重なりを分類する段。
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -6,7 +6,7 @@ use std::path::Path;
 use super::discovery::{DictFile, Discovered};
 use super::{Finding, FindingKind, msg};
 
-/// 判定はモジュール名だけで行う（4.4）。比べるのは大文字と小文字を畳んだ名前、報告は実際の名前と実物の綴り
+/// 判定はモジュール名だけで行う。比べるのは大文字と小文字を畳んだ名前、報告は実際の名前と実物の綴り
 pub(crate) fn check(discovered: &Discovered) -> Vec<Finding> {
     let pasta = by_module(&discovered.pasta);
     let lua = by_module(&discovered.lua);

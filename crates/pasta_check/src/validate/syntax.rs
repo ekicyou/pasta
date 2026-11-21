@@ -1,10 +1,10 @@
-//! 各辞書ファイルを pasta.dll と同じ関数で読み、最初の構文エラーと読めないファイルを報告する段（3.1〜3.4）。
+//! 各辞書ファイルを pasta.dll と同じ関数で読み、最初の構文エラーと読めないファイルを報告する段。
 
 use pasta_dsl::{ParseError, PastaFile};
 
 use super::{FileText, Finding, FindingKind, msg};
 
-/// 読めたファイルの構文木を、パスと組にして次の段に渡す。どのファイルで失敗しても残りを続ける（3.1）
+/// 読めたファイルの構文木を、パスと組にして次の段に渡す。どのファイルで失敗しても残りを続ける
 pub(crate) fn check(files: &[(String, FileText)]) -> (Vec<(String, PastaFile)>, Vec<Finding>) {
     let mut parsed = Vec::new();
     let mut findings = Vec::new();
@@ -33,7 +33,7 @@ pub(crate) fn check(files: &[(String, FileText)]) -> (Vec<(String, PastaFile)>, 
     (parsed, findings)
 }
 
-/// 位置は行の頭に出すので、parse_str の文言から pest の短い説明（末尾の `  = expected id` の行）だけを取る（7.1 の 1 行）
+/// 位置は行の頭に出すので、parse_str の文言から pest の短い説明（末尾の `  = expected id` の行）だけを取る
 pub fn syntax_finding(path: &str, e: ParseError) -> Finding {
     match e {
         ParseError::SyntaxError {

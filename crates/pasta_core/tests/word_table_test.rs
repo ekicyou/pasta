@@ -1,20 +1,17 @@
 //! 単語テーブルの外部テスト
 //!
-//! Phase A: registry/word_table.rs のインラインテストから外部化
 
 use pasta_core::WordTableError;
 use pasta_core::registry::{MockRandomSelector, WordDefRegistry, WordTable};
 
 fn create_test_registry() -> WordDefRegistry {
     let mut registry = WordDefRegistry::new();
-    // Global words
     registry.register_global(
         "挨拶",
         vec!["こんにちは".to_string(), "おはよう".to_string()],
     );
     registry.register_global("場所", vec!["東京".to_string()]);
     registry.register_global("場所_日本", vec!["大阪".to_string(), "京都".to_string()]);
-    // Local words
     registry.register_local("会話_1", "挨拶", vec!["やあ".to_string()]);
     registry.register_local("会話_1", "場所", vec!["ここ".to_string()]);
     registry
@@ -47,7 +44,6 @@ fn test_collect_word_candidates_global_exact() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let table = WordTable::from_word_def_registry(registry, selector);
 
-    // Exact match for global word
     let candidates = table.collect_word_candidates("", "挨拶").unwrap();
     assert_eq!(candidates.len(), 2);
     assert!(candidates.contains(&"こんにちは".to_string()));
@@ -60,9 +56,7 @@ fn test_collect_word_candidates_global_prefix() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let table = WordTable::from_word_def_registry(registry, selector);
 
-    // Prefix match: "場所" matches both "場所" and "場所_日本"
     let candidates = table.collect_word_candidates("", "場所").unwrap();
-    // Should get all 3 words merged (東京, 大阪, 京都)
     assert_eq!(candidates.len(), 3);
     assert!(candidates.contains(&"東京".to_string()));
     assert!(candidates.contains(&"大阪".to_string()));
@@ -77,10 +71,8 @@ fn test_collect_word_candidates_local_only() {
 
     // Local search only - does NOT include global words
     let candidates = table.collect_word_candidates("会話_1", "挨拶").unwrap();
-    // Should get ONLY local word (やあ)
     assert_eq!(candidates.len(), 1);
     assert!(candidates.contains(&"やあ".to_string()));
-    // Global words NOT included
     assert!(!candidates.contains(&"こんにちは".to_string()));
     assert!(!candidates.contains(&"おはよう".to_string()));
 }
@@ -91,7 +83,6 @@ fn test_collect_word_candidates_local_not_found_no_fallback() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let table = WordTable::from_word_def_registry(registry, selector);
 
-    // No local word for "場所" in module "別のモジュール"
     // Should NOT fall back to global - should return error
     let result = table.collect_word_candidates("別のモジュール", "場所");
     assert!(result.is_err());
@@ -116,7 +107,6 @@ fn test_collect_word_candidates_global_only() {
 
 #[test]
 fn test_collect_word_candidates_duplicate_entries_merge() {
-    // Test that duplicate entries are merged in collect_word_candidates
     let mut registry = WordDefRegistry::new();
     registry.register_global(
         "挨拶",
@@ -130,7 +120,6 @@ fn test_collect_word_candidates_duplicate_entries_merge() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let table = WordTable::from_word_def_registry(registry, selector);
 
-    // Should collect all 4 words before shuffling
     let candidates = table.collect_word_candidates("", "挨拶").unwrap();
     assert_eq!(candidates.len(), 4);
     assert!(candidates.contains(&"おはよう".to_string()));
@@ -159,7 +148,6 @@ fn test_search_word_global_exact() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Exact match for global word
     let result = table.search_word("", "挨拶");
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "こんにちは");
@@ -171,10 +159,8 @@ fn test_search_word_global_prefix() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Prefix match: "場所" matches both "場所" and "場所_日本"
     let result = table.search_word("", "場所");
     assert!(result.is_ok());
-    // Should get word from merged list (東京, 大阪, 京都)
     let word = result.unwrap();
     assert!(word == "東京" || word == "大阪" || word == "京都");
 }
@@ -185,10 +171,8 @@ fn test_search_word_local() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Fallback strategy: Local search found, global NOT included
     let result = table.search_word("会話_1", "挨拶");
     assert!(result.is_ok());
-    // Should get ONLY from local (やあ) - fallback strategy
     let word = result.unwrap();
     assert_eq!(word, "やあ");
 }
@@ -218,7 +202,6 @@ fn test_search_word_cache_sequential() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Sequential calls should return different words until exhausted
     let r1 = table.search_word("", "test").unwrap();
     let r2 = table.search_word("", "test").unwrap();
     let r3 = table.search_word("", "test").unwrap();
@@ -236,11 +219,9 @@ fn test_search_word_cache_reshuffle() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Exhaust cache
     let _ = table.search_word("", "test").unwrap();
     let _ = table.search_word("", "test").unwrap();
 
-    // Next call should reshuffle and start over
     let r3 = table.search_word("", "test").unwrap();
     assert_eq!(r3, "a"); // Back to first (no shuffle)
 }
@@ -255,7 +236,6 @@ fn test_cache_key_separation() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Different modules should have separate caches
     let r1 = table.search_word("mod1", "word").unwrap();
     let r2 = table.search_word("mod2", "word").unwrap();
 
@@ -275,17 +255,14 @@ fn test_local_does_not_match_global_prefix() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Global search should not include local entries
     let result = table.search_word("", "abc").unwrap();
     assert_eq!(result, "global_abc");
 }
 
 #[test]
 fn test_search_word_merge_duplicate_entries() {
-    // Test that multiple registrations of same key are merged at search time
     let mut registry = WordDefRegistry::new();
 
-    // Same global word name registered twice
     registry.register_global(
         "挨拶",
         vec!["おはよう".to_string(), "こんにちわ".to_string()],
@@ -298,11 +275,9 @@ fn test_search_word_merge_duplicate_entries() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Search for "挨拶" should find both entries and merge all 4 words
     let result = table.search_word("", "挨拶");
     assert!(result.is_ok());
 
-    // Verify that we get one of the 4 expected words
     let word = result.unwrap();
     assert!(
         word == "おはよう" || word == "こんにちわ" || word == "はろー" || word == "ぐっもーにん",
@@ -313,7 +288,6 @@ fn test_search_word_merge_duplicate_entries() {
 
 #[test]
 fn test_search_word_merge_duplicate_entries_all_words_reachable() {
-    // Test that sequential calls reach all 4 words from duplicate entries
     let mut registry = WordDefRegistry::new();
 
     registry.register_global(
@@ -328,16 +302,13 @@ fn test_search_word_merge_duplicate_entries_all_words_reachable() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Sequential calls should exhaust all 4 words
     let r1 = table.search_word("", "挨拶").unwrap();
     let r2 = table.search_word("", "挨拶").unwrap();
     let r3 = table.search_word("", "挨拶").unwrap();
     let r4 = table.search_word("", "挨拶").unwrap();
 
-    // Collect results
     let results = [r1, r2, r3, r4];
 
-    // All 4 words should be represented
     assert!(results.contains(&"おはよう".to_string()));
     assert!(results.contains(&"こんにちわ".to_string()));
     assert!(results.contains(&"はろー".to_string()));
@@ -346,7 +317,6 @@ fn test_search_word_merge_duplicate_entries_all_words_reachable() {
 
 #[test]
 fn test_search_word_merge_duplicate_local_entries() {
-    // Test that duplicate local entries are merged
     let mut registry = WordDefRegistry::new();
 
     registry.register_local("会話", "挨拶", vec!["やあ".to_string(), "よう".to_string()]);
@@ -359,7 +329,6 @@ fn test_search_word_merge_duplicate_local_entries() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Search for local word should find both entries
     let result = table.search_word("会話", "挨拶");
     assert!(result.is_ok());
 
@@ -389,7 +358,6 @@ fn test_replace_selector_clears_cache_keeps_entries() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // Consume part of the sequence
     assert_eq!(table.search_word("", "test").unwrap(), "a");
 
     // Replace the selector — cache must be cleared, entries preserved
@@ -456,7 +424,6 @@ fn test_collect_word_candidates_local_entry_with_empty_values() {
 
 #[test]
 fn test_search_word_merge_duplicate_with_global() {
-    // Test that duplicate global + global entries are all merged
     // Pattern: search for global, should get all 5 words (2 + 3)
     let mut registry = WordDefRegistry::new();
 
@@ -469,12 +436,10 @@ fn test_search_word_merge_duplicate_with_global() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    // All 5 calls should succeed
     let results: Vec<_> = (0..5)
         .map(|_| table.search_word("", "word").unwrap())
         .collect();
 
-    // Check all 5 words are reachable
     assert_eq!(results.len(), 5);
     assert!(results.contains(&"a".to_string()));
     assert!(results.contains(&"b".to_string()));

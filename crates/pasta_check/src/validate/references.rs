@@ -1,6 +1,6 @@
-//! 静的な飛び先の Call・選択肢を辞書のシーンと組み込みの名前で探し、動的な Call を数える段（6.1〜6.9）。
+//! 静的な飛び先の Call・選択肢を辞書のシーンと組み込みの名前で探し、動的な Call を数える段。
 //!
-//! 候補は辞書のシーンと組み込みの名前だけ。Lua の中身は読まない（6.9）。
+//! 候補は辞書のシーンと組み込みの名前だけ。Lua の中身は読まない。
 
 use std::collections::BTreeMap;
 
@@ -158,7 +158,7 @@ fn global_candidates(
     table.collect_scene_candidates("", &SceneRegistry::sanitize_name(key))
 }
 
-/// 文字列リテラルだけの式（括弧で囲んだものも）。実行時は書いた名前で `act:call_key` になる（6.2）
+/// 文字列リテラルだけの式（括弧で囲んだものも）。実行時は書いた名前で `act:call_key` になる
 fn string_literal(expr: &Expr) -> Option<&str> {
     match expr {
         Expr::String(key) => Some(key),
@@ -167,7 +167,7 @@ fn string_literal(expr: &Expr) -> Option<&str> {
     }
 }
 
-/// `On`・`script:` で始まるジャンプ先は SSP が別の意味で使うので見ない（6.5。sakura_builder.lua と同じ判定）
+/// `On`・`script:` で始まるジャンプ先は SSP が別の意味で使うので見ない（sakura_builder.lua と同じ判定）
 fn not_scene_choice(target: &str) -> bool {
     target.starts_with("On") || target.starts_with("script:")
 }

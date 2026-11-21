@@ -1,4 +1,4 @@
-//! 検査の核の入力と、pasta.toml・辞書の集め方のテスト（1.1・1.7・2.x・11.1）
+//! 検査の核の入力と、pasta.toml・辞書の集め方のテスト
 
 use std::collections::BTreeMap;
 
@@ -71,7 +71,7 @@ fn input_reads_camel_case_with_kind_tag() {
     assert!(matches!(missing, TomlSource::Missing));
 }
 
-// ---- pasta.toml の [loader]・[scene]（2.2・2.4・2.5・2.10） ----
+// ---- pasta.toml の [loader]・[scene] ----
 
 use pasta_check::validate::{Finding, FindingKind};
 
@@ -231,7 +231,7 @@ fn scene_type_errors_are_scene_alias_errors() {
     }
 }
 
-// ---- [actor.*.font] の書き間違い（actor-display-style 7.5） ----
+// ---- [actor.*.font] の書き間違い ----
 
 const UNKNOWN_COLOUR: &str = "[actor.\"おじさん\"] の font に知らない属性「colour」があります（書ける属性: color・name・height・bold・italic・underline・strike・sub・sup・outline・shadowcolor・shadowstyle）";
 const COLOR_ARRAY: &str = "[actor.\"おじさん\"] の font の color は文字列・整数・真偽値のどれかで、空にできません: 配列が書かれています";
@@ -432,7 +432,7 @@ fn same_strictness_as_pasta_dll() {
     }
 }
 
-// ---- 辞書ファイルと辞書モジュールの選び出し（2.1・2.3・2.6・2.7・2.8・11.8） ----
+// ---- 辞書ファイルと辞書モジュールの選び出し ----
 
 use pasta_check::validate::pasta_dll_paths;
 
@@ -634,7 +634,7 @@ fn no_dictionary_files_is_warning_on_pasta_toml() {
     assert!(!report.has_errors(), "{:?}", report.lines());
 }
 
-// ---- 辞書のパターンに一致するフォルダ（2.1〜2.7） ----
+// ---- 辞書のパターンに一致するフォルダ ----
 
 fn with_dirs(mut input: GhostInput, dirs: &[&str]) -> GhostInput {
     input.dirs = dirs.iter().map(|d| d.to_string()).collect();
@@ -681,15 +681,15 @@ fn folders_matching_patterns_are_errors_and_others_are_not() {
             "dic/x.pasta",
         ]
     );
-    // 一致したフォルダの中のファイルは今までどおり辞書ファイル（2.4）
+    // 一致したフォルダの中のファイルは今までどおり辞書ファイル
     assert_eq!(
         select_dictionary_files(&input),
         vec!["dic/sub/a.pasta", "dic/x.pasta/inner.pasta"]
     );
     let report = validate_ghost(&input, &BTreeMap::new());
-    // フォルダは辞書ファイルの数に入らない（2.5）
+    // フォルダは辞書ファイルの数に入らない
     assert_eq!(report.stats.dictionary_files, 2);
-    // 1 行の形と並び順（2.7）
+    // 1 行の形と並び順
     let lines = report.lines();
     let at = |p: &str| lines.iter().position(|l| l.starts_with(p)).unwrap();
     assert_eq!(

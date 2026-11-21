@@ -2,7 +2,7 @@
 //!
 //! アクション行・代入の右辺・式の中の動的参照が WORD トークンになり、
 //! 全角半角混在のマーカー列（`＠$x`・`@＄＊x`）でも位置が合い、
-//! 診断が出ないことを確認する（dynamic-word-reference 6.3, 7.10）。
+//! 診断が出ないことを確認する。
 
 use pasta_lsp::analysis::{AnalysisEngine, AnalysisResult, token_type};
 

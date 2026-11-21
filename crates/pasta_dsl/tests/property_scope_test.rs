@@ -1,7 +1,4 @@
 //! プロパティスコープ（`＄％prop`）のパーサーテスト
-//!
-//! Requirements 1.1〜1.6（プロパティスコープ修飾子と名前の文法）
-//! Requirements 6.1〜6.2（構文エラー報告）
 
 use pasta_dsl::parser::*;
 
@@ -141,7 +138,6 @@ fn test_property_scope_varref_followed_by_talk() {
     let scenes = get_global_scene_scopes(&file);
     let actions = find_actions_in_scene(scenes[0]);
 
-    // Should have VarRef then Talk
     let var_ref = actions.iter().find(|a| matches!(a, Action::VarRef { .. }));
     assert!(var_ref.is_some(), "Expected VarRef action");
     match var_ref.unwrap() {
@@ -291,7 +287,7 @@ fn test_property_scope_regression_global() {
     assert_eq!(var_sets[0].name.as_deref(), Some("var"));
 }
 
-// Req 5.3: ＄＝expr 式文が不変
+// ＄＝expr 式文が不変
 #[test]
 fn test_property_scope_regression_expr_statement() {
     let input = "＊テスト\n　＄＝1＋2\n";
@@ -303,7 +299,7 @@ fn test_property_scope_regression_expr_statement() {
     );
 }
 
-// Req 5.4: 行頭 ％ がアクター辞書マーカーとして不変
+// 行頭 ％ がアクター辞書マーカーとして不変
 #[test]
 fn test_property_scope_regression_actor_marker() {
     let input = "＊テスト\n　％さくら、うにゅう\n　さくら：テスト\n";
@@ -315,7 +311,7 @@ fn test_property_scope_regression_actor_marker() {
     );
 }
 
-// Req 4.2: 複数 ＄％ 参照を含むアクション行
+// 複数 ＄％ 参照を含むアクション行
 #[test]
 fn test_property_scope_multiple_inline_refs() {
     let input = "＊テスト\n　さくら：＄％a.name　と＄％b.name\n";

@@ -1,18 +1,18 @@
-// 動かす面の 2 つの欄（出力 4.2〜4.6／保存変数の表 6.2・6.3・6.6・6.7・7.11）。panels.ts の `.panel` を満たすだけで、押したことは DevActions へ渡す。
-// スクリプト・ログ・名前・値はディスクやゴーストから来るので textContent だけで書く（4.5）。
+// 動かす面の 2 つの欄（出力／保存変数の表）。panels.ts の `.panel` を満たすだけで、押したことは DevActions へ渡す。
+// スクリプト・ログ・名前・値はディスクやゴーストから来るので textContent だけで書く。
 import type { VarRow } from "./ipc.ts";
 import type { PanelSection } from "./panels.ts";
 
-/** 誤り・警告の行。色だけに頼らず頭の文字で見分ける（4.3） */
+/** 誤り・警告の行。色だけに頼らず頭の文字で見分ける */
 export const noticeLine = (level: "error" | "warning", text: string): string => `${level === "error" ? "誤り" : "警告"}: ${text}`;
 
-/** 進んでいる間は操作の名前を出す（4.6） */
+/** 進んでいる間は操作の名前を出す */
 export const outputHeading = (running: string | null): string => (running === null ? "出力" : `出力（実行中: ${running}）`);
 
 const KIND_LABELS: Record<VarRow["kind"], string> = { string: "文字列", number: "数", boolean: "真偽", table: "表" };
 export const kindLabel = (kind: VarRow["kind"]): string => KIND_LABELS[kind];
 
-/** 操作のボタンの読み上げの名前（11.4）。表の行は操作を出さない（6.3） */
+/** 操作のボタンの読み上げの名前。表の行は操作を出さない */
 export function rowActionLabels(row: VarRow): { edit: string; del: string } | null {
   return row.kind === "table" ? null : { edit: `＄＊${row.name} を書き換える`, del: `＄＊${row.name} を消す` };
 }
@@ -30,7 +30,7 @@ export class OutputPanel {
     slot.section.append(this.#log);
   }
 
-  /** 後ろへ足し、前の行は残す。足したら一番下へ送る（4.4） */
+  /** 後ろへ足し、前の行は残す。足したら一番下へ送る */
   append(lines: readonly string[], className?: string): void {
     for (const line of lines) {
       const div = document.createElement("div");
@@ -97,7 +97,7 @@ export class VariablesPanel {
     this.#render({ kind: "unreadable" });
   }
 
-  /** ゴーストの切り替えで前の表を消す（5.3） */
+  /** ゴーストの切り替えで前の表を消す */
   clear(): void {
     this.#render({ kind: "none" });
   }
@@ -107,7 +107,7 @@ export class VariablesPanel {
     // 書き換えた後の描き直しで焦点を body へ落とさない
     const focused = this.#body.contains(document.activeElement);
     this.#body.replaceChildren();
-    // 読めていない間は表も操作も出さない（7.11）
+    // 読めていない間は表も操作も出さない
     if (state.kind === "rows") {
       if (state.rows.length === 0) {
         const p = document.createElement("p");

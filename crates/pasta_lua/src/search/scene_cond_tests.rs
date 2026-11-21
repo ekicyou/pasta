@@ -1,4 +1,4 @@
-//! scene_cond の単体テスト（要件 1.1–1.11・7.1・7.3）
+//! scene_cond の単体テスト
 
 use super::CondOutcome::*;
 use super::*;
@@ -48,7 +48,7 @@ fn scene(attributes: Vec<SceneAttr>) -> SceneInfo {
     }
 }
 
-// --- parse_decimal（1.10） ---
+// --- parse_decimal ---
 
 #[test]
 fn parse_decimal_reads_half_width_decimal_only() {
@@ -63,7 +63,7 @@ fn parse_decimal_reads_half_width_decimal_only() {
     }
 }
 
-// --- 6 種の演算子 × 数（1.6） ---
+// --- 6 種の演算子 × 数 ---
 
 #[test]
 fn numbers_compare_by_value_for_all_operators() {
@@ -93,7 +93,7 @@ fn number_value_not_notation() {
     assert_eq!(eval(CmpOp::Lt, &num(1.0), SceneAttrValue::Float(1.5)), Pass);
 }
 
-// --- 半角十進の文字列は両辺で数（1.10） ---
+// --- 半角十進の文字列は両辺で数 ---
 
 #[test]
 fn decimal_strings_are_numbers_on_both_sides() {
@@ -125,7 +125,7 @@ fn full_width_digits_are_text() {
     assert_eq!(eval(CmpOp::Ge, &txt("３"), int(3)), NotNumber);
 }
 
-// --- 数でなければ ＝・≠ は文字列、大小は NotNumber（1.7・1.8） ---
+// --- 数でなければ ＝・≠ は文字列、大小は NotNumber ---
 
 #[test]
 fn non_numbers_compare_as_strings_for_eq_ne() {
@@ -157,7 +157,7 @@ fn other_values_equal_no_string() {
     assert_eq!(eval(CmpOp::Ne, &Operand::Other, text("x")), Pass);
 }
 
-// --- 値の無い変数は 0・空文字列（1.9・1.11） ---
+// --- 値の無い変数は 0・空文字列 ---
 
 #[test]
 fn nil_is_zero_or_empty_string() {
@@ -170,7 +170,7 @@ fn nil_is_zero_or_empty_string() {
     assert_eq!(eval(CmpOp::Eq, &Operand::Nil, text("春")), Fail);
 }
 
-// --- フラグ（1.4・1.5・1.10） ---
+// --- フラグ ---
 
 #[test]
 fn flag_rules() {
@@ -183,7 +183,7 @@ fn flag_rules() {
     assert_eq!(evaluate(&f, &Operand::Other), Pass);
 }
 
-// --- Lua の値の読み方（1.5・1.9・1.10・10.5） ---
+// --- Lua の値の読み方 ---
 
 #[test]
 fn operand_from_lua_values() {
@@ -209,14 +209,14 @@ fn operand_from_lua_values() {
 #[test]
 fn booleans_are_one_and_zero() {
     assert_eq!(eval(CmpOp::Eq, &num(1.0), int(1)), Pass);
-    // false は ＝０ を満たす（打ち消しの書き方。1.11）
+    // false は ＝０ を満たす
     let lua = Lua::new();
     let f = Operand::from_lua(lua.load("return false").eval().unwrap());
     assert_eq!(eval(CmpOp::Eq, &f, int(0)), Pass);
     assert_eq!(evaluate(&flag("＄x"), &f), Fail);
 }
 
-// --- 述語（1.1・1.2・1.3・7.1・7.3） ---
+// --- 述語 ---
 
 #[test]
 fn predicate_without_conditions_is_true_without_tables() {

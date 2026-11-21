@@ -52,20 +52,16 @@ pub trait SourceMapSink {
     /// Record that a scene declaration with deterministic join key `scene_join_key`
     /// spans `.pasta` source range `span`.
     ///
-    /// Default is a no-op so implementors that only provide `record_line` remain
-    /// backward-non-destructive: they keep working without overriding this method
-    /// (Requirements 3.4). The consumer-side `MapBuilderSink` in
-    /// `debug/source_map/` does override it to collect scene records. The
-    /// line-mapping record stream produced by [`record_line`](SourceMapSink::record_line)
-    /// / [`record`](SourceMapSink::record) is unaffected by this method.
+    /// Default is a no-op so implementors that only provide `record_line` keep
+    /// working without overriding it. The consumer-side `MapBuilderSink` in
+    /// `debug/source_map/` does override it to collect scene records.
     ///
     /// `scene_join_key` is a *deterministic join key* reproducible at BOTH code_gen
     /// and finalize time (example: `sanitize_name(base)` + 出現順). The
     /// counter-suffixed runtime identity (e.g. `会話_1`) is deliberately NOT recorded
     /// here — it is undetermined at code_gen time and is assigned later by the
-    /// runtime, then joined back to this span via the join key (see Design Decision 1:
-    /// runtime-authoritative capture). `span` carries the scene declaration's line
-    /// range.
+    /// runtime, then joined back to this span via the join key. `span` carries the
+    /// scene declaration's line range.
     fn record_scene(&mut self, _scene_join_key: &str, _span: Span) {}
 }
 
@@ -85,16 +81,13 @@ mod tests {
         }
     }
 
-    /// Sugar equivalence (議題3 / Requirements 1.1): `record(lua_line, span)` must
-    /// produce the SAME captured mapping as a direct `record_line(lua_line, P)`
-    /// when `span.start_line == P`. This is the task's completion criterion:
-    /// the span-based API is sugar over the direct line API.
+    /// Sugar equivalence: `record(lua_line, span)` must produce the SAME captured
+    /// mapping as a direct `record_line(lua_line, P)` when `span.start_line == P`.
     #[test]
     fn record_is_sugar_for_record_line() {
         const LUA_LINE: u32 = 11;
         const PASTA_LINE: u32 = 2;
 
-        // Direct line mapping.
         let mut direct = CapturingSink::default();
         direct.record_line(LUA_LINE, PASTA_LINE);
 
@@ -104,7 +97,6 @@ mod tests {
         let span = Span::new(PASTA_LINE as usize, 3, PASTA_LINE as usize, 20, 42, 60);
         via_span.record(LUA_LINE, span);
 
-        // Both APIs yield the identical mapping (L -> P).
         assert_eq!(
             direct.records,
             vec![(LUA_LINE, PASTA_LINE)],
@@ -116,7 +108,7 @@ mod tests {
         );
     }
 
-    /// Requirements 1.3: when a single `.pasta` element produces multiple `.lua`
+    /// When a single `.pasta` element produces multiple `.lua`
     /// lines, ALL of them map (to the same `.pasta` line). Recording several
     /// output lines for one `.pasta` line yields a mapping for every output line.
     #[test]
@@ -134,7 +126,7 @@ mod tests {
         );
     }
 
-    /// Requirements 3.4 (後方非破壊): a sink implementor that provides ONLY
+    /// A sink implementor that provides ONLY
     /// `record_line` (i.e. does NOT override `record_scene`) must still compile and
     /// behave correctly. `CapturingSink` deliberately leaves `record_scene` at its
     /// trait default, so the mere fact this test compiles proves the default exists
@@ -142,7 +134,7 @@ mod tests {
     ///
     /// Behaviorally, calling the default `record_scene` must be a no-op: it must NOT
     /// perturb the line-mapping records captured via `record_line`, and must not
-    /// panic. This guards the design invariant "行マッピングの記録内容・順序は不変".
+    /// panic.
     #[test]
     fn default_record_scene_is_inert_no_op() {
         const LUA_LINE: u32 = 7;

@@ -1,4 +1,4 @@
-//! 記号を含むシーン名の Call と検索の結合テスト（scene-search-key-normalization）。
+//! 記号を含むシーン名の Call と検索の結合テスト。
 //!
 //! テスト用の `.pasta` で一時ゴーストを作り、`PastaLoader::load` で実物のランタイムを起こす。
 //! シーンの出力は `EVENT.fire` の応答文字列で、警告は `tracing_test` の捕捉で確かめる。
@@ -118,7 +118,7 @@ fn assert_ok_with(response: &str, text: &str) {
     );
 }
 
-/// 要件 1.1・7.1: `＞会話・朝` で記号を含むグローバルシーンを Call でき、警告が出ない。
+/// `＞会話・朝` で記号を含むグローバルシーンを Call でき、警告が出ない。
 #[traced_test]
 #[test]
 fn static_call_reaches_symbol_global_scene_without_warning() {
@@ -132,7 +132,7 @@ fn static_call_reaches_symbol_global_scene_without_warning() {
     assert!(!logs_contain("handler not found"));
 }
 
-/// 要件 1.2: 動的ターゲット（文字列・変数）で `会話・朝` を指しても同じシーンが実行される。
+/// 動的ターゲット（文字列・変数）で `会話・朝` を指しても同じシーンが実行される。
 #[traced_test]
 #[test]
 fn dynamic_call_reaches_symbol_global_scene() {
@@ -143,7 +143,7 @@ fn dynamic_call_reaches_symbol_global_scene() {
     assert!(!logs_contain("handler not found"));
 }
 
-/// 要件 1.3: `SCENE.search` と `@pasta_search` の `search_scene` が記号を含む名前で結果を返す。
+/// `SCENE.search` と `@pasta_search` の `search_scene` が記号を含む名前で結果を返す。
 #[test]
 fn scene_search_apis_find_symbol_global_scene() {
     let (_temp, runtime) = load_ghost(SYMBOL_SCENES_PASTA, ACTOR_TOML);
@@ -169,7 +169,7 @@ return tostring(found and found.global_name) .. "|" .. tostring(global_name) .. 
     );
 }
 
-/// 要件 2.1・2.2・7.2: グローバルシーンの中の `・選択・A` を `＞選択・A` で Call でき、
+/// グローバルシーンの中の `・選択・A` を `＞選択・A` で Call でき、
 /// `SCENE.search("選択・A", 登録名)` が結果を返す。
 #[traced_test]
 #[test]
@@ -194,7 +194,7 @@ return found and (found.global_name .. "|" .. found.local_name) or "nil""#,
     assert_ne!(local_name, "__start__", "ローカルシーンでない: {result}");
 }
 
-/// 要件 3.5: 存在しない記号つきの名前を Call すると次の行へ進み、警告に元の名前が出る。
+/// 存在しない記号つきの名前を Call すると次の行へ進み、警告に元の名前が出る。
 #[traced_test]
 #[test]
 fn missing_symbol_call_warns_with_raw_name_and_continues() {
@@ -202,7 +202,7 @@ fn missing_symbol_call_warns_with_raw_name_and_continues() {
 
     let response = fire(&runtime, "不明呼び出し");
     assert_ok_with(&response, "次の行です");
-    // call-execution-correctness 4.6: 見つからない Call は Call 行の位置に失敗表記を出す
+    // 見つからない Call は Call 行の位置に失敗表記を出す
     // （失敗表記は raw_script なので句読点のウェイトは入らない）
     assert_ok_with(
         &response,
@@ -211,7 +211,7 @@ fn missing_symbol_call_warns_with_raw_name_and_continues() {
     assert!(logs_contain("handler not found: key='存在しない・朝'"));
 }
 
-/// 要件 1.5: SHIORI イベントのシーンが記号を含むグローバルシーンを Call すると、
+/// SHIORI イベントのシーンが記号を含むグローバルシーンを Call すると、
 /// 応答が 200 でシーンの出力を含む（204 にならない）。
 #[test]
 fn event_scene_calling_symbol_global_scene_responds_200() {
@@ -226,7 +226,7 @@ fn event_scene_calling_symbol_global_scene_responds_200() {
     assert_ok_with(&response, "朝の会話です");
 }
 
-/// 要件 2.4・7.2: 選択肢行 `＠？選択・A「Aにする」` を出したあと、選択 ID `選択・A` の
+/// 選択肢行 `＠？選択・A「Aにする」` を出したあと、選択 ID `選択・A` の
 /// `OnChoiceSelectEx` を起こすと、記号を含むローカルシーンが実行される（204 にならない）。
 #[test]
 fn choice_select_jumps_to_symbol_local_scene() {
@@ -255,7 +255,7 @@ return EVENT.fire({
     assert_ok_with(&response, "選択肢からAに来ました");
 }
 
-/// 要件 4.1・7.3: `％さくら・改` のアクター辞書の単語 `通常` を `さくら・改：＠通常` で出力できる
+/// `％さくら・改` のアクター辞書の単語 `通常` を `さくら・改：＠通常` で出力できる
 /// （アクター辞書の単語はアクターの表に入らないので、actor.lua の A2 段で見つかる）。
 #[test]
 fn symbol_actor_dictionary_word_is_output() {
@@ -264,7 +264,7 @@ fn symbol_actor_dictionary_word_is_output() {
     assert_ok_with(&fire(&runtime, "アクター辞書参照"), "改の通常顔");
 }
 
-/// 要件 4.2・7.3: `scripts/main.lua` から `WORD.create_actor("さくら・改", "口癖")` で登録した単語を、
+/// `scripts/main.lua` から `WORD.create_actor("さくら・改", "口癖")` で登録した単語を、
 /// `さくら・改：＠口癖` で引ける。
 #[test]
 fn lua_registered_symbol_actor_word_is_output() {
@@ -274,7 +274,7 @@ fn lua_registered_symbol_actor_word_is_output() {
     assert_ok_with(&fire(&runtime, "Lua登録参照"), "Luaで登録した口癖");
 }
 
-/// 要件 4.3・7.3: pasta.toml の `[actor."さくら・改"]` で記号を含む名前のアクターを設定し、
+/// pasta.toml の `[actor."さくら・改"]` で記号を含む名前のアクターを設定し、
 /// 同じ名前のアクター辞書の単語を引ける。
 #[test]
 fn toml_symbol_actor_finds_dictionary_word() {

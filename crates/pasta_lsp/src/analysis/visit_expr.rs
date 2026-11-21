@@ -1,7 +1,4 @@
 //! AST visitor methods for semantic token generation: VarSet/expression tokenization.
-//!
-//! This file exceeds the 300-line guideline as documented in the design spec
-//! (guideline exception: tightly-coupled visitor methods).
 
 use pasta_dsl::parser::ast::*;
 
@@ -20,7 +17,6 @@ impl super::AnalysisEngine {
         let line = vs.span.start_line;
         let (line_text, span_text, span_start_in_line) = Self::span_line_window(&vs.span, source);
 
-        // Parse sub-tokens from the span text using cursor-based scanning
         Self::tokenize_var_set_text(span_text, span_start_in_line, line, vs, tokens, line_text);
         push_trailing_comment(source, line, vs.span.end_byte, tokens);
     }
@@ -37,7 +33,7 @@ impl super::AnalysisEngine {
         let line0 = (line - 1) as u32;
         let mut cursor = 0usize; // byte offset within span_text
 
-        // 1) Marker: ＄＊ or ＄ (variable marker with optional global prefix)
+        // Marker: ＄＊ or ＄ (variable marker with optional global prefix)
         //
         // 健全な var_set 行は必ずマーカーで始まる。span_text がどのマーカーでも
         // 始まらない場合、span がこの行に整合していない（部分パースのチャンク相対
@@ -46,7 +42,6 @@ impl super::AnalysisEngine {
         // 後続の `span_text[cursor..]` がパニックする。
         let marker = match vs.scope {
             VarScope::Global => {
-                // Try ＄＊ first, then $*
                 if span_text.starts_with("＄＊") {
                     "＄＊"
                 } else if span_text.starts_with("$*") {
@@ -69,7 +64,6 @@ impl super::AnalysisEngine {
                 }
             }
         };
-        // Emit marker token
         let marker_offset = base_offset + cursor;
         tokens.push(RawToken {
             line: line0,
@@ -80,7 +74,7 @@ impl super::AnalysisEngine {
         });
         cursor += marker.len();
 
-        // 2) Variable name (skip for var_set_none where name is None)
+        // Variable name (skipped for var_set_none, where name is None)
         if let Some(name) = &vs.name
             && let Some(name_pos) = span_text[cursor..].find(name.as_str())
         {
@@ -101,7 +95,6 @@ impl super::AnalysisEngine {
             cursor = name_start + name.len();
         }
 
-        // 3) Assignment operator ＝ or =
         let remaining = &span_text[cursor..];
         let eq_char = if remaining.starts_with('＝') {
             Some(('＝', '＝'.len_utf8()))
@@ -122,7 +115,6 @@ impl super::AnalysisEngine {
             cursor += eq_len;
         }
 
-        // 4) Right-hand side value
         let rhs_text = &span_text[cursor..];
         let rhs_base = base_offset + cursor;
         Self::tokenize_expr_text(rhs_text, rhs_base, line0, &vs.value, tokens, line_text);
@@ -139,7 +131,6 @@ impl super::AnalysisEngine {
     ) {
         match value {
             SetValue::WordRef { name } => {
-                // Find @name or ＠name in text
                 let marker_and_name = format!("＠{}", name);
                 let alt_marker = format!("@{}", name);
                 if let Some(pos) = text
@@ -215,7 +206,6 @@ impl super::AnalysisEngine {
     ) {
         match expr {
             Expr::Integer(_) | Expr::Float(_) => {
-                // Find the number literal in text
                 if let Some((start, end)) = find_number_literal(text) {
                     let offset = base_offset + start;
                     let num_text = &text[start..end];
@@ -229,7 +219,6 @@ impl super::AnalysisEngine {
                 }
             }
             Expr::String(s) => {
-                // String literal - find it in text
                 if let Some(pos) = text.find(s.as_str()) {
                     let offset = base_offset + pos;
                     tokens.push(RawToken {
@@ -243,7 +232,6 @@ impl super::AnalysisEngine {
             }
             Expr::BlankString => {}
             Expr::VarRef { name, scope } => {
-                // Find $name or ＄name (or $*name/＄＊name for global) in text
                 let patterns = match scope {
                     VarScope::Global => vec![format!("＄＊{}", name), format!("$*{}", name)],
                     VarScope::Args(_) => vec![format!("＄{}", name), format!("${}", name)],
@@ -265,7 +253,6 @@ impl super::AnalysisEngine {
                 }
             }
             Expr::FnCall { name, scope, .. } => {
-                // Find @name or ＠name (or @*name/＠＊name for global)
                 let patterns = match scope {
                     FnScope::Global => vec![format!("＠＊{}", name), format!("@*{}", name)],
                     FnScope::Local => vec![format!("＠{}", name), format!("@{}", name)],
@@ -273,7 +260,6 @@ impl super::AnalysisEngine {
                 for pat in &patterns {
                     if let Some(pos) = text.find(pat.as_str()) {
                         let fn_offset = base_offset + pos;
-                        // Emit function name token
                         tokens.push(RawToken {
                             line,
                             start_char: utf8_offset_to_utf16(line_text, fn_offset),
@@ -281,7 +267,6 @@ impl super::AnalysisEngine {
                             token_type: token_type::WORD,
                             modifiers: 0,
                         });
-                        // Try to tokenize arguments inside parentheses
                         let after_name = pos + pat.len();
                         Self::tokenize_args_text(
                             &text[after_name..],
@@ -296,7 +281,6 @@ impl super::AnalysisEngine {
                 }
             }
             Expr::Paren(inner) => {
-                // Find opening paren
                 if let Some(paren_pos) = find_open_paren(text) {
                     let paren_len = Self::push_char_op_token(
                         text,
@@ -306,7 +290,6 @@ impl super::AnalysisEngine {
                         tokens,
                         line_text,
                     );
-                    // Inner expression
                     let inner_start = paren_pos + paren_len;
                     let close_pos = find_close_paren(text, inner_start);
                     let inner_text = if let Some(cp) = close_pos {
@@ -322,7 +305,6 @@ impl super::AnalysisEngine {
                         tokens,
                         line_text,
                     );
-                    // Closing paren
                     if let Some(cp) = close_pos {
                         Self::push_char_op_token(text, cp, base_offset, line, tokens, line_text);
                     }
@@ -446,7 +428,6 @@ impl super::AnalysisEngine {
                     &text[inner_start..]
                 };
 
-                // Tokenize each argument by scanning the args text
                 let mut arg_cursor = 0usize;
                 for arg in &args.items {
                     let arg_expr = match arg {
@@ -454,12 +435,10 @@ impl super::AnalysisEngine {
                         Arg::Keyword { value, .. } => value,
                     };
                     let remaining = &args_text[arg_cursor..];
-                    // Skip comma/separator
                     let skip = remaining
                         .find(|c: char| !c.is_whitespace() && c != '、' && c != ',')
                         .unwrap_or(0);
                     let arg_text_start = arg_cursor + skip;
-                    // Estimate the end of this argument: find next comma or end
                     let arg_remaining = &args_text[arg_text_start..];
                     let arg_end = find_arg_end(arg_remaining);
                     let arg_slice = &args_text[arg_text_start..arg_text_start + arg_end];
@@ -474,7 +453,6 @@ impl super::AnalysisEngine {
                     arg_cursor = arg_text_start + arg_end;
                 }
 
-                // Closing paren
                 if let Some(cp) = close_pos {
                     Self::push_char_op_token(text, cp, base_offset, line, tokens, line_text);
                 }

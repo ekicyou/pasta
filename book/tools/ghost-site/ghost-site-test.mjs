@@ -1,6 +1,6 @@
-// ghost-site-test.mjs — ghost-site の自己テスト（hello-pasta-network-update タスク 1.1–1.4 / 要件 1.1–1.3, 1.5, 3.1–3.3, 4.4, 5.1, 5.3, 5.4, 7.1–7.3, 10.4, 11.4）、hello-pasta-book-sync タスク 2.1（要件 1.2–1.6, 2.6, 7.1）・2.2（要件 6.1–6.3）。
+// ghost-site-test.mjs — ghost-site の自己テスト。
 //
-// 観測する完了条件（design「GhostSite」Invariants・Testing Strategy）:
+// 観測すること:
 //   - readNar がテスト内で組んだ zip（保存・deflate）を読み、ディレクトリのエントリを捨てる。
 //   - `../x`・`a\b`・先頭 `/`・`C:`・NUL・空の区切り・重複・暗号化・zip64・非対応の方式を NarError で拒否する。
 //   - parseUpdates が CRLF・0x01 区切り・charset 行・空行を扱い、date= を無視し、解釈できない行で失敗する。
@@ -314,7 +314,7 @@ test('照合 → 展開: 照合に失敗したとき出力先に何も書かな�
   });
 });
 
-// --- buildSite と CLI `build`（タスク 1.3 / 要件 1.1, 1.2, 7.1–7.3） ---
+// --- buildSite と CLI `build` ---
 const SCRIPT = fileURLToPath(new URL('./ghost-site.mjs', import.meta.url));
 const INDEX = fileURLToPath(new URL('./index.html', import.meta.url));
 const narOf = (files) => makeZip(files.map((f) => ({ name: f.name, data: f.data })));
@@ -435,7 +435,7 @@ test('CLI: 引数の不足・不明なサブコマンドは使い方を出して
   }
 });
 
-// --- listTree・narOnlyFiles と CLI `nar-only`（hello-pasta-book-sync タスク 2.1 / 要件 1.2–1.6, 2.6, 7.1） ---
+// --- listTree・narOnlyFiles と CLI `nar-only` ---
 // 一時の git リポジトリで、hello/ の下をタグにし、その後で作業ツリーから消す（main で消したものに当たる）。
 // コミットを作らず、ツリーのオブジェクトに軽いタグを付ける（利用者の git 設定の署名などに左右されない）。
 const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
@@ -556,7 +556,7 @@ test('CLI nar-only: nar の側が 0 本・出力先が空でない・引数の�
   });
 });
 
-// --- verifyLive と CLI `verify-live`（タスク 1.4 / 要件 1.3, 5.1, 5.3, 5.4, 10.4） ---
+// --- verifyLive と CLI `verify-live` ---
 async function atest(name, fn) {
   try {
     await fn();

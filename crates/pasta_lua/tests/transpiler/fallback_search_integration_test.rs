@@ -1,4 +1,4 @@
-//! Integration tests for actor-word-dictionary feature.
+//! Integration tests for actor word dictionary feature.
 //!
 //! Tests for parser/transpiler functionality and basic runtime behavior.
 //! Complex fallback search tests are covered by finalize_scene_test.rs and runtime_e2e_test.rs.
@@ -38,7 +38,6 @@ fn test_comprehensive_fallback_parses() {
 
     let file = result.unwrap();
 
-    // Verify structure
     let actors: Vec<_> = file
         .items
         .iter()
@@ -83,7 +82,6 @@ fn test_transpiler_actor_array_format() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Check symmetric API format output
     assert!(
         lua_code.contains("ACTOR:create_word"),
         "Expected ACTOR:create_word API format"
@@ -101,7 +99,6 @@ fn test_transpiler_expands_code_blocks() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Check code block expansion
     assert!(
         lua_code.contains("function ACTOR.時刻(act)"),
         "Expected ACTOR.時刻 function"
@@ -139,7 +136,6 @@ fn test_generated_lua_actor_structure() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Check actor creation
     assert!(
         lua_code.contains("PASTA.create_actor(\"さくら\")"),
         "Expected さくら actor creation"
@@ -149,7 +145,6 @@ fn test_generated_lua_actor_structure() {
         "Expected うにゅう actor creation"
     );
 
-    // Check do-end blocks for actor scope (format may vary)
     assert!(
         lua_code.contains("do") && lua_code.contains("end"),
         "Expected do-end blocks"
@@ -188,10 +183,8 @@ use std::path::PathBuf;
 fn setup_runtime() -> mlua::Lua {
     use mlua::{Lua, StdLib};
 
-    // Create Lua VM with safe standard libraries
     let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
 
-    // Configure package.path to include pasta scripts directory
     let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("pasta_scripts")
         .to_string_lossy()

@@ -1,9 +1,5 @@
-// Unit tests for RunScene (task 5.2). Plain node against fakeMcpServer and a temp ghost; the real clock is
+// Unit tests for RunScene. Plain node against fakeMcpServer and a temp ghost; the real clock is
 // never used for the waits (sleep is injected and counted).
-//
-// Requirements: 4.4 / 4.5 (not sent when the reload says not OK to play), 4.6 (Reference0 = absolute path,
-// Reference1 = 1-based line), 4.7 (script shown as-is, failure notation included), 4.8 (no response → script
-// log re-query and selection rule), 4.9 (could not confirm), 4.10 (204 hint + OnPastaSceneAt: reason lines).
 
 import * as assert from 'assert';
 import * as fs from 'fs';

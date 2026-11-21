@@ -1,6 +1,4 @@
 //! AST 型定義の外部テスト
-//!
-//! Phase A: parser/ast.rs のインラインテストから外部化
 
 use pasta_dsl::parser::*;
 use std::path::PathBuf;
@@ -93,7 +91,6 @@ fn test_bin_op_equality() {
 
 #[test]
 fn test_ast_types_clone() {
-    // Test that all AST types implement Clone
     // Span は Copy（Copy: Clone なので Clone 実装も保証される）
     let span = Span::new(1, 1, 1, 1, 0, 1);
     let _span2 = span;
@@ -111,7 +108,6 @@ fn test_ast_types_clone() {
 
 #[test]
 fn test_ast_types_debug() {
-    // Test that all AST types implement Debug
     let span = Span::new(1, 1, 1, 1, 0, 1);
     let _ = format!("{:?}", span);
 
@@ -129,7 +125,7 @@ fn test_ast_types_debug() {
 }
 
 // ============================================================================
-// word-multi-key: 複数キー単語定義のパーステスト
+// 複数キー単語定義のパーステスト
 // ============================================================================
 
 /// 単一キーの従来形式が names.len() == 1 を返す（後方互換性）

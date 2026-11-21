@@ -108,12 +108,10 @@ fn string_to_multibyte(codepage: u32, data: &str, default_char: Option<u8>) -> R
 ///
 /// See https://docs.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
 fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8]) -> Result<String> {
-    // Empty string
     if multi_byte_str.is_empty() {
         return Ok(String::new());
     }
 
-    // Reject lengths the Win32 API cannot represent (prevents `as` cast wrap).
     let in_len = buffer_len_to_i32(multi_byte_str.len())?;
 
     // SAFETY: Calls to `MultiByteToWideChar` are safe under these conditions:
@@ -127,7 +125,6 @@ fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8]) -> 
     //  4. Return values are checked: if either call returns 0, we fall through to
     //     `Error::last_os_error()` instead of reading uninitialized memory.
     unsafe {
-        // Get length of UTF-16 string
         let len = MultiByteToWideChar(
             codepage,
             flags,
@@ -138,7 +135,6 @@ fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8]) -> 
         );
 
         if len > 0 {
-            // Allocate buffer and convert to UTF-16
             // SAFETY: MultiByteToWideChar will fully initialize the buffer up to `len` elements.
             #[allow(clippy::uninit_vec)]
             let mut wstr: Vec<u16> = {
@@ -177,12 +173,10 @@ fn wide_char_to_multi_byte(
     default_char: Option<u8>,
     use_default_char_flag: bool,
 ) -> Result<(Vec<u8>, bool)> {
-    // Empty string
     if wide_char_str.is_empty() {
         return Ok((Vec::new(), false));
     }
 
-    // Reject lengths the Win32 API cannot represent (prevents `as` cast wrap).
     let in_len = buffer_len_to_i32(wide_char_str.len())?;
 
     // SAFETY: Calls to `WideCharToMultiByte` are safe under these conditions:
@@ -198,7 +192,6 @@ fn wide_char_to_multi_byte(
     //  5. Return values are checked: if either call returns 0, we fall through to
     //     `Error::last_os_error()` instead of reading uninitialized memory.
     unsafe {
-        // Get length of multibyte string
         let len = WideCharToMultiByte(
             codepage,
             flags,
@@ -211,7 +204,6 @@ fn wide_char_to_multi_byte(
         );
 
         if len > 0 {
-            // Allocate buffer and convert from UTF-16 to multibyte
             // SAFETY: WideCharToMultiByte will fully initialize the buffer up to `len` elements.
             #[allow(clippy::uninit_vec)]
             let mut astr: Vec<u8> = {
@@ -283,7 +275,6 @@ mod tests {
 
     #[test]
     fn test_multi_byte_to_wide_char_utf8() {
-        // Test UTF-8 to UTF-16 conversion using CP_UTF8
         let result =
             multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS_FLAG, "テスト".as_bytes())
                 .unwrap();
@@ -377,8 +368,6 @@ mod tests {
 
     #[test]
     fn test_buffer_len_to_i32_accepts_representable_lengths() {
-        // Boundary regression for the FFI length guard (hardening):
-        // representable lengths pass through unchanged.
         assert_eq!(buffer_len_to_i32(0).unwrap(), 0);
         assert_eq!(buffer_len_to_i32(1).unwrap(), 1);
         assert_eq!(
@@ -390,9 +379,7 @@ mod tests {
 
     #[test]
     fn test_buffer_len_to_i32_rejects_overlong_lengths() {
-        // Boundary regression for the FFI length guard (hardening):
-        // lengths above i32::MAX previously wrapped via `as` cast.
-        // u32::MAX is the most dangerous value — it wraps to -1, which the
+        // u32::MAX would wrap to -1 under `as`, which the
         // Win32 APIs treat as "null-terminated input" (out-of-bounds read).
         let just_over = i32::MAX as usize + 1;
         let err = buffer_len_to_i32(just_over).expect_err("i32::MAX+1 must be rejected");
