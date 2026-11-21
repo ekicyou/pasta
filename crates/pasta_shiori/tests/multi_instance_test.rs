@@ -127,7 +127,7 @@ fn on_pasta_scene(scene: &str) -> String {
 
 /// デバッグを有効にした 2 体が並び、どちらも開発用のイベントを許し、待ち受けのログを出さない
 /// （debug-mcp-runtime 1.1・1.3・1.5）。`[logging]` の出し先と量は自分のログだけに効く（5.3・5.4）。
-/// B の量は info にする（warn だと有効の info の行まで絞られ、1.5 を確かめられない）。
+/// 有効の行はログの量に左右されずに出るので、A と B の量を変えても 1 行ずつある。
 #[test]
 fn two_debug_enabled_instances_stand_side_by_side() {
     const ENABLED: &str = "Debug enabled: development events are allowed";
