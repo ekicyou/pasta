@@ -306,6 +306,22 @@ fn load_entry_line_survives_narrowed_logging() {
     assert_only_load_entry_info(&dir, "entry=\"loadu\" loaded=false");
 }
 
+/// `level = "warn"` のゴーストでも、判断の行がちょうど 1 行、印より前に出る。
+fn decision_line_before_mark(enabled: bool) {
+    let root = TempDir::new().expect("create temp dir");
+    let dir = install_narrowed_ghost(&root, "decision", "level = \"warn\"");
+    if enabled {
+        let toml = dir.join("pasta.toml");
+        let mut text = std::fs::read_to_string(&toml).expect("read pasta.toml");
+        text.push_str("\n[debug]\nenabled = true\n");
+        std::fs::write(&toml, text).expect("write pasta.toml");
+    }
+    assert!(drive_loadu(&dir), "ゴーストは読み込めるべき");
+    assert_eq!(unload(), 1, "unload は常に true を返す");
+    let log = common::wait_log_contains(&dir, "SHIORI load entry completed");
+    common::assert_debug_decision_before_mark(&log, enabled);
+}
+
 // ===========================================================================
 // 設計 Testing Strategy > E2E Tests 項 3 の系列（1 本の直列テスト）
 // ===========================================================================
@@ -381,4 +397,6 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
 
     // プロセス全域 static を共有するので、同じ直列テストの続きで確かめる。
     load_entry_line_survives_narrowed_logging();
+    decision_line_before_mark(false);
+    decision_line_before_mark(true);
 }

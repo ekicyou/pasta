@@ -166,3 +166,30 @@ pub fn wait_log_contains(ghost: &Path, needle: &str) -> String {
         std::thread::sleep(Duration::from_millis(50));
     }
 }
+
+/// 判断の行（`enabled` なら有効、でなければ無効）がちょうど 1 行あり、
+/// 読み込みの終わりの印より前にあることを表明する。
+pub fn assert_debug_decision_before_mark(log: &str, enabled: bool) {
+    let (line, other) = if enabled {
+        (
+            "Debug enabled: development events are allowed",
+            "Debug disabled: development events are refused",
+        )
+    } else {
+        (
+            "Debug disabled: development events are refused",
+            "Debug enabled: development events are allowed",
+        )
+    };
+    assert_eq!(
+        log.matches(line).count(),
+        1,
+        "判断の行がちょうど 1 行\nlog:\n{log}"
+    );
+    assert!(!log.contains(other), "逆の判断の行は出ない\nlog:\n{log}");
+    let at = log.find(line).unwrap();
+    let mark = log
+        .find("SHIORI load entry completed")
+        .expect("mark present");
+    assert!(at < mark, "判断の行は印より前\nlog:\n{log}");
+}

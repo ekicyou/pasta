@@ -7,12 +7,39 @@
 
 mod common;
 
-use common::{copy_fixture_to_temp, wait_log_contains};
+use common::{assert_debug_decision_before_mark, copy_fixture_to_temp, wait_log_contains};
 use pasta::shiori_get_api;
 use shiori4_abi::{SHIORI_ABI_VERSION_3, ShioriApi};
 
 #[test]
 fn v3_load_entry_line_survives_narrowed_logging() {
+    v3_decision_line_before_mark(false);
+    v3_decision_line_before_mark(true);
+    v3_narrowed_logging_only_load_entry_info();
+}
+
+fn v3_decision_line_before_mark(enabled: bool) {
+    // SAFETY: shiori_get_api はこの試験のバイナリに静的にリンクされ、テーブルは static。
+    let api =
+        unsafe { ShioriApi::from_raw(shiori_get_api(SHIORI_ABI_VERSION_3), SHIORI_ABI_VERSION_3) }
+            .expect("v3 table must pass validation");
+    let ghost = copy_fixture_to_temp("shiori_lifecycle");
+    let toml = ghost.path().join("pasta.toml");
+    let mut text = std::fs::read_to_string(&toml).expect("read pasta.toml");
+    text.push_str("\n[logging]\nlevel = \"warn\"\n");
+    if enabled {
+        text.push_str("\n[debug]\nenabled = true\n");
+    }
+    std::fs::write(&toml, text).expect("write pasta.toml");
+    let inst = api
+        .load_v3(ghost.path().to_str().expect("utf-8 path"))
+        .expect("v3 load");
+    drop(inst);
+    let log = wait_log_contains(ghost.path(), "SHIORI load entry completed");
+    assert_debug_decision_before_mark(&log, enabled);
+}
+
+fn v3_narrowed_logging_only_load_entry_info() {
     // SAFETY: shiori_get_api はこの試験のバイナリに静的にリンクされ、テーブルは static。
     let api =
         unsafe { ShioriApi::from_raw(shiori_get_api(SHIORI_ABI_VERSION_3), SHIORI_ABI_VERSION_3) }
