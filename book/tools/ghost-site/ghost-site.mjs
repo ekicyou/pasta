@@ -7,7 +7,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
-import { execFileSync } from 'node:child_process';
 
 /** @typedef {{ name: string, data: Buffer }} NarFile */
 /** @typedef {{ path: string, md5: string, size: number }} UpdateRecord */
@@ -204,47 +203,6 @@ export function buildSite({ narPath, outDir, indexPath }) {
   if (diff.length > 0) throw new Error(diff.join('\n'));
 }
 
-/** pasta_check release が更新の対象から外す名前（update_files.rs の EXCLUDED_FILES と同じ）。どの階層でも最後の部品で比べる。 */
-export const EXCLUDED_NAMES = Object.freeze(['updates.txt', 'updates2.dau', 'developer_options.txt']);
-
-/**
- * git ls-tree -r --name-only -z <treeish> の名前の集合（<タグ>:<hello-pasta のパス> なら hello-pasta からの相対）。
- * git が失敗したら、git の標準エラーを添えて Error を投げる。
- * @param {string} treeish @param {string} [cwd] @returns {Set<string>}
- */
-export function listTree(treeish, cwd) {
-  let out;
-  try {
-    out = execFileSync('git', ['ls-tree', '-r', '--name-only', '-z', treeish], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch (e) {
-    throw new Error(`NG ${treeish}: タグのツリーを読めない（${(e.stderr || e.message).trim()}）`);
-  }
-  return new Set(out.split('\0').filter((n) => n !== ''));
-}
-
-/**
- * nar の側: files のうち、tree に無く、最後の部品が EXCLUDED_NAMES に当たらないもの。順は files のまま。
- * @param {NarFile[]} files @param {Set<string>} tree @returns {NarFile[]}
- */
-export function narOnlyFiles(files, tree) {
-  return files.filter((f) => !tree.has(f.name) && !EXCLUDED_NAMES.includes(f.name.split('/').pop()));
-}
-
-/**
- * nar を照合し、nar の側のファイルを nar のバイトのまま outDir へ書いて、書いた名前を返す。
- * 照合の問題・git の失敗・nar の側が 0 本・出力先が空でない、は何も書かずに Error を投げる。
- * @param {{ narPath: string, treeish: string, outDir: string }} opts @returns {string[]}
- */
-export function writeNarOnly({ narPath, treeish, outDir }) {
-  const files = readNar(fs.readFileSync(narPath));
-  const r = checkIntegrity(files);
-  if (!r.ok) throw new Error(r.problems.join('\n'));
-  const picked = narOnlyFiles(files, listTree(treeish));
-  if (picked.length === 0) throw new Error(`NG ${treeish}: nar の側のファイルが 0 本（タグのツリーの渡し間違いの疑い）`);
-  extractNar(picked, outDir);
-  return picked.map((f) => f.name);
-}
-
 const md5Of = (buf) => crypto.createHash('md5').update(buf).digest('hex');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -260,30 +218,17 @@ async function fetchOnce(fetchFn, url) {
 const stateOf = (r) => (r.error ? `取得できない（${r.error}）` : `HTTP ${r.status}・長さ ${r.body.length}・md5 ${md5Of(r.body)}`);
 
 /**
- * nar の updates.txt の行のうち、nar の側のファイル（narOnlyFiles）の行を「比べる行」とし、実 URL の updates.txt に
- * 比べる行が全部、同じパス・md5・大きさで載れば一致とする（日付の欄と、比べる行の外の行は見ない）。
- * 一致するまで attempts 回まで intervalMs おきに取り直す（HTTP 200 以外・解釈できない・ネットワークの失敗も取り直す。
- * 最後の回の後は待たない）。取得には一意のクエリ cb=<ラベル>-<回数> を付ける。比べる行が 0 本なら取らずに失敗する。
- * full なら、一致の後に実 URL の updates.txt の各行のファイルを 1 回ずつ取って md5・大きさを照合し、問題を 1 件 1 行で全部集める。
- * 戻り値の attempts は updates.txt を取った回数（一致した回、諦めたときは上限。取らずに失敗したときは 0）、
- * compared は比べる行の本数、checked は full で照合したファイルの数。
- * @param {{ files: NarFile[], tree: Set<string>, base: string, attempts: number, intervalMs: number, full: boolean, fetchFn?: typeof fetch }} opts
- * @returns {Promise<CheckResult & { attempts: number, compared: number, checked: number }>}
+ * 実 URL の updates.txt を nar の updates.txt とバイト一致で見比べる。一致するまで attempts 回まで intervalMs おきに取り直す
+ * （HTTP 200 以外・ネットワークの失敗も取り直す。最後の回の後は待たない）。取得には一意のクエリ cb=<ラベル>-<回数> を付ける。
+ * full なら、一致の後に updates.txt の各行のファイルを 1 回ずつ取って md5・大きさを照合し、問題を 1 件 1 行で全部集める。
+ * 戻り値の attempts は updates.txt を取った回数（一致した回、諦めたときは上限。nar に updates.txt が無ければ 0）。
+ * @param {{ files: NarFile[], base: string, attempts: number, intervalMs: number, full: boolean, fetchFn?: typeof fetch }} opts
+ * @returns {Promise<CheckResult & { attempts: number }>}
  */
-export async function verifyLive({ files, tree, base, attempts, intervalMs, full, fetchFn = fetch }) {
+export async function verifyLive({ files, base, attempts, intervalMs, full, fetchFn = fetch }) {
   if (!(Number.isInteger(attempts) && attempts >= 1)) throw new Error(`attempts は 1 以上の整数: ${attempts}`);
-  const fail = (problems, extra = {}) => ({ ok: false, problems, attempts: 0, compared: 0, checked: 0, ...extra });
   const local = files.find((f) => f.name === 'updates.txt');
-  if (!local) return fail(['NG updates.txt: nar の直下に無い']);
-  let wanted;
-  try {
-    const narOnly = new Set(narOnlyFiles(files, tree).map((f) => f.name));
-    wanted = parseUpdates(local.data.toString('utf8')).filter((r) => narOnly.has(r.path));
-  } catch (e) {
-    return fail([`NG updates.txt: ${e.message}`]);
-  }
-  const compared = wanted.length;
-  if (compared === 0) return fail(['NG updates.txt: nar の側の行が 0 本（タグのツリーの渡し間違いの疑い）']);
+  if (!local) return { ok: false, problems: ['NG updates.txt: nar の直下に無い'], attempts: 0 };
   const root = base.endsWith('/') ? base : `${base}/`;
   const { GITHUB_RUN_ID: id, GITHUB_RUN_ATTEMPT: at } = process.env;
   // 再実行（同じ run ID）でも別のクエリになるよう試行の番号も入れる。
@@ -294,44 +239,29 @@ export async function verifyLive({ files, tree, base, attempts, intervalMs, full
     return u.href;
   };
 
-  // 比べる行ごとの違い（無ければ空）。実 URL が 200 で解釈できたときだけ作る。
-  const diffOf = (records) => {
-    const byPath = new Map(records.map((r) => [r.path, r]));
-    return wanted.flatMap((w) => {
-      const r = byPath.get(w.path);
-      if (!r) return [`NG ${w.path}: 実 URL の updates.txt に無い`];
-      return [
-        ...(r.md5 !== w.md5 ? [`NG ${w.path}: md5 が違う（nar: ${w.md5}、実 URL: ${r.md5}）`] : []),
-        ...(r.size !== w.size ? [`NG ${w.path}: 大きさが違う（nar: ${w.size}、実 URL: ${r.size}）`] : []),
-      ];
-    });
-  };
   let last;
-  let records;
   let n = 1;
   for (; n <= attempts; n++) {
     last = await fetchOnce(fetchFn, urlOf('updates.txt', n));
-    if (last.status === 200) {
-      try {
-        records = parseUpdates(last.body.toString('utf8'));
-        last.diff = diffOf(records);
-      } catch (e) {
-        last.parseError = e.message;
-      }
-      if (last.diff?.length === 0) break;
-    }
+    if (last.status === 200 && last.body.equals(local.data)) break;
     last.mismatch = true;
     if (n < attempts) await sleep(intervalMs);
   }
   if (last.mismatch) {
-    const why = last.parseError ? `${stateOf(last)}・${last.parseError}` : stateOf(last);
-    return fail([`NG updates.txt: ${attempts} 回取っても nar の側の ${compared} 行が一致しない（最後: ${why}）`, ...(last.diff ?? [])], {
+    return {
+      ok: false,
+      problems: [`NG updates.txt: ${attempts} 回取っても nar と一致しない（最後: ${stateOf(last)}、nar: 長さ ${local.data.length}・md5 ${md5Of(local.data)}）`],
       attempts,
-      compared,
-    });
+    };
   }
-  if (!full) return { ok: true, problems: [], attempts: n, compared, checked: 0 };
+  if (!full) return { ok: true, problems: [], attempts: n };
 
+  let records;
+  try {
+    records = parseUpdates(local.data.toString('utf8'));
+  } catch (e) {
+    return { ok: false, problems: [`NG updates.txt: ${e.message}`], attempts: n };
+  }
   const problems = [];
   for (const r of records) {
     const got = await fetchOnce(fetchFn, urlOf(r.path, 'full'));
@@ -343,13 +273,12 @@ export async function verifyLive({ files, tree, base, attempts, intervalMs, full
     if (actual !== r.md5) problems.push(`NG ${r.path}: md5 が違う（updates.txt: ${r.md5}、実 URL: ${actual}）`);
     if (got.body.length !== r.size) problems.push(`NG ${r.path}: 大きさが違う（updates.txt: ${r.size}、実 URL: ${got.body.length}）`);
   }
-  return { ok: problems.length === 0, problems, attempts: n, compared, checked: records.length };
+  return { ok: problems.length === 0, problems, attempts: n };
 }
 
 const USAGE = `使い方:
   node ghost-site.mjs build --nar <file> --out <dir> --index <html>
-  node ghost-site.mjs nar-only --nar <file> --tree <treeish> --out <dir>
-  node ghost-site.mjs verify-live --nar <file> --tree <treeish> --base <url> [--attempts 30] [--interval 30] [--full]
+  node ghost-site.mjs verify-live --nar <file> --base <url> [--attempts 30] [--interval 30] [--full]
     （--interval は秒）`;
 
 const usage = (msg) => {
@@ -368,7 +297,6 @@ async function main(argv) {
         nar: { type: 'string' },
         out: { type: 'string' },
         index: { type: 'string' },
-        tree: { type: 'string' },
         base: { type: 'string' },
         attempts: { type: 'string', default: '30' },
         interval: { type: 'string', default: '30' },
@@ -381,22 +309,17 @@ async function main(argv) {
   let run;
   if (cmd === 'build' && values.nar && values.out && values.index) {
     run = async () => buildSite({ narPath: values.nar, outDir: values.out, indexPath: values.index });
-  } else if (cmd === 'nar-only' && values.nar && values.tree && values.out) {
-    run = async () => {
-      for (const n of writeNarOnly({ narPath: values.nar, treeish: values.tree, outDir: values.out })) console.log(n);
-    };
-  } else if (cmd === 'verify-live' && values.nar && values.tree && values.base) {
+  } else if (cmd === 'verify-live' && values.nar && values.base) {
     const attempts = Number(values.attempts);
     const interval = Number(values.interval);
     if (!Number.isInteger(attempts) || attempts < 1) return usage(`--attempts は 1 以上の整数: ${values.attempts}`);
     if (!Number.isInteger(interval) || interval < 0) return usage(`--interval は 0 以上の整数（秒）: ${values.interval}`);
     run = async () => {
       const files = readNar(fs.readFileSync(values.nar));
-      const tree = listTree(values.tree);
-      const r = await verifyLive({ files, tree, base: values.base, attempts, intervalMs: interval * 1000, full: values.full });
+      const r = await verifyLive({ files, base: values.base, attempts, intervalMs: interval * 1000, full: values.full });
       if (!r.ok) throw new Error(r.problems.join('\n'));
-      // publish-ghost-site.ps1 が「<n> 回目で」から回数を読む。
-      console.log(`OK updates.txt: ${r.attempts} 回目で nar の側の ${r.compared} 行が一致${values.full ? `（--full: ${r.checked} ファイルも一致）` : ''}`);
+      const listed = values.full ? parseUpdates(files.find((f) => f.name === 'updates.txt').data.toString('utf8')).length : 0;
+      console.log(`OK updates.txt: ${r.attempts} 回目で一致${values.full ? `（--full: ${listed} ファイルも一致）` : ''}`);
     };
   } else {
     return usage();
