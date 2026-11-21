@@ -1,12 +1,13 @@
 // Test-only stand-in for the SSP / areka MCP endpoint (POST /api/mcp/v1).
 // Wire shapes follow the real SSP 2.9.28 / areka answers recorded in
-// .kiro/specs/completed/vscode-mcp-client/research.md. Node built-ins only.
+// .kiro/specs/completed/vscode-mcp-client/research.md.
 
 import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
+import { DEBUG_DISABLED_LINE, DEBUG_ENABLED_LINE } from '../../../shared/ghostFiles.ts';
 
-export type ReloadLogLine = 'loadedTrue' | 'loadedFalse' | 'error' | 'warn';
+export type ReloadLogLine = 'loadedTrue' | 'loadedFalse' | 'error' | 'warn' | 'debugOn' | 'debugOff';
 export type RaiseEventMode = 'script' | 'noScript' | 'drop' | 'silent' | 'empty';
 
 export interface FakeLogRecord {
@@ -65,6 +66,8 @@ function pastaLogLine(kind: ReloadLogLine): string {
   switch (kind) {
     case 'loadedTrue': return `${ts}  INFO pasta::windows: SHIORI load entry completed entry="loadu" loaded=true`;
     case 'loadedFalse': return `${ts}  INFO pasta::windows: SHIORI load entry completed entry="loadu" loaded=false`;
+    case 'debugOn': return `${ts}  INFO pasta::debug_state: ${DEBUG_ENABLED_LINE}`;
+    case 'debugOff': return `${ts}  INFO pasta::debug_state: ${DEBUG_DISABLED_LINE}`;
     case 'error': return `${ts} ERROR pasta_lua::loader: fake load error`;
     case 'warn': return `${ts}  WARN pasta_lua::loader::cache: fake load warning`;
   }

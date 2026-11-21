@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as vscode from './mock/vscode';
 import { startFakeMcpServer, FakeMcpServer } from './fakeMcpServer';
 import { OUTPUT_CHANNEL, registerDevCommands } from '../devCommands';
+import { DISABLE_DEBUG, ENABLE_DEBUG } from '../../../shared/debugToggle.ts';
 import { DEFAULT_TIMING } from '../../../shared/reloadShiori.ts';
 
 let passed = 0;
@@ -92,11 +93,11 @@ async function main() {
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, Math.min(ms, 5)));
   registerDevCommands(context as any, { ports: [a.port, b.port, brokenPort], timing: DEFAULT_TIMING, sleep });
 
-  await test('registers the 3 commands and one output channel', async () => {
-    for (const id of ['pasta.runSceneAtCursor', 'pasta.reloadShiori', 'pasta.showSaveVariables']) {
+  await test('registers the 5 commands and one output channel', async () => {
+    for (const id of ['pasta.runSceneAtCursor', 'pasta.reloadShiori', 'pasta.showSaveVariables', 'pasta.enableShioriDebug', 'pasta.disableShioriDebug']) {
       assert.ok(vscode.registeredCommands.has(id), id);
     }
-    assert.strictEqual(context.subscriptions.length, 4);
+    assert.strictEqual(context.subscriptions.length, 6);
   });
 
   await test('2.5: ▶ シーンを実行 on a .lua stops with a warning and sends nothing', async () => {
@@ -472,6 +473,49 @@ async function main() {
     vscode.workspace.textDocuments.length = 0;
     assert.strictEqual(callsOf(a, 'reload').length, reloads + 1);
     assert.strictEqual(callsOf(a, 'raise_event').filter((c) => c.arguments.event === 'OnPastaDumpVariables').length, dumps + 1);
+  });
+
+  await test('toggle: enable writes ＄＊デバッグ, reloads and reports the state; disable does the same', async () => {
+    for (const [id, enable, title, line, state] of [
+      ['pasta.enableShioriDebug', true, ENABLE_DEBUG, 'debugOn', 'デバッグは有効です'],
+      ['pasta.disableShioriDebug', false, DISABLE_DEBUG, 'debugOff', 'デバッグは無効です'],
+    ] as const) {
+      a.state.reloadLog = [line, 'loadedTrue'];
+      a.state.raiseEvent = { mode: 'noScript' };
+      const { m, o } = onlyOn(a, b);
+      const events = callsOf(a, 'raise_event').length;
+      const reloads = callsOf(a, 'reload').length;
+      await run(id);
+      const sent = callsOf(a, 'raise_event').slice(events);
+      assert.deepStrictEqual(sent.map((c) => [c.arguments.event, c.arguments.references]), [['OnPastaSetSaveVariable', ['デバッグ', String(enable), 'boolean']]]);
+      assert.strictEqual(callsOf(a, 'reload').length, reloads + 1);
+      assert.ok(outputSince(o).some((l) => l.includes(title)), outputSince(o).join(' | '));
+      assert.ok(outputSince(o).some((l) => l.includes(state)), outputSince(o).join(' | '));
+      assert.deepStrictEqual(messagesSince(m), []);
+    }
+    resetServer(a);
+  });
+
+  await test('toggle: refused with the busy message while another command runs on the ghost', async () => {
+    const g = makeGhost();
+    a.state.runningRoots = [g.root];
+    b.state.runningRoots = [];
+    a.state.reloadDelayMs = 100;
+    openEditor(g.dic);
+    const m = vscode.shownMessages.length;
+    const events = callsOf(a, 'raise_event').length;
+    const reloads = callsOf(a, 'reload').length;
+    const reloading = run('pasta.reloadShiori');
+    // The lock is taken only after the ghost resolves, so wait until the reload has reached the server.
+    for (let i = 0; i < 400 && callsOf(a, 'reload').length === reloads; i++) {
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    assert.strictEqual(callsOf(a, 'reload').length, reloads + 1);
+    await run('pasta.enableShioriDebug');
+    await reloading;
+    a.state.reloadDelayMs = 0;
+    assert.strictEqual(callsOf(a, 'raise_event').length, events);
+    assert.deepStrictEqual(messagesSince(m).map((x) => [x.kind, x.message]), [['warning', 'このゴーストへのコマンドが進んでいます']]);
   });
 
   await a.close();
