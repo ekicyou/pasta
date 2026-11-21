@@ -66,7 +66,7 @@
   - _Dispatch: mechanical — 今の読みの輪に欄 1 つと行の照合を足す_
   - _Requirements: 5.4, 5.5_
 
-- [ ] 3.2 デバッグが無効なときの案内の文をトグルへ向ける
+- [x] 3.2 デバッグが無効なときの案内の文をトグルへ向ける
   - `DEBUG_HINT` を「SHIORI デバッグを有効にする」を案内する文に、`NO_SCRIPT_GUIDE` を 204 とトグルを案内する文に替える（文は設計の表のとおり）
   - 204 のときに pasta.log の警告の行を理由として添える今の振る舞いは残す。`DEBUG_HINT` は保存変数の表示を断られたとき（`dumpVariables.ts`）にも出るので、そこでも読める文であることを確かめる
   - 古い文に合わせている今の試験（VSCode の `devCommands.e2e.test.ts`・`dumpVariables.test.ts`・`runSceneAtCursor.test.ts` の案内の照合）を新しい文に直す

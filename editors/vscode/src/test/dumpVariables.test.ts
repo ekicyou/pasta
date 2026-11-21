@@ -68,7 +68,7 @@ function is<K extends DumpOutcome['kind']>(o: DumpOutcome, kind: K): Extract<Dum
   return o as Extract<DumpOutcome, { kind: K }>;
 }
 
-const HINT = /pasta\.toml に \[debug\] enabled = true を書いて/;
+const HINT = /「SHIORI デバッグを有効にする」/;
 
 async function main() {
   console.log('dumpVariables');

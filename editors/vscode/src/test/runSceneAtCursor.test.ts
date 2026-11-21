@@ -75,7 +75,7 @@ function is<K extends SceneOutcome['kind']>(o: SceneOutcome, kind: K): Extract<S
   return o as Extract<SceneOutcome, { kind: K }>;
 }
 
-const GUIDE = /`?pasta\.toml`? に `?\[debug\] enabled = true`? を書いて/;
+const GUIDE = /「SHIORI デバッグを有効にする」/;
 
 async function main() {
   console.log('runSceneAtCursor');
@@ -200,7 +200,7 @@ async function main() {
     assert.match(f.notice ?? '', /スクリプトを確かめられませんでした/);
   });
 
-  await test('204: [debug] enabled hint plus only the OnPastaSceneAt: warn lines appended to pasta.log (4.10)', async () => {
+  await test('204: debug toggle hint plus only the OnPastaSceneAt: warn lines appended to pasta.log (4.10)', async () => {
     const reason = `${ts()}  WARN pasta_lua::runtime: OnPastaSceneAt: debug is disabled; scene not played`;
     const { outcome } = await play(server, makeGhost(), {
       raiseEvent: { mode: 'noScript' },

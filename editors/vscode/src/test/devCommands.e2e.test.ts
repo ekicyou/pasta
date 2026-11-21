@@ -318,16 +318,16 @@ async function main() {
     assert.deepStrictEqual(messagesSince(m).map((x) => [x.kind, x.message]), [['warning', 'スクリプトを確かめられませんでした']]);
   });
 
-  await test('4.10: 204 → the [debug] enabled guide with the OnPastaSceneAt: reason line', async () => {
+  await test('4.10: 204 → the SHIORI debug-enable guide with the OnPastaSceneAt: reason line', async () => {
     a.state.raiseEvent = { mode: 'noScript' };
     a.state.raiseEventLog = [`${new Date().toISOString()}  WARN pasta_lua::debug: OnPastaSceneAt: debug is disabled`];
     const { m, o } = onlyOn(a, b);
     await run('pasta.runSceneAtCursor');
     resetServer(a);
-    assert.ok(outputSince(o).some((l) => l.includes('[debug] enabled = true')), outputSince(o).join('\n'));
+    assert.ok(outputSince(o).some((l) => l.includes('「SHIORI デバッグを有効にする」')), outputSince(o).join('\n'));
     assert.ok(outputSince(o).some((l) => l.includes('OnPastaSceneAt: debug is disabled')));
     assert.deepStrictEqual(messagesSince(m).map((x) => x.kind), ['warning']);
-    assert.match(messagesSince(m)[0].message, /\[debug\] enabled = true/);
+    assert.match(messagesSince(m)[0].message, /「SHIORI デバッグを有効にする」/);
   });
 
   await test('6.2 / 6.4: 保存変数を表示 shows the fresh variables.toml; no save, no reload', async () => {
