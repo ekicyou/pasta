@@ -1,33 +1,20 @@
-//! 本番アクター機構の **ホスト非依存・決定論テストハーネス**（ActorTestHarness・task 6.2）。
+//! 本番アクター機構の **ホスト非依存・決定論テストハーネス**。
 //!
-//! 関連仕様: `.kiro/specs/completed/pasta-actor-runtime/`
-//! - 充足要件: R10.5（アクター機構の振る舞いを SSP 非依存に再現・検証できる決定論テスト
-//!   ハーネスで観測・デバッグ可能にする。PoC `actor_poc/` の `sim_driver`／`mailbox`／
-//!   `coroutine_probe` 検証等を本番化）／R10.7（データ競合・デッドロック・スレッド非決定性を
-//!   単一直列キューの順序保存＋drop→204 ガードで構造的に排除し、再現困難な並行バグを最小化）
-//! - 設計: design.md の **ByteInvariantSuite / ActorTestHarness** コンポーネント
-//!   （`sim_driver`〈GET/NOTIFY tick 生成〉・`mailbox`／`coroutine_probe` 検証＋reply
-//!   move/drop exactly-once をホスト非依存の決定論テストへ昇格）。
+//! 実 SSP も実 Lua VM も要さず、アクター役スレッド（producer/consumer の単一直列契約のみ）と
+//! 本番 `actor/` モジュール（`mailbox`／`marshaling`／`teardown`）の型で、アクター機構の振る舞いを
+//! 決定論的に検証する。PoC 足場は一切参照しない。
 //!
-//! ## PoC 昇格の方針（actor_poc に依存しない）
-//! 旧 PoC（pasta_lua の actor-poc 足場の `sim_driver`／`coroutine_probe`／`flume_wake`）が
-//! 実証していた **価値ある決定論検証**を、**本番 `actor/` モジュール**（`mailbox`／
-//! `marshaling`／`teardown`）に対して再ホームしたものである。本ファイルは
-//! その PoC 足場を **一切参照しない**（task 7.2 が PoC 足場を撤去しても本カバレッジは
-//! 残る）。検証は実 SSP も実 Lua VM も要さず、アクター役スレッド（producer/consumer の
-//! 単一直列契約のみ）と本番 mailbox／marshaling 型で決定論的に成立する。
-//!
-//! 昇格した検証群:
+//! 検証群:
 //! - **SimDriver 風 GET/NOTIFY tick 生成**: `tick(playable)` の bool だけから GET/NOTIFY を
 //!   決定論的にタグ付けし（受信文字列を再パースしない独立生成器）、本番 marshaling へ
 //!   投入して GET=block-on-reply／NOTIFY=即 204 の契約を観測する。
 //! - **mailbox 検証**: 本番 `mailbox()`（flume FIFO・単一 consumer）の投入順＝処理順を
-//!   複数 producer から実証（R6 横断・順序一意性）。
+//!   複数 producer から実証する。
 //! - **reply move/drop exactly-once**: 本番 `marshal_get_with_timeout` 越しに、reply を
-//!   送れば値・送らず drop すれば 204 の exactly-once を観測（flume move/drop 意味論）。
+//!   送れば値・送らず drop すれば 204 の exactly-once を観測する。
 //! - **coroutine_probe 風 survival**: timeout で SHIORI 待機を打ち切っても、アクター役の
 //!   in-flight work は **打ち切られず**後続 tick で回復する（co_scene 保存の構造的根拠）。
-//!   実 Lua コルーチンは要さず、単一直列 FIFO の継続として決定論的に観測する。
+//!   単一直列 FIFO の継続として決定論的に観測する。
 //!
 //! ## 決定論・ホスト非依存
 //! - 実 SSP・実ネットワーク・実 Lua VM を一切起動しない（アクター役スレッドが mailbox を
@@ -41,11 +28,10 @@ use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use pasta::actor::marshaling::{default_204, marshal_get_with_timeout, marshal_notify};
 
 // ===========================================================================
-// SimDriver 風 GET/NOTIFY tick 生成器（PoC sim_driver の昇格・独立生成器）
+// SimDriver 風 GET/NOTIFY tick 生成器（独立生成器）
 // ---------------------------------------------------------------------------
 // `tick(playable)` の bool 引数だけから method を決定論的にタグ付けする。受信
 // リクエスト文字列を一切パースしない（Marshal の再パースに構造的に依存し得ない）。
-// PoC の SimMethod/SimTick/SimDriver を本ハーネスに最小再現したもの。
 // ===========================================================================
 
 /// OnSecondChange tick の method タグ（GET/NOTIFY ≡ Reference3 の権威）。
@@ -109,7 +95,7 @@ impl SimDriver {
 // 1) SimDriver 風 tick 生成 → 本番 marshaling 投入の契約検証
 // ===========================================================================
 
-/// SimDriver が GET/NOTIFY を bool だけから自己整合にタグ付けする（独立生成器・R10.5）。
+/// SimDriver が GET/NOTIFY を bool だけから自己整合にタグ付けする（独立生成器）。
 #[test]
 fn sim_driver_tags_get_and_notify_from_bool_only() {
     let mut driver = SimDriver::new();
@@ -129,7 +115,7 @@ fn sim_driver_tags_get_and_notify_from_bool_only() {
 }
 
 /// SimDriver 生成 tick を本番 marshaling へ流し、GET=block-on-reply／NOTIFY=即 204 の
-/// 契約をホスト非依存に観測する（R10.5・marshaling シーム）。
+/// 契約をホスト非依存に観測する。
 ///
 /// アクター役スレッドは GET だけを drain して reply する（NOTIFY は応答経路を持たない）。
 /// 実 SSP・実 VM を起動せず、単一直列 FIFO とアクター役だけで決定論的に成立する。
@@ -154,7 +140,6 @@ fn sim_driver_ticks_drive_production_marshaling_contract() {
         }
     });
 
-    // GET tick: marshal_get_with_timeout は実 reply 値を返す（block-on-reply）。
     let get_tick = driver.tick(true);
     assert!(get_tick.is_playable());
     let get_resp = marshal_get_with_timeout(
@@ -167,7 +152,6 @@ fn sim_driver_ticks_drive_production_marshaling_contract() {
         "GET tick must drive block-on-reply and return the actor's reply value"
     );
 
-    // NOTIFY tick: marshal_notify は即 204（アクター完了を待たない）。
     let notify_tick = driver.tick(false);
     assert!(!notify_tick.is_playable());
     let notify_resp = marshal_notify(&tx, MailboxRequest::new(2, "BODY"));
@@ -177,7 +161,6 @@ fn sim_driver_ticks_drive_production_marshaling_contract() {
         "NOTIFY tick must return 204 immediately (fire-and-forget)"
     );
 
-    // teardown（clean stop）。
     let (stop, done_rx) = ActorMsg::stop();
     tx.send(stop).expect("send Stop");
     done_rx
@@ -187,11 +170,11 @@ fn sim_driver_ticks_drive_production_marshaling_contract() {
 }
 
 // ===========================================================================
-// 2) mailbox 検証（FIFO・単一 consumer・順序一意性）— PoC mailbox 検証の昇格
+// 2) mailbox 検証（FIFO・単一 consumer・順序一意性）
 // ===========================================================================
 
 /// 本番 `mailbox()` を複数 producer から近接 `send` しても、単一 consumer が投入順
-/// （producer-local FIFO）で全件を一意に drain する（R6/R10.7・順序保存で並行バグ排除）。
+/// （producer-local FIFO）で全件を一意に drain する。
 #[test]
 fn production_mailbox_preserves_fifo_across_producers() {
     let (tx, rx) = mailbox();
@@ -216,7 +199,6 @@ fn production_mailbox_preserves_fifo_across_producers() {
     }
     drop(tx);
 
-    // 単一 consumer が全件を 1 本の FIFO として受ける。
     let mut drained: Vec<u64> = Vec::new();
     while let Ok(msg) = rx.try_recv() {
         if let ActorMsg::Notify { req } = msg {
@@ -224,14 +206,12 @@ fn production_mailbox_preserves_fifo_across_producers() {
         }
     }
 
-    // (1) 取りこぼし・重複なし。
     assert_eq!(
         drained.len() as u64,
         PRODUCERS * PER_PRODUCER,
         "single consumer must receive exactly every enqueued message once"
     );
 
-    // (2) producer-local FIFO 保存。
     for p in 0..PRODUCERS {
         let sub: Vec<u64> = drained
             .iter()
@@ -246,7 +226,6 @@ fn production_mailbox_preserves_fifo_across_producers() {
         );
     }
 
-    // (3) 全順序の一意性（重複インデックスなし）。
     let mut sorted = drained.clone();
     sorted.sort_unstable();
     sorted.dedup();
@@ -258,11 +237,11 @@ fn production_mailbox_preserves_fifo_across_producers() {
 }
 
 // ===========================================================================
-// 3) reply move/drop exactly-once（PoC responder 検証相当の昇格）
+// 3) reply move/drop exactly-once
 // ===========================================================================
 
 /// 本番 marshaling 越しに、reply を送れば値・送らず drop すれば 204 の exactly-once を
-/// 観測する（flume の move/drop 意味論・独自 Responder 不要・R10.5/R5.3）。
+/// 観測する（flume の move/drop 意味論・独自 Responder 不要）。
 #[test]
 fn reply_move_then_value_or_204_on_drop_exactly_once() {
     // ケース A: アクター役が reply を送る → 値が届く（move）。
@@ -306,11 +285,10 @@ fn reply_move_then_value_or_204_on_drop_exactly_once() {
 // ===========================================================================
 
 /// timeout で SHIORI 待機を打ち切っても、アクター役の in-flight work は **打ち切られず**
-/// 後続 tick で回復する（co_scene 保存の構造的根拠・R10.5/R10.7）。
+/// 後続 tick で回復する（co_scene 保存の構造的根拠）。
 ///
-/// PoC `coroutine_probe` が実 Lua コルーチンで実証した「executor 駆動下の resume 継続／
-/// 喪失なし」を、本番 mailbox の単一直列 FIFO の継続として **実 VM なしで** 決定論化する。
-/// timeout は SHIORI 側の待機を切るだけで、アクター役（Lua 実行相当）は処理を続行する。
+/// 実 Lua コルーチンの resume 継続を、本番 mailbox の単一直列 FIFO の継続として実 VM なしで
+/// 決定論化する。timeout は SHIORI 側の待機を切るだけで、アクター役（Lua 実行相当）は処理を続行する。
 #[test]
 fn actor_work_survives_timeout_and_recovers_on_next_tick() {
     let (tx, rx) = mailbox();
@@ -357,11 +335,10 @@ fn actor_work_survives_timeout_and_recovers_on_next_tick() {
 }
 
 // ===========================================================================
-// 5) ハーネス自己検査: actor_poc に依存していないこと（task 7.2 撤去の安全性）
+// 5) ハーネス自己検査: actor_poc に依存していないこと
 // ===========================================================================
 
-/// 本ハーネスソースが `actor_poc` を一切参照しないことを静的に確認する（R10.8 整合・
-/// task 7.2 が `actor_poc/` を撤去しても本決定論カバレッジが残ることの保証）。
+/// 本ハーネスソースが `actor_poc` を一切参照しないことを静的に確認する。
 #[test]
 fn harness_does_not_depend_on_actor_poc() {
     let src = include_str!("actor_test_harness.rs");

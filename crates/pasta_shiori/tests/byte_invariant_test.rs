@@ -1,23 +1,8 @@
 //! FFI 入口応答バイト列のゴールデン特性化テスト（ByteInvariantSuite）
 //!
-//! 関連仕様: `.kiro/specs/completed/pasta-actor-runtime/`
-//! - 充足要件: R1.1（外部 SHIORI 挙動バイト不変）／R1.2（全既存テスト回帰不変）／
-//!   R1.4（差分検出で revert 可能な回帰ガード）
-//! - 設計: design.md の **ByteInvariantSuite** コンポーネント
-//!   （Testing Strategy → Integration Tests「ByteInvariant ゴールデン」）
-//!
-//! ## 目的
-//! 本ファイルは pasta-actor-runtime の **アクター化リファクタ着手前**に敷設する、
-//! FFI 入口（`PastaShiori::request` = research.md の外部観測点）応答バイト列の
-//! **特性化（characterization）ゴールデン**である。現行実装の応答バイト列を
-//! ゴールデンとして固定し、以後の各リファクタ段（event stream / actor+marshaling /
-//! teardown / unsafe 撤去 / 足場撤去）で 1 バイトでも応答が変化したら検出する
-//! 回帰ガードとして機能する。
-//!
-//! ## 非挙動タスク（特性化）について
-//! これは新規挙動を導入しないテスト基盤タスクである。RED フェーズは存在しない
-//! （現行実装で即グリーン）。ゴールデンは現行挙動そのものを「正」として符号化する。
-//! 将来のリファクタで応答バイトが変化した場合、本テストが赤化し revert を促す。
+//! FFI 入口（`PastaShiori::request`）応答バイト列の **特性化（characterization）ゴールデン**。
+//! 現行実装の応答バイト列をゴールデンとして固定し、リファクタで 1 バイトでも応答が変化したら
+//! 赤化して revert を促す回帰ガードとして機能する。ゴールデンは現行挙動そのものを「正」として符号化する。
 //!
 //! ## 決定論・ハーメティック性
 //! - 乱数依存（OnTalk 等のランダム選択）を避け、**決定論的に同一バイトを返す**
@@ -173,7 +158,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// OnBoot の FFI 入口応答バイト列ゴールデン（hello-pasta 単一シーン）。
 ///
 /// さくらスクリプト描画（`\p`/`\s`/`\_w`/`\n`/`\e`）と本文がバイト不変であること。
-/// アクター化リファクタ後もこのバイト列が同一であることを保証する（R1.1）。
+/// アクター化リファクタ後もこのバイト列が同一であることを保証する。
 #[test]
 fn golden_onboot_response_bytes() {
     let temp = common::copy_sample_ghost_to_temp();
@@ -200,7 +185,7 @@ Reference0: マスターシェル\n",
 /// Round1 で `get_property` がコルーチンを yield して get タグ応答を返し、
 /// Round2 のコールバックでコルーチンが resume され値が反映される。
 /// executor 駆動化（アクター化）後もこの 2 段のバイト列が同一であることを
-/// 保証する（コルーチン意味論不変・R1.1/R9 横断観測）。
+/// 保証する（コルーチン意味論不変）。
 #[test]
 fn golden_get_property_coroutine_continuation_bytes() {
     let (mut shiori, _temp) = load_async_callback();
@@ -259,7 +244,7 @@ Reference3: 0\n",
 /// 特性化テストの価値は「バイトが 1 つでも変われば赤化する」点にある。
 /// ここでは `assert_golden_bytes` が実際に差分を検出できること
 /// （= 後続リファクタの回帰ガードとして機能すること）を、意図的な改竄に対して
-/// パニックが起きることで確認する（R1.4 差分検出）。
+/// パニックが起きることで確認する。
 #[test]
 fn golden_assertion_actually_detects_drift() {
     // 1 文字だけ変えた偽応答はバイト不一致でパニックすべき。

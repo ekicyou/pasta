@@ -43,7 +43,6 @@ impl ShioriResponse {
 
         let mut lines = text.split("\r\n");
 
-        // Parse status line: "SHIORI/3.0 200 OK"
         let status_line = lines.next().ok_or(ShioriResponseError::MissingStatusLine)?;
         if status_line.is_empty() {
             return Err(ShioriResponseError::MissingStatusLine);
@@ -51,7 +50,6 @@ impl ShioriResponse {
 
         let (status_code, status_text) = parse_status_line(status_line)?;
 
-        // Parse headers
         let mut headers = HashMap::new();
         let mut value = None;
 
@@ -61,7 +59,6 @@ impl ShioriResponse {
             }
             let (key, val) = parse_header_line(line)?;
 
-            // Extract Value header specially
             if key.eq_ignore_ascii_case("Value") {
                 value = Some(val.to_string());
             } else {

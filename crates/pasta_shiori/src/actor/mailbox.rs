@@ -1,25 +1,22 @@
-//! 単一直列 mailbox（本番化・task 3.2／R6.1-R6.4）。
+//! 単一直列 mailbox。
 //!
 //! SHIORI スレッド（producer）↔アクタースレッド（consumer）間の単一直列キュー。
-//! 本番アクターランタイム（design.md「Mailbox / Reply / Teardown」コンポーネント）の
-//! メッセージ契約の中核であり、PoC 段階の std mpsc 実装（撤去済み）を **flume**
-//! へ差し替えて本番昇格したもの。
 //!
-//! # チャンネル決定（design.md Technology Stack / RN7）
+//! # チャンネル
 //! - mailbox 本体 = **flume unbounded**。consumer は単一（アクタースレッド）で、
 //!   同期 `recv()` ループ（`thread.rs`）による直列処理。flume `Sender` は
-//!   `Send + Sync + Clone` ゆえ芯の型 `ActorInstance`（`instance.rs`）越しに lock-free に共有され、
-//!   送信パスに Mutex を置かない（R8）。
+//!   `Send + Sync + Clone` ゆえ芯の型 `ActorInstance` 越しに lock-free に共有され、
+//!   送信パスに Mutex を置かない。
 //! - reply / done = **flume bounded(1)**。GET 応答・teardown done ack とも
-//!   `recv_timeout` で有界に待つ（`marshaling.rs`・`teardown.rs`）。
+//!   `recv_timeout` で有界に待つ。
 //!
-//! # 単一 consumer 不変条件（design.md Revalidation Trigger）
+//! # 単一 consumer 不変条件
 //! mailbox は **単一の同期 `recv()` ループ**で消費し、`select!` を張らない。
 //! 将来の新メッセージ源は別チャンネル＋`select!` ではなく [`ActorMsg`] の
 //! variant として同一 mailbox へ merge する。この不変条件により flume の
 //! cancel 欠陥（#104/#135）に構造的に到達しない。
 //!
-//! # FIFO 順序保証（R6.1-R6.4）
+//! # FIFO 順序保証
 //! flume は送信順＝受信順の FIFO を保証する。単一 mailbox を単一 consumer が逐次
 //! drain することで、近接した複数 `try_send` も投入順＝処理順で逐次処理され、
 //! 同時並行 VM アクセスは構造的に発生しない。複数の `Sender` クローンから合流した
@@ -37,11 +34,10 @@ use flume::{Receiver, Sender, bounded, unbounded};
 ///
 /// Lua リクエストテーブルは `!Send` で mailbox を越えられないため、SHIORI スレッドが
 /// 受け取った生文字列をそのまま運び、アクタースレッド上の `PastaShiori::request` が
-/// パースしてテーブル化する（design.md の `LuaRequestTable` は VM 同居の表現）。
-/// `seq` は投入順＝処理順を観測するための順序識別子（ログに出る）。
+/// パースしてテーブル化する。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MailboxRequest {
-    /// 投入順＝処理順の検証に用いる順序識別子。
+    /// 投入順＝処理順を観測するための順序識別子（ログに出る）。
     pub seq: u64,
     /// SHIORI リクエスト本文（アクタースレッド側でパースされる生文字列）。
     pub raw: String,
@@ -57,7 +53,7 @@ impl MailboxRequest {
     }
 }
 
-/// mailbox を流れるメッセージの判別共用体（design.md「Event Contract（Mailbox）」）。
+/// mailbox を流れるメッセージ。
 ///
 /// SHIORI marshaling の契約 3 種を表す:
 /// - [`ActorMsg::Get`]: GET 同期契約。`reply`（flume `bounded(1)`）を同梱し、アクターが
@@ -67,7 +63,7 @@ impl MailboxRequest {
 ///   返す。先行メッセージを drain 後に同一 FIFO 上で処理される（clean drain）。
 #[derive(Debug)]
 pub enum ActorMsg {
-    /// GET 同期メッセージ。`reply` は flume `bounded(1)` の応答経路（exactly-once）。
+    /// GET 同期メッセージ。
     Get {
         /// VM へ渡す SHIORI リクエスト（生文字列。テーブル化はアクタースレッド側）。
         req: MailboxRequest,
@@ -91,8 +87,7 @@ pub enum ActorMsg {
 impl ActorMsg {
     /// teardown 制御メッセージを構築する。
     ///
-    /// 返り値の done [`Receiver`]（`bounded(1)`）で完了 ack を待つ（`teardown.rs` の
-    /// `teardown_via_sender` が `recv_timeout` で待つ）。
+    /// 返り値の done [`Receiver`]（`bounded(1)`）で完了 ack を待つ。
     pub fn stop() -> (ActorMsg, Receiver<()>) {
         let (done, done_rx) = bounded(1);
         (ActorMsg::Stop { done }, done_rx)
@@ -102,10 +97,8 @@ impl ActorMsg {
 /// 単一直列 mailbox を生成し、producer 側 [`Sender`] と consumer 側 [`Receiver`] の
 /// ペアを返す（flume unbounded）。
 ///
-/// `Sender<ActorMsg>` は `Send + Sync + Clone` ゆえ複数 SHIORI 経路（および
-/// 芯の型 `ActorInstance`）から lock-free に合流でき、`Receiver<ActorMsg>` は単一 consumer
-/// （アクタースレッド）が所有する。consumer は同期 `recv()`（`thread.rs`）で
-/// 単一 recv ループを回し、`select!` を張らない（単一 consumer 不変条件）。
+/// `Receiver<ActorMsg>` は単一 consumer（アクタースレッド）が所有し、`select!` を張らない
+/// （単一 consumer 不変条件）。
 pub fn mailbox() -> (Sender<ActorMsg>, Receiver<ActorMsg>) {
     unbounded()
 }
@@ -115,7 +108,6 @@ mod tests {
     use super::*;
     use std::thread;
 
-    /// NOTIFY メッセージ（テストの投入用）。
     fn notify(seq: u64) -> ActorMsg {
         ActorMsg::Notify {
             req: MailboxRequest::new(seq, ""),
@@ -129,9 +121,7 @@ mod tests {
         (ActorMsg::Get { req, reply }, reply_rx)
     }
 
-    /// 種別に依らず順序識別子 (`seq`) を取り出すテストヘルパ。
-    ///
-    /// `Stop` は順序識別子を持たないため、テストでは予約値 `u64::MAX`（末尾終端マーカー）で表す。
+    /// `Stop` は順序識別子を持たないため `u64::MAX` で表す。
     fn seq_of(msg: &ActorMsg) -> u64 {
         match msg {
             ActorMsg::Get { req, .. } => req.seq,
@@ -140,11 +130,7 @@ mod tests {
         }
     }
 
-    /// 単一 consumer が現在キューにあるメッセージを FIFO で drain する。
-    ///
-    /// 本番アクターは同期 `recv()` の単一ループで消費する（task 3.3）。
-    /// task 3.2 のテストではブロッキングせず `try_recv` で「現時点で利用可能な分」を
-    /// 投入順に取り出し、FIFO / 単一直列契約を確認する。
+    /// 現在キューにある分だけをブロッキングせず FIFO で drain する。
     fn drain(rx: &Receiver<ActorMsg>) -> Vec<ActorMsg> {
         let mut out = Vec::new();
         while let Ok(msg) = rx.try_recv() {
@@ -153,7 +139,7 @@ mod tests {
         out
     }
 
-    /// R6.1/R6.2（FIFO）: 投入順 1..=N がそのままの順序で drain される。
+    /// 投入順 1..=N がそのままの順序で drain される。
     #[test]
     fn drains_in_enqueue_order() {
         let (tx, rx) = mailbox();
@@ -172,24 +158,20 @@ mod tests {
         );
     }
 
-    /// R6.1/R6.4（全 variant FIFO）: Get/Notify/Stop を混在投入しても、種別に依らず
-    /// 投入順がそのまま drain 順に保存され、順序が一意に確定する。
+    /// Get/Notify/Stop を混在投入しても、種別に依らず投入順がそのまま drain 順になる。
     #[test]
     fn all_variants_preserve_fifo_order() {
         let (tx, rx) = mailbox();
 
-        // GET の応答経路（bounded(1)）は順序確認では使わないが、drop すると
-        // exactly-once 経路が閉じるため保持しておく。
+        // 応答経路は使わないが、drop すると閉じるため保持しておく。
         let (get_a, _rx_a) = get(11);
         let (get_b, _rx_b) = get(13);
         let (stop, _done_rx) = ActorMsg::stop();
 
-        // 種別を意図的に交互配置し、順序が種別ではなく投入順で決まることを示す。
         tx.send(notify(10)).unwrap();
         tx.send(get_a).unwrap();
         tx.send(notify(12)).unwrap();
         tx.send(get_b).unwrap();
-        // Stop は同一 FIFO を通り、先行メッセージを drain 後に処理される（clean drain）。
         tx.send(stop).unwrap();
 
         let order: Vec<u64> = drain(&rx).iter().map(seq_of).collect();
@@ -200,10 +182,8 @@ mod tests {
         );
     }
 
-    /// R6.3/R6.4（単一直列・データ競合排除）: 複数の `Sender` クローンから別スレッドで
-    /// 近接して `try_send`（flume の send は実質ノンブロッキング）しても、単一 consumer が
-    /// すべてを一意な全順序で逐次 drain する。各 producer 内の投入順は consumer 側でも
-    /// 保存され（producer-local FIFO）、同時並行 VM アクセスは構造的に発生しない。
+    /// 複数の `Sender` クローンから別スレッドで近接して送っても、単一 consumer が
+    /// すべてを一意な全順序で逐次 drain し、各 producer 内の投入順も保存される。
     #[test]
     fn cloned_senders_feed_one_serial_fifo() {
         let (tx, rx) = mailbox();
@@ -215,8 +195,7 @@ mod tests {
             let txc = tx.clone();
             handles.push(thread::spawn(move || {
                 for i in 0..PER_PRODUCER {
-                    // seq = producer*1000 + i により、各 producer の投入順が
-                    // consumer 側で単調増加として観測できるよう符号化する。
+                    // producer ごとの投入順を consumer 側で単調増加として観測できるように符号化する。
                     let seq = p * 1000 + i;
                     txc.send(notify(seq))
                         .expect("clone send must succeed while consumer is alive");
@@ -226,20 +205,16 @@ mod tests {
         for h in handles {
             h.join().expect("producer thread must not panic");
         }
-        // 全 producer が投入し終えてから単一 consumer が drain する。
         drop(tx);
 
         let drained: Vec<u64> = drain(&rx).iter().map(seq_of).collect();
 
-        // (1) 単一直列の証跡: drain 総数 = 投入総数（取りこぼし・重複なし）。
         assert_eq!(
             drained.len() as u64,
             PRODUCERS * PER_PRODUCER,
             "single consumer must receive exactly every enqueued message once"
         );
 
-        // (2) producer-local FIFO: 各 producer 由来のサブ列が投入順（単調増加）で
-        //     保存される。これにより「同一 producer の近接投入が投入順＝処理順」を確認。
         for p in 0..PRODUCERS {
             let sub: Vec<u64> = drained
                 .iter()
@@ -254,8 +229,6 @@ mod tests {
             );
         }
 
-        // (3) 全順序の一意性: drain 列は決定的な 1 本の系列であり、重複インデックスは
-        //     存在しない（単一 consumer ゆえ並行処理されない）。
         let mut sorted = drained.clone();
         sorted.sort_unstable();
         sorted.dedup();
@@ -266,20 +239,15 @@ mod tests {
         );
     }
 
-    /// 単一 consumer 不変条件（design.md Revalidation Trigger）: consumer は 1 つの
-    /// `Receiver` を所有し、recv は単一経路に閉じる。`Sender` のみ `Clone` でき、
-    /// `Receiver` をクローンして複数 recv 経路（`select!` 相当）に分岐させない設計を
-    /// 型レベルで示す（`mailbox()` は `Receiver` を 1 つしか返さない）。
+    /// `Sender` のクローンからの送信は、1 つの `Receiver` が 1 本の FIFO として受ける。
     #[test]
     fn sender_is_clonable_receiver_is_single_consumer() {
         let (tx, rx) = mailbox();
 
-        // Sender は Send + Sync + Clone（lock-free static 共有の素地）。
         let tx2 = tx.clone();
         tx.send(notify(1)).unwrap();
         tx2.send(notify(2)).unwrap();
 
-        // 単一 consumer がすべてを 1 本の FIFO として受ける。
         let order: Vec<u64> = drain(&rx).iter().map(seq_of).collect();
         assert_eq!(
             order,
@@ -287,31 +255,27 @@ mod tests {
             "single consumer receives both clones' sends in order"
         );
 
-        // Sender が Send + Sync であることを静的に確認（芯の型 ActorInstance 越しに SHIORI スレッドと共有する前提）。
+        // 芯の型 ActorInstance 越しに SHIORI スレッドと共有する前提。
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<Sender<ActorMsg>>();
     }
 
-    /// exactly-once（move/drop 意味論・R5.3 の素地）: GET の `reply` をアクター役が
-    /// 受け取り `send` すれば値が届き、send せず drop すれば受信側が `Disconnected` を
-    /// 観測する（task 3.4 の `recv_timeout`→204 の構造的根拠）。
+    /// GET の `reply` を `send` すれば値が届き、send せず drop すれば受信側が `Disconnected` を
+    /// 観測する（marshaling の 204 の根拠）。
     #[test]
     fn get_reply_move_then_value_or_disconnected_on_drop() {
         let (tx, rx) = mailbox();
 
-        // ケース A: アクター役が reply を送る → 値が届く。
         let (get_a, reply_rx_a) = get(1);
         tx.send(get_a).unwrap();
 
-        // ケース B: アクター役が reply を送らず drop → 受信側は Disconnected。
         let (get_b, reply_rx_b) = get(2);
         tx.send(get_b).unwrap();
         drop(tx);
 
         let drained = drain(&rx);
         for msg in drained {
-            // seq==1 は reply を送る。seq==2 は reply を送らず drop（スコープ離脱）→
-            // exactly-once の drop 側（受信端が Disconnected を観測する根拠）。
+            // seq==2 は reply を送らずスコープを抜けて drop する。
             if let ActorMsg::Get { req, reply } = msg
                 && req.seq == 1
             {

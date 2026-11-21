@@ -1,20 +1,19 @@
-//! reload リーク検査の統合テスト（task 4.1・R7.2/R7.3）。
+//! reload リーク検査の統合テスト。
 //!
 //! reload（spawn→teardown ×N）でカーネルハンドル／USER オブジェクトがリーク・枯渇
 //! しないことを、実 OS カウンタ（`GetProcessHandleCount`/`GetGuiResources`）で検査する。
 //!
-//! # なぜ専用のテストバイナリに置くか（flake の根本原因）
+//! # なぜ専用のテストバイナリに置くか
 //! 計測するカウンタは **プロセス全体**の値である。libtest は同一バイナリ内のテストを
-//! 並列スレッドで走らせるため、以前 `actor_teardown_test.rs` に同居していた頃は、
-//! 兄弟テスト（各々アクタースレッド＋VM を spawn→teardown する）のハンドル解放が
-//! 計測窓の途中に重なり、baseline だけが兄弟分（~14）高く採られて growth が負に振れ、
-//! slope 判定が偽陽性になった（遅い CI ランナーでのみ顕在化）。
+//! 並列スレッドで走らせるため、兄弟テスト（各々アクタースレッド＋VM を spawn→teardown する）の
+//! ハンドル解放が計測窓の途中に重なると、baseline だけが兄弟分（~14）高く採られて growth が負に振れ、
+//! slope 判定が偽陽性になる（遅い CI ランナーでのみ顕在化する）。
 //! cargo はテストバイナリを直列に実行するので、本ファイルに計測するテストはこの 1 本だけを置けば
 //! 計測中に同一プロセスで他のテストが動くことはない。**このファイルにアクターを起こすテストを
 //! 追加しないこと。**（アクターも OS の資源も触らない `user_objects_from` の単体テストだけは同居させる。）
 //!
 //! 検査の一式（`ReloadProbe`・OS の資源の数え上げ）は、このテストだけが使うので出荷のコードでなく
-//! ここに置く（ponytail-shiori 6.1）。
+//! ここに置く。
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -24,7 +23,7 @@ use pasta::actor::teardown::teardown_via_sender;
 use pasta::actor::thread::spawn_actor_thread_with;
 use tempfile::TempDir;
 
-/// reload 反復の結果レポート（R7.2 の re-spawn ＋ R7.3 のリーク不在）。
+/// reload 反復の結果レポート。
 #[derive(Debug, Clone, Copy)]
 struct ReloadReport {
     /// 実際に回した reload サイクル数（途中で hang/panic していなければ要求数と一致）。
@@ -35,33 +34,25 @@ struct ReloadReport {
     leak_metric: Option<LeakMetric>,
 }
 
-/// reload 反復前後の実 OS リソースカウンタとその増分（R7.3）。
+/// reload 反復前後の実 OS リソースカウンタとその増分。
 ///
 /// ベースラインは **ウォームアップ後** に採取する（一回性初期化を除外するため）。
 /// 計測は `GetProcessHandleCount` / `GetGuiResources(GR_USEROBJECTS)` による。
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(not(windows), allow(dead_code))]
 struct LeakMetric {
-    /// ウォームアップ後・計測サイクル開始時のカーネルハンドル数。
     kernel_handles_baseline: u32,
-    /// N サイクル完了後のカーネルハンドル数。
     kernel_handles_final: u32,
-    /// カーネルハンドル数の増分（final - baseline）。
     kernel_handle_growth: i64,
-    /// ウォームアップ後・計測サイクル開始時の USER オブジェクト数。
     user_objects_baseline: u32,
-    /// N サイクル完了後の USER オブジェクト数。
     user_objects_final: u32,
-    /// USER オブジェクト数の増分（final - baseline）。
     user_object_growth: i64,
 }
 
-/// reload teardown の反復リーク検査ハーネス（design「Reload / Teardown Tests」）。
+/// reload teardown の反復リーク検査ハーネス。
 ///
-/// spawn→teardown（`Stop{done}` ack）→ 再 spawn のサイクルを反復し、各サイクルで
-/// アクタースレッド・VM・チャネルが漏れなく解放される
-/// （clean teardown）こと、サイクル間でリソースが累積しない（リーク／枯渇不在）ことを
-/// **done ack 後に** 実測する。
+/// spawn→teardown（`Stop{done}` ack）→再 spawn のサイクルを反復し、リソースがサイクル間で
+/// 累積しない（リーク／枯渇不在）ことを **done ack 後に** 実測する。
 struct ReloadProbe;
 
 impl ReloadProbe {
@@ -72,22 +63,14 @@ impl ReloadProbe {
     /// reload（spawn→teardown）サイクルを `n` 回反復し、各サイクルの teardown 結果と
     /// 累積リーク指標を返す。
     ///
-    /// 各サイクルは新規 `spawn_actor_thread_with`（新スレッド＋新 VM＋新チャネル）→
-    /// 送信端からの `teardown_via_sender`（`Stop{done}` ack）→ 手放し（detach）。ack を受けてから
-    /// 次サイクルを spawn するため、計測は **done ack 後** に行われる（解放完了後の実測）。
-    ///
-    /// - Postconditions: 全サイクルで done ack（clean teardown）・再 spawn 正常稼働。
-    /// - Invariants: スレッドハンドル／USER オブジェクト／port がサイクル間で枯渇しない。
+    /// ack を受けてから次サイクルを spawn するため、計測は done ack 後（解放完了後）に行われる。
     fn run_cycles(load_dir: &Path, n: usize, timeout: Duration) -> ReloadReport {
-        // (1) ウォームアップ: 実 VM 構築の一回性コストを baseline から除外する。
         for _ in 0..Self::WARMUP_CYCLES {
             let _ = run_one_reload_cycle(load_dir, timeout);
         }
 
-        // (2) ウォームアップ後のベースライン採取（計測サイクルの開始点）。
         let baseline = sample_resources();
 
-        // (3) 計測対象の N サイクルを回す。
         let mut clean_teardowns = 0usize;
         for _ in 0..n {
             if run_one_reload_cycle(load_dir, timeout) {
@@ -95,7 +78,6 @@ impl ReloadProbe {
             }
         }
 
-        // (4) N サイクル後のリソースカウンタ採取と増分算出（done ack 後の実測）。
         let final_sample = sample_resources();
         let leak_metric = LeakMetric::from_samples(baseline, final_sample);
 
@@ -148,12 +130,10 @@ struct ResourceSample {
     user_objects: Option<u32>,
 }
 
-/// 現在プロセスの実 OS リソースカウンタを採取する（PoC 計測アプローチの流用）。
-///
-/// Windows では `GetProcessHandleCount`（カーネルハンドル・スレッド／イベント／
-/// チャネル由来ハンドルが漏れれば増える）と `GetGuiResources(GR_USEROBJECTS)`
-/// （USER オブジェクト。アクターはウィンドウを作らないので増えないはず）を読む。非 Windows では
-/// 計測手段がないため `None`。
+/// 現在プロセスの実 OS リソースカウンタを採取する。
+/// Windows では `GetProcessHandleCount`（カーネルハンドル）と `GetGuiResources(GR_USEROBJECTS)`
+/// （USER オブジェクト。アクターはウィンドウを作らないので増えないはず）を読む。
+/// 非 Windows では計測手段がないため `None`。
 #[cfg(windows)]
 fn sample_resources() -> ResourceSample {
     use windows_sys::Win32::Foundation::{GetLastError, SetLastError};
@@ -211,7 +191,7 @@ fn sample_resources() -> ResourceSample {
     }
 }
 
-/// `GetGuiResources` の 0 を、`GetLastError` で「本当に 0」と「測れない」に読み分ける（8.4）。
+/// `GetGuiResources` の 0 を、`GetLastError` で「本当に 0」と「測れない」に読み分ける。
 /// USER オブジェクトが 0 のプロセス（誤りの番号 0）では `Some(0)` を返す。
 #[cfg(windows)]
 #[test]
@@ -263,8 +243,8 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// R7.2/R7.3: reload（spawn→teardown ×N）でカーネルハンドル／USER オブジェクトが
-/// リーク・枯渇しない。done ack 後に計測する（PoC の実 OS 計測アプローチを流用）。
+/// reload（spawn→teardown ×N）でカーネルハンドル／USER オブジェクトがリーク・枯渇しない。
+/// done ack 後に計測する。
 ///
 /// # 判定（slope 法）
 /// 真の per-cycle リークは増分が N に **線形比例**して増える（growth ≈ L·N）。一方

@@ -3,8 +3,6 @@
 //! SHIORIプロトコルレベルでの非同期コールバック（get_property）機構を検証する。
 //! 各テストシナリオはマルチラウンドのリクエスト・レスポンスサイクルとして構成される。
 //! このファイルは単発の get → callback シナリオとコールバックID/プロトコル準拠を扱う。
-//!
-//! 検証要件: 2.1, 2.2, 2.3, 3.1, 3.2, 5.2, 6.1, 6.2, 6.3
 
 mod common;
 
@@ -15,10 +13,10 @@ use async_callback_support::AsyncCallbackEnv;
 
 // ============================================================================
 // Scenario 1: シンプルなプロパティ取得（2ラウンド）
-// Req 2.1: get_propertyがコルーチン内で呼び出し可能
-// Req 2.2: コールバックイベントIDが\![get,property,...]に含まれる
-// Req 2.3: コールバック到着時にコルーチンがresumeされ値が返る
-// Req 6.1: get_propertyが\![get,property,{id},{name}]タグを生成
+// get_propertyがコルーチン内で呼び出し可能
+// コールバックイベントIDが\![get,property,...]に含まれる
+// コールバック到着時にコルーチンがresumeされ値が返る
+// get_propertyが\![get,property,{id},{name}]タグを生成
 // ============================================================================
 
 /// Round 1: GET OnTestSimple → get_property タグを含むレスポンス
@@ -39,12 +37,12 @@ ID: OnTestSimple
     assert_eq!(resp1.status_code, 200, "Round 1 should return 200 OK");
 
     let value1 = resp1.value.as_ref().expect("Round 1 should have Value");
-    // Req 6.1: get タグが含まれること
+    // get タグが含まれること
     assert!(
         value1.contains("\\![get,property,OnPastaCallBack"),
         "Round 1 Value should contain get property tag, got: {value1}"
     );
-    // Req 6.2: baseware.version がタグに含まれること
+    // baseware.version がタグに含まれること
     assert!(
         value1.contains("baseware.version"),
         "Round 1 Value should contain property name, got: {value1}"
@@ -68,7 +66,7 @@ Reference0: 2.6.77
     assert_eq!(resp2.status_code, 200, "Round 2 should return 200 OK");
 
     let value2 = resp2.value.as_ref().expect("Round 2 should have Value");
-    // Req 2.3: コルーチンがresumeされプロパティ値が反映される
+    // コルーチンがresumeされプロパティ値が反映される
     assert!(
         value2.contains("version=2.6.77"),
         "Round 2 Value should contain property value, got: {value2}"
@@ -144,8 +142,8 @@ Reference0: 3.14
 
 // ============================================================================
 // Scenario 4: コールバック待ち中の無関係イベント
-// Req 3.1: コールバック待ち中に他のイベントが処理可能
-// Req 3.2: 無関係イベントがコールバック状態に影響しない
+// コールバック待ち中に他のイベントが処理可能
+// 無関係イベントがコールバック状態に影響しない
 // ============================================================================
 
 /// Round 1: GET OnTestWait → get_property タグ（コールバック待ち）
@@ -181,7 +179,7 @@ ID: OnUnrelatedEvent
 "#,
     );
 
-    // Req 3.1: 無関係イベントは正常に処理される（204 No Content）
+    // 無関係イベントは正常に処理される（204 No Content）
     assert_eq!(
         resp2.status_code, 204,
         "Round 2 unrelated event should return 204, got: {}",
@@ -198,7 +196,7 @@ Reference0: 9.99
 "#,
     );
 
-    // Req 3.2: コールバックが正常に処理される
+    // コールバックが正常に処理される
     assert_eq!(resp3.status_code, 200, "Round 3 should return 200 OK");
 
     let value3 = resp3.value.as_ref().expect("Round 3 should have Value");
@@ -214,7 +212,7 @@ Reference0: 9.99
 
 // ============================================================================
 // Scenario: コールバックIDの一意性（連続呼び出し）
-// Req 2.2: コールバックIDが一意に生成される
+// コールバックIDが一意に生成される
 // ============================================================================
 
 /// 連続で2つのget_property呼び出しが異なるコールバックIDを生成すること
@@ -257,7 +255,7 @@ ID: OnTestSimple
     );
 
     let value3 = resp3.value.as_ref().expect("should have Value");
-    // Req 2.2: 2つ目は異なるIDになる
+    // 2つ目は異なるIDになる
     assert!(
         value3.contains("OnPastaCallBack2"),
         "Second callback should be OnPastaCallBack2, got: {value3}"
@@ -266,7 +264,7 @@ ID: OnTestSimple
 
 // ============================================================================
 // Scenario: 無効なコールバックID（ルーティングされない）
-// Req 3.1: 存在しないコールバックIDは通常イベントとして処理
+// 存在しないコールバックIDは通常イベントとして処理
 // ============================================================================
 
 /// 存在しないコールバックIDにリクエストを送ると、通常のイベント処理になる
@@ -293,7 +291,7 @@ Reference0: bogus
 
 // ============================================================================
 // Scenario: コールバックレスポンスのプロトコル準拠
-// Req 6.1, 6.2: レスポンスヘッダーが正しいこと
+// レスポンスヘッダーが正しいこと
 // ============================================================================
 
 /// コールバックレスポンスに標準ヘッダーが含まれること

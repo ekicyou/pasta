@@ -9,7 +9,7 @@ use common::copy_fixture_to_temp;
 use pasta::PastaShiori;
 
 // ========================================================================
-// Task 3.1: SHIORI.load実行確認テスト
+// SHIORI.load実行確認テスト
 // ========================================================================
 
 /// Test that SHIORI.load sets observable Lua global variables.
@@ -46,7 +46,7 @@ fn test_shiori_load_sets_globals() {
 }
 
 // ========================================================================
-// Task 3.2: SHIORI.request呼び出しカウントテスト
+// SHIORI.request呼び出しカウントテスト
 // ========================================================================
 
 /// Test that SHIORI.request increments the request counter.
@@ -89,7 +89,7 @@ fn test_shiori_request_increments_counter() {
 }
 
 // ========================================================================
-// Task 3.3: Pasta DSLシーン呼び出しテスト
+// Pasta DSLシーン呼び出しテスト
 // ========================================================================
 
 /// Test that SHIORI.request calls Pasta DSL scene via @pasta_search.
@@ -123,7 +123,7 @@ fn test_shiori_request_calls_pasta_scene() {
 }
 
 // ========================================================================
-// Task 3.4: SHIORI.unloadファイルマーカーテスト
+// SHIORI.unloadファイルマーカーテスト
 // ========================================================================
 
 /// Test that SHIORI.unload creates a marker file on drop.
@@ -159,7 +159,7 @@ fn test_shiori_unload_creates_marker() {
 }
 
 // ========================================================================
-// Task 3.5: 統合E2Eライフサイクルテスト
+// 統合E2Eライフサイクルテスト
 // ========================================================================
 
 /// E2E test verifying entire SHIORI lifecycle with Lua execution.

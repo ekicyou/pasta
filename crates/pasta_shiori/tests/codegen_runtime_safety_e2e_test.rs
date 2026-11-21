@@ -1,13 +1,11 @@
 //! 書き間違い（U18・U19・U20・U22）と `\\` エスケープ（U08）の SHIORI 経由 E2E テスト
 //!
-//! 仕様 `dsl-codegen-runtime-safety` task 4.2（requirements 4.1–4.3, 5.2, 5.5）。
-//!
 //! フィクスチャ `tests/fixtures/codegen_runtime_safety/` のシーンを SHIORI リクエストの
 //! イベント ID（シーン関数フォールバック）で起動し、500 にならず、書き間違いの箇所を既定の
 //! 結果に置き換えたトークが返ることを、最終さくらスクリプトの一致で固定する。
 //! フィクスチャは埋め込みの標準ランタイムと本番 entry.lua を通す（理由は pasta.toml のコメント）。
 //!
-//! 仕様 `string-concat-operator` task 5.1 の連結（`＆`）のシーンも同じフィクスチャで動かす。
+//! 連結（`＆`）のシーンも同じフィクスチャで動かす。
 
 mod common;
 
@@ -62,7 +60,7 @@ fn fire_with_log(event_id: &str) -> (String, String) {
     (value, log)
 }
 
-/// U18・U19・U20・U22 を含むシーンが 500 にならず、既定の結果に置き換えたトークを返す（5.2, 5.5）
+/// U18・U19・U20・U22 を含むシーンが 500 にならず、既定の結果に置き換えたトークを返す
 #[test]
 fn test_typo_scene_returns_talk_with_default_results() {
     let value = fire("OnTypoCheck");
@@ -73,15 +71,15 @@ fn test_typo_scene_returns_talk_with_default_results() {
         r"\p[0]【未登録アクター：未登録さん】こんにちは",
         // U20: act のメンバー名と同名のアクター talk が普通に話す
         r"\p[2]トークです",
-        // U22: 数値にできない被演算子は警告を出して 0 とみなす（expr-nil-coercion 4.1）。
-        // 失敗表記は起きた位置（直前の話者のバルーン）に出る（failure-output-unification #9）
+        // U22: 数値にできない被演算子は警告を出して 0 とみなす。
+        // 失敗表記は起きた位置（直前の話者のバルーン）に出る
         r#"【数にできない値："abc"】"#,
         r"\p[1]\n[150]結果0、\_w[450]終わり\e",
     );
     assert_eq!(value, expected);
 }
 
-/// U08: `C:\\new`・行末の `\\` がウェイト設定ありでも割れず、`\e` を壊さない（4.1–4.3, 5.5）
+/// U08: `C:\\new`・行末の `\\` がウェイト設定ありでも割れず、`\e` を壊さない
 #[test]
 fn test_escaped_backslash_survives_wait_insertion() {
     let value = fire("OnEscapeCheck");
@@ -103,8 +101,8 @@ fn assert_no_lua_warning(log: &str) {
     );
 }
 
-/// 未代入の変数を連結する式文があっても 500 にならず、続きの行を話す（string-concat-operator 6.4）。
-/// 連結の nil は空文字列とみなすので警告は出ない（expr-nil-coercion 2.1・3.1）
+/// 未代入の変数を連結する式文があっても 500 にならず、続きの行を話す。
+/// 連結の nil は空文字列とみなすので警告は出ない
 #[test]
 fn test_concat_with_unassigned_variable_does_not_500() {
     let (value, log) = fire_with_log("OnConcatUnassigned");
@@ -113,7 +111,6 @@ fn test_concat_with_unassigned_variable_does_not_500() {
 }
 
 /// 連結の被演算子の nil は空文字列とみなすので、代入先は残りの部分（`さん`）になり、警告は出ない
-/// （expr-nil-coercion 2.1・3.1）
 #[test]
 fn test_concat_nil_operand_leaves_the_rest() {
     let (value, log) = fire_with_log("OnConcatNilShow");
@@ -121,13 +118,13 @@ fn test_concat_nil_operand_leaves_the_rest() {
     assert_no_lua_warning(&log);
 }
 
-/// 関数呼び出しと Call の引数に連結した文字列が渡る（算術が連結より先: 1＋2＆「個」→「3個」）（1.5, 1.6, 4.4, 6.6）
+/// 関数呼び出しと Call の引数に連結した文字列が渡る（算術が連結より先: 1＋2＆「個」→「3個」）
 #[test]
 fn test_concat_passed_to_function_and_call_args() {
     assert_eq!(fire("OnConcatArgs"), r"\p[1]連結引数連結呼出と3個\e");
 }
 
-/// 連結した名前（「連結」＆「_挨拶」）を動的ターゲットにして Call できる（4.4, 6.6）
+/// 連結した名前（「連結」＆「_挨拶」）を動的ターゲットにして Call できる
 #[test]
 fn test_concat_as_dynamic_call_target() {
     assert_eq!(fire("OnConcatDynamic"), r"\p[1]動的に呼ばれた\e");

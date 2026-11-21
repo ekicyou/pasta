@@ -1,7 +1,5 @@
 //! `[logging] balloon_warning` で失敗表記の有無だけが切り替わることの SHIORI 経由 E2E テスト
 //!
-//! 仕様 `failure-output-unification` task 4.1（requirements 6.4, 7.1–7.5）。
-//!
 //! フィクスチャ `tests/fixtures/failure_notation_switch/` の pasta.toml の末尾に
 //! `[logging] balloon_warning` を書き足して（書かない・false・型違い）同じシーンを起動し、
 //! 出さない設定の出力が出す設定の出力から表記（`【…】`）を除いたものと一致し、
@@ -79,7 +77,7 @@ fn strip_notations(s: &str) -> String {
     out
 }
 
-/// 出さない設定の出力は、出す設定の出力から表記を除いたものと同じで、ログの警告は同じ（6.4・7.3・7.4）
+/// 出さない設定の出力は、出す設定の出力から表記を除いたものと同じで、ログの警告は同じ
 #[test]
 fn test_disabled_output_equals_enabled_without_notations() {
     let (on, on_warns) = fire("OnFailureMix", None);
@@ -94,7 +92,7 @@ fn test_disabled_output_equals_enabled_without_notations() {
     assert_eq!(off_warns, on_warns);
 }
 
-/// 型違いの値は書かれていないときと同じ（表記を出す）（7.2・7.5）
+/// 型違いの値は書かれていないときと同じ（表記を出す）
 #[test]
 fn test_mistyped_value_falls_back_to_showing() {
     let (on, _) = fire("OnFailureMix", None);
@@ -102,7 +100,7 @@ fn test_mistyped_value_falls_back_to_showing() {
     assert_eq!(value(mistyped), value(on));
 }
 
-/// 表記しか出ないシーン（未登録アクターの値の無い変数だけ）は、出さない設定で 204（7.3）
+/// 表記しか出ないシーン（未登録アクターの値の無い変数だけ）は、出さない設定で 204
 #[test]
 fn test_notation_only_scene_is_204_when_disabled() {
     let (on, _) = fire("OnFailureOnly", None);

@@ -1,4 +1,4 @@
-//! 機能レベル統合 E2E（task 7.1・R1.1/R1.2/R1.3/R1.4・R9.1/R9.2/R9.3/R9.4）。
+//! 機能レベル統合 E2E。
 //!
 //! 出荷 SHIORI ホスト（SSP 等）が実際に呼ぶ **extern "C" 入口シンボルそのもの**
 //! （`load`/`request`/`unload`・`#[unsafe(no_mangle)]`）を、実ゴースト VM に対して
@@ -6,7 +6,7 @@
 //! あること・ライフサイクルがクリーンに閉じることを実証する。
 //!
 //! # なぜこのテストが必要か（既存カバレッジとの差分＝閉じる継ぎ目）
-//! task 7.1 までに整備済みの統合テストは、それぞれ出荷経路の一部のみを踏む:
+//! 既存の統合テストは、それぞれ出荷経路の一部のみを踏む:
 //! - `byte_invariant_test`: `PastaShiori::request`（構造体メソッド）経由。
 //!   extern 入口・HGLOBAL 所有移譲・ANSI/UTF-8 デコードは踏まない。
 //! - `ffi_actor_lifecycle_test`: `actor::lifecycle::{spawn_actor,marshal_request,teardown_actor}`
@@ -14,19 +14,18 @@
 //! - `windows_tests`（unit）: extern `load`/`request`/`unload` を踏むが、**実 VM を spawn しない**
 //!   ガード／未初期化（204）契約のみ（プロセスグローバル LEGACY 競合回避）。
 //!
-//! 結果として「出荷 extern シンボルを通して **実ゴースト VM** を load→request(複数・コルーチン跨ぎ)
-//! →unload する完全セッションのバイト不変」を end-to-end で確認するテストが**存在しなかった**。
-//! 本ファイルはその継ぎ目を、SSP と同一の C ABI（no_mangle シンボル＋HGLOBAL＋CP_ACP dir デコード
-//! ＋UTF-8 request デコード）で閉じる。
+//! 出荷 extern シンボルを通して **実ゴースト VM** を load→request(複数・コルーチン跨ぎ)
+//! →unload する完全セッションのバイト不変は、本ファイルが SSP と同一の C ABI（no_mangle シンボル＋
+//! HGLOBAL＋CP_ACP dir デコード＋UTF-8 request デコード）で end-to-end に確認する。
 //!
 //! # `static LEGACY` 共有のため単一 `#[test]`・他テストと同居させない
 //! extern 入口は `actor::lifecycle::LEGACY`（プロセスグローバル）を変化させる。本ファイルは
 //! 全フェーズを 1 つの `#[test]` に直列化し、同一バイナリ内に他テストを置かない（順序非依存）。
 //!
 //! # 特性化（characterization）E2E について
-//! 統合済みシステムに対するゴールデン固定であり RED フェーズは持たない（現行で即グリーン）。
+//! 統合済みシステムに対するゴールデン固定であり、現行挙動をそのまま「正」とする。
 //! 価値はドリフト検出にある: メタアサーション（最後）で「1 バイトでも変われば赤化する」ことを実証し、
-//! 後続 7.2（PoC 足場撤去）や将来変更の回帰ガードとして機能することを示す。
+//! 将来変更の回帰ガードとして機能することを示す。
 
 #![cfg(windows)]
 
@@ -75,16 +74,13 @@ Value: version=2.6.77\\e\\e\r\n\
 
 /// 出荷経路の NOTIFY / OnSecondChange / unload 後 GET 安全網が返す正準 204 のバイト列。
 ///
-/// 出荷アクター経路の NOTIFY は **VM を起こさず即 204**（fire-and-forget）を返す契約（R5.2:
-/// 「アクタースレッドの完了を待たず即座に 204 No Content を返す」）。R5.2 は **即時性**を
-/// 要求するのであって、応答バイトを変えることは要求しない。即時 204 は marshaling の
-/// `default_204()` であり、リファクタ前の出荷 NOTIFY/OnSecondChange 経路が返していた
-/// **VM 産 204**（`res.lua` の `RES.no_content`・標準ヘッダ 3 種＝`Charset`/`Sender`/
-/// `SecurityLevel: local`）と **バイト同一**である。
+/// 出荷アクター経路の NOTIFY は **VM を起こさず即 204**（fire-and-forget）を返す。
+/// 即時 204 は marshaling の `default_204()` であり、VM 産 204（`res.lua` の `RES.no_content`・
+/// 標準ヘッダ 3 種＝`Charset`/`Sender`/`SecurityLevel: local`）と **バイト同一**である。
 ///
 /// したがって本定数は `byte_invariant_test` の `GOLDEN_NOTIFY_204` /
 /// `GOLDEN_ON_SECOND_CHANGE_204` と完全一致する（唯一の正準 204・両経路で同一）。
-/// これにより NOTIFY の即時性（R5.2）と外部 SHIORI 挙動のバイト不変（R1.1）は同時に成立する。
+/// これにより NOTIFY の即時性と外部 SHIORI 挙動のバイト不変は同時に成立する。
 const GOLDEN_204: &str = "SHIORI/3.0 204 No Content\r\n\
 Charset: UTF-8\r\n\
 Sender: Pasta\r\n\
@@ -241,12 +237,6 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// 出荷 extern FFI（`load`→複数 `request`〔コルーチン跨ぎ talk 含む〕→`unload`）の
 /// 完全セッションを実ゴースト VM で駆動し、全応答がゴールデンとバイト不変で、
 /// ライフサイクルがクリーンに閉じることを実証する。
-///
-/// 検証要件:
-///  - R1.1/R1.3: 出荷経路の外部 SHIORI 応答が代表イベント列でバイト不変。
-///  - R9.1〜R9.4: コルーチン yield → callback resume の意味論が extern 経路で無改変。
-///  - R5.2/R5.6: NOTIFY 即 204、unload 後 request も無限待機なく 204。
-///  - R7.x/R8.x: unload→reload で新スレッド＋新チャネルが稼働し応答不変。
 #[test]
 fn extern_ffi_session_byte_invariant_e2e() {
     let (dir, _temp) = build_async_callback_dir();
@@ -257,7 +247,7 @@ fn extern_ffi_session_byte_invariant_e2e() {
         "extern load() must load the real ghost VM on the actor thread"
     );
 
-    // --- request 1/2: GET property コルーチン継続（yield → resume・R9/R1.1） ---
+    // --- request 1/2: GET property コルーチン継続（yield → resume） ---
     let round1 = drive_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n");
     assert_eq!(
         round1.as_bytes(),
@@ -272,7 +262,7 @@ fn extern_ffi_session_byte_invariant_e2e() {
         "round2 callback resume via extern FFI must be byte-invariant (coroutine continuation, R9)\nactual: {round2:?}"
     );
 
-    // --- request 3: NOTIFY 即 204（R5.2・単一直列 FIFO） ---
+    // --- request 3: NOTIFY 即 204（単一直列 FIFO） ---
     let notify = drive_request("NOTIFY SHIORI/3.0\nCharset: UTF-8\nID: OnUnrelatedEvent\n");
     assert_eq!(
         notify.as_bytes(),
@@ -297,7 +287,7 @@ fn extern_ffi_session_byte_invariant_e2e() {
         "extern unload() must return true (clean teardown)"
     );
 
-    // --- unload 後の request: アクター不在で安全網 204（無限待機なし・R5.6） ---
+    // --- unload 後の request: アクター不在で安全網 204（無限待機なし） ---
     let after_unload = drive_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n");
     assert_eq!(
         after_unload.as_bytes(),
@@ -305,7 +295,7 @@ fn extern_ffi_session_byte_invariant_e2e() {
         "request after unload (no actor) must return the 204 safety net via extern FFI"
     );
 
-    // --- reload（再 `load` → 新スレッド＋新チャネル）→ 応答不変（R7/R8） ---
+    // --- reload（再 `load` → 新スレッド＋新チャネル）→ 応答不変 ---
     assert!(
         drive_load(&dir),
         "reload extern load() must spawn a fresh actor + channel"
@@ -326,7 +316,7 @@ fn extern_ffi_session_byte_invariant_e2e() {
 
     // --- メタアサーション: ゴールデンが「自明に真」でないこと（ドリフト検出の実証） ---
     // 1 文字でも応答が変われば上のアサーションは赤化する。ここでは比較器自体が差分を
-    // 捉えることを、意図的改竄に対するパニックで確認する（回帰ガードの非自明性・R1.4）。
+    // 捉えることを、意図的改竄に対するパニックで確認する。
     let tampered = GOLDEN_204.replacen("204 No Content", "200 OK", 1);
     assert_ne!(
         tampered.as_bytes(),

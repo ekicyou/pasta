@@ -6,18 +6,15 @@ mod common;
 
 use pasta_lua::mlua::Lua;
 
-// Re-export lua_request module for testing (need to expose it)
 mod lua_request_bridge {
-    // We'll test through the public API
 }
 
-/// Test helper: Create a Lua instance for testing
 fn create_test_lua() -> Lua {
     Lua::new()
 }
 
 // ============================================================================
-// Task 7.3: parse_request function tests - Basic functionality
+// parse_request function tests - Basic functionality
 // ============================================================================
 
 mod parse_request_basic_tests {
@@ -95,7 +92,6 @@ mod parse_request_basic_tests {
 
         let dic: pasta_lua::mlua::Table = table.get("dic").expect("dic table should exist");
 
-        // All key-value pairs should be in dic
         let charset: String = dic.get("Charset").expect("dic['Charset'] should exist");
         let sender: String = dic.get("Sender").expect("dic['Sender'] should exist");
         let id: String = dic.get("ID").expect("dic['ID'] should exist");
@@ -129,10 +125,8 @@ mod parse_request_basic_tests {
         let lua = create_test_lua();
         let table = parse_request(&lua, SHIORI3_GET_REQUEST).expect("parse_request should succeed");
 
-        // Verify date subtable exists and contains expected fields
         let date: pasta_lua::mlua::Table = table.get("date").expect("date table should exist");
 
-        // Verify all expected fields exist
         let year: i32 = date.get("year").expect("date.year should exist");
         let month: u8 = date.get("month").expect("date.month should exist");
         let day: u8 = date.get("day").expect("date.day should exist");
@@ -143,7 +137,6 @@ mod parse_request_basic_tests {
         let _yday: u16 = date.get("yday").expect("date.yday should exist");
         let _wday: u8 = date.get("wday").expect("date.wday should exist");
 
-        // Sanity checks
         assert!((2020..=2100).contains(&year), "year should be reasonable");
         assert!((1..=12).contains(&month), "month should be 1-12");
         assert!((1..=31).contains(&day), "day should be 1-31");
@@ -154,7 +147,7 @@ mod parse_request_basic_tests {
 }
 
 // ============================================================================
-// Task 7.4: parse_request function tests - Error handling
+// parse_request function tests - Error handling
 // ============================================================================
 
 mod parse_request_error_tests {
@@ -192,7 +185,7 @@ mod parse_request_error_tests {
 }
 
 // ============================================================================
-// Task 7.5: SHIORI 2.x format tests
+// SHIORI 2.x format tests
 // ============================================================================
 
 mod shiori2_tests {
@@ -226,7 +219,7 @@ mod shiori2_tests {
 }
 
 // ============================================================================
-// Task 7.6*: Edge case tests (optional)
+// Edge case tests
 // ============================================================================
 
 mod edge_case_tests {
@@ -242,7 +235,6 @@ mod edge_case_tests {
             ID: TestEvent\r\n",
         );
 
-        // Add 15 references
         for i in 0..15 {
             request.push_str(&format!("Reference{}: value{}\r\n", i, i));
         }
@@ -254,7 +246,6 @@ mod edge_case_tests {
             .get("reference")
             .expect("reference table should exist");
 
-        // Check first and last references
         let ref0: String = reference.get(0).expect("reference[0] should exist");
         let ref14: String = reference.get(14).expect("reference[14] should exist");
 
@@ -287,7 +278,7 @@ mod edge_case_tests {
 }
 
 // ============================================================================
-// G1 (3.35): parse_request edge cases — previously unreached branches
+// parse_request edge cases
 // ============================================================================
 
 mod g1_edge_case_tests {
@@ -296,8 +287,7 @@ mod g1_edge_case_tests {
     use pasta::lua_request::parse_request;
 
     /// Reference index that overflows i32 hits the "Invalid reference number"
-    /// Script error branch (previously unreached — grammar accepts any digit
-    /// run, the i32 parse is the only guard).
+    /// Script error branch (grammar accepts any digit run, the i32 parse is the only guard).
     #[test]
     fn test_reference_number_overflow_returns_script_error() {
         let lua = create_test_lua();
@@ -401,7 +391,7 @@ mod g1_edge_case_tests {
 }
 
 // ============================================================================
-// Task 3.2: X-Pasta-Time header injection tests
+// X-Pasta-Time header injection tests
 // ============================================================================
 
 mod x_pasta_time_tests {
@@ -497,7 +487,6 @@ mod x_pasta_time_tests {
         let table = parse_request(&lua, request).expect("parse_request should succeed");
         let date: pasta_lua::mlua::Table = table.get("date").expect("date table should exist");
 
-        // date fields exist and have sane values
         let year: i32 = date.get("year").unwrap();
         let month: u8 = date.get("month").unwrap();
         let day: u8 = date.get("day").unwrap();
@@ -534,7 +523,7 @@ mod x_pasta_time_tests {
 }
 
 // ============================================================================
-// 3.37 (G3): FFI boundary stack-safety regression.
+// FFI boundary stack-safety regression.
 //
 // parse_request is reached from the extern "C" `request` entry point with
 // host-controlled text. Stack exhaustion inside that call graph aborts the
@@ -546,10 +535,8 @@ mod stack_safety_tests {
     use super::*;
     use pasta::lua_request::parse_request;
 
-    /// RED evidence (3.37): with the recursive parse1 (one stack frame per
-    /// header pair), this test crashed the test process with
-    /// "thread '...' has overflowed its stack" inside the 256 KiB worker
-    /// thread. After the iterative rewrite it passes.
+    /// With a recursive parse1 (one stack frame per header pair), this test crashes the test
+    /// process with "thread '...' has overflowed its stack" inside the 256 KiB worker thread.
     #[test]
     fn test_parse_request_many_headers_constant_stack() {
         // 256 KiB: ample for the iterative parser + a Lua state, nowhere near
@@ -582,10 +569,9 @@ mod stack_safety_tests {
 }
 
 // ============================================================================
-// ponytail-shiori 1.3: 値の空いた見出しの行（`Key:`）の特性化テスト（3.1〜3.5・9.4）
+// 値の空いた見出しの行（`Key:`）の特性化テスト
 //
-// タスク 3 で直した後の期待（`Key:` と `Key:value` が解ける・
-// SSP の 3 要求が旧来と版 3 の両方で Lua に届く）。
+// `Key:` と `Key:value` が解ける・SSP の 3 要求が旧来と版 3 の両方で Lua に届く。
 // ============================================================================
 
 mod empty_header_value_tests {
@@ -605,7 +591,7 @@ mod empty_header_value_tests {
         Some((reference.get(0).unwrap(), dic.get("Reference0").unwrap()))
     }
 
-    /// コロンの直後で行が終わる見出しは値 `""`（3.1）。
+    /// コロンの直後で行が終わる見出しは値 `""`。
     #[test]
     fn colon_then_line_end_is_empty() {
         assert_eq!(
@@ -614,7 +600,7 @@ mod empty_header_value_tests {
         );
     }
 
-    /// コロンの直後に空白の無い値はその値（3.3）。
+    /// コロンの直後に空白の無い値はその値。
     #[test]
     fn colon_then_value_without_space_is_value() {
         assert_eq!(

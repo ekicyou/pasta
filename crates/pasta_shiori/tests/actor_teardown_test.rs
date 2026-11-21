@@ -1,11 +1,8 @@
-//! 本番 teardown（`Stop{done}` ack）の統合テスト（task 4.1・R7.1/R7.4/R7.5）。
-//! reload リーク検査（R7.2/R7.3）はプロセス全体カウンタを計測するため、兄弟テストと
-//! 並列に走らないよう専用バイナリ `actor_reload_leak_test.rs` に分離している。
+//! 本番 teardown（`Stop{done}` ack）の統合テスト。
+//! reload リーク検査はプロセス全体カウンタを計測するため、兄弟テストと並列に走らないよう
+//! 専用バイナリ `actor_reload_leak_test.rs` に分離している。
 //!
-//! 本テストは **既定（no-feature）ビルドで実行される**（旧 `actor-poc` ガードは撤去）。
-//! `windows-sys/Win32_System_Threading`（リーク検査の計測）は dev-dependencies にある。
-//!
-//! # 何を証明するか（task 4.1 の observable 完了条件）
+//! # 何を証明するか
 //!  (a) `Stop{done}` を送ると、アクターが残メッセージ drain 後に VM 破棄・cleanup を
 //!      終えて `done` ack を返し、SHIORI 側が ack を受けて完了する。Stop 前に投入した
 //!      メッセージは Stop より前に処理される（drain-before-stop・clean drain）。
@@ -77,8 +74,8 @@ fn normalize_request(text: &str) -> String {
     req
 }
 
-/// R7.1/R7.4: `Stop{done}` ack による clean teardown。Stop 前に投入した GET が
-/// Stop より先に処理（drain-before-stop）され、その後 done ack が有界に返る。
+/// `Stop{done}` ack による clean teardown。Stop 前に投入した GET が Stop より先に処理
+/// （drain-before-stop）され、その後 done ack が有界に返る。
 #[test]
 fn stop_done_ack_drains_then_tears_down_cleanly() {
     let (load_dir, _temp) = build_async_callback_dir();
@@ -116,8 +113,8 @@ fn stop_done_ack_drains_then_tears_down_cleanly() {
     );
 }
 
-/// R7.4: 冪等 teardown。done ack 後にもう一度送信端から Stop 送信を
-/// 行っても、閉じたチャネルを already-done として安全に no-op（hang/panic なし）。
+/// 冪等 teardown。done ack 後にもう一度送信端から Stop 送信を行っても、
+/// 閉じたチャネルを already-done として安全に no-op（hang/panic なし）。
 #[test]
 fn second_teardown_after_done_is_safe_noop() {
     let (load_dir, _temp) = build_async_callback_dir();

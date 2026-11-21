@@ -1,4 +1,4 @@
-//! 版 3 の入口の試験（仕様 `shiori4-v3-portable`・1.2〜1.4・2.1〜2.5・2.7・3.1〜3.7・3.9・3.10・4.1・6.2）。
+//! 版 3 の入口の試験。
 //!
 //! `shiori_get_api(3)` のテーブルを `shiori4_abi` の `ShioriApi::load_v3` と `ShioriInstance` で呼び、
 //! ABI のテーブルを通して版 3 の口を確かめる。ゴーストは試験ごとに一時ディレクトリへ写す。
@@ -66,7 +66,7 @@ fn wait_log_contains(ghost: &Path, needle: &str) -> String {
     }
 }
 
-/// 版 3 だけにテーブルを返し、2 回呼んでも同じポインタ（1.2〜1.4）。
+/// 版 3 だけにテーブルを返し、2 回呼んでも同じポインタ。
 #[test]
 fn get_api_returns_v3_table_only() {
     let a = shiori_get_api(3);
@@ -79,7 +79,7 @@ fn get_api_returns_v3_table_only() {
 }
 
 /// 同じゴーストに旧来の窓口と版 3 で同じ GET を送ると、応答のバイト列が同じで、
-/// 版 3 の戻り値は開始行のコード（3.1・3.9・3.10）。旧来を片付けてから版 3 を読む。
+/// 版 3 の戻り値は開始行のコード。旧来を片付けてから版 3 を読む。
 #[test]
 fn v3_get_matches_legacy_bytes_and_returns_start_line_code() {
     let ghost = copy_fixture_to_temp("v3_probe");
@@ -96,7 +96,7 @@ fn v3_get_matches_legacy_bytes_and_returns_start_line_code() {
     assert_eq!(status, 200);
 }
 
-/// NOTIFY は 204。notify への GET・2.x・読めない要求は 400 で、Lua には届かない（3.2〜3.6）。
+/// NOTIFY は 204。notify への GET・2.x・読めない要求は 400 で、Lua には届かない。
 #[test]
 fn notify_is_204_and_rejected_requests_are_400_and_not_counted() {
     let ghost = copy_fixture_to_temp("v3_probe");
@@ -141,7 +141,7 @@ fn notify_is_204_and_rejected_requests_are_400_and_not_counted() {
     );
 }
 
-/// 読めない開始行は戻り値 500、本文は Lua が返したまま（3.7）。
+/// 読めない開始行は戻り値 500、本文は Lua が返したまま。
 #[test]
 fn unreadable_start_line_is_500_with_body_unchanged() {
     let ghost = copy_fixture_to_temp("v3_probe");
@@ -155,7 +155,7 @@ fn unreadable_start_line_is_500_with_body_unchanged() {
     );
 }
 
-/// 無いディレクトリ・相対パスは NULL で、登録に項目を残さない（2.2・2.4）。
+/// 無いディレクトリ・相対パスは NULL で、登録に項目を残さない。
 #[test]
 fn missing_or_relative_dir_is_null_without_registry_entry() {
     let root = tempfile::TempDir::new().expect("temp dir");
@@ -168,7 +168,7 @@ fn missing_or_relative_dir_is_null_without_registry_entry() {
     assert_no_registry_entry(relative);
 }
 
-/// 辞書に書き間違いのあるゴーストでもインスタンスは返り、GET は 500＋理由のヘッダ（2.1・2.3・2.7）。
+/// 辞書に書き間違いのあるゴーストでもインスタンスは返り、GET は 500＋理由のヘッダ。
 #[test]
 fn dictionary_typo_returns_instance_and_get_is_500_with_reason() {
     let ghost = copy_fixture_to_temp("shiori_lifecycle");
@@ -189,8 +189,8 @@ fn dictionary_typo_returns_instance_and_get_is_500_with_reason() {
     );
 }
 
-/// 同じディレクトリの 2 つ目は NULL で、占有している側のログに理由が出る（6.2・2.5）。
-/// unload の直後に登録から項目が消え、同じディレクトリをすぐ読み直せる（4.1）。
+/// 同じディレクトリの 2 つ目は NULL で、占有している側のログに理由が出る。
+/// unload の直後に登録から項目が消え、同じディレクトリをすぐ読み直せる。
 #[test]
 fn second_load_is_null_and_unload_releases_dir() {
     let ghost = copy_fixture_to_temp("v3_probe");
@@ -220,7 +220,7 @@ const UNREADABLE: &str = "GET SHIORI/3.0\r\nCharset UTF-8\r\nID: SECRET_MARKER_4
 const SHIORI2: &str = "GET Sentence SHIORI/2.6\r\nCharset: UTF-8\r\n\r\n";
 const UNREADABLE_MSG: &str = "request could not be parsed";
 
-/// 解けない要求の warn の行がちょうど 1 つで、入口・位置・1 行目を含み、全文を含まないこと（3.8）。
+/// 解けない要求の warn の行がちょうど 1 つで、入口・位置・1 行目を含み、全文を含まないこと。
 fn assert_one_unreadable_warn(ghost: &Path, entry: &str) {
     let log = wait_log_contains(ghost, UNREADABLE_MSG);
     let lines: Vec<&str> = log.lines().filter(|l| l.contains(UNREADABLE_MSG)).collect();
@@ -246,7 +246,7 @@ fn assert_one_unreadable_warn(ghost: &Path, entry: &str) {
 }
 
 /// 解けない要求は、旧来の意味で 204・版 3 で 400 を返し、どちらもゴーストのログに warn を 1 行残す。
-/// 2.x の要求は warn を増やさない（3.6〜3.8）。2.x を先に送り、warn が現れた時点で 1 行だけかを見る。
+/// 2.x の要求は warn を増やさない。2.x を先に送り、warn が現れた時点で 1 行だけかを見る。
 #[test]
 fn unreadable_request_warns_once_on_both_entries() {
     // 旧来の意味（ActorInstance::request。旧来の窓口の置き場は使わない）

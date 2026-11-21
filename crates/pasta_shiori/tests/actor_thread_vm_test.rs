@@ -1,17 +1,15 @@
-//! 本番アクタースレッド × mailbox 駆動 × 実 `!Send` VM コルーチン継続の統合テスト
-//! （task 3.3・R4.1/R4.2/R4.3/R4.5/R9.1/R9.2/R9.3/R9.4）。
+//! 本番アクタースレッド × mailbox 駆動 × 実 `!Send` VM コルーチン継続の統合テスト。
 //!
-//! task 5.1 で FFI 出荷経路がアクター経路へ昇格したため、
-//! 本テストは **既定（no-feature）ビルドで実行される**（旧 `actor-poc` ガードは撤去）。
+//! 既定（no-feature）ビルドで実行される。
 //!
-//! # 何を証明するか（task 3.3 の observable 完了条件）
+//! # 何を証明するか
 //! 専用アクタースレッドが実 [`PastaShiori`] VM を生成・pin し、
-//! 単一の同期 `recv()` ループで mailbox（task 3.2）を消費する。SHIORI（テスト）
+//! 単一の同期 `recv()` ループで mailbox を消費する。SHIORI（テスト）
 //! スレッドから `ActorMsg::Get`/`Notify` を投入すると:
 //!  (a) VM がアクタースレッドで読み込まれる（別スレッドであることは VM の型 `!Send` が保証）。
 //!  (b) コルーチン継続が tick をまたいで動く（GET property yield → callback resume の
-//!      2 ラウンドで `co_scene` が VM 内に persist し継続）— R9.1/R9.2/R9.3/R9.4。
-//!  (c) 生成された SHIORI 応答が期待バイト列に一致 — R4.1/R4.3。
+//!      2 ラウンドで `co_scene` が VM 内に persist し継続）。
+//!  (c) 生成された SHIORI 応答が期待バイト列に一致する。
 //!
 //! # テストが「自明に真」でないことの担保
 //! Get 応答は `bounded(1)` の `recv_timeout` を有界で待つ。wake 統合が効かない／
@@ -187,7 +185,7 @@ fn actor_thread_processes_notify_then_get_in_fifo() {
         .expect("actor thread must join cleanly after Stop");
 }
 
-/// 失敗を返す起動の口（`spawn_actor_thread_with`・仕様 `shiori4-v3-portable` 2.3）が、
+/// 失敗を返す起動の口（`spawn_actor_thread_with`）が、
 /// 返った時点で読み込みを終え、要求を受けることを確かめる。
 #[test]
 fn actor_thread_with_returns_ready_actor_as_ok() {

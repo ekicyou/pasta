@@ -75,10 +75,8 @@ pub fn parse_request(lua: &Lua, text: &str) -> MyResult<Table> {
 }
 
 fn parse1(table: &Table, mut it: FlatPairs<'_, Rule>) -> MyResult<()> {
-    // 3.37 (G3): iterate instead of recursing. The pair stream length is
-    // host-controlled (one element per header); recursing per pair allowed a
-    // hostile request to exhaust the stack, which aborts the whole host
-    // process across the SHIORI boundary (cannot be caught).
+    // Iterate, do not recurse: the pair count is host-controlled (one per header), and
+    // a stack overflow aborts the whole host process across the SHIORI boundary.
     while let Some(pair) = it.next() {
         let rule = pair.as_rule();
         match rule {

@@ -1,4 +1,4 @@
-//! 仮想時刻の時報と日時変数の SHIORI E2E テスト（仕様 `tutorial-ssp-gaps` task 4.1）。
+//! 仮想時刻の時報と日時変数の SHIORI E2E テスト。
 //!
 //! フィクスチャ `tests/fixtures/virtual_clock/` は `＊時報その他`（時報）と `＊時刻`（転記してから
 //! `＄時` を出す）を持つ。本物のランタイムに `OnSecondChange` と `OnPastaClock`（SSP の仮想時刻を
@@ -89,7 +89,7 @@ fn clock_scene(env: &mut ShioriTestEnv) -> String {
     text
 }
 
-/// 返事で仮想の日時を送ると、次の毎秒の回で時報のシーンと仮想の `＄時` が出る（2.1・2.2・2.4）
+/// 返事で仮想の日時を送ると、次の毎秒の回で時報のシーンと仮想の `＄時` が出る
 #[test]
 fn reply_with_virtual_time_fires_hour_signal_with_virtual_hour() {
     let mut env = ShioriTestEnv::new(FIXTURE);
@@ -114,7 +114,7 @@ fn reply_with_virtual_time_fires_hour_signal_with_virtual_hour() {
         v.hour()
     );
 
-    // 時報でないシーンの日時変数も仮想の時刻（2.2）
+    // 時報でないシーンの日時変数も仮想の時刻
     let text = clock_scene(&mut env);
     assert!(
         text.contains(&says_hour(v.hour())),
@@ -123,7 +123,7 @@ fn reply_with_virtual_time_fires_hour_signal_with_virtual_hour() {
     );
 }
 
-/// X-Pasta-Time 付きでは仮想時刻が効かず、時報が出ない（2.8）
+/// X-Pasta-Time 付きでは仮想時刻が効かず、時報が出ない
 #[test]
 fn x_pasta_time_ignores_virtual_time() {
     let mut env = ShioriTestEnv::new(FIXTURE);
@@ -168,7 +168,7 @@ fn season_and_sekku_route_by_x_pasta_time() {
     }
 }
 
-/// `＞「祝日_」＆＄祝日`・`＞「行事_」＆＄行事` が X-Pasta-Time の日付で振り分けられる（date-var-calendar 1.3・3.6・8.6）
+/// `＞「祝日_」＆＄祝日`・`＞「行事_」＆＄行事` が X-Pasta-Time の日付で振り分けられる
 #[test]
 fn holiday_and_event_route_by_x_pasta_time() {
     let mut env = ShioriTestEnv::new(FIXTURE);
@@ -191,7 +191,7 @@ fn holiday_and_event_route_by_x_pasta_time() {
     }
 }
 
-/// 読めない値の返事は 204 で、続く応答は OS の時計のまま（2.9）
+/// 読めない値の返事は 204 で、続く応答は OS の時計のまま
 #[test]
 fn unreadable_reply_falls_back_to_os_clock() {
     let mut env = ShioriTestEnv::new(FIXTURE);

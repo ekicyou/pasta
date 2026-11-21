@@ -1,37 +1,21 @@
-//! 本番アクタースレッド（task 3.3・design.md「ActorThread」コンポーネント）。
+//! 本番アクタースレッド。
 //!
 //! `!Send` な Lua VM（[`PastaShiori`] が内包する [`PastaLuaRuntime`]）を **専用 OS
 //! スレッドへ pin** し、そのスレッド上で単一の同期 `recv()` ループを回して mailbox
-//! （task 3.2）を消費する（OS のウィンドウやメッセージの仕組みを使わない・全部の OS で同じ形・
-//! 仕様 `shiori4-v3-portable` 8.1/8.2）。
-//! 各メッセージで実 `SHIORI.request` Function を VM 上で呼び、既存コルーチン
-//! （`co_scene`／`resume_until_valid`／`CALLBACK`）を **無改変** にこのループの下で
-//! resume・継続させる。
+//! を消費する（OS のウィンドウやメッセージの仕組みを使わない・全部の OS で同じ形）。
 //!
-//! # なぜ VM をスレッドへ pin し、生リクエスト文字列を mailbox で運ぶのか
-//! [`PastaLuaRuntime`]（mlua）は `!Send` であり、SHIORI スレッドとアクタースレッドの
-//! 間をチャネルで越境できない。そこで mailbox（[`ActorMsg`]）が運ぶのは `Send` な生の
-//! SHIORI リクエスト文字列（[`MailboxRequest::raw`]）のみとし、**VM スレッド側でパース
-//! してテーブル化**する（design.md `LuaRequestTable` は VM 同居表現）。VM はこのスレッド
-//! で生成され、ここを一度も離れない。
+//! # なぜ生リクエスト文字列を mailbox で運ぶのか
+//! [`PastaLuaRuntime`]（mlua）は `!Send` であり、チャネルで越境できない。そこで mailbox
+//! が運ぶのは `Send` な生の SHIORI リクエスト文字列（[`MailboxRequest::raw`]）のみとし、
+//! **VM スレッド側でパースしてテーブル化**する。VM はこのスレッドで生成され、ここを一度も離れない。
 //!
 //! # コルーチン意味論の不変保存
-//! 本スレッドは出荷経路と同一の [`PastaShiori::request`] をそのまま呼ぶ。`co_scene`
-//! はメッセージ間で VM 内に persist するため、`resume_until_valid` / `CALLBACK` は
-//! tick から tick へ継続する（GET property → callback resume の 2 ラウンド等）。
-//! ループは VM を駆動するだけでコルーチン状態には一切干渉しない。
+//! `co_scene` はメッセージ間で VM 内に persist するため、`resume_until_valid` / `CALLBACK` は
+//! tick から tick へ継続する。ループは VM を駆動するだけでコルーチン状態には干渉しない。
 //!
 //! # 単一 consumer 不変条件
 //! 消費は単一の同期 `recv()` ループのみで行い、`select!` を張らない
-//! （mailbox.rs のドキュメント参照）。`Stop` は同一 FIFO 上で先行メッセージを drain
-//! 後に処理され、ループを抜けてスレッドが終わる。
-//!
-//! # 配線（task 5.1 で完了）
-//! FFI 入口（`windows.rs` → [`crate::actor::lifecycle`] の置き場の芯の型 `ActorInstance`）が本スレッドへ
-//! 配線済み。GET の完全な timeout/204/drop marshaling 契約は [`crate::actor::marshaling`]
-//! （task 3.4）が担い、本スレッドの `Get` 応答は VM 応答文字列を返す
-//! （エラー時も `MyError::to_shiori_response()` の 500 応答文字列を返す・
-//! 仕様 `lua-require-robustness` 4.3/4.4/4.8）。
+//! （mailbox.rs のドキュメント参照）。
 
 use std::io;
 use std::path::PathBuf;
@@ -49,7 +33,6 @@ use crate::shiori::PastaShiori;
 /// VM はこのスレッドに pin され、決して越境しない。SHIORI スレッドは mailbox
 /// （[`ActorMsg`]）越しにのみ VM へアクセスする。
 pub struct ActorThread {
-    /// VM をホストする専用 OS スレッドの join ハンドル。
     handle: Option<JoinHandle<()>>,
     /// ロード成否（`SHIORI.load` 成功＝true）。失敗時もスレッドは drain を続ける
     /// （request は NotInitialized/Load エラーを返す）。
@@ -67,7 +50,7 @@ impl ActorThread {
         self.loaded
     }
 
-    /// アクタースレッドを join する（unload の後始末＝ack の後の join・テスト用）。
+    /// アクタースレッドを join する（ack の後の後始末）。
     ///
     /// 呼び出し側は事前に [`ActorMsg::Stop`] を mailbox へ送り、ループを抜けさせて
     /// おくこと（さもなくば `recv()` が永久に待ち続けて join できない）。
@@ -84,40 +67,27 @@ impl ActorThread {
         result
     }
 
-    /// アクタースレッドを **detach** する（join しない後始末用・design.md「後始末の決まり」）。
+    /// アクタースレッドを **detach** する（ack が来ずに手放すとき）。
     ///
-    /// 完了は `ActorMsg::Stop { done }` の done ack で確認する（ack 受信時に VM 破棄・cleanup
-    /// 完了済み）。unload は ack の後に [`join`](Self::join) し、本メソッドを使うのは ack が来ずに
-    /// 手放すときと、reload 反復のリーク検査の経路。`JoinHandle` を join せずに drop してスレッドを detach する。
-    ///
-    /// 約束の送り手を落とすので、スレッドは片付けの後に自分で参照を返して終わり
-    /// （`FreeLibraryAndExitThread`）、ハンドルは drop で解放される
-    /// （reload リーク検査がスレッドハンドルの非リークを実測で裏取りする）。
+    /// 約束の送り手を落とすので、スレッドは片付けの後に自分で参照を返して終わる
+    /// （`FreeLibraryAndExitThread`）。
     pub fn detach(self) {
-        // JoinHandle を drop すると Rust はスレッドを detach する（join しない）。
         drop(self);
     }
 }
 
-/// 専用アクタースレッドを起動し、その上で `!Send` VM を生成・pin して mailbox を
-/// 駆動する（仕様 `shiori4-v3-portable` 2.3・2.4）。
+/// 専用アクタースレッドを起動し、その上で `!Send` VM を生成・pin して mailbox を駆動する。
 ///
 /// # 引数
-/// - `load_dir`: VM を構築する [`PastaShiori::load`] へ渡す（`Send`）。
-///   VM 本体（`!Send`）はこのスレッド上で構築されるため越境しない。
-/// - `rx`: mailbox の consumer 側 [`Receiver`]（単一 consumer 不変条件）。
+/// - `load_dir`: VM を構築する [`PastaShiori::load`] へ渡す。
+/// - `rx`: mailbox の consumer 側 [`Receiver`]。
 /// - `claim`: VM の片付けで外すディレクトリの占有の札（[`PastaShiori::set_claim`]）。
-///
-/// # 動作
-/// スレッド上で VM を構築後、`while let Ok(msg) = rx.recv()` の単一の同期ループで
-/// mailbox を消費する（別スレッドの `send` が `recv()` を起こす・ウィンドウもメッセージの
-/// 仕組みも使わない）。
 ///
 /// # 戻り値
 /// [`ActorThread`]（`loaded()` でロード成否を観測できる。`join()` 前に [`ActorMsg::Stop`] を
-/// 送ること）。返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている（2.3）。OS がスレッドを
+/// 送ること）。返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている。OS がスレッドを
 /// 起こせないときは `thread::Builder::spawn` の誤り、スレッドが ready を返す前に終わった
-/// ときは `io::ErrorKind::Other` の誤りを返す（パニックしない・2.4）。後者ではスレッドを
+/// ときは `io::ErrorKind::Other` の誤りを返す（パニックしない）。後者ではスレッドを
 /// join してから返し、資源を残さない。
 pub fn spawn_actor_thread_with(
     load_dir: PathBuf,
@@ -127,76 +97,49 @@ pub fn spawn_actor_thread_with(
     // 参照はスレッドを起こす前に取る（参照の無いアクタースレッドを作らない）。
     let module = ModuleRef::acquire()?;
     let (keep, keep_rx) = flume::bounded::<()>(1);
-    // ロード成否を呼び出し側へ返す小チャネル（VM 本体は越境しない）。
     let (ready_tx, ready_rx) = flume::bounded::<bool>(1);
 
     let spawned = thread::Builder::new()
         .name("pasta-actor".to_string())
         .spawn(move || {
-            // ログの振り分けの文脈（仕様 `pasta-toml-logging-consistency` 4.2）。スレッドの
-            // 終わりまで保ち、メッセージループの観測ログをロガーの数によらず自分のロガーへ
-            // 届ける。done ack の後に出るログは登録解除の後なので捨てられる（4.7）。
+            // ログの振り分けの文脈。スレッドの終わりまで保ち、ループのログを自分のロガーへ届ける。
+            // done ack の後に出るログは登録解除の後なので捨てられる。
             let log_context = LoadDirGuard::new(load_dir.clone());
-            // (1) VM をこのスレッドで構築・pin（!Send ゆえ越境不可）。
             let mut shiori = PastaShiori::default();
             shiori.set_claim(claim);
             let loaded = shiori.load(load_dir.as_os_str()).unwrap_or(false);
 
-            // 観測ログ点（R10.4・無効時ゼロコスト）: アクタースレッド起動・VM pin 完了。
             tracing::debug!(seam = "actor.spawn", loaded, "actor thread spawned; VM pinned on this thread");
 
-            // ロード成否を返す（VM 本体は越境しない）。
             let _ = ready_tx.send(loaded);
 
-            // (2) 単一 recv ループ（select! なし・手動 wake なし）。
-            //     Stop で break → cleanup → done ack → スレッドが終わる。
-            //     done ack を持ち帰り、ループ脱出後（＝先行メッセージ drain 後）に
-            //     VM 破棄・cleanup を終えてから ack を送る（task 4.1・R7.1/R7.4:
-            //     ack 受信時に全資源解放済みを保証）。
+            // done ack はループ脱出後、VM 破棄・cleanup を終えてから送る（ack 受信＝全資源解放済み）。
             let mut done_ack: Option<flume::Sender<()>> = None;
             while let Ok(msg) = rx.recv() {
                 match msg {
-                    // GET 同期: 実 SHIORI.request を VM 上で呼び、応答値を返す。
-                    // co_scene は VM 内に persist し、resume_until_valid/CALLBACK が
-                    // メッセージ間で継続する（コルーチン意味論不変）。
                     ActorMsg::Get { req, reply } => {
                         let seq = req.seq;
-                        // 観測ログ点（R10.4・無効時ゼロコスト）: GET を mailbox から受信。
                         tracing::trace!(seam = "actor.recv", method = "get", seq, "actor received GET");
-                        // timeout/異常→204 の marshaling 契約は 3.4（marshaling.rs）が担う。
-                        // ここは GET 応答を **必ず 1 回**返す:
-                        // 成功は VM 応答文字列、失敗は 500 + X-ERROR-REASON 応答文字列
-                        // （仕様 `lua-require-robustness` 4.3/4.4/4.8・design.md
-                        // `ActorErrorReply`）。ロード失敗（`MyError::Load`）・未ロード
-                        // （`NotInitialized`）・Lua 実行エラー（`Script`）は同一分岐を通る。
+                        // GET 応答を **必ず 1 回**返す。失敗は 204 に読み替えず
+                        // 500 + X-ERROR-REASON で返す（ロード失敗・未ロード・Lua 実行エラーとも）。
                         match shiori.request(&req.raw) {
                             Ok(resp) => {
                                 let _ = reply.send(resp);
-                                // 観測ログ点（R10.4）: VM 応答を reply で返した（exactly-once move）。
                                 tracing::trace!(seam = "actor.reply", method = "get", seq, "actor replied with VM response");
                             }
                             Err(e) => {
-                                // 旧実装は reply を drop して 204 へ読み替えていた（無言化）。
-                                // 現契約はエラーを 500 応答として返す（204 に読み替えない）。
                                 let _ = reply.send(e.to_shiori_response());
-                                // 観測ログ点（R10.4）: エラーを 500 応答として返した
-                                // （`actor.drop` は reply を送れなかった場合に限定される）。
                                 tracing::debug!(seam = "actor.reply", method = "get", seq, error = true, reason = %e, "actor replied with 500 error response");
                             }
                         }
                     }
-                    // NOTIFY fire-and-forget: VM 上で処理し応答経路は持たない。
-                    // 応答は捨てる（NOTIFY は即 204 で終結する・3.4 で契約確定）。
+                    // NOTIFY の応答は捨てる（呼び出し側は即 204 を返し済み）。
                     ActorMsg::Notify { req } => {
-                        // 観測ログ点（R10.4）: NOTIFY を mailbox から受信（応答経路なし）。
                         tracing::trace!(seam = "actor.recv", method = "notify", seq = req.seq, "actor received NOTIFY");
                         let _ = shiori.request(&req.raw);
                     }
-                    // teardown: ack 経路を保持してループを抜ける。Stop は同一 FIFO を
-                    // 通るため、ここに到達した時点で先行メッセージは drain 済み
-                    // （clean drain）。ack はループ脱出後・cleanup 完了後に送る。
+                    // Stop は同一 FIFO を通るため、ここに到達した時点で先行メッセージは drain 済み。
                     ActorMsg::Stop { done } => {
-                        // 観測ログ点（R10.4）: Stop を受信しループ脱出（clean drain 完了）。
                         tracing::debug!(seam = "actor.stop", "actor received Stop; draining done, breaking loop");
                         done_ack = Some(done);
                         break;
@@ -204,28 +147,19 @@ pub fn spawn_actor_thread_with(
                 }
             }
 
-            // (3) teardown cleanup（task 4.1・design.md「reload teardown」順序）:
-            //     VM（shiori）をこのスレッド上で明示 drop する。drop により
-            //     PastaShiori が内包する !Send Lua VM・debug backend（socket bridge
-            //     join・port 解放）・関連リソースが解放される（debug backend は VM の
-            //     一部として VM drop 時にこのアクタースレッド上で teardown される）。
+            // VM はこのスレッド上で drop する（debug backend も VM の一部としてここで teardown される）。
             drop(shiori);
-            // mailbox receiver も ack 前に閉じる。ack 受信後の Stop 再送（二重 teardown）が
-            // 確実に Disconnected＝already-done になる（R7.4）。スレッドの終わりまで rx を
-            // 生かすと、ack〜スレッド終了の隙間に再送が受理されて冪等判定が競合する。
+            // mailbox receiver も ack 前に閉じる。スレッドの終わりまで rx を生かすと、
+            // ack〜スレッド終了の隙間に Stop の再送が受理されて冪等判定が競合する。
             drop(rx);
 
-            // (4) cleanup 完了後に done ack を送る（R7.1/R7.4: ack 受信＝全資源解放
-            //     済み）。Stop 経由でなく rx Disconnected 等でループを抜けた場合は
-            //     ack 経路を持たない（done_ack=None）ので送らない。
             if let Some(done) = done_ack {
                 let _ = done.send(());
-                // 観測ログ点（R10.4）: cleanup 完了後に done ack を送出（全資源解放済み）。
                 tracing::debug!(seam = "actor.done", "actor sent done ack after VM/resource cleanup");
             }
-            // (5) 持つ値を落としてから join の約束を待つ（約束を待つ間は DLL のコードを走らせない）。
-            //     届けば普通に戻り、参照は join した親が返す。送り手が落ちていれば（見捨てられた）
-            //     参照を返してスレッドを終える（Windows では戻らない）。
+            // 持つ値を落としてから join の約束を待つ（約束を待つ間は DLL のコードを走らせない）。
+            // 届けば普通に戻り、参照は join した親が返す。送り手が落ちていれば（見捨てられた）
+            // 参照を返してスレッドを終える（Windows では戻らない）。
             drop(log_context);
             drop(load_dir);
             drop(ready_tx);
@@ -243,7 +177,6 @@ pub fn spawn_actor_thread_with(
         }
     };
 
-    // VM 構築完了（ロード成否）を待つ。
     // ready の送り手が落ちた＝スレッドが ready の前に終わった（パニック等）。join して資源を残さない。
     // 閉包は約束に届いていないので、参照は join の後にここで返す。
     let Ok(loaded) = ready_rx.recv() else {

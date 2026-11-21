@@ -1,16 +1,16 @@
-//! ロード失敗・リクエスト処理エラーの可視化 E2E テスト（task 2.6）。
+//! ロード失敗・リクエスト処理エラーの可視化 E2E テスト。
 //!
 //! 本番と同じリクエスト経路——`lifecycle::spawn_actor`（FFI `load` 相当）で実 VM を
 //! アクタースレッドへ pin し、`lifecycle::marshal_request`（FFI `request` 相当）で
-//! アクター境界を跨いで応答を得る経路——を通して、以下のケースを検証する（要件 6.3）。
+//! アクター境界を跨いで応答を得る経路——を通して、以下のケースを検証する。
 //!
 //!  (a) SHIORI 応答モジュール（`pasta.shiori.entry`）のロードに失敗するゴースト
 //!  (b) 利用者初期化スクリプト（`main`）のロードに失敗するゴースト
 //!  (c) ロードは成功するが `SHIORI.request` が複数行メッセージでエラーになるゴースト
-//!  (d) 旧来の入口 `load` に、存在しないフォルダを渡す（Windows のみ・ponytail-shiori 要件 2）
+//!  (d) 旧来の入口 `load` に、存在しないフォルダを渡す（Windows のみ）
 //!  (e) 旧来の入口 `load` に、ANSI で表せない文字を含むパスを渡す（同上・ACP が 65001 なら飛ばす）
 //!
-//! 各ケースで確認するのは以下（要件 4.2 / 4.3 / 4.4 / 4.5 / 4.6 / 4.8 / 4.10 / 5.5）。
+//! 各ケースで確認するのは以下。
 //!
 //!  1. 初期化の成否: (a)(b)(d)(e) は `load` が false、(c) は true。
 //!  2. GET が 500 を返し、既定 204 へ読み替えられない。
@@ -25,7 +25,7 @@
 //! 次のケースを spawn する（既存 `ffi_actor_lifecycle_test.rs` と同方式）。
 //!
 //! `mod common;` は `PASTA_DEBUG` を main 前に中和する `#[ctor]` を
-//! 取り込むためにも必須である（要件 6.4）。`#[ignore]` は付けない（要件 6.6）。
+//! 取り込むためにも必須である。`#[ignore]` は付けない。
 
 mod common;
 
@@ -63,7 +63,7 @@ const NOTIFY_REQUEST: &str =
     "NOTIFY SHIORI/3.0\nCharset: UTF-8\nID: OnUnrelatedEvent\nSender: SSP\n";
 
 /// 500 応答の構造（ステータス行・ヘッダ列・`\r\n\r\n` 終端）を検証し、
-/// `X-ERROR-REASON` の値を返す（要件 4.3 / 4.6）。
+/// `X-ERROR-REASON` の値を返す。
 fn assert_500_structure_and_take_reason(case: &str, response: &str) -> String {
     assert_ne!(
         response.as_bytes(),
@@ -127,7 +127,7 @@ fn assert_500_structure_and_take_reason(case: &str, response: &str) -> String {
     reason
 }
 
-/// `X-ERROR-REASON` に期待するマーカーがすべて含まれることを検証する（要件 4.5 / 5.5）。
+/// `X-ERROR-REASON` に期待するマーカーがすべて含まれることを検証する。
 fn assert_reason_contains(case: &str, reason: &str, markers: &[&str]) {
     for marker in markers {
         assert!(
@@ -151,7 +151,7 @@ fn run_case(case: &str, loaded: bool, expect_loaded: bool, markers: &[&str]) {
     let reason = assert_500_structure_and_take_reason(case, &get);
     assert_reason_contains(case, &reason, markers);
 
-    // NOTIFY は本仕様の変更後も即 204 のまま（要件 4.10）。
+    // NOTIFY は即 204 のまま。
     let notify = marshal_request(&normalize_request(NOTIFY_REQUEST));
     assert_eq!(
         notify.as_bytes(),
@@ -169,7 +169,7 @@ fn run_case(case: &str, loaded: bool, expect_loaded: bool, markers: &[&str]) {
 /// (a)〜(e) を 1 本のテストで直列に検証する（プロセス全域 `LEGACY` 共有のため）。
 #[test]
 fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
-    // --- ケース (a): SHIORI 応答モジュールのロード失敗（要件 4.1 / 4.5 / 5.5） ---
+    // --- ケース (a): SHIORI 応答モジュールのロード失敗 ---
     let entry_broken = ghost_with_script(
         "pasta/shiori/entry.lua",
         r#"error("PASTA_E2E_ENTRY_MARKER")"#,
@@ -179,7 +179,7 @@ fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
         spawn_actor(entry_broken.path().to_path_buf()),
         false,
         &[
-            // フォルダがあるときの失敗の理由の形は変えない（ponytail-shiori 要件 2.6）。
+            // フォルダがあるときの失敗の理由の形は変えない。
             "Load error: ",
             "failed to load startup module 'pasta.shiori.entry'",
             "PASTA_E2E_ENTRY_MARKER",
@@ -187,7 +187,7 @@ fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
     );
     drop(entry_broken);
 
-    // --- ケース (b): 利用者初期化スクリプトのロード失敗（要件 5.2 / 5.5） ---
+    // --- ケース (b): 利用者初期化スクリプトのロード失敗 ---
     // `a b` の形は LuaJIT の構文エラーとなり、メッセージに後続トークンが出る。
     let main_broken = ghost_with_script("main.lua", "PASTA_E2E_MAIN_A PASTA_E2E_MAIN_B\n");
     run_case(
@@ -202,7 +202,7 @@ fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
     );
     drop(main_broken);
 
-    // --- ケース (c): ロードは成功、リクエスト処理が複数行メッセージでエラー（要件 4.4 / 4.6） ---
+    // --- ケース (c): ロードは成功、リクエスト処理が複数行メッセージでエラー ---
     // 内蔵 `entry.lua` は `xpcall` で握って Lua 側で 500 化するため、Rust 側の `Err` 経路へ
     // 到達させるには保護なしの `SHIORI.request` で上書きする必要がある。
     let request_error = ghost_with_script(
@@ -226,7 +226,7 @@ return SHIORI
     );
     drop(request_error);
 
-    // --- ケース (d)(e): 旧来の入口 `load` にフォルダの無いパスを渡す（ponytail-shiori 要件 2.1〜2.4） ---
+    // --- ケース (d)(e): 旧来の入口 `load` にフォルダの無いパスを渡す ---
     #[cfg(windows)]
     missing_dir::run_cases();
 
@@ -234,7 +234,7 @@ return SHIORI
     let _ = teardown_actor();
 }
 
-/// 旧来の入口 `load`（ANSI）にフォルダの無いパスを渡したときの 500（ponytail-shiori 要件 2.1〜2.4・9.4）。
+/// 旧来の入口 `load`（ANSI）にフォルダの無いパスを渡したときの 500。
 ///
 /// GET の理由は `Load error: load directory not found: <入口がデコードしたパス>`。
 /// ANSI で表せない文字は、入口のデコードと同じく置き換わった形で出る。
@@ -336,7 +336,7 @@ mod missing_dir {
         }
         let dir = root.path().join(NON_ANSI_DIR_NAME);
         copy_fixture_into("shiori_lifecycle", &dir);
-        // 理由のパスが、表せない文字の置き換わった形であることを前提として確かめる（2.4）。
+        // 理由のパスが、表せない文字の置き換わった形であることを前提として確かめる。
         assert!(
             ansi_round_trip(&dir).to_string_lossy().contains('?'),
             "非 ANSI の名前は CP_ACP で `?` へ置き換わるはず"

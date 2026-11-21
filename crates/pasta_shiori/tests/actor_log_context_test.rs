@@ -1,8 +1,7 @@
-//! アクタースレッドの観測ログが、ロガーの数によらず自分のゴーストのログファイルへ届くことの検証
-//! （仕様 `pasta-toml-logging-consistency` task 5.2・requirements 4.2・design.md `ActorLogContext`）。
+//! アクタースレッドの観測ログが、ロガーの数によらず自分のゴーストのログファイルへ届くことの検証。
 //!
 //! 2 つのゴーストのアクタースレッドを同時に起こし、ロガーを 2 つ登録した状態にする。文脈の無い
-//! ログは「ロガーが 1 つだけのときだけ届く」規則（4.6）なので、アクタースレッドの入口で文脈を
+//! ログは「ロガーが 1 つだけのときだけ届く」規則なので、アクタースレッドの入口で文脈を
 //! 張らないと、メッセージループの観測ログ（`actor.spawn`・`actor.recv`・`actor.stop`）は捨てられる。
 //!
 //! 観測ログは debug・trace なので、tracing のフィルタ（プロセス全体で 1 つ）を `level = "trace"`
@@ -76,12 +75,12 @@ fn actor_thread_logs_reach_own_logger_with_two_loggers_registered() {
         log_a.contains("actor.stop"),
         "A's stop log must reach A's file:\n{log_a}"
     );
-    // 他のゴーストのログファイルへは書かない（4.6）。
+    // 他のゴーストのログファイルへは書かない。
     assert!(
         !log_b.contains("seq=7"),
         "A's recv log must not reach B's file:\n{log_b}"
     );
-    // A の done ack 後のログは、A のロガーの登録解除の後なので B のファイルへ流れない（4.7）。
+    // A の done ack 後のログは、A のロガーの登録解除の後なので B のファイルへ流れない。
     assert!(
         !log_b.contains("actor.done"),
         "post-ack log must be discarded:\n{log_b}"

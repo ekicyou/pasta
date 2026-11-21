@@ -59,13 +59,13 @@ impl From<time::error::IndeterminateOffset> for MyError {
 /// mlua のエラー Display が末尾に付ける、スタックトレース開始行のマーカー。
 const STACK_TRACEBACK_MARKER: &str = "stack traceback:";
 
-/// `X-ERROR-REASON` ヘッダ値を単一行に整形する（要件 4.6 / 4.11）。
+/// `X-ERROR-REASON` ヘッダ値を単一行に整形する。
 ///
 /// (1) `stack traceback:` の行以降を捨てる。全文は既存の error ログに残る。
 /// (2) 残りを CR / LF で分割し、各行を trim、空行を捨て、半角スペース 1 個で連結する。
 ///
-/// 改行を含まない入力は無変換で返すため、既存応答はバイト不変（要件 3.5）。
-/// `no file '…'` の候補パス列は落とさず、長さ上限も設けない。非 ASCII は変換しない（要件 2.3）。
+/// 改行を含まない入力は無変換で返す。
+/// `no file '…'` の候補パス列は落とさず、長さ上限も設けない。非 ASCII は変換しない。
 fn single_line(message: &str) -> String {
     if !message.contains(['\r', '\n']) {
         return message.to_string();
@@ -168,11 +168,8 @@ mod tests {
         );
     }
 
-    // ====================================================================
-    // G1 (3.35): Display contract for previously untested variants.
-    // X-ERROR-REASON embeds `{self}` directly, so these strings are part of
+    // X-ERROR-REASON embeds `{self}` directly, so these Display strings are part of
     // the observable SHIORI 500/400 response surface.
-    // ====================================================================
 
     #[test]
     fn display_contract_remaining_variants() {
@@ -189,10 +186,6 @@ mod tests {
             "Script error: boom"
         );
     }
-
-    // ====================================================================
-    // G1 (3.35): From conversions (previously all untested).
-    // ====================================================================
 
     #[test]
     fn from_utf8_error_maps_to_encode_utf8() {
@@ -246,30 +239,25 @@ mod tests {
         );
     }
 
-    // ====================================================================
-    // タスク 2.1: `X-ERROR-REASON` 値の単一行化（`single_line`）
-    // 要件 2.3 / 3.5 / 4.6 / 4.11、design.md `ErrorResponse`
-    // ====================================================================
-
-    /// LF 区切りの複数行を半角スペース 1 個で連結する（4.6）。
+    /// LF 区切りの複数行を半角スペース 1 個で連結する。
     #[test]
     fn single_line_joins_lf_separated_lines() {
         assert_eq!(single_line("first\nsecond\nthird"), "first second third");
     }
 
-    /// CRLF 区切りでも空行を生まずに連結し、末尾改行も落とす（4.6）。
+    /// CRLF 区切りでも空行を生まずに連結し、末尾改行も落とす。
     #[test]
     fn single_line_joins_crlf_separated_lines() {
         assert_eq!(single_line("first\r\nsecond\r\n"), "first second");
     }
 
-    /// 単独 CR 区切りも改行として扱う（4.6）。
+    /// 単独 CR 区切りも改行として扱う。
     #[test]
     fn single_line_joins_cr_separated_lines() {
         assert_eq!(single_line("first\rsecond"), "first second");
     }
 
-    /// タブ字下げの継続行は trim し、連続改行による空行は捨てる（4.6）。
+    /// タブ字下げの継続行は trim し、連続改行による空行は捨てる。
     #[test]
     fn single_line_trims_tab_indented_continuation_lines() {
         let message = "module 'x' not found:\n\tno field package.preload['x']\n\n\tno file 'a.lua'";
@@ -279,33 +267,33 @@ mod tests {
         );
     }
 
-    /// `stack traceback:` の行以降を捨てる（4.11）。
+    /// `stack traceback:` の行以降を捨てる。
     #[test]
     fn single_line_drops_stack_traceback_and_after() {
         let message = "runtime error: boom\n\tdetail line\nstack traceback:\n\t[C]: in function 'require'\n\tentry.lua:1: in main chunk";
         assert_eq!(single_line(message), "runtime error: boom detail line");
     }
 
-    /// 字下げ付きの `stack traceback:` でも同様に落とす（4.11）。
+    /// 字下げ付きの `stack traceback:` でも同様に落とす。
     #[test]
     fn single_line_drops_indented_stack_traceback() {
         let message = "runtime error: boom\n\tstack traceback:\n\t[C]: in ?";
         assert_eq!(single_line(message), "runtime error: boom");
     }
 
-    /// 入力が丸ごとトレースバックなら空文字になる（4.11）。
+    /// 入力が丸ごとトレースバックなら空文字になる。
     #[test]
     fn single_line_traceback_only_becomes_empty() {
         assert_eq!(single_line("stack traceback:\n\t[C]: in ?"), "");
     }
 
-    /// 空白のみの複数行入力は空文字になる（4.6）。
+    /// 空白のみの複数行入力は空文字になる。
     #[test]
     fn single_line_whitespace_only_becomes_empty() {
         assert_eq!(single_line("  \n\t\r\n "), "");
     }
 
-    /// 改行を含まない入力はバイト不変で返す（3.5）。
+    /// 改行を含まない入力はバイト不変で返す。
     #[test]
     fn single_line_without_newline_is_byte_identical() {
         for message in [
@@ -322,7 +310,7 @@ mod tests {
         }
     }
 
-    /// 非 ASCII 文字は変換・欠落させない（2.3）。
+    /// 非 ASCII 文字は変換・欠落させない。
     #[test]
     fn single_line_preserves_non_ascii() {
         let message = "モジュール 'テスト' が見つかりません:\n\tno file 'C:/ゴースト/テスト.lua'";
@@ -332,7 +320,7 @@ mod tests {
         );
     }
 
-    /// `no file '…'` の候補パス列は落とさず、長さ上限による切り詰めもしない（4.11）。
+    /// `no file '…'` の候補パス列は落とさず、長さ上限による切り詰めもしない。
     #[test]
     fn single_line_keeps_all_candidate_paths_without_truncation() {
         let mut message = String::from("module 'a.b' not found:");
@@ -354,7 +342,7 @@ mod tests {
         );
     }
 
-    /// 複数行メッセージでも 500 応答のヘッダ構造が壊れない（4.6 / 4.11）。
+    /// 複数行メッセージでも 500 応答のヘッダ構造が壊れない。
     #[test]
     fn to_shiori_response_multiline_message_is_single_line() {
         let err =
@@ -369,7 +357,7 @@ mod tests {
         );
     }
 
-    /// 複数行メッセージでも 400 応答のヘッダ構造が壊れない（4.6）。
+    /// 複数行メッセージでも 400 応答のヘッダ構造が壊れない。
     #[test]
     fn to_shiori_400_response_multiline_message_is_single_line() {
         let err = MyError::InvalidPastaTime {

@@ -58,7 +58,6 @@ pub(super) fn copy_dir_recursive(
         let dest_path = dst.join(entry.file_name());
 
         if path.is_dir() {
-            // Skip profile directories
             if entry.file_name() == "profile" {
                 continue;
             }
@@ -72,7 +71,7 @@ pub(super) fn copy_dir_recursive(
 }
 
 // ========================================================================
-// Task 1.1: 400 Bad Requestレスポンス生成機能テスト
+// 400 Bad Requestレスポンス生成機能テスト
 // ========================================================================
 
 #[test]
@@ -83,7 +82,6 @@ fn test_400_response_via_my_error() {
     };
     let response = err.to_shiori_400_response();
 
-    // SHIORI/3.0プロトコル準拠を検証
     assert!(response.starts_with("SHIORI/3.0 400 Bad Request\r\n"));
     assert!(response.contains("Charset: UTF-8\r\n"));
     assert!(response.contains("X-ERROR-REASON:"));
@@ -92,18 +90,16 @@ fn test_400_response_via_my_error() {
 }
 
 // ========================================================================
-// Task 4.1: パース成功・失敗パステスト
+// パース成功・失敗パステスト
 // ========================================================================
 
 #[test]
 fn test_request_with_valid_shiori_request() {
-    // 有効なSHIORIリクエスト形式でのテスト
     let temp = copy_shiori_lifecycle_fixture();
     let mut shiori = PastaShiori::default();
 
     assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
-    // 有効なSHIORI/3.0リクエスト
     let valid_request = "GET SHIORI/3.0\r\n\
         Charset: UTF-8\r\n\
         ID: OnBoot\r\n\
@@ -120,7 +116,6 @@ fn test_request_with_valid_shiori_request() {
         "Parse should have succeeded, but got 400 Bad Request: {}",
         response
     );
-    // 有効なSHIORIレスポンス形式であることを確認
     assert!(
         response.starts_with("SHIORI/3.0"),
         "Expected valid SHIORI response format, got: {}",
@@ -130,13 +125,11 @@ fn test_request_with_valid_shiori_request() {
 
 #[test]
 fn test_request_with_invalid_shiori_request_returns_400() {
-    // 無効なSHIORIリクエスト形式でのテスト
     let temp = copy_shiori_lifecycle_fixture();
     let mut shiori = PastaShiori::default();
 
     assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
-    // 完全に無効なリクエスト（パース失敗を引き起こす）
     let invalid_request = "THIS IS NOT A VALID SHIORI REQUEST";
 
     let result = shiori.request(invalid_request);
@@ -149,13 +142,11 @@ fn test_request_with_invalid_shiori_request_returns_400() {
     );
 }
 
-/// Test that parsed request table fields are correctly passed to Lua.
-/// This verifies Lua can actually read method, version, id, reference, dic, etc.
+/// Parsed request table fields (method, version, id, reference, dic, ...) are readable in Lua.
 #[test]
 fn test_request_parsed_table_fields_accessible_in_lua() {
     let temp = copy_shiori_lifecycle_fixture();
 
-    // Override entry.lua to echo back req table fields for verification
     let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
     std::fs::write(
         &entry_lua_path,
@@ -217,7 +208,6 @@ end
     let mut shiori = PastaShiori::default();
     assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
-    // Send a request with all fields populated
     let request = "GET SHIORI/3.0\r\n\
         Charset: UTF-8\r\n\
         Sender: SSP\r\n\
@@ -228,14 +218,12 @@ end
 
     let response = shiori.request(request).unwrap();
 
-    // Verify response is 200 OK (not 400 Bad Request)
     assert!(
         response.contains("SHIORI/3.0 200 OK"),
         "Expected 200 OK, got: {}",
         response
     );
 
-    // Verify each field was correctly parsed and accessible in Lua
     assert!(
         response.contains("method=get"),
         "Expected method=get in response: {}",
@@ -279,7 +267,7 @@ end
 }
 
 // ========================================================================
-// G1 (3.35): call_lua_load failure branches (previously unreached)
+// call_lua_load failure branches
 // ========================================================================
 
 /// SHIORI.load returning false must surface as load() == Ok(false).
@@ -356,7 +344,7 @@ end
 }
 
 // ========================================================================
-// G1 (3.35): call_lua_request error branches (previously unreached)
+// call_lua_request error branches
 // ========================================================================
 
 /// SHIORI.request raising a Lua error must surface as Err(MyError::Script)
@@ -438,7 +426,7 @@ end
 }
 
 // ========================================================================
-// G1 (3.35): runtime() accessor None branch
+// runtime() accessor None branch
 // ========================================================================
 
 #[test]
@@ -448,13 +436,13 @@ fn test_runtime_accessor_none_before_load() {
 }
 
 // ========================================================================
-// ponytail-shiori 1.4: SHIORI.request の無いゴーストへの自前の 204（特性化）
+// SHIORI.request の無いゴーストへの自前の 204（特性化）
 // ========================================================================
 
 /// SHIORI.request の無いゴーストへの GET は、ほかの自前の 204 と同じ
-/// `default_204()` を返す（5.1・5.2）。
+/// `default_204()` を返す。
 /// 期待のバイト列は `tests/byte_invariant_test.rs` の `GOLDEN_NOTIFY_204`
-/// （Lua の `RES.no_content()` が既定の設定で作る 204 を固めた値）の写し（5.3）。
+/// （Lua の `RES.no_content()` が既定の設定で作る 204 を固めた値）の写し。
 const SELF_204_WITHOUT_REQUEST_FN: &str = "SHIORI/3.0 204 No Content\r\n\
 Charset: UTF-8\r\n\
 Sender: Pasta\r\n\

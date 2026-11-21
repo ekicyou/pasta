@@ -1,17 +1,16 @@
-//! UTF-8 初期化入口（`loadu`）の FFI 検証（task 2.7・要件 2.4 / 2.5 / 2.6 / 6.4 / 6.9）。
+//! UTF-8 初期化入口（`loadu`）の FFI 検証。
 //!
 //! 出荷 SHIORI ホスト（SSP 2.6.92 以降）が呼ぶ **extern "C" 入口シンボルそのもの**
-//! （`loadu`/`load`/`request`/`unload`）を C ABI で駆動し、設計
-//! 「Testing Strategy > E2E Tests（pasta_shiori・本番リクエスト経路）」項 3 の系列を検証する。
+//! （`loadu`/`load`/`request`/`unload`）を C ABI で駆動し、以下の系列を検証する。
 //!
 //!  1. 非 ANSI 名（[`common::NON_ANSI_DIR_NAME`]）のディレクトリへ設置したゴーストの
-//!     パスを UTF-8 で `loadu` へ渡し、ロードが成功する（要件 2.4 / 6.9）。
+//!     パスを UTF-8 で `loadu` へ渡し、ロードが成功する。
 //!  2. `request` の GET が 500 でも既定 204 でもない正常応答を返す。
 //!  3. `unload` で終了処理。
 //!  4. 再度 `loadu` で初期化したあと従来入口 `load` を呼ぶと、ANSI では表現できず欠落した
 //!     パスを渡しても TRUE が返り、直後の GET が同一の正常応答を返す＝ロード済み状態が
-//!     壊れない（要件 2.5）。
-//!  5. `unload` 後に `load` を単独で呼ぶと、従来どおり ANSI の設置パスでロードする（要件 2.6）。
+//!     壊れない。
+//!  5. `unload` 後に `load` を単独で呼ぶと、従来どおり ANSI の設置パスでロードする。
 //!
 //! # プロセス全域 static を共有するため 1 本のテスト関数で直列化する
 //! `actor::lifecycle::LEGACY` と `windows.rs` の `loadu` 初期化フラグはどちらもプロセス
@@ -19,7 +18,7 @@
 //! 他のテストを置かない（順序非依存）。
 //!
 //! `mod common;` は `PASTA_DEBUG` を main 前に中和する `#[ctor]` を
-//! 取り込むためにも必須である（要件 6.4）。`#[ignore]` は付けない（要件 6.6）。
+//! 取り込むためにも必須である。`#[ignore]` は付けない。
 
 #![cfg(windows)]
 
@@ -41,7 +40,7 @@ use pasta::{load, request, unload};
 use std::ffi::c_long;
 
 unsafe extern "C" {
-    /// SHIORI DLL 共通仕様の `loadu`（設置パスを UTF-8 で受け取る初期化入口・要件 2.4）。
+    /// SHIORI DLL 共通仕様の `loadu`（設置パスを UTF-8 で受け取る初期化入口）。
     fn loadu(hdir: HGLOBAL, len: c_long) -> i32;
 }
 
@@ -114,7 +113,7 @@ fn drive_request() -> String {
     read_and_free_response(hres, len.try_into().unwrap())
 }
 
-/// 設置パスを UTF-8 バイト列として `loadu` へ渡す（要件 2.4）。
+/// 設置パスを UTF-8 バイト列として `loadu` へ渡す。
 fn drive_loadu(dir: &Path) -> bool {
     let utf8 = dir
         .to_str()
@@ -129,7 +128,7 @@ fn drive_loadu(dir: &Path) -> bool {
 /// 設置パスをシステム ANSI（CP_ACP）へ変換して従来入口 `load` へ渡す。
 ///
 /// 非 ANSI 名のディレクトリでは表現できない文字が既定文字へ置換され、パスは欠落する。
-/// それが「従来入口では非 ANSI の設置パスが届かない」という本仕様の前提そのものである。
+/// 従来入口では非 ANSI の設置パスが届かない、という前提そのものを再現する。
 fn drive_load(dir: &Path) -> bool {
     let ansi = path_to_ansi_bytes(dir);
     let hdir = alloc_hglobal(&ansi);
@@ -259,7 +258,7 @@ fn install_narrowed_ghost(root: &TempDir, name: &str, logging: &str) -> PathBuf 
 }
 
 /// 読み込みの終わりの行が、ログを絞ったゴーストの `pasta.log` にも出て、ほかの info は
-/// 出ないことを表明する（要件 10.1・10.2・10.4）。unload の後に呼ぶ。
+/// 出ないことを表明する。unload の後に呼ぶ。
 fn assert_only_load_entry_info(dir: &Path, needle: &str) {
     let log = common::wait_log_contains(dir, "SHIORI load entry completed");
     assert!(
@@ -277,8 +276,8 @@ log:
     );
 }
 
-/// `[logging]` を絞ったゴーストでも、`loadu` の読み込みの終わりの行が 1 行出る
-/// （要件 10.1〜10.4）。辞書の壊れたゴーストでは `loaded=false` で出る。
+/// `[logging]` を絞ったゴーストでも、`loadu` の読み込みの終わりの行が 1 行出る。
+/// 辞書の壊れたゴーストでは `loaded=false` で出る。
 fn load_entry_line_survives_narrowed_logging() {
     for logging in ["level = \"warn\"", "filter = \"pasta_lua=error\""] {
         let root = TempDir::new().expect("create temp dir");
@@ -323,7 +322,7 @@ fn decision_line_before_mark(enabled: bool) {
 }
 
 // ===========================================================================
-// 設計 Testing Strategy > E2E Tests 項 3 の系列（1 本の直列テスト）
+// 1 本の直列テスト
 // ===========================================================================
 
 #[test]
@@ -331,7 +330,7 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
     let non_ansi_root = TempDir::new().expect("create temp dir");
     let non_ansi_dir = install_ghost(&non_ansi_root, NON_ANSI_DIR_NAME);
 
-    // --- 段 1: 非 ANSI の設置パスを UTF-8 で渡す初期化（要件 2.4 / 6.9） ---
+    // --- 段 1: 非 ANSI の設置パスを UTF-8 で渡す初期化 ---
     assert!(
         drive_loadu(&non_ansi_dir),
         "loadu は非 ANSI の設置パスでもロードを完了するべき（要件 2.4 / 6.9）: {}",
@@ -353,7 +352,7 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
     // （非同期 writer のため、ロガーが解放される unload の後に読む）
     assert_entry_logged(&non_ansi_dir, "loadu");
 
-    // --- 段 4: loadu で初期化したあとの従来入口 load は状態を壊さない（要件 2.5） ---
+    // --- 段 4: loadu で初期化したあとの従来入口 load は状態を壊さない ---
     assert!(
         drive_loadu(&non_ansi_dir),
         "2 回目の loadu もロードを完了するべき（要件 2.4）"
@@ -369,7 +368,7 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
         "loadu 済みの load はロード済み状態を壊してはならない（要件 2.5）\nactual: {after_load:?}"
     );
 
-    // --- 段 5: unload 後の load 単独は従来どおりロードする（要件 2.6） ---
+    // --- 段 5: unload 後の load 単独は従来どおりロードする ---
     assert_eq!(unload(), 1, "unload は常に true を返す");
     let ascii_root = TempDir::new().expect("create temp dir");
     let ascii_dir = install_ghost(&ascii_root, "ascii_install_path");

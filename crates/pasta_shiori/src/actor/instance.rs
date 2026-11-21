@@ -1,12 +1,12 @@
-//! 芯の型 [`ActorInstance`]（仕様 `shiori4-v3-portable`・design.md「ActorInstance」）。
+//! 芯の型 [`ActorInstance`]。
 //!
 //! インスタンス 1 つ＝アクター 1 つ。mailbox の送信端・アクタースレッドのハンドル・
-//! ディレクトリ・要求の連番だけを持ち、グローバルな状態を参照しない（ログの登録を除く・5.1）。
-//! 要求はそのインスタンスの mailbox だけを通り（5.2）、後始末はほかのインスタンスに触れない（4.3）。
+//! ディレクトリ・要求の連番だけを持ち、グローバルな状態を参照しない（ログの登録を除く）。
+//! 要求はそのインスタンスの mailbox だけを通り、後始末はほかのインスタンスに触れない。
 //!
-//! 後始末の決まり（design.md「後始末の決まり」）: Stop を送って ack を待ち、ack が届けば
+//! 後始末の決まり: Stop を送って ack を待ち、ack が届けば
 //! アクタースレッドを join する（受け口が既に閉じていたときも join）。それ以外は手放す（detach）。
-//! ack が来なければ手放したことを警告のログ（`seam = "instance.abandon"`）に出す（4.2）。
+//! ack が来なければ手放したことを警告のログ（`seam = "instance.abandon"`）に出す。
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -25,23 +25,22 @@ use crate::actor::teardown::{TeardownReport, teardown_via_sender};
 use crate::actor::thread::{ActorThread, spawn_actor_thread_with};
 use crate::util::parsers::req::ParseError;
 
-/// 後始末で ack を待つ上限（4.2）。通常運転では後始末は速やかに終わる。
-/// 万一アクターが ack を返さない場合でも呼び出し側（＝ホスト）を無限待機させない安全網。
+/// 後始末で ack を待つ上限。アクターが ack を返さなくてもホストを無限待機させない安全網。
 pub const TEARDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// 起動の前のディレクトリの占有のしかた（design.md「ActorInstance」・6.2）。
+/// 起動の前のディレクトリの占有のしかた。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClaimMode {
     /// 占有されていれば [`SpawnError::DirInUse`]（版 3 と、旧来の口の普通の読み込み）。
     Exclusive,
-    /// 占有を新しい世代で奪う（旧来の口が、打ち切りに終わった自分の片付けの直後に同じディレクトリを読むときだけ・7.1・7.2）。
+    /// 占有を新しい世代で奪う（旧来の口が、打ち切りに終わった自分の片付けの直後に同じディレクトリを読むときだけ）。
     TakeOver,
 }
 
 /// [`ActorInstance::spawn`] の失敗。
 #[derive(Debug)]
 pub enum SpawnError {
-    /// 同じディレクトリを生きているインスタンスが占有している（6.2）。
+    /// 同じディレクトリを生きているインスタンスが占有している。
     DirInUse,
     /// OS がスレッドを起こせない。
     Thread(std::io::Error),
@@ -50,19 +49,16 @@ pub enum SpawnError {
     NotReady,
 }
 
-/// インスタンス 1 つ＝アクター 1 つ（5.1）。`Send + Sync`（VM はアクタースレッドから出ない・6.3）。
+/// インスタンス 1 つ＝アクター 1 つ。`Send + Sync`（VM はアクタースレッドから出ない）。
 pub struct ActorInstance {
-    /// mailbox の送信端。
     tx: Sender<ActorMsg>,
     /// アクタースレッドのハンドル。後始末を終えると `None`（Drop の二重の後始末を防ぐ）。
     thread: Option<ActorThread>,
-    /// ゴーストのディレクトリ。
     load_dir: PathBuf,
     /// 要求の連番（FIFO 観測用の `seq`）。
     seq: AtomicU64,
 }
 
-// 芯の型が `Send + Sync` であることのコンパイルの検査（6.3）。
 const _: fn() = || {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<ActorInstance>();
@@ -71,7 +67,7 @@ const _: fn() = || {
 impl ActorInstance {
     /// アクタースレッドを起こし、VM を構築して `SHIORI.load` を呼ぶ（[`ClaimMode::Exclusive`]）。
     ///
-    /// 返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている（2.3）。辞書・Lua・
+    /// 返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている。辞書・Lua・
     /// `SHIORI.load` の失敗はインスタンスを返す（[`loaded`](Self::loaded) が偽）。
     pub fn spawn(load_dir: PathBuf) -> Result<Self, SpawnError> {
         Self::spawn_with(load_dir, ClaimMode::Exclusive)
@@ -81,7 +77,7 @@ impl ActorInstance {
     ///
     /// 起動の前にディレクトリを占有して札を得る。札はアクタースレッドの VM が持ち、VM の
     /// 片付けで札で外す。占有に失敗したら占有している側のログに理由を出し、
-    /// [`SpawnError::DirInUse`] を返す（6.2・2.5）。
+    /// [`SpawnError::DirInUse`] を返す。
     pub fn spawn_with(load_dir: PathBuf, mode: ClaimMode) -> Result<Self, SpawnError> {
         let registry = GlobalLoggerRegistry::instance();
         let token = match mode {
@@ -123,7 +119,7 @@ impl ActorInstance {
                 // 取り直し、理由を出した後に外す（項目を残さない）。
                 // shortcut: 取り直す前に別のインスタンスが同じディレクトリを占有すると、そのロガーを既定のものに替えてしまう。unwind のビルドで同じディレクトリを同時に起こすときだけ起きるので、それが要る用途ができたら直す。
                 let token = registry.try_claim(load_dir.clone()).unwrap_or(token);
-                // 理由を出すため、そのディレクトリに既定のロガーを登録する（2.5）。
+                // 理由を出すため、そのディレクトリに既定のロガーを登録する。
                 if let Ok(logger) = PastaLogger::new(&load_dir, None) {
                     registry.register(load_dir.clone(), Arc::new(logger));
                 }
@@ -132,7 +128,6 @@ impl ActorInstance {
                     tracing::error!(seam = "instance.spawn", error = %e, "actor thread could not start");
                 }
                 registry.release_claim(&token);
-                // ready の前に終わったスレッドは spawn_actor_thread_with が join 済み。
                 Err(if e.kind() == std::io::ErrorKind::Other {
                     SpawnError::NotReady
                 } else {
@@ -170,7 +165,7 @@ impl ActorInstance {
         }
     }
 
-    /// 解けない要求を、このインスタンスのログに warn 1 行で残す（3.6〜3.8）。
+    /// 解けない要求を、このインスタンスのログに warn 1 行で残す。
     /// 要求は利用者の名前を含みうるので、位置と 1 行目だけを載せ、全文は載せない。
     pub(crate) fn warn_unreadable(&self, entry: &'static str, req: &str, err: &ParseError) {
         let (line, col) = match err.line_col {
@@ -193,7 +188,7 @@ impl ActorInstance {
         marshal_get(&self.tx, self.next_request(req))
     }
 
-    /// NOTIFY: 積んで即 204 を返す（3.8）。
+    /// NOTIFY: 積んで即 204 を返す。
     pub fn notify(&self, req: &str) -> String {
         marshal_notify(&self.tx, self.next_request(req))
     }
@@ -203,7 +198,7 @@ impl ActorInstance {
         teardown_via_sender(&self.tx, TEARDOWN_TIMEOUT)
     }
 
-    /// 後始末（4.1・4.2・4.4）。ack が届けば join してから返る。
+    /// 後始末。ack が届けば join してから返る。
     pub fn shutdown(self) -> TeardownReport {
         self.shutdown_with_timeout(TEARDOWN_TIMEOUT)
     }

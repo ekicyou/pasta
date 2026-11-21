@@ -1,15 +1,15 @@
-//! 旧来の入口の置き場（LegacySlot・仕様 `shiori4-v3-portable`・design.md「LegacySlot」）。
+//! 旧来の入口の置き場。
 //!
 //! 旧来の SHIORI の入口（`windows.rs` の `load`／`request`／`unload`）は、呼び出し側に
 //! インスタンスのハンドルを返せない ABI である。そのためこの入口だけは、プロセスに 1 つの
-//! 置き場 [`LEGACY`]（芯の型 [`ActorInstance`] を 1 つ持つ）を残す（5.7）。芯・アクター・版 3 の
+//! 置き場 [`LEGACY`]（芯の型 [`ActorInstance`] を 1 つ持つ）を残す。芯・アクター・版 3 の
 //! 口はグローバルな状態を持たず、ここを参照しない。
 //!
-//! # 窓口の自由関数（名前と形は今のまま・7.1・7.4）
-//! - [`spawn_actor`]: 先に [`teardown_actor`] で前のインスタンスを片付け（7.2）、新しい
+//! # 窓口の自由関数
+//! - [`spawn_actor`]: 先に [`teardown_actor`] で前のインスタンスを片付け、新しい
 //!   [`ActorInstance`] を起こして置き場へ入れる。
 //! - [`marshal_request`]: 置き場の芯の型へ要求を渡す。空なら 204（SHIORI スレッドを待たせない）。
-//! - [`teardown_actor`]: 置き場から取り出して後始末する（ack の後に join・7.6）。空なら冪等の no-op。
+//! - [`teardown_actor`]: 置き場から取り出して後始末する（ack の後に join）。空なら冪等の no-op。
 //!
 //! # 送信の道にロックを置かない
 //! 置き場は [`ArcSwapOption`] で、送信の道（[`marshal_request`]）は `load_full()`
@@ -26,19 +26,19 @@ use crate::actor::instance::{ActorInstance, ClaimMode, TEARDOWN_TIMEOUT};
 use crate::actor::marshaling::default_204;
 use crate::actor::teardown::TeardownReport;
 
-/// 旧来の入口の置き場。プロセスに 1 つの状態はこれだけ（5.7）。
+/// 旧来の入口の置き場。プロセスに 1 つの状態はこれだけ。
 static LEGACY: ArcSwapOption<ActorInstance> = ArcSwapOption::const_empty();
 
 /// アクターを起こして置き場へ入れる（`load` 起点・loader lock の外）。
 ///
-/// 前のインスタンスがあれば先に [`teardown_actor`] で片付ける（reload・7.2）。
+/// 前のインスタンスがあれば先に [`teardown_actor`] で片付ける（reload）。
 /// 戻り値はアクタースレッド上での `PastaShiori::load` 成否。ロードに失敗してもインスタンスは
 /// 置き場に入り、以後の GET の応答は失敗の種類で異なる（`PastaShiori::request` を参照）。
 /// スレッドを起こせなかったときと、ディレクトリをほかのインスタンスが占有しているとき
 /// （`SpawnError`）は偽を返し、置き場は空のまま。
 ///
 /// 前の片付けが打ち切りに終わり（ack が来ずにスレッドを手放した）同じディレクトリを読み直すときは、
-/// 手放したスレッドの VM がまだ持つ占有を引き継ぐ（今の SSP の再読み込みを保つ・7.1・7.2）。
+/// 手放したスレッドの VM がまだ持つ占有を引き継ぐ（SSP の再読み込みを通すため）。
 pub fn spawn_actor(load_dir: PathBuf) -> bool {
     spawn_actor_with_teardown_timeout(load_dir, TEARDOWN_TIMEOUT)
 }
@@ -47,7 +47,6 @@ pub fn spawn_actor(load_dir: PathBuf) -> bool {
 /// （試験から短い値を注入する内部の口。本番の上限は [`TEARDOWN_TIMEOUT`] のまま）。
 #[doc(hidden)]
 pub fn spawn_actor_with_teardown_timeout(load_dir: PathBuf, teardown_timeout: Duration) -> bool {
-    // 前のディレクトリは片付けの前に手元へ取る（新しいグローバルな状態は持たない）。
     let prev_dir = LEGACY.load().as_ref().map(|i| i.load_dir().to_path_buf());
     let report = teardown_slot(&LEGACY, teardown_timeout);
     let timed_out = !report.acked && !report.already_done;
@@ -58,7 +57,6 @@ pub fn spawn_actor_with_teardown_timeout(load_dir: PathBuf, teardown_timeout: Du
     };
 
     let Ok(instance) = ActorInstance::spawn_with(load_dir, mode) else {
-        // 理由は ActorInstance::spawn_with がログに出している。
         return false;
     };
     let loaded = instance.loaded();
@@ -84,7 +82,7 @@ fn request_into(slot: &ArcSwapOption<ActorInstance>, request: &str) -> String {
     }
 }
 
-/// 置き場のアクターを後始末する（`unload` 入口・7.1・7.6）。
+/// 置き場のアクターを後始末する（`unload` 入口）。
 ///
 /// 戻り値は後始末の結果（clean／冪等 no-op／異常を値で返す。ホストを巻き込まない）。
 /// ack が届けばアクタースレッドを join してから返る（ack が来なければ手放す）。
@@ -106,11 +104,8 @@ fn teardown_slot(slot: &ArcSwapOption<ActorInstance>, timeout: Duration) -> Tear
     match Arc::try_unwrap(instance) {
         Ok(instance) => instance.shutdown_with_timeout(timeout),
         // 片付けと同時に別のスレッドで要求が走っている（単一スレッドの規約に反する呼び方）。
-        // 停止の要求だけをして、最後の参照の Drop でスレッドを片付ける。
-        // `request_stop` が ack を受けていれば、Drop の Stop は閉じた mailbox に届かず
-        // already-done になり、約束を待つだけのスレッドを join して返る（止まらない）。
-        // ack が timeout していたときだけ、最後の Drop が ack を最大 5 秒待ち、届かなければ
-        // 手放す（規約に反する同時の呼び出しでだけ起きる残りの端）。
+        // 停止の要求だけをして、最後の参照の Drop でスレッドを片付ける。ack が timeout
+        // していたときだけ、その Drop が ack を最大 5 秒待ち、届かなければ手放す。
         Err(shared) => shared.request_stop(),
     }
 }
