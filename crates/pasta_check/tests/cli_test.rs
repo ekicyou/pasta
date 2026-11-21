@@ -45,7 +45,7 @@ fn test_help_flag_prints_usage_and_exits_zero() {
     let stderr = stderr_of(&output);
     assert!(stderr.contains("Usage: pasta_check"));
     assert!(stderr.contains("release"));
-    // validate と、その --target も一覧に出る（Req 1.5）
+    // validate と、その --target も一覧に出る
     assert!(stderr.contains("  validate "), "stderr: {stderr:?}");
     let (_, validate_opts) = stderr
         .split_once("Options for 'validate':")
@@ -131,7 +131,7 @@ fn test_release_end_to_end_via_binary() {
 
     assert!(output.status.success(), "stderr: {}", stderr_of(&output));
     let stdout = stdout_of(&output);
-    // 段の表示は [1/6]〜[6/6]（段 4 が辞書の検査・Req 8.1・8.5）
+    // 段の表示は [1/6]〜[6/6]（段 4 が辞書の検査）
     for n in 1..=6 {
         assert!(stdout.contains(&format!("[{n}/6]")), "stdout: {stdout:?}");
     }
@@ -139,14 +139,13 @@ fn test_release_end_to_end_via_binary() {
     assert!(!stdout.contains("/5]"), "stdout: {stdout:?}");
     assert!(stdout.contains("Release complete!"));
 
-    // 成果物の実在検証
     assert!(release.join("ghost/master/descript.txt").is_file());
     assert!(release.join("readme.txt").is_file(), "overlay file applied");
     assert!(release.join("updates.txt").is_file());
     assert!(nar.is_file(), "NAR created (parent dir auto-created)");
     assert!(fs::metadata(&nar).unwrap().len() > 0);
 
-    // 同梱バルーン無しでは警告を出さない（Req 8.3）
+    // 同梱バルーン無しでは警告を出さない
     assert!(
         !stderr_of(&output).contains("Warning:"),
         "stderr: {}",
@@ -172,7 +171,7 @@ fn write_min_ghost(target: &Path) {
 }
 
 /// 辞書に誤りがあれば validate と同じ行を出し、`Error:` と終了コード 1 で、
-/// 更新ファイルと nar を作らない（Req 8.2）
+/// 更新ファイルと nar を作らない
 #[test]
 fn test_release_dictionary_errors_fail_without_update_files() {
     let temp = TempDir::new().unwrap();
@@ -221,7 +220,7 @@ type,ghost
 }
 
 /// 配布フォルダに中身の無い `dic/x.pasta/` があると段 4 で止まり、
-/// 更新ファイルと nar を作らない（Req 4.4）
+/// 更新ファイルと nar を作らない
 #[test]
 fn test_release_folder_matching_pattern_fails_without_update_files() {
     let temp = TempDir::new().unwrap();
@@ -273,7 +272,7 @@ fn run_release(temp: &TempDir, target: &Path) -> Output {
     ])
 }
 
-/// 派生ゴーストの homeurl の注意は release を止めず、行を出して nar を作る（Req 8.7・8.8）
+/// 派生ゴーストの homeurl の注意は release を止めず、行を出して nar を作る
 #[test]
 fn test_release_derived_homeurl_warns_and_creates_nar() {
     let temp = TempDir::new().unwrap();
@@ -310,7 +309,7 @@ type,ghost
 }
 
 /// homeurl の無い同梱バルーン: 警告を `Warning: ` 付きで stderr に出し、
-/// 止めずにバルーン用 updates.txt と nar を作って終了コード 0（Req 4.9・7.3・7.4）
+/// 止めずにバルーン用 updates.txt と nar を作って終了コード 0
 #[test]
 fn test_release_bundled_balloon_without_homeurl_warns_and_succeeds() {
     let temp = TempDir::new().unwrap();
@@ -348,7 +347,7 @@ fn test_release_bundled_balloon_without_homeurl_warns_and_succeeds() {
 }
 
 /// charset 宣言の無い install.txt: `Error:` と UTF-8 の旨を stderr に出し、
-/// 終了コード 1 で nar を作らない（Req 1.10・8.6）
+/// 終了コード 1 で nar を作らない
 #[test]
 fn test_release_install_txt_without_charset_fails_without_nar() {
     let temp = TempDir::new().unwrap();
@@ -372,7 +371,7 @@ fn test_release_install_txt_without_charset_fails_without_nar() {
 }
 
 /// 開発フォルダの中で `--target . --release .` を走らせると、段 1 の前に断り、
-/// 開発フォルダの中身を消さない（Req 1.9・7.2・7.7）
+/// 開発フォルダの中身を消さない
 #[test]
 fn test_release_same_dot_paths_rejected_before_stage_one() {
     let temp = TempDir::new().unwrap();
@@ -398,7 +397,7 @@ fn test_release_same_dot_paths_rejected_before_stage_one() {
     assert!(!temp.path().join("out.nar").exists());
 }
 
-/// 相対の開発フォルダと、その中を指す絶対の配布フォルダも断る（Req 7.3）
+/// 相対の開発フォルダと、その中を指す絶対の配布フォルダも断る
 #[test]
 fn test_release_absolute_release_inside_relative_target_rejected() {
     let temp = TempDir::new().unwrap();

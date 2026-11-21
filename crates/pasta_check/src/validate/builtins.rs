@@ -1,4 +1,4 @@
-//! pasta.dll が組み込みで持つ Call の飛び先の名前（5.4・6.3）。
+//! pasta.dll が組み込みで持つ Call の飛び先の名前。
 //!
 //! 実物は pasta_lua の pasta_scripts。一致テストが実行時の `GLOBAL` と act の関数の名前を列挙して照らす。
 

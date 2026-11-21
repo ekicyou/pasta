@@ -1,7 +1,7 @@
-//! 一致テスト: 検査の核の規則が同じ版の pasta.dll（pasta_lua）と同じであること（9.2〜9.4）。
+//! 一致テスト: 検査の核の規則が同じ版の pasta.dll（pasta_lua）と同じであること。
 //!
 //! (a) モジュール名 (b) 辞書の選び出し (c) 読み込みの成否 (d) トランスパイルの成否 を照らす。
-//! pasta_lua の規則が変わるとここが落ちる（design の Revalidation Triggers）。
+//! pasta_lua の規則が変わるとここが落ちる。
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -120,14 +120,14 @@ fn module_name_matches_cache_manager() {
             "{rel}"
         );
     }
-    // 大文字と小文字だけ違う 2 つは、畳んだ名前が両側で等しい（2.7・2.8）
+    // 大文字と小文字だけ違う 2 つは、畳んだ名前が両側で等しい
     let fold_check = |rel: &str| module_name_of(rel).to_lowercase();
     let fold_dll = |rel: &str| cache.source_to_module_name(&base.join(rel)).to_lowercase();
     assert_eq!(fold_check("dic/A-b.pasta"), fold_check("dic/a_B.pasta"));
     assert_eq!(fold_dll("dic/A-b.pasta"), fold_dll("dic/a_B.pasta"));
 }
 
-/// 衝突の読み込みエラー（LoaderError::ModuleNameCollision）と、検査の衝突のエラーが一致する（2.3・2.8）
+/// 衝突の読み込みエラー（LoaderError::ModuleNameCollision）と、検査の衝突のエラーが一致する
 #[test]
 fn module_collision_matches_loader() {
     let lua: &[u8] = b"return {}
@@ -322,7 +322,7 @@ fn discovery_matches_discover_files_with_capitalized_dic_folder() {
 
 // ---- (c) 読み込みの成否 ----
 
-/// 読み込みを止める誤り（9.4・9.5）。飛び先・シーン・モジュール名の重なりは読み込みを止めない（＆順番 の番号の重なりは止める）
+/// 読み込みを止める誤り。飛び先・シーン・モジュール名の重なりは読み込みを止めない（＆順番 の番号の重なりは止める）
 fn stops_loading(kind: FindingKind) -> bool {
     use FindingKind::*;
     matches!(
@@ -373,7 +373,7 @@ fn load_failure_matches_errors() {
             false,
         ),
         (
-            // 誤りでも実行時は注意してシャッフルで選ぶ（6.2・3.1）
+            // 誤りでも実行時は注意してシャッフルで選ぶ
             "Call の候補に ＆順番 の有る・無いが混ざる",
             &[
                 ("pasta.toml", toml),
@@ -501,7 +501,7 @@ fn load_failure_matches_errors() {
             ],
             false,
         ),
-        // アクターの装い（actor-display-style 7.1〜7.5）
+        // アクターの装い
         (
             "正しい装い",
             &[
@@ -621,7 +621,7 @@ font = { name = "a\\b" }
             ],
             true,
         ),
-        // scene-pick-modes の読み込みを止める 4 種（9.5・6.1）
+        // 読み込みを止める 4 種
         (
             "＆重み の値が 1 以上の整数でない",
             &[
@@ -723,7 +723,7 @@ font = { name = "a\\b" }
             ],
             false,
         ),
-        // 単語の重みの構文エラー（6.4）
+        // 単語の重みの構文エラー
         (
             "単語の重みが ＠０",
             &[
@@ -778,7 +778,7 @@ font = { name = "a\\b" }
     }
 }
 
-/// 順番の混ざりは誤りとして出すが、その誤りだけの辞書を pasta.dll は読み込める（6.2）
+/// 順番の混ざりは誤りとして出すが、その誤りだけの辞書を pasta.dll は読み込める
 #[test]
 fn call_order_mixed_only_dictionary_loads() {
     let temp = ghost(&[
@@ -977,7 +977,7 @@ fn calendar_errors(base: &Path) -> (bool, Vec<u32>) {
     (!errors.is_empty(), lines)
 }
 
-/// pasta.dll の行事の表の読み込み失敗と、検査の CalendarInvalid の誤りが（有無も行番号の集合も）一致する（8.5）
+/// pasta.dll の行事の表の読み込み失敗と、検査の CalendarInvalid の誤りが（有無も行番号の集合も）一致する
 #[test]
 fn calendar_load_failure_matches_errors() {
     let toml = TOML.as_bytes();

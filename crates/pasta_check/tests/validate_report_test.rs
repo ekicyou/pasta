@@ -1,4 +1,4 @@
-//! 報告の形のテスト: 1 行の形・並び順・まとめの行・誤りと注意の固定（7.1〜7.8・2.9・6.7・6.8）
+//! 報告の形のテスト: 1 行の形・並び順・まとめの行・誤りと注意の固定
 
 use pasta_check::validate::{Finding, FindingKind, Report, Severity, SkipReason, Stats, msg};
 
@@ -52,7 +52,7 @@ fn one_line_with_column_without_column_and_without_line() {
     assert_eq!(lines[2], "ghost/master/pasta.toml: 注意: y");
 }
 
-/// どの理由も 1 件 1 行。改行を含む説明（toml・pest など）は空白 1 つでつなぐ（7.1）
+/// どの理由も 1 件 1 行。改行を含む説明（toml・pest など）は空白 1 つでつなぐ
 #[test]
 fn message_with_newlines_is_one_line() {
     let f = finding(
@@ -180,7 +180,7 @@ fn summary_line_and_notice_when_references_skipped() {
     assert_eq!(lines[5], "検査した辞書ファイル 13 個: 誤り 3 件、注意 1 件");
 }
 
-/// 案内の行は理由を表の順に「と」でつなぐ。省いたときはまとめの行に飛び先の項が無い（1.4・1.5）
+/// 案内の行は理由を表の順に「と」でつなぐ。省いたときはまとめの行に飛び先の項が無い
 #[test]
 fn notice_lists_skip_reasons_in_table_order() {
     use SkipReason::*;
@@ -219,7 +219,7 @@ fn notice_lists_skip_reasons_in_table_order() {
     assert!(!stats(2, 3, &[]).references_skipped());
 }
 
-/// 種類ごとの分類と code（7.7・9.6）。ワイルドカードを使わないので、種類を足すとここが compile で落ちる
+/// 種類ごとの分類と code。ワイルドカードを使わないので、種類を足すとここが compile で落ちる
 fn expected(kind: FindingKind) -> (Severity, &'static str) {
     use FindingKind::*;
     use Severity::*;
@@ -264,7 +264,7 @@ fn expected(kind: FindingKind) -> (Severity, &'static str) {
     }
 }
 
-/// すべての種類の分類と、保存時の報告に出る code の文字列を固定する（7.7・9.6）
+/// すべての種類の分類と、保存時の報告に出る code の文字列を固定する
 #[test]
 fn every_kind_has_fixed_severity_and_code() {
     use FindingKind::*;
@@ -321,7 +321,7 @@ fn every_kind_has_fixed_severity_and_code() {
     }
 }
 
-/// 文言の表（design.md の Report）どおりの理由
+/// 文言の表どおりの理由
 #[test]
 fn messages_follow_wording_table() {
     assert_eq!(

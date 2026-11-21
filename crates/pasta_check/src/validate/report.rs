@@ -1,6 +1,6 @@
-//! 報告の種類・分類・文言・並び順・出力の形（7.1〜7.8・2.9・6.7・6.8）。
+//! 報告の種類・分類・文言・並び順・出力の形。
 //!
-//! 分類（誤り／注意）は種類ごとに固定で、オプションや状況で変えない（7.7）。
+//! 分類（誤り／注意）は種類ごとに固定で、オプションや状況で変えない。
 
 use serde::Serialize;
 
@@ -12,7 +12,7 @@ pub enum Severity {
 }
 
 impl Severity {
-    /// 1 行の形に出す日本語の分類（7.8）
+    /// 1 行の形に出す日本語の分類
     pub fn label(self) -> &'static str {
         match self {
             Severity::Error => "誤り",
@@ -21,7 +21,7 @@ impl Severity {
     }
 }
 
-/// 報告の種類。並び順（7.3）で code を比べるときは宣言の順を使う
+/// 報告の種類。並び順で code を比べるときは宣言の順を使う
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum FindingKind {
@@ -65,7 +65,7 @@ pub enum FindingKind {
 }
 
 impl FindingKind {
-    /// 固定の対応。オプションや状況で変えない（7.7）
+    /// 固定の対応。オプションや状況で変えない
     pub fn severity(self) -> Severity {
         use FindingKind::*;
         match self {
@@ -102,7 +102,7 @@ pub struct Finding {
 }
 
 impl Finding {
-    /// 分類は種類から決める（7.7）。理由に改行があれば各行を空白 1 つでつなぎ、1 件 1 行にする（7.1）
+    /// 分類は種類から決める。理由に改行があれば各行を空白 1 つでつなぎ、1 件 1 行にする
     pub fn new(
         code: FindingKind,
         path: impl Into<String>,
@@ -120,7 +120,7 @@ impl Finding {
         }
     }
 
-    /// `ghost/master/{path}:{line}:{column}: {誤り|注意}: {message}`。無い位置は省く（7.1・7.2）
+    /// `ghost/master/{path}:{line}:{column}: {誤り|注意}: {message}`。無い位置は省く
     pub fn line_text(&self) -> String {
         let mut s = ghost_path(&self.path);
         if let Some(line) = self.line {
@@ -153,7 +153,7 @@ impl SkipReason {
     }
 }
 
-/// findings から省く理由を決める（昇順・重複なし）。空なら飛び先を検査する（1.1〜1.3・1.6）。
+/// findings から省く理由を決める（昇順・重複なし）。空なら飛び先を検査する。
 /// 辞書の中身・集め方・別名表が分からないとき、検査した辞書のシーンの集まりが pasta.dll と同じとは言えない
 pub(crate) fn skip_reasons(findings: &[Finding]) -> Vec<SkipReason> {
     use FindingKind::*;
@@ -218,7 +218,7 @@ impl Report {
         self.stats.errors > 0
     }
 
-    /// 問題の行（7.3 の順）、案内の行、まとめの行。CLI はこれを順に標準出力へ出す
+    /// 問題の行、案内の行、まとめの行。CLI はこれを順に標準出力へ出す
     pub fn lines(&self) -> Vec<String> {
         let s = &self.stats;
         let mut lines: Vec<String> = self.findings.iter().map(Finding::line_text).collect();
@@ -264,7 +264,7 @@ fn ghost_paths(paths: &[&str]) -> String {
         .join("、")
 }
 
-/// 理由の文言（design.md の Report の文言の表）。パスは ghost/master からの相対パスで渡す
+/// 理由の文言。パスは ghost/master からの相対パスで渡す
 pub mod msg {
     use super::{SkipReason, ghost_path, ghost_paths};
 

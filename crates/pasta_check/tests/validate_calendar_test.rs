@@ -1,11 +1,11 @@
-//! 行事の表（calendar.csv）の検査のテスト（Req 6.1〜6.5）
+//! 行事の表（calendar.csv）の検査のテスト
 
 use std::fs;
 
 use pasta_check::ghost_files::collect;
 use pasta_check::validate::{FindingKind, Severity, validate_ghost};
 
-/// 殻（collect）が表を読み、表の誤りがあっても飛び先と条件の検査は省かない（Req 6.1・6.2・6.5）
+/// 殻（collect）が表を読み、表の誤りがあっても飛び先と条件の検査は省かない
 #[test]
 fn bad_table_is_an_error_and_dictionary_checks_still_run() {
     let dir = tempfile::tempdir().unwrap();
@@ -72,7 +72,7 @@ fn table_findings(report: &pasta_check::validate::Report) -> Vec<(&str, Option<u
         .collect()
 }
 
-/// 行の誤り 5 種は、種類ごとの文と行番号で出る（Req 5.1〜5.5・6.1）
+/// 行の誤り 5 種は、種類ごとの文と行番号で出る
 #[test]
 fn each_line_error_has_its_message_and_line() {
     let cases = [

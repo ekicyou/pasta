@@ -15,17 +15,14 @@ pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
     // 段の表示より前に、危ない組み合わせを何にも触れずに断る
     check_release_args(args)?;
 
-    // Step 1: リリースフォルダー初期化
     println!("[1/6] Preparing release folder...");
     prepare_release_dir(&args.release)?;
     remove_stale_nar(&args.nar)?;
 
-    // Step 2: target → release コピー
     println!("[2/6] Copying target files...");
     let count = copy_dir_recursive(&args.target, &args.release)?;
     println!("  Copied {count} files from {}", args.target.display());
 
-    // Step 3: --copy 上書きコピー
     if !args.copy_dirs.is_empty() {
         println!("[3/6] Applying overlay copies...");
         for copy_dir in &args.copy_dirs {
@@ -36,7 +33,7 @@ pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
         println!("[3/6] Applying overlay copies... (none specified)");
     }
 
-    // Step 4: 辞書の検査（--copy 上書き後の配布フォルダ・誤りなら更新ファイルと nar の前で止める）
+    // 誤りなら更新ファイルと nar の前で止める
     println!("[4/6] Validating dictionaries...");
     let outcome =
         run_on_master(&args.release.join("ghost").join("master")).map_err(io::Error::other)?;
@@ -46,7 +43,7 @@ pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
         )));
     }
 
-    // Step 5: 更新ファイル生成（判定は --copy 上書き後の配布フォルダで行う・Req 1.7）
+    // 同梱バルーンの判定は --copy 上書き後の配布フォルダで行う
     println!("[5/6] Generating update files...");
     let plan = plan_bundled_balloons(&args.release)?;
     let summary = generate_update_files(&args.release, &plan.dirs)?;
@@ -57,14 +54,13 @@ pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
     for (dir, entries) in &summary.balloon_entries {
         println!("  Generated {dir}/updates.txt ({entries} entries)");
     }
-    // 警告は止めずに段 6 へ進む（Req 7.3・7.4）
+    // 警告は止めずに段 6 へ進む
     for w in &plan.warnings {
         eprintln!("Warning: {w}");
     }
 
-    // Step 6: NAR 作成
     println!("[6/6] Creating NAR archive...");
-    // 途中で失敗したら作りかけの nar を消してから元のエラーを返す（Req 8.8）
+    // 途中で失敗したら作りかけの nar を消してから元のエラーを返す
     let nar_size = create_nar(&args.release, &args.nar).inspect_err(|_| {
         let _ = fs::remove_file(&args.nar);
     })?;
@@ -112,7 +108,6 @@ mod tests {
     fn test_execute_release_full_pipeline() {
         let temp = TempDir::new().unwrap();
 
-        // target フォルダーを準備
         let target = temp.path().join("target_ghost");
         write_files(&target, MIN_GHOST);
         fs::create_dir_all(target.join("ghost/master")).unwrap();
@@ -132,13 +127,10 @@ mod tests {
 
         execute_release(&args).unwrap();
 
-        // リリースフォルダーに更新ファイルが生成されている
         assert!(!release.join("updates2.dau").exists());
         assert!(release.join("updates.txt").exists());
-        // NAR が作成されている
         assert!(nar.exists());
         assert!(nar.metadata().unwrap().len() > 0);
-        // target フォルダーは変更されていない
         assert!(!target.join("updates2.dau").exists());
         assert_eq!(
             fs::read_to_string(target.join("install.txt")).unwrap(),
@@ -238,7 +230,7 @@ mod tests {
     }
 
     /// release.ps1 の段 4 の形（ghosts\<名前> から release\<名前> と release\<名前>.nar を
-    /// 同じ親に並べて作る）で最後まで進む（Req 4.1・4.2・7.4）
+    /// 同じ親に並べて作る）で最後まで進む
     #[test]
     fn test_execute_release_release_ps1_stage4_shape() {
         let temp = TempDir::new().unwrap();
@@ -268,7 +260,7 @@ mod tests {
         assert!(release.join("updates.txt").exists());
     }
 
-    /// 段 2 の I/O の誤りは、読めなかったフォルダのパスを添えて返る（Req 5.3）。
+    /// 段 2 の I/O の誤りは、読めなかったフォルダのパスを添えて返る。
     /// 確かめ（metadata・canonicalize）は排他で開いたフォルダでも通る
     #[cfg(windows)]
     #[test]
@@ -324,7 +316,7 @@ mod tests {
     }
 
     /// nar 内の updates.txt の各行の md5・size が、nar 内の `{base}{パス}` のバイト列と一致することを
-    /// 確かめ、記載されたパスを返す（Req 5.3）
+    /// 確かめ、記載されたパスを返す
     fn assert_updates_match_nar(
         entries: &BTreeMap<String, Vec<u8>>,
         updates: &str,
@@ -348,10 +340,10 @@ mod tests {
             .collect()
     }
 
-    /// 同梱バルーン付きのパイプライン。判定は --copy の上書き後の install.txt で行い（Req 1.7）、
-    /// homeurl が無くても警告だけで nar を作る（Req 7.3）。nar に bal/updates.txt が入り（Req 6.1）、
-    /// nar の各ファイルが updates.txt の md5・size と一致し（Req 5.3・8.5）、ゴースト用（ルート・
-    /// ghost/master）に bal/ の行が無く（Req 3.2）、エントリのパス体系と profile/ 除外は従来どおり（Req 6.2）
+    /// 同梱バルーン付きのパイプライン。判定は --copy の上書き後の install.txt で行い、
+    /// homeurl が無くても警告だけで nar を作る。nar に bal/updates.txt が入り、
+    /// nar の各ファイルが updates.txt の md5・size と一致し、ゴースト用（ルート・
+    /// ghost/master）に bal/ の行が無く、エントリのパス体系と profile/ 除外は従来どおり
     #[test]
     fn test_execute_release_bundled_balloon_pipeline() {
         let temp = TempDir::new().unwrap();
@@ -422,7 +414,7 @@ mod tests {
         assert_eq!(entries["ghost/master/updates.txt"], entries["updates.txt"]);
     }
 
-    /// 同梱バルーンが無いときの nar のエントリ集合とエントリ名は従来どおり（Req 8.2・6.2）。
+    /// 同梱バルーンが無いときの nar のエントリ集合とエントリ名は従来どおり。
     /// 宣言の無い同名フォルダ bal/ はゴーストの一部として扱われる
     #[test]
     fn test_execute_release_no_balloon_nar_entries_unchanged() {
@@ -484,8 +476,8 @@ mod tests {
     }
 
     /// 判定エラーでは段 6 に進まず nar を作らず、配布フォルダのルートに updates.txt を書かない
-    /// （Req 1.10・2.5）。--nar の位置の前回の nar も残らない（Req 8.8）。
-    /// 判定は --copy の上書き後の install.txt で行う（Req 1.7）
+    /// --nar の位置の前回の nar も残らない。
+    /// 判定は --copy の上書き後の install.txt で行う
     #[test]
     fn test_execute_release_balloon_plan_error_creates_no_nar() {
         let cases: [(&str, &str, Option<&str>, &str); 3] = [
@@ -548,7 +540,7 @@ mod tests {
         }
     }
 
-    /// 無い --copy は確かめで断り、前回の nar が中身ごと残る（Req 1.7・8.6）
+    /// 無い --copy は確かめで断り、前回の nar が中身ごと残る
     #[test]
     fn test_execute_release_keeps_stale_nar_when_check_rejects() {
         let temp = TempDir::new().unwrap();
@@ -572,7 +564,7 @@ mod tests {
         assert_eq!(fs::read_to_string(&nar).unwrap(), "old nar");
     }
 
-    /// 成功時は前回の nar が新しい nar に置き換わる（Req 8.8）
+    /// 成功時は前回の nar が新しい nar に置き換わる
     #[test]
     fn test_execute_release_replaces_stale_nar_on_success() {
         let temp = TempDir::new().unwrap();
@@ -598,7 +590,7 @@ mod tests {
         assert!(archive.by_name("a.txt").is_ok());
     }
 
-    /// 段 6 の nar 作成が途中で失敗しても --nar の位置に作りかけの nar が残らない（Req 8.8）。
+    /// 段 6 の nar 作成が途中で失敗しても --nar の位置に作りかけの nar が残らない。
     /// Unicode として不正な名前（対のないサロゲート）は、nar ファイル作成後の封入時に
     /// InvalidData で止まる。
     /// var/ は段 5（updates.txt）の対象外で、段 6 だけが読む。
@@ -634,7 +626,7 @@ mod tests {
         assert!(!nar.exists());
     }
 
-    /// --nar がフォルダのときは段 1 で止まる（削除エラーをそのまま返す・Req 8.8）
+    /// --nar がフォルダのときは段 1 で止まる（削除エラーをそのまま返す）
     #[test]
     fn test_execute_release_nar_is_dir_errors_at_stage1() {
         let temp = TempDir::new().unwrap();
@@ -660,7 +652,7 @@ mod tests {
         assert!(nar.is_dir());
     }
 
-    /// 段 4 の検査で誤りがあれば、更新ファイルと nar を作らずに英語の理由で失敗する（Req 8.1・8.2）。
+    /// 段 4 の検査で誤りがあれば、更新ファイルと nar を作らずに英語の理由で失敗する。
     /// 検査は --copy の上書き後の配布フォルダで行う（target は正しく、上書きで壊れる）
     #[test]
     fn test_execute_release_validation_errors_stop_before_update_files() {
@@ -701,7 +693,7 @@ mod tests {
         assert!(!nar.exists());
     }
 
-    /// 注意だけなら止めずに nar まで作る（Req 8.3）
+    /// 注意だけなら止めずに nar まで作る
     #[test]
     fn test_execute_release_validation_warnings_only_continues() {
         let temp = TempDir::new().unwrap();
@@ -781,7 +773,6 @@ mod tests {
             fs::read_to_string(release.join("b.txt")).unwrap(),
             "new file"
         );
-        // target は変更されていない
         assert_eq!(
             fs::read_to_string(target.join("a.txt")).unwrap(),
             "original"

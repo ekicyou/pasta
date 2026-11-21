@@ -105,10 +105,10 @@ fn discover(input: &GhostInput) -> (discovery::Discovered, Vec<Finding>) {
 ///
 /// 順番: 設定 → 集め方 → モジュール名・構文 → トランスパイル・シーン → 飛び先・条件。
 /// すべての段の報告がそろった後に省く理由を 1 回だけ決め、構文エラー・読めない辞書ファイル・
-/// pasta.toml の誤りが 1 つでもあれば飛び先と条件の検査を丸ごと省く（1.1〜1.3・8.4）。
+/// pasta.toml の誤りが 1 つでもあれば飛び先と条件の検査を丸ごと省く。
 pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) -> Report {
     let (config, mut findings) = config::read_config(&input.pasta_toml);
-    // 表の誤りは skip_reasons に入らないので、飛び先と条件の検査を省く理由にならない（Req 6.5）
+    // 表の誤りは skip_reasons に入らないので、飛び先と条件の検査を省く理由にならない
     findings.extend(calendar::check(input, files));
 
     let (discovered, found) = discovery::discover(input, &config);
@@ -148,7 +148,7 @@ pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) ->
     )
 }
 
-/// 字下げから始まる行の span（選択肢・継続行）の列を、字下げの後ろの中身の列にする（7.1）。
+/// 字下げから始まる行の span（選択肢・継続行）の列を、字下げの後ろの中身の列にする。
 /// 字下げ（文法の pad）の文字はどれも Unicode の空白
 fn col_after_indent(texts: &[(String, FileText)], path: &str, span: Span) -> usize {
     let line = texts.iter().find_map(|(p, t)| match t {

@@ -1,5 +1,5 @@
 //! 一致テスト: 検査が登録するシーンの属性が、同じゴーストを読み込んだ pasta.dll（pasta_lua）の
-//! `SCENE.attrs` と項目ごとに同じであること（scene-attribute-store 7.4）。
+//! `SCENE.attrs` と項目ごとに同じであること。
 //!
 //! 値は「Lua の型:Lua の tostring の表記」で比べる（引用した数字の文字列と数を区別する）。
 

@@ -1,4 +1,4 @@
-//! 条件の保存変数の未代入と、優先で塞がれた場面の注意のテスト（8.1〜8.5）
+//! 条件の保存変数の未代入と、優先で塞がれた場面の注意のテスト
 
 use std::collections::BTreeMap;
 
@@ -88,7 +88,7 @@ fn unassigned_save_var_in_condition_is_warned_where_written() {
         ]
     );
     assert_eq!(FindingKind::CondVarUnassigned.severity(), Severity::Warning);
-    // 注意では終了の状態を変えない（8.2）
+    // 注意では終了の状態を変えない
     assert!(!report.has_errors(), "{:?}", report.findings);
 }
 
@@ -203,7 +203,7 @@ fn shadowing_spans_files_and_aliases() {
 
 #[test]
 fn skipped_when_a_file_cannot_be_read() {
-    // 読めないファイルの中の代入を見落として偽の注意を出さない（8.4）
+    // 読めないファイルの中の代入を見落として偽の注意を出さない
     let report = validate(&[
         (
             "dic/a.pasta",

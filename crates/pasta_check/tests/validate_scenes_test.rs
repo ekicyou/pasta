@@ -1,4 +1,4 @@
-//! シーンの登録と名前の重なり・組み込みの名前のテスト（2.4・5.1〜5.4）
+//! シーンの登録と名前の重なり・組み込みの名前のテスト
 
 use std::collections::BTreeMap;
 
@@ -99,7 +99,7 @@ fn global_collision_across_files_shows_other_file() {
 
 #[test]
 fn same_name_alias_and_prefix_are_not_reported() {
-    // ＊会話 は既定の別名で OnTalk に置き換わる。同名・前方一致も報告しない（5.3）
+    // ＊会話 は既定の別名で OnTalk に置き換わる。同名・前方一致も報告しない
     let found = scene_findings(
         TOML,
         &[
@@ -153,7 +153,7 @@ fn local_match_name_collision_is_warning_within_one_global_scene() {
     );
 }
 
-/// 同じ名前の番号の重なりは誤り。2 つ目以降に最初のシーンの位置を示す（6.1・3.3）
+/// 同じ名前の番号の重なりは誤り。2 つ目以降に最初のシーンの位置を示す
 #[test]
 fn duplicate_order_in_same_name_is_error_on_second_and_later() {
     // グローバル（ファイルをまたぐ）
@@ -247,7 +247,7 @@ fn duplicate_order_in_same_name_is_error_on_second_and_later() {
 
 #[test]
 fn local_collision_within_continuation_scene_is_warning() {
-    // 単独の `＊` も 1 つのグローバルシーンで、その中のローカルシーンは重なりを報告する（5.2）
+    // 単独の `＊` も 1 つのグローバルシーンで、その中のローカルシーンは重なりを報告する
     let found = scene_findings(
         TOML,
         &[(
@@ -307,7 +307,7 @@ fn builtin_check_uses_name_after_alias() {
     assert_eq!(found[0].2, FindingKind::SceneShadowedByBuiltin);
 }
 
-/// シーン数の関数と同じ名前のシーンにも注意が出る（scene-count 6.2）
+/// シーン数の関数と同じ名前のシーンにも注意が出る
 #[test]
 fn scene_named_as_scene_count_is_warning() {
     let found = scene_findings(TOML, &[("dic/talk.pasta", "＊シーン数\n  さくら：あ。\n")]);
@@ -387,7 +387,7 @@ fn builtin_names_are_listed() {
     );
 }
 
-// ---- 飛び先（6.1〜6.9） ----
+// ---- 飛び先 ----
 
 fn report_of(toml: &str, dics: &[(&str, &str)]) -> pasta_check::validate::Report {
     let input = GhostInput {
@@ -455,21 +455,21 @@ fn call_to_builtin_name_is_found() {
     assert_eq!(reference_findings(TOML, text), vec![]);
 }
 
-/// おすすめメニューの項目・区切りは組み込みの飛び先として見つかる（10.1・12.4）
+/// おすすめメニューの項目・区切りは組み込みの飛び先として見つかる
 #[test]
 fn call_to_recommend_builtin_is_found() {
     let text = "＊メニュー\n  ＞おすすめ項目（「a」、「https://a/」）\n  ＞おすすめ区切り\n  ＞recommend_item（「b」、「https://b/」）\n  ＞recommend_separator\n";
     assert_eq!(reference_findings(TOML, text), vec![]);
 }
 
-/// シーン数の 4 つの名前は組み込みの飛び先として見つかる（scene-count 6.1）
+/// シーン数の 4 つの名前は組み込みの飛び先として見つかる
 #[test]
 fn call_to_scene_count_builtin_is_found() {
     let text = "＊会話\n  ＞シーン数（「a」）\n  ＞scene_count（「a」）\n  ＞シーン数完全一致（「a」）\n  ＞scene_count_exact（「a」）\n";
     assert_eq!(reference_findings(TOML, text), vec![]);
 }
 
-/// 自動トークの停止・再開も組み込みは完全一致だけ。途中まで・全角英字は見つからない（6.2）
+/// 自動トークの停止・再開も組み込みは完全一致だけ。途中まで・全角英字は見つからない
 #[test]
 fn call_to_partial_or_fullwidth_builtin_name_is_missing() {
     let text = "＊会話\n  ＞自動トーク\n  ＞ｐａｕｓｅ＿ａｕｔｏ＿ｔａｌｋ\n";
@@ -505,7 +505,7 @@ fn string_literal_dynamic_call_is_checked_as_static() {
     );
 }
 
-/// 括弧で囲んだ文字列リテラルも実行時は `act:call_key("…")` になるので静的に探し、動的に数えない（6.2）
+/// 括弧で囲んだ文字列リテラルも実行時は `act:call_key("…")` になるので静的に探し、動的に数えない
 #[test]
 fn parenthesized_string_literal_call_is_checked_as_static() {
     let text = "＊会話\n  ＞（「無い」）\n  ＞（（「会話」））\n";
@@ -537,7 +537,7 @@ fn choice_finds_local_then_global_and_skips_on() {
     );
 }
 
-/// 選択肢の列は字下げの後ろの `＠？` の位置。Call と同じく行の頭ではない（7.1）
+/// 選択肢の列は字下げの後ろの `＠？` の位置。Call と同じく行の頭ではない
 #[test]
 fn choice_column_is_at_choice_marker_like_call() {
     let text = "＊会話\n  ＞無いシーン\n  ＠？無い選択\n\u{3000}＠？無い選択２\n";
@@ -580,7 +580,7 @@ fn order_mixed_findings(text: &str) -> Vec<(u32, u32, String)> {
         .collect()
 }
 
-/// 名前が決まった Call の候補の同じ ＆優先 の組に順番の有る・無いが混ざれば誤り。Call の位置に順番の無い候補を示す（6.2）
+/// 名前が決まった Call の候補の同じ ＆優先 の組に順番の有る・無いが混ざれば誤り。Call の位置に順番の無い候補を示す
 #[test]
 fn call_candidates_mixing_order_is_error_at_call() {
     // グローバル（文字列リテラルの Call も名前が決まっている）
@@ -622,7 +622,7 @@ fn call_candidates_mixing_order_is_error_at_call() {
     );
 }
 
-/// ＆優先 の値が違う候補は別の組なので混ざらない。名前が文字でない Call は見ない（6.2）
+/// ＆優先 の値が違う候補は別の組なので混ざらない。名前が文字でない Call は見ない
 #[test]
 fn call_order_mixed_is_per_priority_and_static_only() {
     let text = "＊会話
@@ -723,7 +723,7 @@ fn missing_targets(report: &Report) -> usize {
         .count()
 }
 
-/// 辞書の中身・集め方・別名表が分からないときは飛び先の検査を丸ごと省き、理由は当たるものだけ（1.1〜1.3・6.1）
+/// 辞書の中身・集め方・別名表が分からないときは飛び先の検査を丸ごと省き、理由は当たるものだけ
 #[test]
 fn unknown_dictionary_contents_skip_references_with_matching_reasons() {
     use SkipReason::*;
@@ -797,7 +797,7 @@ fn unknown_dictionary_contents_skip_references_with_matching_reasons() {
         assert_eq!(report.stats.skip_reasons, reasons, "{name}: {lines:?}");
         assert_eq!(missing_targets(&report), 0, "{name}: {lines:?}");
         assert_eq!(report.stats.unchecked_dynamic_calls, 0, "{name}");
-        // 原因そのものは今までどおり誤りとして報告する（1.7）
+        // 原因そのものは今までどおり誤りとして報告する
         assert!(report.has_errors(), "{name}");
         assert!(
             !lines.last().unwrap().contains("飛び先を検査しなかった"),
@@ -806,7 +806,7 @@ fn unknown_dictionary_contents_skip_references_with_matching_reasons() {
     }
 }
 
-/// 省く条件に当たらない誤りだけなら飛び先を検査する（1.6・6.2）
+/// 省く条件に当たらない誤りだけなら飛び先を検査する
 #[test]
 fn other_errors_still_check_references() {
     let a = || ("dic/a.pasta", text(MISSING_TARGETS));
@@ -857,7 +857,7 @@ fn other_errors_still_check_references() {
     }
 }
 
-/// フォルダの誤りだけなら飛び先を検査する（1.6・6.2）
+/// フォルダの誤りだけなら飛び先を検査する
 #[test]
 fn folder_error_alone_still_checks_references() {
     let input = GhostInput {

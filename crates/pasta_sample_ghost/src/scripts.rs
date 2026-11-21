@@ -7,19 +7,16 @@
 mod tests {
     use std::path::PathBuf;
 
-    /// ghosts/hello-pasta/ghost/master/dic ディレクトリのパスを取得
     fn dic_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ghosts/hello-pasta/ghost/master/dic")
     }
 
-    /// dic/ からスクリプトファイルを読み込む
     fn read_pasta_script(name: &str) -> String {
         let path = dic_dir().join(name);
         std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("{} の読み込みに失敗: {}", name, e))
     }
 
-    /// dic/ の全 *.pasta を（ファイル名, 内容）で辞書順に返す
     fn all_pasta_scripts() -> Vec<(String, String)> {
         let mut names: Vec<String> = std::fs::read_dir(dic_dir())
             .expect("dic/ の読み込みに失敗")
@@ -36,7 +33,6 @@ mod tests {
             .collect()
     }
 
-    /// `line` と完全一致する行の数
     fn count_lines(content: &str, line: &str) -> usize {
         content.lines().filter(|l| l.trim_end() == line).count()
     }
@@ -182,7 +178,6 @@ mod tests {
     fn test_script_expression_names_defined_in_face() {
         let face = read_pasta_script("03-face.pasta");
 
-        /// シーン内のアクション行の先頭の `＠表情` を抜き出す
         fn extract_expression_names(script: &str) -> Vec<&str> {
             let mut names = Vec::new();
             let mut in_scene = false;

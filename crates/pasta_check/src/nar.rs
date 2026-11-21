@@ -9,7 +9,6 @@ use zip::write::SimpleFileOptions;
 
 /// NAR ファイルを作成。戻り値は NAR ファイルのサイズ（バイト）。
 pub(crate) fn create_nar(release_dir: &Path, nar_path: &Path) -> io::Result<u64> {
-    // 親ディレクトリを必要に応じて作成
     // create_dir_all("") は成功するので `--nar g.nar` もそのまま通る
     if let Some(parent) = nar_path.parent() {
         fs::create_dir_all(parent).map_err(|e| path_error(e, "create", parent))?;
@@ -39,7 +38,6 @@ fn add_dir_to_zip<W: Write + io::Seek>(
         let entry = entry.map_err(read_err)?;
         let file_type = entry.file_type().map_err(read_err)?;
 
-        // シンボリックリンクはスキップ（Req 2.1, 2.2）
         if file_type.is_symlink() {
             continue;
         }
@@ -47,7 +45,6 @@ fn add_dir_to_zip<W: Write + io::Seek>(
         let path = entry.path();
 
         if file_type.is_dir() {
-            // profile/ を除外
             if entry.file_name() == "profile" {
                 continue;
             }
@@ -90,7 +87,6 @@ mod tests {
         assert!(size > 0);
         assert!(nar_path.exists());
 
-        // ZIP として読み取れることを確認
         let file = File::open(&nar_path).unwrap();
         let mut archive = zip::ZipArchive::new(file).unwrap();
         let names: Vec<String> = (0..archive.len())
@@ -120,7 +116,7 @@ mod tests {
         assert!(names.contains(&"install.txt".to_string()));
     }
 
-    /// 回帰テスト（Req 5.3）: 自己展開先 `ghost/master/profile/pasta/pasta_scripts/`
+    /// 回帰テスト: 自己展開先 `ghost/master/profile/pasta/pasta_scripts/`
     /// 配下のフレームワークスクリプト・`.md5` マーカーが `.nar`（ZIP）封入対象外であること。
     ///
     /// `profile` の除外条件が外れると、この test は ZIP に
@@ -130,7 +126,6 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let release = temp.path().join("release");
 
-        // 通常ファイル（封入対象 = 含まれるべき）
         let ghost_master = release.join("ghost/master");
         fs::create_dir_all(&ghost_master).unwrap();
         fs::write(ghost_master.join("descript.txt"), "desc").unwrap();
@@ -152,7 +147,6 @@ mod tests {
             .map(|i| archive.by_index(i).unwrap().name().unwrap().to_string())
             .collect();
 
-        // 通常ファイルは封入される
         assert!(
             names.contains(&"ghost/master/descript.txt".to_string()),
             "descript.txt must be archived: {names:?}"
@@ -200,13 +194,11 @@ mod tests {
         fs::create_dir_all(release.join("ghost")).unwrap();
         fs::write(release.join("ghost/real.txt"), "real").unwrap();
 
-        // ファイルへのシンボリックリンク
         unix_fs::symlink(
             release.join("ghost/real.txt"),
             release.join("ghost/link.txt"),
         )
         .unwrap();
-        // ディレクトリへのシンボリックリンク
         unix_fs::symlink(release.join("ghost"), release.join("linked_dir")).unwrap();
 
         let nar_path = temp.path().join("out.nar");
@@ -217,9 +209,7 @@ mod tests {
         let names: Vec<String> = (0..archive.len())
             .map(|i| archive.by_index(i).unwrap().name().unwrap().to_string())
             .collect();
-        // 実ファイルは含まれる
         assert!(names.contains(&"ghost/real.txt".to_string()));
-        // シンボリックリンクは除外される
         assert!(!names.iter().any(|n| n.contains("link.txt")));
         assert!(!names.iter().any(|n| n.contains("linked_dir")));
     }
@@ -298,7 +288,6 @@ mod tests {
 
         let size = create_nar(&release, &nar_path).unwrap();
         assert!(size > 0);
-        // 上書きされたファイルは ZIP として読めること
         let file = File::open(&nar_path).unwrap();
         let archive = zip::ZipArchive::new(file).unwrap();
         assert_eq!(archive.len(), 1);
