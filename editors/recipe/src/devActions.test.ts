@@ -546,7 +546,7 @@ const ON = "Debug enabled: development events are allowed";
 const OFF = "Debug disabled: development events are refused";
 const debugSets = (s: ReturnType<typeof setup>) => s.raises().filter((r) => r.event === "OnPastaSetSaveVariable").map((r) => r.references);
 
-test("トグルの向き: 初めは有効にするで true を書き、有効の読み込み直しで無効にするへ向き、次は false を書く（7.2〜7.4・7.6）", async () => {
+test("トグルの向き: 初めは有効にするで true を書き、有効の読み込み直しで無効にするへ向き、次は false を書く", async () => {
   const s = setup({ raise: setAnd(ok) });
   assert.deepEqual(s.debugStates, [false]);
   s.state.debugLine = ON;
@@ -561,14 +561,14 @@ test("トグルの向き: 初めは有効にするで true を書き、有効の
   assert.equal(s.debugStates.at(-1), false);
 });
 
-test("トグルの前に未保存の辞書を保存する（5.10）", async () => {
+test("トグルの前に未保存の辞書を保存する", async () => {
   const s = setup({ raise: setAnd(ok) });
   s.dirty("dic/a.pasta");
   await s.actions.toggleDebug();
   assert.deepEqual(s.saved, ["dic/a.pasta"]);
 });
 
-test("リロード・▶ の後の有効・無効で向きを改め、リロードを頼めないと有効にするへ戻る（7.3・7.4）", async () => {
+test("リロード・▶ の後の有効・無効で向きを改め、リロードを頼めないと有効にするへ戻る", async () => {
   const s = setup({ raise: played, disk: { "dic/a.pasta": "DISK" }, analyze: morningScenes });
   s.state.debugLine = ON;
   await s.actions.reload();
@@ -584,14 +584,14 @@ test("リロード・▶ の後の有効・無効で向きを改め、リロー�
   assert.equal(s.debugStates.at(-1), false);
 });
 
-test("値を入れて実行の後の有効で無効にするへ向く（7.4）", async () => {
+test("値を入れて実行の後の有効で無効にするへ向く", async () => {
   const s = setup({ raise: played, disk: { "dic/a.pasta": "DISK" }, analyze: morningScenes, locals: () => ({ pairs: [], table: undefined }) });
   s.state.debugLine = ON;
   await s.actions.runWithLocals(morning);
   assert.equal(s.debugStates.at(-1), true);
 });
 
-test("トグルで書き込みを断られたら向きを改めない（7.4）", async () => {
+test("トグルで書き込みを断られたら向きを改めない", async () => {
   const s = setup({ raise: setAnd(() => text("Script: 【断り】")) });
   s.state.debugLine = ON;
   await s.actions.reload();
@@ -601,7 +601,7 @@ test("トグルで書き込みを断られたら向きを改めない（7.4）",
   assert.deepEqual(s.debugStates, [false, true]);
 });
 
-test("別のゴーストを開くと有効にするへ戻り、切り替えに失敗して同じゴーストへ戻ると向きを保つ（7.5）", async () => {
+test("別のゴーストを開くと有効にするへ戻り、切り替えに失敗して同じゴーストへ戻ると向きを保つ", async () => {
   const s = setup({ raise: setAnd(ok) });
   s.state.debugLine = ON;
   await s.actions.reload();
@@ -616,7 +616,7 @@ test("別のゴーストを開くと有効にするへ戻り、切り替えに�
   assert.deepEqual(debugSets(s), [["デバッグ", "true", "boolean"]]);
 });
 
-test("操作の間にゴーストが替わったら前のゴーストの結果で向きを改めない（7.4・7.5）", async () => {
+test("操作の間にゴーストが替わったら前のゴーストの結果で向きを改めない", async () => {
   const holder: { s?: ReturnType<typeof setup> } = {};
   holder.s = setup({ raise: setAnd(() => (holder.s!.actions.setGhost(OTHER), ok())) });
   const s = holder.s;
