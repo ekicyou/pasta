@@ -19,7 +19,7 @@ const VARS = "C:\\g\\ghost\\master\\profile\\pasta\\debug\\variables.toml";
 type RaiseArgs = { event: string; references: string[]; ghost_name: string };
 
 /** 9801 で SSP がこのゴーストを動かしている。reload で pasta.log に読み込みの終わりの行が出る。raise_event は raise に任せる */
-function serve(fio: FakeGhostIO, raise?: (a: RaiseArgs) => PostOutcome, refuseReload = () => false) {
+function serve(fio: FakeGhostIO, raise?: (a: RaiseArgs) => PostOutcome, refuseReload = () => false, debugLine = (): string | undefined => undefined) {
   return (req: PostRequest): PostOutcome => {
     if (req.port !== 9801) return { kind: "unreachable", detail: "ECONNREFUSED" };
     const { method, params } = JSON.parse(req.body);
@@ -28,7 +28,9 @@ function serve(fio: FakeGhostIO, raise?: (a: RaiseArgs) => PostOutcome, refuseRe
     if (params.name === "get_log") return text("(no log entries)");
     if (params.name === "reload") {
       if (refuseReload()) return { kind: "unreachable", detail: "ECONNRESET" };
-      fio.appendFile(LOG, DONE);
+      const d = debugLine();
+      fio.appendFile(LOG, (d === undefined ? "" : `2026-11-13T00:00:00Z  INFO pasta::debug_state: ${d}
+`) + DONE);
       return text("OK");
     }
     if (params.name === "raise_event" && raise) return raise(params.arguments);
@@ -62,7 +64,7 @@ function setup(opts: SetupOpts = {}) {
   const fio = createFakeGhostIO("pasta-recipe");
   if (opts.descript !== false) fio.setFile(`${info.master}\\descript.txt`, "charset,UTF-8\r\nname,ゴースト\r\n");
   const raise = opts.raise;
-  fio.queuePost(...Array.from({ length: 100 }, () => serve(fio, raise && ((a) => raise(a, fio)), () => state.refuseReload)));
+  fio.queuePost(...Array.from({ length: 100 }, () => serve(fio, raise && ((a) => raise(a, fio)), () => state.refuseReload, () => state.debugLine)));
   const analyzed: string[] = [];
   const rowTexts: string[] = [];
   const cmds: string[] = [];
@@ -114,7 +116,8 @@ function setup(opts: SetupOpts = {}) {
   const saved: string[] = [];
   const dialogs: string[] = [];
   /** during: 保存と read_text の途中で呼ぶ（操作の途中でゴーストを開いたときを作る） */
-  const state = { saveOk: true as boolean | "throw", progressThrows: false, refuseReload: false, during: undefined as (() => void) | undefined };
+  const state = { saveOk: true as boolean | "throw", progressThrows: false, refuseReload: false, during: undefined as (() => void) | undefined, debugLine: undefined as string | undefined };
+  const debugStates: boolean[] = [];
   const actions = new DevActions({
     docs: {
       tabs: tabs as never,
@@ -145,6 +148,7 @@ function setup(opts: SetupOpts = {}) {
       setUnreadable: () => void table.push("unreadable"),
     },
     panels: { show: (f) => void shown.push(f) },
+    onDebugState: (on) => void debugStates.push(on),
     dialogs: {
       editVariable: async (row) => (dialogs.push(`edit:${row?.name ?? "(新)"}`), opts.edit ?? null),
       confirmDelete: async (name) => (dialogs.push(`delete:${name}`), opts.confirm ?? false),
@@ -158,7 +162,7 @@ function setup(opts: SetupOpts = {}) {
   const tools = () => fio.posts.map((p) => JSON.parse(p.body).params?.name).filter(Boolean);
   const raises = () =>
     fio.posts.map((p) => JSON.parse(p.body).params).filter((p) => p?.name === "raise_event").map((p) => p.arguments as RaiseArgs);
-  return { actions, fio, lines, notices, shown, saved, state, dirty, count, tools, raises, analyzed, rowTexts, table, dialogs, cleared: () => cleared };
+  return { actions, debugStates, fio, lines, notices, shown, saved, state, dirty, count, tools, raises, analyzed, rowTexts, table, dialogs, cleared: () => cleared };
 }
 
 test("リロードは見出しの行と拡張と同じ要約を出し、動かす面を見せ、devBegin・devEnd で包む（2.1・4.2）", async () => {
@@ -536,4 +540,89 @@ test("merge は先の知らせを採るが、後だけが失敗なら誤りを�
   assert.deepEqual(merge(warn, err), { ...err, lines: ["a", "b"] });
   assert.deepEqual(merge(warn, { lines: ["b"] }), { ...warn, lines: ["a", "b"] });
   assert.deepEqual(merge({ lines: ["x"] }, warn), { ...warn, lines: ["x", "a"] });
+});
+
+const ON = "Debug enabled: development events are allowed";
+const OFF = "Debug disabled: development events are refused";
+const debugSets = (s: ReturnType<typeof setup>) => s.raises().filter((r) => r.event === "OnPastaSetSaveVariable").map((r) => r.references);
+
+test("トグルの向き: 初めは有効にするで true を書き、有効の読み込み直しで無効にするへ向き、次は false を書く（7.2〜7.4・7.6）", async () => {
+  const s = setup({ raise: setAnd(ok) });
+  assert.deepEqual(s.debugStates, [false]);
+  s.state.debugLine = ON;
+  await s.actions.toggleDebug();
+  assert.deepEqual(debugSets(s), [["デバッグ", "true", "boolean"]]);
+  assert.equal(s.debugStates.at(-1), true);
+  assert.match(s.lines[0], /SHIORI デバッグを有効にする — ゴースト/);
+  assert.ok(s.lines.includes("デバッグは有効です"));
+  s.state.debugLine = OFF;
+  await s.actions.toggleDebug();
+  assert.deepEqual(debugSets(s)[1], ["デバッグ", "false", "boolean"]);
+  assert.equal(s.debugStates.at(-1), false);
+});
+
+test("トグルの前に未保存の辞書を保存する（5.10）", async () => {
+  const s = setup({ raise: setAnd(ok) });
+  s.dirty("dic/a.pasta");
+  await s.actions.toggleDebug();
+  assert.deepEqual(s.saved, ["dic/a.pasta"]);
+});
+
+test("リロード・▶ の後の有効・無効で向きを改め、リロードを頼めないと有効にするへ戻る（7.3・7.4）", async () => {
+  const s = setup({ raise: played, disk: { "dic/a.pasta": "DISK" }, analyze: morningScenes });
+  s.state.debugLine = ON;
+  await s.actions.reload();
+  assert.equal(s.debugStates.at(-1), true);
+  s.state.debugLine = OFF;
+  await s.actions.run(morning);
+  assert.equal(s.debugStates.at(-1), false);
+  s.state.debugLine = ON;
+  await s.actions.run(morning);
+  assert.equal(s.debugStates.at(-1), true);
+  s.state.refuseReload = true;
+  await s.actions.reload();
+  assert.equal(s.debugStates.at(-1), false);
+});
+
+test("値を入れて実行の後の有効で無効にするへ向く（7.4）", async () => {
+  const s = setup({ raise: played, disk: { "dic/a.pasta": "DISK" }, analyze: morningScenes, locals: () => ({ pairs: [], table: undefined }) });
+  s.state.debugLine = ON;
+  await s.actions.runWithLocals(morning);
+  assert.equal(s.debugStates.at(-1), true);
+});
+
+test("トグルで書き込みを断られたら向きを改めない（7.4）", async () => {
+  const s = setup({ raise: setAnd(() => text("Script: 【断り】")) });
+  s.state.debugLine = ON;
+  await s.actions.reload();
+  await s.actions.toggleDebug();
+  assert.deepEqual(debugSets(s), [["デバッグ", "false", "boolean"]]);
+  assert.equal(s.tools().filter((t) => t === "reload").length, 1);
+  assert.deepEqual(s.debugStates, [false, true]);
+});
+
+test("別のゴーストを開くと有効にするへ戻り、切り替えに失敗して同じゴーストへ戻ると向きを保つ（7.5）", async () => {
+  const s = setup({ raise: setAnd(ok) });
+  s.state.debugLine = ON;
+  await s.actions.reload();
+  s.actions.setGhost(null);
+  s.actions.setGhost(info);
+  assert.equal(s.debugStates.at(-1), true);
+  s.actions.setGhost(OTHER);
+  assert.equal(s.debugStates.at(-1), false);
+  s.actions.setGhost(info);
+  assert.equal(s.debugStates.at(-1), false);
+  await s.actions.toggleDebug();
+  assert.deepEqual(debugSets(s), [["デバッグ", "true", "boolean"]]);
+});
+
+test("操作の間にゴーストが替わったら前のゴーストの結果で向きを改めない（7.4・7.5）", async () => {
+  const holder: { s?: ReturnType<typeof setup> } = {};
+  holder.s = setup({ raise: setAnd(() => (holder.s!.actions.setGhost(OTHER), ok())) });
+  const s = holder.s;
+  s.state.debugLine = ON;
+  await s.actions.toggleDebug();
+  assert.ok(s.tools().includes("reload"));
+  s.actions.setGhost(info);
+  assert.deepEqual(s.debugStates, [false, false, false]);
 });

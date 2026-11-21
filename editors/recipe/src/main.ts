@@ -16,6 +16,7 @@ import { TreeView } from "./tree.ts";
 import { DevActions } from "./devActions.ts";
 import { OutputPanel, VariablesPanel } from "./devPanels.ts";
 import { registerSceneLens } from "./sceneLens.ts";
+import { DISABLE_DEBUG, ENABLE_DEBUG } from "../../shared/debugToggle.ts";
 
 const editor = await createEditor(document.getElementById("editor")!);
 const docs = new Documents(editor, document.getElementById("tabs")!, document.getElementById("notices")!, {
@@ -60,6 +61,7 @@ const devActions = new DevActions({
     onAdd: () => void devActions.addVariable(),
   }),
   panels,
+  onDebugState: (on) => (debugButton.textContent = on ? DISABLE_DEBUG : ENABLE_DEBUG),
 });
 const tree = new TreeView(document.getElementById("tree")!, docs, devActions);
 registerSceneLens(docs, devActions);
@@ -89,7 +91,10 @@ saveButton.addEventListener("click", () => {
 const reloadButton = document.createElement("button");
 reloadButton.textContent = "SHIORI をリロード";
 reloadButton.addEventListener("click", () => void devActions.reload());
-document.getElementById("toolbar")!.append(saveButton, reloadButton);
+const debugButton = document.createElement("button");
+debugButton.textContent = ENABLE_DEBUG;
+debugButton.addEventListener("click", () => void devActions.toggleDebug());
+document.getElementById("toolbar")!.append(saveButton, reloadButton, debugButton);
 
 const start = new StartView(document.getElementById("start")!, document.getElementById("toolbar")!, (path, origin) => void openPath(path, origin));
 
