@@ -195,6 +195,14 @@ export function parsePastaLogLine(line: string): PastaLogLine {
   return { level: m ? (m[1] as PastaLogLevel) : undefined, text: line };
 }
 
+export const DEBUG_ENABLED_LINE = 'Debug enabled: development events are allowed';
+export const DEBUG_DISABLED_LINE = 'Debug disabled: development events are refused';
+
+/** pasta.log の 1 行が有効・無効の行なら true・false、ほかは undefined */
+export function debugDecision(line: string): boolean | undefined {
+  return line.includes(DEBUG_ENABLED_LINE) ? true : line.includes(DEBUG_DISABLED_LINE) ? false : undefined;
+}
+
 /** `SHIORI load entry completed` の行なら loaded の値（true・false だけ）、ほかは undefined */
 export function loadCompletion(line: string): { loaded: boolean } | undefined {
   if (!line.includes('SHIORI load entry completed')) {

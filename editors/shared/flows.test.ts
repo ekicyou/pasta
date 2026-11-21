@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFakeGhostIO, type FakeGhostIO, type PostStep } from './fakeGhostIO.ts';
 import type { PostOutcome } from './ghostIO.ts';
-import { DEBUG_HINT, type GhostTarget } from './ghostFiles.ts';
+import { DEBUG_DISABLED_LINE, DEBUG_ENABLED_LINE, DEBUG_HINT, type GhostTarget } from './ghostFiles.ts';
 import { type FlowContext, type ReloadOutcome, type Timing, blocksPlayback, formatReload, reloadAndWait } from './reloadShiori.ts';
 import { formatScene, runScene } from './runSceneAtCursor.ts';
 import { dumpVariables, formatDump, formatSet, setSaveVariable } from './dumpVariables.ts';
@@ -19,6 +19,7 @@ const timing: Timing = { loadTimeoutMs: 3, pollIntervalMs: 1, scriptLogWaitMs: 2
 const L = {
   done: (loaded: boolean) => `2026-11-13T00:00:00Z  INFO pasta::windows: SHIORI load entry completed entry="loadu" loaded=${loaded}`,
   error: (t: string) => `2026-11-13T00:00:00Z ERROR pasta_lua::loader: ${t}`,
+  debug: (on: boolean) => `2026-11-13T00:00:00Z  INFO pasta::debug_state: ${on ? DEBUG_ENABLED_LINE : DEBUG_DISABLED_LINE}`,
   warn: (t: string) => `2026-11-13T00:00:00Z  WARN pasta_lua::loader: ${t}`,
 };
 const lines = (...ls: string[]) => ls.map((l) => l + '\n').join('');
@@ -84,6 +85,26 @@ test('読み込み直し: 印の行で終わり、前からある行と印より
   assert.equal(blocksPlayback(o), false);
   assert.deepEqual(call(1), { name: 'reload', args: { target: 'shiori', ghost_name: 'C:\\g' } });
   assert.equal(call(2).args.since_id, 4, '前の番号より後の誤りだけを引く');
+});
+
+test('読み込み直し: 有効・無効の欄は印より前の最後の行で決まり、印より後の行では変わらない', async () => {
+  const { io, ctx } = setup();
+  io.setFile(LOG, lines(L.debug(false)));
+  io.queuePost(
+    ok(NO_LOG),
+    okAfter('OK', () => io.appendFile(LOG, lines(L.debug(false), L.debug(true), L.done(true), L.debug(false)))),
+    ok(NO_LOG),
+  );
+  const o = done(await reloadAndWait(ctx));
+  assert.equal(o.debug, true);
+  assert.ok(!formatReload(o).lines.some((l) => l.includes('Debug')), '結果の文は変えない');
+});
+
+test('読み込み直し: 有効・無効の行が無ければ欄は分からない', async () => {
+  const { io, ctx } = setup();
+  queueCleanReload(io);
+  const o = done(await reloadAndWait(ctx));
+  assert.equal(o.debug, undefined);
 });
 
 test('読み込み直し: loaded=false の印は誤りに数えて止める', async () => {
