@@ -1,8 +1,8 @@
-//! scene-name-alias task 5: ローダーが同じ別名表を宣言と検索の両方へ配線する。
+//! ローダーが同じ別名表を宣言と検索の両方へ配線する。
 //!
 //! `＊会話` だけの辞書を `PastaLoader` で読み込み、既定の別名表（`OnTalk = ["会話"]`）が
 //! 宣言（トランスパイラ）・検索（`@pasta_search`）・デバッグのソースマップの 3 か所へ
-//! 同じ値で届いていることを確かめる（requirements 2.7 / 6.2 / 7.1〜7.3）。
+//! 同じ値で届いていることを確かめる。
 //! PASTA_DEBUG の中和は `tests/common/mod.rs` の `#[ctor]` ガードが担う。
 
 use crate::common;
@@ -29,7 +29,7 @@ fn search_global(lua: &mlua::Lua, name: &str) -> Option<String> {
 }
 
 /// 既定表のもとで `＊会話` は `OnTalk_1` として登録され、`会話`・`OnTalk` の
-/// どちらで検索しても同じシーンに解決する（宣言と検索が同じ表を使う・6.2）。
+/// どちらで検索しても同じシーンに解決する（宣言と検索が同じ表を使う）。
 #[test]
 fn alias_only_dic_registers_ontalk_and_both_names_resolve_to_it() {
     let temp = create_temp_with_pasta(ALIAS_ONLY_DIC);
@@ -51,7 +51,7 @@ fn alias_only_dic_registers_ontalk_and_both_names_resolve_to_it() {
 }
 
 /// デバッグ有効時、ソースマップ側のトランスパイラも同じ表を使うため、突合キーが
-/// `G:OnTalk#1` となり `＊会話` の本体行が runtime の `OnTalk_1` へ対応づく（7.1〜7.3）。
+/// `G:OnTalk#1` となり `＊会話` の本体行が runtime の `OnTalk_1` へ対応づく。
 #[test]
 fn debug_source_map_join_uses_aliased_name() {
     let temp = create_temp_with_pasta(ALIAS_ONLY_DIC);
@@ -81,7 +81,7 @@ fn debug_source_map_join_uses_aliased_name() {
     );
 }
 
-/// 有効な別名表（出どころと各行）が info で 1 回だけ記録される（2.7）。
+/// 有効な別名表（出どころと各行）が info で 1 回だけ記録される。
 #[tracing_test::traced_test]
 #[test]
 fn effective_alias_table_is_logged_once() {

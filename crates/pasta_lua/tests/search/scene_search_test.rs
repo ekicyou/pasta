@@ -1,40 +1,32 @@
 //! Integration tests for SCENE.search() function.
-//!
-//! These tests verify that the SCENE.search() Lua function works correctly
-//! with @pasta_search module integration.
 
 use crate::common;
 
 use common::e2e_helpers::create_runtime_with_search;
 use pasta_lua::context::TranspileContext;
 
-/// Helper to create a TranspileContext with test data for SCENE.search() testing.
 fn create_scene_search_context() -> TranspileContext {
     let mut ctx = TranspileContext::new();
 
-    // Register global scenes that match Lua STORE.scenes structure
     // Format: "グローバル名_カウンタ" for fn_name, which becomes "グローバル名_カウンタ" in global_name
 
     // Register "メイン" as global scene (will become メイン_1)
     let (_, counter) = ctx.scene_registry.register_global("メイン", Vec::new());
 
-    // Register local scene under メイン
     ctx.scene_registry
         .register_local("選択肢", "メイン", counter, 1, Vec::new());
 
-    // Register another global scene for testing
     ctx.scene_registry.register_global("OnBoot", Vec::new());
 
     ctx
 }
 
-/// Helper function to extract string result
 fn get_string_result(value: mlua::Value) -> String {
     value.as_string().unwrap().to_str().unwrap().to_string()
 }
 
 // =============================================================================
-// Task 2.1: 正常系テスト（ローカル・グローバル検索）
+// 正常系テスト（ローカル・グローバル検索）
 // =============================================================================
 
 #[test]
@@ -42,7 +34,6 @@ fn test_scene_search_returns_result_with_metadata() {
     let ctx = create_scene_search_context();
     let lua = create_runtime_with_search(ctx).unwrap();
 
-    // Register a scene in Lua side first
     let result: mlua::Value = lua
         .load(
             r#"
@@ -153,7 +144,7 @@ fn test_scene_search_local_search() {
 }
 
 // =============================================================================
-// Task 2.2: エラー系・境界値テスト
+// エラー系・境界値テスト
 // =============================================================================
 
 #[test]
@@ -253,7 +244,7 @@ fn test_scene_search_scene_not_registered_in_lua_returns_nil() {
 }
 
 // =============================================================================
-// Task 2.3: __call メタメソッドの動作検証
+// __call メタメソッドの動作検証
 // =============================================================================
 
 #[test]
@@ -370,7 +361,7 @@ fn test_scene_search_result_metadata_access() {
 }
 
 // =============================================================================
-// Task 3.3: 既存 API との互換性検証
+// 既存 API との互換性検証
 // =============================================================================
 
 #[test]
@@ -420,7 +411,7 @@ fn test_existing_scene_api_still_works() {
 }
 
 // =============================================================================
-// Task 4.1: イベントハンドラからのシーン呼び出しテスト
+// イベントハンドラからのシーン呼び出しテスト
 // =============================================================================
 
 #[test]
@@ -470,7 +461,7 @@ fn test_scene_search_from_event_handler_pattern() {
 }
 
 // =============================================================================
-// touch-poke-shortcuts 2.2: Lua から完全一致で探す（SEARCH:search_scene_exact）
+// Lua から完全一致で探す（SEARCH:search_scene_exact）
 // =============================================================================
 
 /// グローバルシーンを `names` の順に登録し、`aliases` を持つ SearchContext を
@@ -581,7 +572,7 @@ fn test_search_scene_exact_empty_name_is_lua_error() {
 }
 
 // =============================================================================
-// recommend-menu-scenes 2.3: Lua から別名の表を読む（SEARCH:scene_aliases）
+// Lua から別名の表を読む（SEARCH:scene_aliases）
 // =============================================================================
 
 #[test]

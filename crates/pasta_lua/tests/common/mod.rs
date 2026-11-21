@@ -1,7 +1,4 @@
 //! Common test utilities for pasta_lua integration tests.
-//!
-//! This module provides shared helper functions for E2E testing of the
-//! Pasta DSL to Lua transpilation and runtime execution pipeline.
 
 #![allow(dead_code)]
 
@@ -55,7 +52,7 @@ pub fn get_scripts_dir() -> String {
 /// `[logging] balloon_warning = false`（止まるエラーの表記を出さない設定）に固定する。
 ///
 /// `FAILURE.enabled` は呼んだ時点で `pasta.config` を引くため、その代役だけを差し替える。
-/// 止まるエラーで「500・理由の行・値が無い」応答を確かめるテストが使う（runtime-error-balloon 6.5）。
+/// 止まるエラーで「500・理由の行・値が無い」応答を確かめるテストが使う。
 pub fn pin_balloon_warning_off(runtime: &PastaLuaRuntime) {
     runtime
         .exec(
@@ -138,7 +135,6 @@ pub fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::
         let dest_path = dst.join(entry.file_name());
 
         if path.is_dir() {
-            // Skip profile directories
             if entry.file_name() == "profile" {
                 continue;
             }
@@ -166,7 +162,6 @@ pub fn copy_fixture_into(fixture: &str, dest: &std::path::Path) {
     std::fs::create_dir_all(dest).unwrap();
     copy_dir_recursive(&loader_fixtures_path(fixture), dest).unwrap();
 
-    // Also copy scripts directory from crate root for pasta runtime modules
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let scripts_src = crate_root.join("pasta_scripts");
     let scripts_dst = dest.join("pasta_scripts");
@@ -175,7 +170,6 @@ pub fn copy_fixture_into(fixture: &str, dest: &std::path::Path) {
         copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
     }
 
-    // Also copy scriptlibs directory
     let scriptlibs_src = crate_root.join("scriptlibs");
     let scriptlibs_dst = dest.join("scriptlibs");
     if scriptlibs_src.exists() {
@@ -192,7 +186,7 @@ pub fn copy_fixture_into(fixture: &str, dest: &std::path::Path) {
 ///
 /// 日本語・ハングル・キリル文字・ギリシャ文字・絵文字を混在させることで、
 /// 実行環境のシステムロケールがどの ANSI コードページであっても
-/// 「ANSI で表現不能」という条件が成立する（要件 6.7）。
+/// 「ANSI で表現不能」という条件が成立する。
 pub const NON_ANSI_DIR_NAME: &str = "日本語_한글_Кириллица_ελληνικά_😀";
 
 /// 深いディレクトリを掘るときに 1 段ごとに積むセグメント名（38 文字）。
@@ -217,14 +211,11 @@ pub fn create_temp_with_pasta(pasta_content: &str) -> tempfile::TempDir {
     let temp = tempfile::TempDir::new().unwrap();
     let base_dir = temp.path();
 
-    // Create minimal dic structure
     std::fs::create_dir_all(base_dir.join("dic/test")).unwrap();
     std::fs::write(base_dir.join("dic/test/hello.pasta"), pasta_content).unwrap();
 
-    // Create minimal pasta.toml
     std::fs::write(base_dir.join("pasta.toml"), "[loader]\ndebug_mode = true\n").unwrap();
 
-    // Copy pasta_scripts directory from crate root for pasta runtime modules
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let scripts_src = crate_root.join("pasta_scripts");
     let scripts_dst = base_dir.join("pasta_scripts");
@@ -233,7 +224,6 @@ pub fn create_temp_with_pasta(pasta_content: &str) -> tempfile::TempDir {
         copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
     }
 
-    // Also copy scriptlibs directory
     let scriptlibs_src = crate_root.join("scriptlibs");
     let scriptlibs_dst = base_dir.join("scriptlibs");
     if scriptlibs_src.exists() {
@@ -289,7 +279,6 @@ pub fn create_sakura_test_runtime() -> mlua::Lua {
     let config = TalkConfig::default();
     let module = sakura_script::register(&lua, Some(&config)).unwrap();
 
-    // Register as @pasta_sakura_script
     let package: mlua::Table = lua.globals().get("package").unwrap();
     let loaded: mlua::Table = package.get("loaded").unwrap();
     loaded.set("@pasta_sakura_script", module).unwrap();

@@ -1,27 +1,9 @@
-//! Task 2.1 — トランスパイル API へのソースマップ受け渡し口（TranspileSinkPort）。
-//!
-//! 仕様参照:
-//! - requirements.md **1.1**: ソースマップ生成が有効である時、生成 `.lua` 行に由来 `.pasta`
-//!   位置を記録する（本タスクは「sink を transpile へ届ける口」を確立し、既存
-//!   `generate_action` の `record_span_since` 配線が提供 sink へ記録されることを実証する）。
-//! - requirements.md **3.1**: 構築したソースマップをメモリ内に保持し、ディスク中間
-//!   ファイルを必須としない（sink はメモリ内構造へ記録する `&mut dyn SourceMapSink`）。
-//! - requirements.md **7.1**: ソースマップ生成が無効（sink 非装着）である時、生成 `.lua`
-//!   の出力をバイト不変に保つ（薄いラッパ `transpile` は従来どおり）。
-//!
-//! design.md 参照:
-//! - "File Structure Plan" → Modified Files producer `transpiler.rs`（153 行）:
-//!   「`transpile` にオプショナル `&mut dyn SourceMapSink` 受け渡し口を追加。既存
-//!   シグネチャは sink なしの薄いラッパで互換維持」。
-//! - Components "TranspileSinkPort"（300 行）: 「sink を transpile へ受け渡し」。
-//! - "Existing Architecture Analysis"（70 行）: `LuaTranspiler::transpile()` は現状 sink を
-//!   通さない（本番ローダから到達不能）→ 本タスクで受け渡し口を追加。
-//!
-//! # このモジュールの役割
+//! トランスパイル API へのソースマップ受け渡し口（TranspileSinkPort）。
 //!
 //! 本番ローダが装着できる sink 受け渡し口（`transpile_with_source_map`）を確立し、in-test の
 //! 捕捉 sink を通して `.pasta`（トーク行）をトランスパイルすると、sink が
-//! `(lua_line, .pasta span)` を少なくとも 1 件捕捉することを表明する。
+//! `(lua_line, .pasta span)` を少なくとも 1 件捕捉することを表明する。sink はメモリ内構造へ記録する
+//! `&mut dyn SourceMapSink` で、ディスク中間ファイルを必須としない。薄いラッパ `transpile` は従来どおり sink なし。
 
 use pasta_dsl::parser::Span;
 use pasta_dsl::parser::parse_str;
@@ -59,7 +41,7 @@ const TALK_FIXTURE: &str = "\
   さくら：「こんにちは」
 ";
 
-/// **1.1 / 3.1 — sink あり transpile で記録が収集される**。
+/// **sink あり transpile で記録が収集される**。
 ///
 /// 新設の受け渡し口（`transpile_with_source_map`）に in-test 捕捉 sink を渡してトークを含む
 /// `.pasta` をトランスパイルすると、sink は少なくとも 1 件の `(lua_line, .pasta span)` を
@@ -98,7 +80,7 @@ fn test_transpile_with_source_map_collects_records() {
     );
 }
 
-/// **7.1 — sink=None の `transpile_with_source_map` は従来 `transpile` とバイト一致**。
+/// **sink=None の `transpile_with_source_map` は従来 `transpile` とバイト一致**。
 ///
 /// 受け渡し口に `None` を渡した場合と、薄いラッパ `transpile` を呼んだ場合とで、生成
 /// バイトが完全一致する（受け渡し口の追加が OFF 経路の出力を一切変えない）。

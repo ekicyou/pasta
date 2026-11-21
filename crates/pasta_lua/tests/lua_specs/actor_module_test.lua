@@ -1,5 +1,5 @@
 -- pasta.actor（ACTOR / アクター単語のビルダー / プロキシポストプロセス）単体テスト
--- review-improvement-loop cell 3.46 (G1): 既存 proxy_find_handler_test は検索段のみを
+-- 既存 proxy_find_handler_test は検索段のみを
 -- カバーしており、get_or_create のキャッシュ・アクター単語のビルダー・
 -- proxy:word / proxy:expr_fn のポストプロセス分岐が未カバーだった
 local describe = require("lua_test.test").describe

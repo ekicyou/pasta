@@ -7,7 +7,6 @@ use std::path::PathBuf;
 fn run_lua_unit_tests() -> LuaResult<()> {
     let lua = Lua::new();
 
-    // プロジェクトルートからの相対パスを設定
     let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -67,13 +66,11 @@ fn run_lua_unit_tests() -> LuaResult<()> {
     let calendar_table = pasta_lua::runtime::calendar::register(&lua, Default::default())?;
     loaded.set("@pasta_calendar", calendar_table)?;
 
-    // Lua ユニットテストを実行（エントリーポイント: init.lua）
     let test_file = lua_specs_path.join("init.lua");
     println!("Running Lua tests from: {}", test_file.display());
 
     let test_code = std::fs::read_to_string(&test_file).expect("Failed to read test file");
 
-    // テスト実行（init.lua が各 spec を require して実行）
     match lua.load(&test_code).exec() {
         Ok(_) => {
             println!("✅ All Lua tests passed");

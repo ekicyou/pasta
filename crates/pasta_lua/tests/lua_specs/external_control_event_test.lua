@@ -1,10 +1,10 @@
--- external-control-events: 外からの操作のイベントの既定のハンドラの単体テスト
+-- 外からの操作のイベントの既定のハンドラの単体テスト
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
 -- ============================================================================
--- 2.1: 既定のハンドラ REG.OnPastaCallFunction
+-- 既定のハンドラ REG.OnPastaCallFunction
 -- @pasta_log・pasta.config を差し替え、act は本物の ShioriAct の find_handler（と build）を差し替えて確かめる。
 -- ============================================================================
 
@@ -236,7 +236,7 @@ describe("OnPastaCallFunction - 呼び出し", function()
 end)
 
 -- ============================================================================
--- 2.2: 既定のハンドラ REG.OnPastaSetSaveVariable
+-- 既定のハンドラ REG.OnPastaSetSaveVariable
 -- pasta.save は代役の表。Reference2 の型に従って Reference1 を読む。
 -- ============================================================================
 

@@ -1,4 +1,4 @@
--- SCENE.attrs・SCENE.set_attrs・STORE.scene_attrs のテスト (scene-attribute-store 4.2)
+-- SCENE.attrs・SCENE.set_attrs・STORE.scene_attrs のテスト
 --
 -- STORE.scenes はスイート間で共有されるため、衝突しない接頭辞 "sat42_" を使う。
 local describe = require("lua_test.test").describe

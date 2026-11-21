@@ -1,4 +1,4 @@
-//! Integration tests for the `@pasta_calendar` module (date-var-calendar 3.1).
+//! Integration tests for the `@pasta_calendar` module.
 
 use crate::common::create_empty_context;
 

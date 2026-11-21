@@ -1,4 +1,4 @@
--- PASTA.str のランタイムテスト (string-concat-operator / expr-nil-coercion)
+-- PASTA.str のランタイムテスト
 -- 連結式（＆）の生成コードが被演算子を通す変換。文字列はそのまま、数値はアクション行の表示と同じ表記、
 -- nil は黙って空文字列、それ以外は警告 1 行と空文字列
 local describe = require("lua_test.test").describe

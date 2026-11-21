@@ -1,10 +1,6 @@
 //! Property scope (VarScope::Property) code generation tests.
 //!
-//! Covers requirements:
-//! - 2.1〜2.6: SET (各種値タイプ)
-//! - 3.1〜3.4: GET代入
-//! - 4.1, 4.5: インラインGET
-//! - Expression中のProperty参照 → TranspileError::PropertyInExpression
+//! SET（各種値タイプ）・GET代入・インラインGET・式中の Property 参照（`TranspileError::PropertyInExpression`）を扱う。
 
 use pasta_dsl::parser::{Action, BinOp, Expr, SetValue, Span, VarScope, VarSet};
 use pasta_lua::TranspileError;
@@ -14,7 +10,7 @@ use pasta_lua::code_gen::LuaCodeGenerator;
 // SET tests (generate_property_set via generate_var_set)
 // ============================================================================
 
-/// 2.1: ＄％prop＝123 → act:set_property("prop", 123)
+/// ＄％prop＝123 → act:set_property("prop", 123)
 #[test]
 fn test_property_set_integer() {
     let mut output = Vec::new();
@@ -36,7 +32,7 @@ fn test_property_set_integer() {
     );
 }
 
-/// 2.2: ＄％system.name＝「テスト」 → act:set_property("system.name", "テスト")
+/// ＄％system.name＝「テスト」 → act:set_property("system.name", "テスト")
 #[test]
 fn test_property_set_string() {
     let mut output = Vec::new();
@@ -63,7 +59,7 @@ fn test_property_set_string() {
     );
 }
 
-/// 2.3: ＄％prop＝＄var → act:set_property("prop", var.var)
+/// ＄％prop＝＄var → act:set_property("prop", var.var)
 #[test]
 fn test_property_set_local_var_ref() {
     let mut output = Vec::new();
@@ -88,7 +84,7 @@ fn test_property_set_local_var_ref() {
     );
 }
 
-/// 2.4: ＄％prop＝＄＊gvar → act:set_property("prop", save.gvar)
+/// ＄％prop＝＄＊gvar → act:set_property("prop", save.gvar)
 #[test]
 fn test_property_set_global_var_ref() {
     let mut output = Vec::new();
@@ -113,7 +109,7 @@ fn test_property_set_global_var_ref() {
     );
 }
 
-/// 2.5: ＄％prop＝＠word → act:set_property("prop", act:word("word"))
+/// ＄％prop＝＠word → act:set_property("prop", act:word("word"))
 #[test]
 fn test_property_set_word_ref() {
     let mut output = Vec::new();
@@ -137,7 +133,7 @@ fn test_property_set_word_ref() {
     );
 }
 
-/// 2.6: ＄％prop＝1＋2 → act:set_property("prop", (1 + 2))
+/// ＄％prop＝1＋2 → act:set_property("prop", (1 + 2))
 #[test]
 fn test_property_set_binary_expr() {
     let mut output = Vec::new();
@@ -167,7 +163,7 @@ fn test_property_set_binary_expr() {
 // GET assignment tests (direct assignment in generate_var_set)
 // ============================================================================
 
-/// 3.1: ＄var＝＄％p → var.var = act:get_property("p")
+/// ＄var＝＄％p → var.var = act:get_property("p")
 #[test]
 fn test_property_get_assign_local() {
     let mut output = Vec::new();
@@ -192,7 +188,7 @@ fn test_property_get_assign_local() {
     );
 }
 
-/// 3.2: ＄＊var＝＄％p → save.var = act:get_property("p")
+/// ＄＊var＝＄％p → save.var = act:get_property("p")
 #[test]
 fn test_property_get_assign_global() {
     let mut output = Vec::new();
@@ -221,7 +217,7 @@ fn test_property_get_assign_global() {
 // Inline GET tests (generate_action with VarRef + Property)
 // ============================================================================
 
-/// 4.1: さくら：＄％p → act:actor_proxy("さくら"):talk(tostring(act:get_property("p")))
+/// さくら：＄％p → act:actor_proxy("さくら"):talk(tostring(act:get_property("p")))
 #[test]
 fn test_property_inline_get() {
     let mut output = Vec::new();

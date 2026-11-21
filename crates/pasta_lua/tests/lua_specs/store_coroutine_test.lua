@@ -5,8 +5,7 @@ local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
 -- ============================================================================
--- Task 1.1: co_scene フィールドと初期化処理
--- Requirements: 7.1, 7.3
+-- co_scene フィールドと初期化処理
 -- ============================================================================
 
 describe("STORE.co_scene - フィールド定義", function()
@@ -38,8 +37,7 @@ describe("STORE.co_scene - フィールド定義", function()
 end)
 
 -- ============================================================================
--- Task 1.2: STORE.reset() クリーンアップ処理
--- Requirements: 7.2
+-- STORE.reset() クリーンアップ処理
 -- ============================================================================
 
 describe("STORE.reset() - co_sceneクリーンアップ", function()

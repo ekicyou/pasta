@@ -1,13 +1,7 @@
-//! dsl-literal-fixes のランタイムテスト。
+//! 空の候補・改行入りリテラルのランタイムテスト。
 //!
 //! 空の候補（`＠w：「」`）が実行時に空文字列として返ることを確かめる。
 //! 未定義単語の警告は `nil` を返す経路だけなので、空文字列が返れば警告の経路を通っていない。
-//!
-//! # Requirements Coverage
-//! - Requirement 3.4: 空の候補は `nil` ではなく空文字列になる（act 経由・アクター単語の経路）
-//! - Requirement 3.5: `＠w：「」、あ` を 2 回引くと空文字列と `あ` が 1 回ずつ出る
-//! - Requirement 5.1: 改行を含む値の Lua リテラルを評価すると元の値に戻る
-//! - Requirement 5.2, 8.2: 改行入りの値・別々の行の `""` を含む生成 Lua がロードできる
 
 use crate::common;
 
@@ -29,7 +23,7 @@ fn load(source: &str) -> Lua {
     lua
 }
 
-/// 3.4: グローバル単語 `＠w：「」` を act 経由で引くと空文字列になる。
+/// グローバル単語 `＠w：「」` を act 経由で引くと空文字列になる。
 #[test]
 fn test_empty_candidate_via_act_returns_empty_string() {
     let lua = load("＠w：「」\n");
@@ -47,7 +41,7 @@ fn test_empty_candidate_via_act_returns_empty_string() {
     assert_eq!(value, Some(String::new()));
 }
 
-/// 3.4: アクター単語 `＠w：「」` をアクターのプロキシ経由で引くと空文字列になる。
+/// アクター単語 `＠w：「」` をアクターのプロキシ経由で引くと空文字列になる。
 #[test]
 fn test_empty_candidate_via_actor_word_returns_empty_string() {
     let lua = load("％さくら\n  ＠w：「」\n");
@@ -67,7 +61,7 @@ fn test_empty_candidate_via_actor_word_returns_empty_string() {
     assert_eq!(value, Some(String::new()));
 }
 
-/// 3.5: `＠w：「」、あ` を 2 回引くと、空文字列と `あ` が 1 回ずつ出る。
+/// `＠w：「」、あ` を 2 回引くと、空文字列と `あ` が 1 回ずつ出る。
 #[test]
 fn test_empty_and_nonempty_candidates_each_drawn_once() {
     let lua = load("＠w：「」、あ\n");
@@ -89,7 +83,7 @@ fn test_empty_and_nonempty_candidates_each_drawn_once() {
     assert_eq!(values, vec![Some(String::new()), Some("あ".to_string())]);
 }
 
-/// 5.1: 規則 0 の出力を Lua で評価すると、元の値とバイト単位で一致する。
+/// 規則 0 の出力を Lua で評価すると、元の値とバイト単位で一致する。
 #[test]
 fn test_newline_literal_round_trips_in_lua() {
     let lua = Lua::new();
@@ -104,13 +98,13 @@ fn test_newline_literal_round_trips_in_lua() {
     }
 }
 
-/// 8.2: 別々の行に `""` を複数書いた `.pasta` がロードと finalize_scene まで通る。
+/// 別々の行に `""` を複数書いた `.pasta` がロードと finalize_scene まで通る。
 #[test]
 fn test_separate_line_blank_strings_load() {
     load("＠a：\"\"\n＠b：\"\"\n＊s\n　＄x＝\"\"\n　＄y＝\"\"\n　さくら：「ok」\n");
 }
 
-/// 5.2, 8.2: AST の単語の候補を改行入りの値に差し替えても、ロードと finalize_scene が通り、
+/// AST の単語の候補を改行入りの値に差し替えても、ロードと finalize_scene が通り、
 /// グローバル単語は元の値のまま読み戻せる。
 #[test]
 fn test_newline_word_values_load_and_read_back() {

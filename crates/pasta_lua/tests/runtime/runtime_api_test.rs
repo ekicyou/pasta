@@ -1,13 +1,4 @@
-//! PastaLuaRuntime 公開 API の統合テスト（review-improvement-loop セル 3.16 / G1）
-//!
-//! 既存テストで未到達だった Rust 側 runtime API を検証する:
-//! - `exec_file` — ファイル実行の成功・失敗パス（従来は定義のみで全テスト未到達）
-//! - `exec_named` — チャンク名がエラーメッセージへ反映される契約
-//! - `register_module` — カスタムモジュール登録と require 連携・上書き
-//! - `with_config` — 不正ライブラリ名の ConfigError 伝播
-//! - `PastaLoader::load` — 変換した辞書の実行・辞書の実行時のエラーの文脈
-//! - `@pasta_config` — toml_to_lua の型変換（int/float/bool/datetime/array/nested）と
-//!   actor name 注入（モジュール登録境界での検証。loader 統合テストの増分）
+//! PastaLuaRuntime 公開 API の統合テスト
 
 use crate::common::{copy_fixture_to_temp, create_empty_context, create_temp_with_pasta};
 use pasta_lua::loader::PastaLoader;
@@ -69,7 +60,6 @@ fn test_exec_file_propagates_script_error() {
 fn test_exec_named_chunk_name_appears_in_error() {
     let runtime = PastaLuaRuntime::new(create_empty_context()).unwrap();
 
-    // 実行時エラー（nil への算術）は「<チャンク名>:<行>:」プレフィックスを持つ
     let err = runtime
         .exec_named("local x = nil\nreturn x + 1", "cell316_chunk.lua")
         .unwrap_err();
@@ -168,7 +158,7 @@ fn test_with_config_unknown_library_fails_with_name() {
     );
 }
 
-/// `std_package` を欠いた構成は、VM を作らずに名前付きの構成エラーになる（3.1、7.2）。
+/// `std_package` を欠いた構成は、VM を作らずに名前付きの構成エラーになる。
 #[test]
 fn test_with_config_missing_std_package_fails_with_name() {
     for libs in [vec!["std_string"], vec!["std_all", "-std_package"]] {
@@ -230,7 +220,7 @@ fn test_runtime_without_math_library_still_builds() {
     assert!(runtime.exec("return math").unwrap().is_nil());
 }
 
-/// mlua-stdlib の 6 つのモジュールは、既定の構成でも 6 つの名前を並べた構成でも入らない（1.1・1.5）。
+/// mlua-stdlib の 6 つのモジュールは、既定の構成でも 6 つの名前を並べた構成でも入らない。
 #[test]
 fn test_mlua_stdlib_modules_are_not_requirable() {
     const NAMES: [&str; 6] = ["assertions", "testing", "env", "regex", "json", "yaml"];
@@ -274,7 +264,6 @@ fn test_load_executes_transpiled_modules() {
 /// 起動モジュール `pasta.scene_dic` の文脈を持つ。
 #[test]
 fn test_load_transpiled_error_propagates_with_module_name() {
-    // 実行時エラー（nil への算術）でモジュール名がチャンク名として現れることを観測する
     let temp = create_temp_with_pasta(
         "＊テスト\n  ゴースト：「こんにちは」\n```lua\nlocal x = nil\nCELL316_ERR = x + 1\n```\n",
     );
@@ -394,11 +383,11 @@ fn test_pasta_config_non_table_actor_is_noop() {
 }
 
 // ============================================================================
-// @pasta_log ハードニング回帰（review-improvement-loop セル 3.17 / G3）
+// @pasta_log ハードニング回帰
 // ============================================================================
 
 /// @pasta_log は極端に深い入れ子テーブル（Lua 入力で自由に構築可能）でも
-/// ホストの Rust スタックを溢れさせない（abort は SHIORI ホストごと落とす — R3.7）。
+/// ホストの Rust スタックを溢れさせない（abort は SHIORI ホストごと落とす）。
 /// 深さ上限（MAX_NESTING_DEPTH）を超えるテーブルは共有の厳しい変換（深さ 10）が
 /// Err を返し tostring() フォールバックへ退避することを、プロセス生存と正常復帰で確認する。
 #[test]
@@ -422,7 +411,7 @@ fn test_log_deeply_nested_table_does_not_overflow_host_stack() {
 
 /// 深さ上限の境界ペア（その1）: ちょうど深さ上限（MAX_NESTING_DEPTH = 10）の
 /// テーブルは TOML の 1 行に書かれ、リーフの値がログへそのまま現れる
-/// （review-improvement-loop セル 3.18 / 3.17 申し送り — 閾値ドリフト防止）。
+/// （閾値ドリフト防止）
 #[tracing_test::traced_test]
 #[test]
 fn test_log_table_at_depth_limit_is_toml_inline() {

@@ -1,4 +1,4 @@
-//! 深いパス・ANSI に無い名前・依存 DLL・探索のフォルダ・名前の解き方の確かめ（要件 2.x・3.x・4.x）。
+//! 深いパス・ANSI に無い名前・依存 DLL・探索のフォルダ・名前の解き方の確かめ。
 
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
@@ -11,7 +11,7 @@ use crate::dll_fixture::{
     loaded_module, lock, make_ghost, non_ansi_dir, put_dep, put_dlls, put_foo, short_path,
 };
 
-/// 長いパスの接頭辞。文言・結果に出てはいけない（2.7）。
+/// 長いパスの接頭辞。文言・結果に出てはいけない。
 const VERBATIM_PREFIX: &str = r"\\?\";
 
 /// 拡張長の接頭辞 `\\?\` を付けたパス（`path` は `/` を含まない絶対パス）。
@@ -53,7 +53,7 @@ fn load_and_call_via_dep(file: &Path) -> Result<i32, u32> {
     Ok(v)
 }
 
-/// 決定事項 3 の試し打ち（要件 2.5・9.10）。pasta の置き換えを通さず、300 文字超えのフォルダの `foo.dll` を
+/// 試し打ち。pasta の置き換えを通さず、300 文字超えのフォルダの `foo.dll` を
 /// `\\?\` の形で読み、隣の `dep.dll` が解けることを確かめる。`\\?\` で解けなければ 8.3 名のパスを同じ形で試す。
 /// CI では `LongPathsEnabled=0` にしたうえで `PASTA_TEST_LONG_PATHS_DISABLED=1` で走らせる。
 #[test]
@@ -141,8 +141,8 @@ fn placements(root: &Path) -> [(&'static str, PathBuf); 3] {
 }
 
 /// 深いフォルダ・ANSI に無い文字のフォルダ・その両方のゴーストで、名前だけ・`\` の絶対パス・`/` の絶対パスの
-/// どれでも `ffi.load` が読め、関数と隣の `dep.dll` を通る関数が呼べる（2.1–2.6・2.9・9.1・9.2）。
-/// 結果の文字列に長いパスの接頭辞が出ない（2.7）。
+/// どれでも `ffi.load` が読め、関数と隣の `dep.dll` を通る関数が呼べる。
+/// 結果の文字列に長いパスの接頭辞が出ない。
 #[test]
 fn ffi_load_reads_dll_from_deep_and_non_ansi_folders() {
     let _guard = lock();
@@ -163,7 +163,7 @@ fn ffi_load_reads_dll_from_deep_and_non_ansi_folders() {
             .unwrap_or_else(|e| panic!("{label}: ゴーストを読めない: {e}"));
         let abs = file.to_str().unwrap().to_string();
         for name in ["foo".to_string(), abs.clone(), slashed(&file)] {
-            // 2.7（文言に接頭辞が出ない）は失敗の文言で確かめる（下のテスト）。
+            // 文言に接頭辞が出ないことは失敗の文言で確かめる（下のテスト）。
             let (sum, dep, _) = ffi_load_and_call(runtime.lua(), &name)
                 .unwrap_or_else(|e| panic!("{label}: ffi.load({name:?}) が失敗: {e}"));
             assert_eq!((sum, dep), (3, VIA_DEP_VALUE), "{label}: {name}");
@@ -175,7 +175,7 @@ fn ffi_load_reads_dll_from_deep_and_non_ansi_folders() {
     }
 }
 
-/// 3 種の置き場所で失敗するときの文言に長いパスの接頭辞が出ない（2.7）。
+/// 3 種の置き場所で失敗するときの文言に長いパスの接頭辞が出ない。
 /// 隣の `dep.dll` が無い（深いフォルダでは `\\?\` の形で先読みして失敗する）場合と、ファイルの無い絶対パスの場合。
 #[test]
 fn deep_path_failure_messages_have_no_verbatim_prefix() {
@@ -210,7 +210,7 @@ fn deep_path_failure_messages_have_no_verbatim_prefix() {
     }
 }
 
-/// ファイル名が ANSI で表せない DLL は、読まずに 2.8 の文言で失敗する（名前だけ・絶対パスの両方）。
+/// ファイル名が ANSI で表せない DLL は、読まずに 専用の文言で失敗する（名前だけ・絶対パスの両方）。
 #[test]
 fn non_ansi_file_name_fails_with_file_name_message() {
     const FILE: &str = "foo_😀.dll";
@@ -240,7 +240,7 @@ fn non_ansi_file_name_fails_with_file_name_message() {
     }
 }
 
-// ---- 名前の解決と依存 DLL（5.3・要件 3.x・4.x・9.3・9.4） ----
+// ---- 名前の解決と依存 DLL ----
 
 /// `ERROR_MOD_NOT_FOUND` の Windows の理由（`FormatMessageW` の UTF-16 を UTF-8 にしたもの）。
 fn mod_not_found_message() -> String {
@@ -373,9 +373,9 @@ impl Drop for CwdAndPath {
     }
 }
 
-/// 隣の `dep.dll` を通る関数が呼べる（4.1・9.3）。`foo.dll` は静的 CRT で `KERNEL32.dll` に頼るので、
-/// システムの DLL の依存も解けている（4.2）。`dep.dll` が隣に無ければ、カレントのフォルダと `PATH` に
-/// あっても使わず（4.3）、`cannot load module 'foo': <理由>` で失敗し、プロセスは落ちない（4.5）。
+/// 隣の `dep.dll` を通る関数が呼べる。`foo.dll` は静的 CRT で `KERNEL32.dll` に頼るので、
+/// システムの DLL の依存も解けている。`dep.dll` が隣に無ければ、カレントのフォルダと `PATH` に
+/// あっても使わず、`cannot load module 'foo': <理由>` で失敗し、プロセスは落ちない。
 #[test]
 fn neighbour_dep_resolves_and_missing_dep_fails_without_crash() {
     let _guard = lock();
@@ -411,8 +411,8 @@ fn neighbour_dep_resolves_and_missing_dep_fails_without_crash() {
     assert_eq!(loaded_module("dep.dll"), None);
 }
 
-/// 名前だけの `ffi.load` は `.dll` を足し（3.1）、探索のフォルダを順に探して最初のものを読む（3.2）。
-/// `lua_search_paths` を変えると、`ffi.load` も `require` も同じ順で探す（3.3・9.4）。
+/// 名前だけの `ffi.load` は `.dll` を足し、探索のフォルダを順に探して最初のものを読む。
+/// `lua_search_paths` を変えると、`ffi.load` も `require` も同じ順で探す。
 #[test]
 fn name_only_follows_lua_search_paths_order() {
     let _guard = lock();
@@ -449,7 +449,7 @@ fn name_only_follows_lua_search_paths_order() {
 }
 
 /// 探索のフォルダに無い名前だけの `ffi.load("kernel32")` は、`kernel32.dll` として元の `ffi.load` に
-/// 渡り、システムの関数が呼べる（3.4・9.4）。2 番目の引数を渡しても同じ（3.8）。
+/// 渡り、システムの関数が呼べる。2 番目の引数を渡しても同じ。
 #[test]
 fn name_only_falls_back_to_system_dll() {
     let _guard = lock();
@@ -478,8 +478,8 @@ fn name_only_falls_back_to_system_dll() {
     );
 }
 
-/// 区切りのある相対の名前は、カレントのフォルダでなくゴーストの基点から解く（3.5）。絶対パスはそのまま（3.6）。
-/// 2 番目の引数を渡しても結果は変わらず、そのまま元の `ffi.load` に渡る（3.8）。
+/// 区切りのある相対の名前は、カレントのフォルダでなくゴーストの基点から解く。絶対パスはそのまま。
+/// 2 番目の引数を渡しても結果は変わらず、そのまま元の `ffi.load` に渡る。
 #[test]
 fn relative_names_resolve_from_ghost_base() {
     let _guard = lock();
@@ -522,7 +522,7 @@ fn relative_names_resolve_from_ghost_base() {
 }
 
 /// 区切りのある名前（相対・絶対）のファイルが無ければ、元の `ffi.load` へ渡さず、
-/// 「モジュールが見つからない」の Windows の理由で失敗する（3.7）。名前だけの探索に同名があっても読まない。
+/// 「モジュールが見つからない」の Windows の理由で失敗する。名前だけの探索に同名があっても読まない。
 #[test]
 fn missing_path_name_fails_without_original() {
     let _guard = lock();
@@ -599,7 +599,7 @@ fn dep_loaded_from(folder: &str) -> bool {
 }
 
 /// 同じ依存 DLL が DLL のフォルダにも既定の探索のフォルダ（`AddDllDirectory`）にもあれば、
-/// DLL のフォルダのものを使う（4.4）。隣に無ければ既定の探索のフォルダのものが使われる（足したフォルダが効いている確かめ）。
+/// DLL のフォルダのものを使う。隣に無ければ既定の探索のフォルダのものが使われる（足したフォルダが効いている確かめ）。
 #[test]
 fn neighbour_dep_wins_over_default_search_dirs() {
     let _guard = lock();

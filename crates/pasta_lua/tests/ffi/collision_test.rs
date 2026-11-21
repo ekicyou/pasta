@@ -1,4 +1,4 @@
-//! 同名の別 DLL の取り違えの確かめ（要件 5.1–5.4・9.5）。
+//! 同名の別 DLL の取り違えの確かめ。
 //!
 //! ゴーストごとに版の違う `foo.dll` を置き、`which()` の値でどのファイルを読んだかを見分ける。
 
@@ -8,7 +8,7 @@ use pasta_lua::{PastaLoader, PastaLuaRuntime};
 
 use crate::dll_fixture::{FFI_TOML, Which, lock, make_ghost, put_dlls, short_path};
 
-/// 取り違えの文言（`ffi_load/mod.rs` の `reason_collision` と 6.1 の形）。
+/// 取り違えの文言（`ffi_load/mod.rs` の `reason_collision`）。
 const COLLISION_MSG: &str =
     "cannot load module 'foo': a different DLL named 'foo.dll' is already loaded in this process";
 
@@ -38,7 +38,7 @@ fn load_which(runtime: &PastaLuaRuntime) -> Result<i32, String> {
     }
 }
 
-/// ゴースト A を保ったまま、別のフォルダのゴースト B は取り違えの文言で失敗し、A の DLL を返さない（5.1・5.2）。
+/// ゴースト A を保ったまま、別のフォルダのゴースト B は取り違えの文言で失敗し、A の DLL を返さない。
 /// A を落とした後は B が読める。
 #[test]
 fn other_ghost_same_name_fails_while_first_is_alive() {
@@ -60,7 +60,7 @@ fn other_ghost_same_name_fails_while_first_is_alive() {
     assert_eq!(load_which(&vm_b), Ok(Which::V2 as i32));
 }
 
-/// 同じ VM で 2 回読める（5.3）。同じフォルダの VM をもう 1 つ作っても読める（5.4）。
+/// 同じ VM で 2 回読める。同じフォルダの VM をもう 1 つ作っても読める。
 #[test]
 fn same_file_loads_twice_and_from_second_vm() {
     let _guard = lock();
@@ -86,7 +86,7 @@ fn long_form(path: &Path) -> PathBuf {
     PathBuf::from(s)
 }
 
-/// 基点を 8.3 名で綴った VM と長い名前で綴った VM（同じフォルダ）を並べても読める（5.4・決定事項 2）。
+/// 基点を 8.3 名で綴った VM と長い名前で綴った VM（同じフォルダ）を並べても読める。
 #[test]
 fn short_and_long_spelling_of_same_folder_both_load() {
     let _guard = lock();

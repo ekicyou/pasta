@@ -1,10 +1,10 @@
-//! task 2.2 統合テスト（pasta-scene-kick-from-cursor）。
+//! `SceneIdentityIndex` の統合テスト。
 //!
 //! `.pasta` を transpile→ロード（debug 有効）後、finalize join が確定した
 //! [`SceneIdentityIndex`]（`Arc<SourceMap>` の write-once スロット）が、既知のシーン
 //! 宣言行から **ランタイム実 identity** な (scene_id, parent) を返すことを観測する。
 //!
-//! 観測対象（requirements 3.1/3.2/3.3/7.1）:
+//! 観測対象:
 //! 1. グローバル本体領域の行 → `(OnTalk_1, None)`（global・parent なし）。
 //! 2. 名前付き local 領域の行 → `(挨拶_1, Some(OnTalk_1))`（local・parent あり）。
 //! 3. 同 base 2 本目のグローバル領域 → `(OnTalk_2, None)`（per-base 出現順突合）。
@@ -17,19 +17,9 @@ use pasta_lua::debug::source_map::SceneIdentity;
 use pasta_lua::mlua::Lua;
 use pasta_lua::{PastaLoader, RuntimeConfig};
 
-/// Neutralize ambient debug env vars before any test thread starts.
-///
-/// The developer session may export `PASTA_DEBUG=1`.
-/// Without this guard, the debug-disabled `PastaLoader::load_with_config` here
-/// would still enable the debug backend (making `debug_enabled()` true and
-/// building a `SourceMap`), so the "normal mode" assertions fail. Tests must
-/// behave identically regardless of the session environment, so we clear these
-/// here. Each integration-test binary compiles separately, so this standalone
-/// binary needs its own copy of the guard held in `tests/common/mod.rs`.
-///
-/// Running inside a `#[ctor]` (executed before `main`, while the process is still
-/// single-threaded) makes the `remove_var` calls race-free under the Rust 2024
-/// edition where `std::env::remove_var` is `unsafe`.
+/// Ambient `PASTA_DEBUG=1` would enable the debug backend in the "normal mode" tests.
+/// Each integration-test binary needs its own copy of the guard in `tests/common/mod.rs`.
+/// `#[ctor]` runs before `main`, single-threaded, so `remove_var` is race-free.
 #[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
@@ -39,7 +29,7 @@ fn neutralize_debug_env() {
 
 /// 統合フィクスチャ（global「会話」×2 ＋ 名前付き local「挨拶」）。行番号は本ファイルの
 /// アサーションが依存するため、フィクスチャ編集時は行も追従すること。
-/// 既定の別名表（`OnTalk = ["会話"]`、scene-name-alias）により `＊会話` の登録名は `OnTalk_N`。
+/// 既定の別名表（`OnTalk = ["会話"]`）により `＊会話` の登録名は `OnTalk_N`。
 ///  7: ＊会話        → global OnTalk_1（本体 __start__ 領域）
 ///  8: さくら：「おはよう」
 ///  9: ＞挨拶
@@ -110,7 +100,7 @@ fn make_base_dir(base: &Path, debug_enabled: bool) -> PathBuf {
     pasta_file
 }
 
-/// 1/2/3/4: debug 有効でロード後、索引が既知行からランタイム実 identity を返し、
+/// debug 有効でロード後、索引が既知行からランタイム実 identity を返し、
 /// その値が `collect_scenes` の SSOT と一致する。
 #[test]
 fn finalize_join_resolves_runtime_identities_for_global_and_local() {
@@ -129,28 +119,28 @@ fn finalize_join_resolves_runtime_identities_for_global_and_local() {
         .debug_source_map()
         .expect("enabled debug runtime must hold the aggregated source map");
 
-    // (1) グローバル本体領域 → (OnTalk_1, None)。
+    // グローバル本体領域 → (OnTalk_1, None)。
     assert_eq!(
         source_map.scene_at(&pasta_key, LINE_GLOBAL1_BODY),
         Some(ident("OnTalk_1", None)),
         "global 本体行 {LINE_GLOBAL1_BODY} は (OnTalk_1, None) へ解決する"
     );
 
-    // (2) 名前付き local 本体領域 → (挨拶_1, Some(OnTalk_1))。
+    // 名前付き local 本体領域 → (挨拶_1, Some(OnTalk_1))。
     assert_eq!(
         source_map.scene_at(&pasta_key, LINE_LOCAL_BODY),
         Some(ident("挨拶_1", Some("OnTalk_1"))),
         "local 本体行 {LINE_LOCAL_BODY} は (挨拶_1, Some(OnTalk_1)) へ解決する"
     );
 
-    // (3) 同 base 2 本目のグローバル → (OnTalk_2, None)（per-base 出現順突合）。
+    // 同 base 2 本目のグローバル → (OnTalk_2, None)（per-base 出現順突合）。
     assert_eq!(
         source_map.scene_at(&pasta_key, LINE_GLOBAL2_BODY),
         Some(ident("OnTalk_2", None)),
         "2 本目 global 本体行 {LINE_GLOBAL2_BODY} は (OnTalk_2, None) へ解決する"
     );
 
-    // (4) 索引の identity が collect_scenes（runtime SSOT）に一致する。
+    // 索引の identity が collect_scenes（runtime SSOT）に一致する。
     let scenes = pasta_lua::runtime::finalize::collect_scenes(runtime.lua())
         .expect("collect_scenes must succeed");
     // global OnTalk_1 / OnTalk_2 が存在する。
@@ -169,7 +159,7 @@ fn finalize_join_resolves_runtime_identities_for_global_and_local() {
     );
 }
 
-/// 5: 通常モード（debug 無効）では、シーンマップも索引も作らない。
+/// 通常モード（debug 無効）では、シーンマップも索引も作らない。
 #[test]
 fn normal_mode_builds_no_index() {
     // debug 無効でロード: source map 自体が構築されない（None）。
@@ -189,7 +179,7 @@ fn normal_mode_builds_no_index() {
     );
 }
 
-/// scene-play-event task 2.3（requirements 2.1/4.1/4.2）: `@pasta_debug` を Lua から呼ぶ。
+/// `@pasta_debug` を Lua から呼ぶ。
 /// 有効なら `enabled()` が真で、`scene_at` は相対・絶対パスとも登録名の組を返し、
 /// 行が 1..=u32::MAX の整数でなければエラーにせず nil。無効なら偽で、マップが無いので常に nil。
 #[test]
@@ -241,7 +231,7 @@ fn pasta_debug_module_reports_enabled_and_resolves_positions() {
     );
 }
 
-/// scene-play-locals task 1.2（requirements 4.2）: `@pasta_debug.is_local_var_name` は
+/// `@pasta_debug.is_local_var_name` は
 /// `＄名前` のローカル変数名の決まりに当たるかを返す。
 #[test]
 fn pasta_debug_is_local_var_name_checks_id_rule() {
@@ -261,15 +251,11 @@ fn pasta_debug_is_local_var_name_checks_id_rule() {
 }
 
 // ===========================================================================
-// task 6.1 統合/回帰テスト（pasta-scene-kick-from-cursor・requirements 3.1/3.3/3.4/7.1）。
-//
-// 単一の **実ロード済みランタイム** 上で次のループを閉じる:
-//   位置 → `@pasta_debug.scene_at`（`resolve_position`。登録名の組 `(大域, ローカル)`）
+// 単一の実ロード済みランタイム上で次のループを閉じる:
+//   位置 → `@pasta_debug.scene_at`（登録名の組 `(大域, ローカル)`）
 //        → シーン表（`STORE.scenes`）からの完全一致の引き当て（`OnPastaSceneAt` と同手順）
-//        → 着地した runtime (global_name, local_name) が `collect_scenes`（SSOT）に一致。
-// これにより「位置の引きの組 == runtime 実シーン」を実機で突合する（3.1/3.3）。
-// 加えて debug 有効・索引充填済みの同一ランタイムで行マッピング双方向 resolve の
-// ラウンドトリップ不変を固定する（3.4 後方非破壊）。
+//        → 着地した (global_name, local_name) が `collect_scenes`（SSOT）に一致。
+// 加えて行マッピング双方向 resolve のラウンドトリップ不変を固定する。
 // ===========================================================================
 
 /// `@pasta_debug.scene_at(file, line)` で位置を登録名の組に引く（見つからなければ `None`）。
@@ -296,7 +282,7 @@ fn scene_fn_exists(lua: &Lua, global: &str, local: &str) -> bool {
     .expect("scene table lookup must not error")
 }
 
-/// 6.1-(1) 位置の引きの組が runtime 実シーンに一致する（requirements 3.1/3.3）。
+/// 位置の引きの組が runtime 実シーンに一致する。
 ///
 /// 既知の global / local 宣言領域の行を `scene_at`（`resolve_position`）で組に引き
 /// （global → `(OnTalk_1, __start__)`、local → `(OnTalk_1, 挨拶_1)`）、シーン表から
@@ -333,23 +319,14 @@ fn resolved_position_pair_matches_runtime_scene() {
 }
 
 // ===========================================================================
-// task 6.x sanitize 衝突 characterization テスト（pasta-scene-kick-from-cursor）。
+// sanitize 衝突の characterization テスト。
 //
-// `SceneRegistry::increment_counter` は per-name カウンタを **生の** scene 名で採番する
-// 一方、ランタイム（pasta/scene.lua `get_or_increment_counter`）は **sanitize 済み** base
-// 名で採番する（create_scene が base_name = sanitize_name(scene.name) で呼ばれるため）。
-//
-// `sanitize_name` で同一 base へ写像されるが distinct な 2 つの生名（例: `会話·A` の
-// U+00B7 MIDDLE DOT と `会話_A` のリテラル `_`、どちらも sanitize で `会話_A`）を 2 本
-// 並べると:
-//   - build 時: increment_counter は生名で別カウンタ → 双方 #1 → join_key は両方
-//     `G:会話_A#1` に衝突する。
-//   - runtime: sanitize base で採番 → `会話_A_1` / `会話_A_2`。
-// 結果、2 本目の cursor 領域が 1 本目（会話_A_1）へ MIS-RESOLVE する（別のシーンを再生してしまう）。
-//
-// 本テストは「同 base へ衝突する 2 本の global が、それぞれ distinct な runtime identity
-// （会話_A_1 / 会話_A_2）へ解決する」ことを固定する。fix 前は RED（2 本目が 会話_A_1 へ
-// mis-resolve、または collect_scenes と不一致）になる。
+// `SceneRegistry::increment_counter` は生の scene 名で採番するが、ランタイム
+// （pasta/scene.lua `get_or_increment_counter`）は sanitize 済み base 名で採番する。
+// `sanitize_name` で同一 base に写像される distinct な 2 つの生名（`会話·A` の U+00B7 と
+// `会話_A` の `_`）を並べると、build 時の join_key が両方 `G:会話_A#1` に衝突し、
+// 2 本目の cursor 領域が 1 本目（会話_A_1）へ mis-resolve する。
+// 本テストは 2 本がそれぞれ distinct な runtime identity（会話_A_1 / 会話_A_2）へ解決することを固定する。
 // ===========================================================================
 
 /// sanitize 衝突フィクスチャ（global「会話·A」「会話_A」＝ sanitize 後はどちらも「会話_A」）。
@@ -388,11 +365,11 @@ fn make_collision_base_dir(base: &Path) -> PathBuf {
     pasta_file
 }
 
-/// 6.x: sanitize 衝突する 2 本の global が distinct な runtime identity へ解決する。
+/// sanitize 衝突する 2 本の global が distinct な runtime identity へ解決する。
 ///
 /// 生名 `会話·A`（U+00B7）と `会話_A`（`_`）は `sanitize_name` で両方 `会話_A`。
-/// build 側カウンタが生名キー（衝突 fix 前）だと双方 #1 → 2 本目が 会話_A_1 へ
-/// mis-resolve する。sanitize キー（fix 後）だと 会話_A_1 / 会話_A_2 と distinct。
+/// build 側カウンタが生名キーだと双方 #1 → 2 本目が 会話_A_1 へ
+/// mis-resolve する。sanitize キーなら 会話_A_1 / 会話_A_2 と distinct。
 #[test]
 fn sanitize_colliding_globals_resolve_to_distinct_runtime_identities() {
     let temp = tempfile::TempDir::new().expect("temp dir");
@@ -425,9 +402,7 @@ fn sanitize_colliding_globals_resolve_to_distinct_runtime_identities() {
         "1 本目（会話·A）本体行 {LINE_COLLISION_SCENE1_BODY} は 会話_A_1 へ解決する"
     );
 
-    // 2 本目本体行 → 会話_A_2（衝突 fix の core アサーション）。
-    // fix 前: build join_key が生名キーで双方 G:会話_A#1 に衝突 → 2 本目が 会話_A_1 へ
-    // mis-resolve（または index 未充填で None）になり、この assert が落ちる。
+    // 2 本目本体行 → 会話_A_2。
     assert_eq!(
         source_map.scene_at(&pasta_key, LINE_COLLISION_SCENE2_BODY),
         Some(ident("会話_A_2", None)),
@@ -444,11 +419,8 @@ fn sanitize_colliding_globals_resolve_to_distinct_runtime_identities() {
 }
 
 // ===========================================================================
-// scene-identity-format 統合テスト（requirements 4.1/4.2/4.5/8.3）。
-//
-// 登録名が `{名前}_{通し番号}` になったことで、末尾が数字のシーン名（`＊章11`）が
-// 同名シーンの 11 本目（`章_11`）と区別され、デバッガの索引は定義元の `.pasta`
-// ファイルごとに突き合わせる。索引の identity はシーン表から完全一致で引ける。
+// 登録名が `{名前}_{通し番号}` なので、末尾が数字のシーン名（`＊章11`）は同名 11 本目（`章_11`）と
+// 区別され、デバッガの索引は定義元の `.pasta` ファイルごとに突き合わせる。
 // ===========================================================================
 
 /// 登録名・名前の形のフィクスチャ（runtime の scene_identity_format_test と共用）。
@@ -510,7 +482,7 @@ fn run_identity(lua: &Lua, id: &SceneIdentity) -> String {
     .expect("identity must resolve to a runnable scene")
 }
 
-/// 4.1/4.2/8.3: 末尾が数字・`_` と数字で終わる・記号を含むシーン名で、カーソル行の identity が
+/// 末尾が数字・`_` と数字で終わる・記号を含むシーン名で、カーソル行の identity が
 /// 登録名どおりになり、その identity でシーン表から引いたシーンがその行のシーンである。
 /// `＊章11` の identity は `章11_1` で、同名シーン `＊章` の 11 本目（`章_11`）にならない。
 #[test]
@@ -555,7 +527,7 @@ const TWO_FILE_A: &str =
 const TWO_FILE_B: &str =
     "＊会話\n　さくら：「Bの会話」\n　＞挨拶\n\n　・挨拶\n　　さくら：「Bの挨拶」\n";
 
-/// 4.5: 2 つの `.pasta` に同名のグローバル（とその中のローカル）があるとき、2 つ目の
+/// 2 つの `.pasta` に同名のグローバル（とその中のローカル）があるとき、2 つ目の
 /// ファイルの行から得た identity は 2 つ目のファイルのシーンを指す（読み込み順に依らず、
 /// 各ファイルの行の identity がそのファイルのシーンを引く）。
 #[test]
@@ -596,12 +568,9 @@ fn same_named_scenes_in_two_files_resolve_to_their_own_file() {
 }
 
 // ===========================================================================
-// scene-name-alias task 6.1（requirements 7.1/7.2/7.3）。
-//
-// 同じファイルに別名 `＊会話` と本名 `＊OnTalk` が混在しても、既定の別名表
-// （`OnTalk = ["会話"]`）のもとで各宣言は同じ base `OnTalk` の出現順で採番され
-// （`OnTalk_1`〜`OnTalk_3`）、各行の identity・位置の引きの組・シーン表から引くシーンが
-// その行の宣言のシーンになる。
+// 同じファイルに別名 `＊会話` と本名 `＊OnTalk` が混在しても、既定の別名表（`OnTalk = ["会話"]`）のもとで
+// 各宣言は同じ base `OnTalk` の出現順で採番され（`OnTalk_1`〜`OnTalk_3`）、各行の identity・
+// 位置の引きの組・シーン表から引くシーンがその行の宣言のシーンになる。
 // ===========================================================================
 
 /// 別名と本名の混在フィクスチャ。行番号は下のケース表が依存する。
@@ -610,7 +579,7 @@ fn same_named_scenes_in_two_files_resolve_to_their_own_file() {
 /// 12: ＊会話   → OnTalk_3（13: 本体）
 const ALIAS_MIXED_FIXTURE: &str = include_str!("fixtures/scene_alias_mixed.pasta");
 
-/// 7.1/7.2/7.3: 各宣言行・本体行が宣言どおりの identity に対応づき、その位置の引きの組で
+/// 各宣言行・本体行が宣言どおりの identity に対応づき、その位置の引きの組で
 /// シーン表から引いたシーンが同名の他候補ではなくその行のシーンである。
 #[test]
 fn aliased_and_real_name_scenes_in_one_file_map_to_their_own_identities() {

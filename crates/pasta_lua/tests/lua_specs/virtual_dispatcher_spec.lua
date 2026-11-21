@@ -1,4 +1,3 @@
--- virtual_dispatcher_spec.lua
 -- Lua-side BDD tests for pasta.shiori.event.virtual_dispatcher module
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
@@ -190,7 +189,7 @@ describe("check_talk function", function()
         expect(result):toBe(nil)
     end)
 
-    -- トークを出さない秒は設定を読まない。初回は 1 回、トークを出す秒は 2 回（要件 4.8）
+    -- トークを出さない秒は設定を読まない。初回は 1 回、トークを出す秒は 2 回
     test("設定を読む回数: 初回 1・トークを出さない秒 0・トークを出す秒 2", function()
         local saved = package.loaded["@pasta_config"]
         local reads = 0
@@ -221,7 +220,7 @@ describe("check_talk function", function()
         if not ok then error(err, 0) end
     end)
 
-    -- 数でない hour_margin（書き間違いの "30"）でも、正時の手前で投げずに間隔どおり振る舞う（要件 1.2・1.3）
+    -- 数でない hour_margin（書き間違いの "30"）でも、正時の手前で投げずに間隔どおり振る舞う
     local function with_string_margin(fn)
         local saved = package.loaded["@pasta_config"]
         package.loaded["@pasta_config"] = { ghost = { hour_margin = "30" } }
@@ -302,8 +301,7 @@ describe("priority and integration", function()
 end)
 
 -- ============================================================================
--- Task 4.2: check_hour() 統合テスト - transfer_date_to_var() 呼び出し確認
--- Requirements: 2.1
+-- check_hour() 統合テスト - transfer_date_to_var() 呼び出し確認
 -- ============================================================================
 
 describe("check_hour - transfer_date_to_var integration", function()
@@ -370,8 +368,7 @@ describe("check_hour - transfer_date_to_var integration", function()
 end)
 
 -- ============================================================================
--- Task 4.3: execute_scene() 統合テスト - act がシーン関数に渡される確認
--- Requirements: 3.1, 3.2
+-- execute_scene() 統合テスト - act がシーン関数に渡される確認
 -- ============================================================================
 
 describe("execute_scene - act parameter passing", function()
@@ -414,8 +411,7 @@ describe("execute_scene - act parameter passing", function()
 end)
 
 -- ============================================================================
--- Task 4.4: check_talk() 統合テスト - transfer_date_to_var() が呼び出されないこと確認
--- Requirements: 4.1, 3.3
+-- check_talk() 統合テスト - transfer_date_to_var() が呼び出されないこと確認
 -- ============================================================================
 
 describe("check_talk - no transfer_date_to_var", function()
@@ -494,8 +490,7 @@ describe("check_talk - no transfer_date_to_var", function()
 end)
 
 -- ============================================================================
--- Task 3.1: フォールバック順序テスト
--- Requirements: 1.1
+-- フォールバック順序テスト
 -- ============================================================================
 
 describe("check_hour - fallback chain order", function()
@@ -532,8 +527,7 @@ describe("check_hour - fallback chain order", function()
 end)
 
 -- ============================================================================
--- Task 3.2: 早期打ち切りテスト
--- Requirements: 1.3
+-- 早期打ち切りテスト
 -- ============================================================================
 
 describe("check_hour - early termination", function()
@@ -589,8 +583,7 @@ describe("check_hour - early termination", function()
 end)
 
 -- ============================================================================
--- Task 3.3: 全候補未発見テスト
--- Requirements: 1.2
+-- 全候補未発見テスト
 -- ============================================================================
 
 describe("check_hour - all candidates miss", function()
@@ -637,8 +630,7 @@ describe("check_hour - all candidates miss", function()
 end)
 
 -- ============================================================================
--- Task 3.4: HH フォーマットテスト
--- Requirements: 2.1, 2.2
+-- HH フォーマットテスト
 -- ============================================================================
 
 describe("check_hour - HH format", function()
@@ -697,8 +689,7 @@ describe("check_hour - HH format", function()
 end)
 
 -- ============================================================================
--- ontalk-block-condition: dispatch() 経由のブロック条件テスト
--- Requirements: 3.1, 3.2, 3.3, 3.4
+-- dispatch() 経由のブロック条件テスト
 -- ============================================================================
 
 describe("dispatch - status block conditions", function()
@@ -724,7 +715,6 @@ describe("dispatch - status block conditions", function()
     end
 
     -- ブロック対象 Status 9件（各キーワード単体）: dispatch() が nil を返す
-    -- Requirements: 3.1
 
     test("blocks when status is 'talking'", function()
         setup()
@@ -781,7 +771,6 @@ describe("dispatch - status block conditions", function()
     end)
 
     -- 複合 Status 2件: dispatch() が nil を返す
-    -- Requirements: 3.2
 
     test("blocks when compound status contains 'choosing'", function()
         setup()
@@ -796,7 +785,6 @@ describe("dispatch - status block conditions", function()
     end)
 
     -- 非ブロック Status 4件（初期化・発火とも同一 status）: dispatch() が nil 以外を返す
-    -- Requirements: 3.3
 
     test("does not block when status is nil", function()
         setup()
@@ -823,7 +811,6 @@ describe("dispatch - status block conditions", function()
     end)
 
     -- M.is_blocked() 直接呼び出し 3件
-    -- Requirements: 3.4
 
     test("is_blocked returns true for 'talking'", function()
         setup()
@@ -842,8 +829,7 @@ describe("dispatch - status block conditions", function()
 end)
 
 -- ============================================================================
--- tutorial-ssp-gaps 3.3: 時報の判定を仮想の時刻で行い、ずれが変わったら次の正時を決め直す
--- Requirements: 2.1, 2.3, 2.4, 2.5, 7.3
+-- 時報の判定を仮想の時刻で行い、ずれが変わったら次の正時を決め直す
 -- ============================================================================
 
 describe("check_hour / check_talk - 仮想の時刻", function()
@@ -1085,7 +1071,7 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         expect(found):toBe("時報" .. hh_of(BASE + H))
     end)
 
-    -- req.date だけが飛ぶ（ずれ 0。SSP 2.9.18 の TimeMachine が OS の時計まで書き換える場合。タスク 7.2 の実機）
+    -- req.date だけが飛ぶ（ずれ 0。SSP 2.9.18 の TimeMachine が OS の時計まで書き換える場合）
 
     vtest("飛び: 14:00:24 から 16:59:29 へ入れ直すと、時報16は出ず、17:00 に時報17が出る", function()
         local T14 = BASE + 4 * H

@@ -1,19 +1,8 @@
-//! Task 2.4 — 要素生成の全 record 配線（RecordWiring / element_gen）。
+//! 要素生成の全 record 配線（RecordWiring / element_gen）。
 //!
-//! 仕様参照（`.kiro/specs/completed/pasta-source-map/`）:
-//! - requirements.md **1.1**: ソースマップ生成が有効である時、生成 `.lua` 行に由来
-//!   `.pasta` 位置を記録する。
-//! - requirements.md **1.3**: 単一の `.pasta` 要素が複数の `.lua` 行を生成する時、その
-//!   全行を `.pasta` 位置へ対応づける。
-//! - requirements.md **1.4**: 主要構文種別（アクション・スコープ・分岐・単語定義など）を
-//!   網羅して記録する。本タスクは変数代入・シーン呼び出し・単語定義（グローバル/アクター/
-//!   ローカル）・コードブロックを担当する（アクションは既配線）。
-//!
-//! design.md 参照:
-//! - "RecordWiring"（315-358 行）: 各 `generate_*` で `out_line` デルタ検出パターンを踏襲し、
-//!   出力行群へ AST ノードの `span` を対応づける。コードブロックは各出力行を
-//!   `record_block_line(block.span.start_line + 行オフセット)` で **個別** 記録する。
-//! - "Service Interface"（348-349 行）: `record_span(span)` / `record_block_line(pasta_line)`。
+//! 変数代入・シーン呼び出し・単語定義（グローバル/アクター/ローカル）・コードブロックの各 `generate_*` が、
+//! 出力 `.lua` 行群へ AST ノードの `span` を対応づけることを検証する。コードブロックは各出力行を
+//! `record_block_line(block.span.start_line + 行オフセット)` で **個別** 記録する。
 //!
 //! # 検証戦略
 //!
@@ -53,7 +42,7 @@ fn span_at(line: usize) -> Span {
 }
 
 // ============================================================================
-// 1.1 — 変数代入（var_set）の record 配線
+// 変数代入（var_set）の record 配線
 // ============================================================================
 
 /// ローカル変数代入（式値）: 1 行出力 → その行が由来 `.pasta` 行へ対応づく。
@@ -141,7 +130,7 @@ fn var_set_property_records_its_pasta_line() {
 }
 
 // ============================================================================
-// 1.1 — シーン呼び出し（call_scene）の record 配線
+// シーン呼び出し（call_scene）の record 配線
 //
 // `generate_call_scene` は pub(super)（直接呼べない）ため、実 `.pasta` を
 // transpile_with_source_map に通し、`act:call(...)` 出力行が呼び出し `.pasta` 行へ対応づくことを
@@ -170,7 +159,6 @@ fn call_scene_records_call_pasta_line_via_pipeline() {
         .map(|i| i as u32 + 1)
         .expect("transpiled output must contain an act:call(...) line");
 
-    // その出力 .lua 行が呼び出し元 .pasta 行（4）へ対応づいて記録されていること。
     assert!(
         sink.records.contains(&(call_lua_line, 4)),
         "1.1: call_scene output line {call_lua_line} must map to .pasta call line 4; records = {:?}",
@@ -179,8 +167,7 @@ fn call_scene_records_call_pasta_line_via_pipeline() {
 }
 
 /// 途中の Call（後ろに行が続く `＞`）は `act:call_restore(...)` 1 行になり、末尾の Call と
-/// 同じくその 1 行だけが呼び出し元 `.pasta` 行（このフィクスチャでは行 3）へ対応づく
-/// （call-execution-correctness: 途中の Call の生成形の切り替え）。
+/// 同じくその 1 行だけが呼び出し元 `.pasta` 行（このフィクスチャでは行 3）へ対応づく。
 #[test]
 fn mid_call_scene_records_call_restore_line_via_pipeline() {
     // 行1: 空, 行2: ＊メイン, 行3: ＞サブ会話（途中）, 行4: トーク, ...
@@ -207,7 +194,7 @@ fn mid_call_scene_records_call_restore_line_via_pipeline() {
     );
     let call_lua_line = call_lua_lines[0];
 
-    // その 1 行の記録は呼び出し元 .pasta 行（3）だけ。
+    // その 1 行の記録は呼び出し元 .pasta 行だけ。
     let pasta_lines_for_call: Vec<u32> = sink
         .records
         .iter()
@@ -223,7 +210,7 @@ fn mid_call_scene_records_call_restore_line_via_pipeline() {
 }
 
 // ============================================================================
-// 1.1 / 1.3 — 単語定義（global / local）の record 配線
+// 単語定義（global / local）の record 配線
 // ============================================================================
 
 /// グローバル単語定義（単一キー）: 1 行 → 由来行へ対応づく。
@@ -256,7 +243,7 @@ fn global_word_single_key_records_its_pasta_line() {
     );
 }
 
-/// グローバル単語定義（複数キー）: 1 要素 → 複数 `.lua` 行。**全行**が同一 `.pasta` 行へ対応づく（1.3）。
+/// グローバル単語定義（複数キー）: 1 要素 → 複数 `.lua` 行。**全行**が同一 `.pasta` 行へ対応づく。
 #[test]
 fn global_word_multi_key_maps_all_lines_to_same_pasta_line() {
     let mut sink = LinePairSink::default();
@@ -265,7 +252,7 @@ fn global_word_multi_key_maps_all_lines_to_same_pasta_line() {
         let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
-        // 3 キー → 3 出力行。すべて span_at(5).start_line == 5 へ写像されること。
+        // 3 キー → 3 出力行。すべて span_at.start_line == 5 へ写像されること。
         let word = KeyWords {
             names: vec!["朝".to_string(), "昼".to_string(), "夜".to_string()],
             words: vec!["はい".to_string()],
@@ -281,7 +268,7 @@ fn global_word_multi_key_maps_all_lines_to_same_pasta_line() {
         3,
         "3 keys must emit 3 lines: {lua}"
     );
-    // 1.3: 3 出力行すべてが同一 .pasta 行(5)へ対応づく。
+    // 3 出力行すべてが同一 .pasta 行へ対応づく。
     assert_eq!(
         sink.records,
         vec![(1, 5), (2, 5), (3, 5)],
@@ -317,10 +304,10 @@ fn local_word_records_its_pasta_line() {
 }
 
 // ============================================================================
-// 1.1 / 1.3 — コードブロック（code_block）の行ごと record 配線
+// コードブロック（code_block）の行ごと record 配線
 // ============================================================================
 
-/// コードブロック: 各出力 `.lua` 行を **個別** に由来 `.pasta` 行へ対応づける（議題3）。
+/// コードブロック: 各出力 `.lua` 行を **個別** に由来 `.pasta` 行へ対応づける。
 ///
 /// `block.span.start_line` は開きフェンス行。content はその次行から始まるので、
 /// content 行オフセット `i` の由来 `.pasta` 行は `start_line + 1 + i`（フェンス行ぶんの
@@ -382,12 +369,10 @@ fn integration_code_block_lines_map_to_real_pasta_lines() {
         .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
 
-    // 記録された由来 .pasta 行の集合を抽出。
     let pasta_lines: std::collections::BTreeSet<u32> =
         sink.records.iter().map(|&(_, p)| p).collect();
 
-    // コードブロック content 行（13,14,15 と 33,34）がすべて記録由来 .pasta 行に含まれる。
-    // これが含まれることで、フェンス行を跨いだ `+1` オフセットが実 span で正しいと実証される。
+    // コードブロック content 行がすべて記録由来 .pasta 行に含まれる。
     for expected in [13u32, 14, 15, 33, 34] {
         assert!(
             pasta_lines.contains(&expected),
@@ -395,10 +380,7 @@ fn integration_code_block_lines_map_to_real_pasta_lines() {
         );
     }
 
-    // フェンス行（12, 32）そのものは content ではないので、コードブロック由来としては
-    // 記録されない（content は次行から始まる = +1 補正の本質）。なお 12 行目はアクター
-    // ヘッダ等とは無関係であり、本フィクスチャでコードブロック以外がその行を記録しないため
-    // 「フェンス行が記録されない」ことを直接表明できる。
+    // フェンス行そのものは content ではないので記録されない（content は次行から始まる = +1 補正の本質）。
     assert!(
         !pasta_lines.contains(&12),
         "opening fence line 12 must NOT be recorded as a code-block content line (set = {pasta_lines:?})"
@@ -416,7 +398,7 @@ fn integration_code_block_lines_map_to_real_pasta_lines() {
 }
 
 /// 統合: sink=None（本番既定）でフィクスチャをトランスパイルしても、sink=Some とバイト一致。
-/// 配線追加が OFF 経路の出力を一切変えないこと（要件 7.1 ゼロコスト）の実地確認。
+/// 配線追加が OFF 経路の出力を一切変えないことの実地確認。
 #[test]
 fn integration_sink_none_is_byte_identical_to_sink_some() {
     let source = include_str!("../fixtures/zero_cost_all_syntax.pasta");

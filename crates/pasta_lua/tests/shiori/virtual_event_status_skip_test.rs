@@ -1,6 +1,4 @@
 //! Integration tests for pasta.shiori.event.virtual_dispatcher status suppression.
-//!
-//! Tests for choosing/talking status skip behavior in dispatch().
 
 use crate::common;
 
@@ -8,7 +6,6 @@ use common::create_runtime_with_pasta_path;
 
 // ============================================================================
 // choosing 状態での OnTalk/OnHour 抑制テスト
-// Requirements: 4.1, 4.2, 4.3
 // ============================================================================
 
 #[test]

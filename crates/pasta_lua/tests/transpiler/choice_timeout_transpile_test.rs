@@ -7,7 +7,7 @@
 use pasta_dsl::parse_str;
 use pasta_lua::LuaTranspiler;
 
-/// `!select(5)` → `act:choice_timeout(5)`
+/// `!select` → `act:choice_timeout`
 #[test]
 fn test_select_with_integer_seconds() {
     let source = "＊選択シーン\n    !select(5)\n";
@@ -25,7 +25,7 @@ fn test_select_with_integer_seconds() {
     );
 }
 
-/// `!select(10.0)` → `act:choice_timeout(10)`
+/// `!select` → `act:choice_timeout`
 #[test]
 fn test_select_with_float_seconds() {
     let source = "＊選択シーン\n    !select(10.0)\n";

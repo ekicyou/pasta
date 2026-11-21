@@ -1,5 +1,3 @@
-// tests/log/main.rs
-//
 // ログ関連の統合テストをグルーピングするエントリーポイント。
 
 mod integration_test;

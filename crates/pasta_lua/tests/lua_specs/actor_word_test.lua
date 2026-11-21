@@ -1,5 +1,5 @@
 -- Actor word dictionary runtime tests
--- Task 3.6: Runtime layer unit tests for actor-word-dictionary feature
+-- Runtime layer unit tests for actor word dictionary
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect

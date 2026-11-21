@@ -1,6 +1,5 @@
 -- mouse_test.lua
 -- pasta.shiori.event.mouse の候補の名前（M.candidates）とアクター名（M.resolve_actor）の単体テスト
--- touch-poke-shortcuts Task 3.1 (Requirements: 1.1, 1.4–1.6, 3.1, 3.4, 3.5, 4.1–4.5, 6.1, 6.4)
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -136,7 +135,7 @@ describe("MOUSE.resolve_actor - アクター名", function()
     end)
 end)
 
--- touch-poke-shortcuts Task 3.2 撫での判定 (Requirements: 2.1–2.8, 3.6, 5.1, 5.2)
+-- 撫での判定
 describe("MOUSE.check_stroke - 撫での判定", function()
     --- 同じ所 (0, Head) へ移動を順に送り、各時刻の結果を "t:true" の形で並べる
     local function run(times, scope, part)
@@ -223,7 +222,7 @@ describe("MOUSE.check_stroke - 撫での判定", function()
     end)
 end)
 
--- tutorial-ssp-gaps Task 8.3 撫での判定はなめらかな時計で数える (Requirements: 2.5, 7.3, 7.5)
+-- 撫での判定はなめらかな時計で数える
 describe("OnMouseMove - 時刻の飛びをまたぐ撫で", function()
     local REG = require("pasta.shiori.event.register")
     local CLOCK = require("pasta.shiori.clock")

@@ -1,13 +1,4 @@
-//! E2E Test Helpers for pasta_lua.
-//!
-//! This module provides common utilities for Runtime E2E testing:
-//! - `create_runtime_with_finalize()` - Create Lua VM with finalize_scene registered
-//! - `create_runtime_with_search()` - Create Lua VM with @pasta_search registered
-//! - `transpile()` - Transpile Pasta source to Lua code
-//! - `execute_scene()` - Execute a scene and collect output (skeleton)
-//!
-//! # Requirements Coverage
-//! - Requirement 7.2: Runtime E2E test infrastructure
+//! E2E test helpers: Lua VM setup and Pasta-to-Lua transpilation.
 
 use mlua::{Lua, StdLib};
 use pasta_dsl::parser::parse_str;
@@ -17,18 +8,6 @@ use pasta_lua::loader::PersistenceConfig;
 use std::path::PathBuf;
 
 /// Create a minimal Lua runtime with finalize_scene capability.
-///
-/// This function:
-/// 1. Creates a Lua VM with safe standard libraries
-/// 2. Configures package.path to include pasta scripts directory
-/// 3. Registers the finalize_scene Rust binding
-/// 4. Registers the @pasta_persistence module for save.lua
-/// 5. Registers the @pasta_search module with empty registries
-///
-/// # Returns
-/// * `Ok(Lua)` - Configured Lua VM ready for E2E testing
-/// * `Err(e)` - Initialization failed
-///
 /// # Example
 /// ```ignore
 /// use common::e2e_helpers::create_runtime_with_finalize;
@@ -38,10 +17,8 @@ use std::path::PathBuf;
 /// lua.load("require('pasta').finalize_scene()").exec().unwrap();
 /// ```
 pub fn create_runtime_with_finalize() -> mlua::Result<Lua> {
-    // Create Lua VM with safe standard libraries
     let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
 
-    // Configure package.path to include pasta scripts directory
     let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("pasta_scripts")
         .to_string_lossy()
@@ -73,7 +50,6 @@ pub fn create_runtime_with_finalize() -> mlua::Result<Lua> {
     let log_table = pasta_lua::runtime::log::register(&lua)?;
     loaded.set("@pasta_log", log_table)?;
 
-    // Register finalize_scene binding
     pasta_lua::runtime::finalize::register_finalize_scene(
         &lua,
         pasta_core::registry::SceneAliasTable::empty(),
@@ -83,26 +59,10 @@ pub fn create_runtime_with_finalize() -> mlua::Result<Lua> {
 }
 
 /// Create a Lua runtime with @pasta_search module and scripts path configured.
-///
-/// This function:
-/// 1. Creates a Lua VM with safe standard libraries
-/// 2. Configures package.path to include pasta scripts directory
-/// 3. Registers the @pasta_persistence module
-/// 4. Registers the @pasta_search module with a custom TranspileContext
-/// 5. Registers the finalize_scene Rust binding
-///
-/// # Arguments
-/// * `ctx` - TranspileContext containing scene/word registries for search
-///
-/// # Returns
-/// * `Ok(Lua)` - Configured Lua VM ready for search testing
-/// * `Err(e)` - Initialization failed
 #[allow(dead_code)]
 pub fn create_runtime_with_search(ctx: TranspileContext) -> mlua::Result<Lua> {
-    // Create Lua VM with safe standard libraries
     let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
 
-    // Configure package.path to include pasta scripts directory
     let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("pasta_scripts")
         .to_string_lossy()
@@ -124,7 +84,6 @@ pub fn create_runtime_with_search(ctx: TranspileContext) -> mlua::Result<Lua> {
     let loaded: mlua::Table = package.get("loaded")?;
     loaded.set("@pasta_persistence", persistence_table)?;
 
-    // Register @pasta_search module
     let search_context =
         pasta_lua::search::SearchContext::new(ctx.scene_registry, ctx.word_registry);
     loaded.set("@pasta_search", lua.create_userdata(search_context)?)?;
@@ -133,7 +92,6 @@ pub fn create_runtime_with_search(ctx: TranspileContext) -> mlua::Result<Lua> {
     let log_table = pasta_lua::runtime::log::register(&lua)?;
     loaded.set("@pasta_log", log_table)?;
 
-    // Register finalize_scene binding
     pasta_lua::runtime::finalize::register_finalize_scene(
         &lua,
         pasta_core::registry::SceneAliasTable::empty(),
@@ -143,17 +101,6 @@ pub fn create_runtime_with_search(ctx: TranspileContext) -> mlua::Result<Lua> {
 }
 
 /// Transpile Pasta source to Lua code.
-///
-/// This function:
-/// 1. Parses the Pasta source string
-/// 2. Transpiles the AST to Lua code
-/// 3. Returns the Lua source as a String
-///
-/// # Arguments
-/// * `source` - Pasta DSL source code
-///
-/// # Returns
-/// * Transpiled Lua code as a String
 ///
 /// # Panics
 /// Panics if parsing or transpilation fails (test helper).
@@ -178,23 +125,11 @@ pub fn transpile(source: &str) -> String {
 /// Execute a scene and collect output (skeleton implementation).
 ///
 /// This function is a placeholder for future implementation.
-/// It will:
-/// 1. Call the specified scene function
-/// 2. Collect all yielded output
-/// 3. Return the output as a Vec<String>
-///
-/// # Arguments
-/// * `_lua` - Lua runtime (unused in skeleton)
-/// * `_scene_name` - Scene name to execute (unused in skeleton)
-///
-/// # Returns
-/// * Empty Vec (skeleton implementation)
 ///
 /// # TODO
 /// Implement actual scene execution with output collection.
 #[allow(dead_code)]
 pub fn execute_scene(_lua: &Lua, _scene_name: &str) -> Vec<String> {
-    // Skeleton implementation - to be implemented in future tasks
     Vec::new()
 }
 

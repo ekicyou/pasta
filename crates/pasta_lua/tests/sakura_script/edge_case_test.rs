@@ -1,13 +1,5 @@
 //! Edge case tests for sakura script tokenization, wait insertion, and
 //! Lua API argument handling.
-//!
-//! Covers gaps not exercised by basic_test / output_test / budoux_test:
-//! - Dangling backslash / unclosed bracket tokenization
-//! - CharSets::classify priority for overlapping character sets
-//! - LineStartProhibited-only pending runs (no own wait value)
-//! - Pending punctuation flush triggered by SakuraScript / LineEndProhibited
-//! - register() with None config (hardcoded defaults)
-//! - Non-table actor / budoux / widths argument fallbacks
 
 use crate::common;
 
@@ -64,7 +56,7 @@ fn test_tokenize_backslash_before_non_tag_char_is_general() {
 #[test]
 fn test_tokenize_double_backslash_then_tag() {
     // r"\\h": r"\\" is an escaped backslash read as one unbreakable unit
-    // (dsl-codegen-runtime-safety 4.2), so the following `h` is plain text,
+    // so the following `h` is plain text,
     // not part of an r"\h" tag.
     let tokens = default_tokenizer().tokenize(r"\\h");
 
@@ -386,8 +378,7 @@ fn test_break_lines_tags_only_input_unchanged() {
 
 // ============================================
 // SSP にそろえたタグの読み取り: ウェイトはタグの直後の字に付き、
-// エスケープ・囲み・引数の中には入らない（paragraph-break-tag-only-talk 6.5）
-// Requirement: 6.4, 6.5, 7.4, 7.6, 7.7, 8.2, 9.2
+// エスケープ・囲み・引数の中には入らない
 // ============================================
 
 /// `talk_to_script(nil, input)` を指定の設定で呼ぶ
@@ -410,7 +401,7 @@ fn visible_normal_wait() -> TalkConfig {
 
 #[test]
 fn test_wait_follows_char_right_after_tag_name() {
-    // `\n` の名前は 1 文字で終わり、後ろの `Hello` は通常の字としてウェイトが付く（7.4）
+    // `\n` の名前は 1 文字で終わり、後ろの `Hello` は通常の字としてウェイトが付く
     assert_eq!(
         talk_with(&visible_normal_wait(), r"\nHello"),
         r"\nH\_w[50]e\_w[50]l\_w[50]l\_w[50]o\_w[50]"
@@ -419,13 +410,13 @@ fn test_wait_follows_char_right_after_tag_name() {
 
 #[test]
 fn test_strong_wait_after_tag_name_with_default_config() {
-    // 既定値でも `\n` の後ろの `!?` は強調の字としてウェイトが付く（7.4）
+    // 既定値でも `\n` の後ろの `!?` は強調の字としてウェイトが付く
     assert_eq!(talk_with(&TalkConfig::default(), r"\n!?"), r"\n!?\_w[450]");
 }
 
 #[test]
 fn test_no_wait_inside_or_right_after_percent_escape() {
-    // `\%` は 1 単位。間にも直後にもウェイトは入らない（8.2）
+    // `\%` は 1 単位。間にも直後にもウェイトは入らない
     assert_eq!(
         talk_with(&visible_normal_wait(), r"100\%です"),
         r"1\_w[50]0\_w[50]0\_w[50]\%で\_w[50]す\_w[50]"
@@ -434,7 +425,7 @@ fn test_no_wait_inside_or_right_after_percent_escape() {
 
 #[test]
 fn test_no_wait_inside_literal_region() {
-    // `\_?` … `\_?` の囲みは全体で 1 単位。中の字にもタグにもウェイトは入らない（9.2）
+    // `\_?` … `\_?` の囲みは全体で 1 単位。中の字にもタグにもウェイトは入らない
     assert_eq!(
         talk_with(&visible_normal_wait(), r"あ\_?\s[1]abc\_?い"),
         r"あ\_w[50]\_?\s[1]abc\_?い\_w[50]"
@@ -443,7 +434,7 @@ fn test_no_wait_inside_literal_region() {
 
 #[test]
 fn test_no_wait_inside_tag_argument_with_escaped_bracket() {
-    // 引数の中の `\]` は `\` ＋ 1 文字の組で、引数は `X]` で閉じる（7.6）
+    // 引数の中の `\]` は `\` ＋ 1 文字の組で、引数は `X]` で閉じる
     assert_eq!(
         talk_with(&visible_normal_wait(), r"\q[a\]b,X]やあ"),
         r"\q[a\]b,X]や\_w[50]あ\_w[50]"
@@ -452,7 +443,7 @@ fn test_no_wait_inside_tag_argument_with_escaped_bracket() {
 
 #[test]
 fn test_no_wait_right_after_non_unit_backslash() {
-    // 単位にならない `\` は通常の字（7.10）。直後にウェイトを挿むと `\\` ができ、
+    // 単位にならない `\` は通常の字。直後にウェイトを挿むと `\\` ができ、
     // SSP がエスケープ ＋ 字として読むので、ウェイトは続く字の後ろに付ける
     let config = visible_normal_wait();
     assert_eq!(talk_with(&config, r"\あい"), r"\あ\_w[50]い\_w[50]");
@@ -462,7 +453,7 @@ fn test_no_wait_right_after_non_unit_backslash() {
 
 #[test]
 fn test_no_wait_inside_quoted_tag_argument() {
-    // 引数の先頭の `"…"` は引用で、中の `]` で引数は閉じない（7.7）
+    // 引数の先頭の `"…"` は引用で、中の `]` で引数は閉じない
     assert_eq!(
         talk_with(&visible_normal_wait(), r#"\![raise,X,"a]b"]やあ"#),
         r#"\![raise,X,"a]b"]や\_w[50]あ\_w[50]"#
@@ -470,7 +461,7 @@ fn test_no_wait_inside_quoted_tag_argument() {
 }
 
 // ============================================
-// 新しいアクター設定と列の状態の表のエラー（vertical-balloon-lines 2.4）
+// 新しいアクター設定と列の状態の表のエラー
 // ============================================
 
 fn talk_err(code: &str) -> String {
@@ -483,7 +474,7 @@ fn talk_err(code: &str) -> String {
 
 #[test]
 fn test_budoux_newlines_not_number_is_error() {
-    // 数値にできない budoux_newlines は Lua のエラー（1.6）
+    // 数値にできない budoux_newlines は Lua のエラー
     let err = talk_err(
         r#"require("@pasta_sakura_script").talk_to_script({ budoux = {6}, budoux_newlines = "abc" }, "今日は")"#,
     );
@@ -492,7 +483,7 @@ fn test_budoux_newlines_not_number_is_error() {
 
 #[test]
 fn test_budoux_jump_non_integer_element_is_error() {
-    // 整数にできない budoux_jump の要素は Lua のエラー（3.5）
+    // 整数にできない budoux_jump の要素は Lua のエラー
     talk_err(
         r#"require("@pasta_sakura_script").talk_to_script({ budoux = {6}, budoux_jump = {6, "x"} }, "今日は")"#,
     );

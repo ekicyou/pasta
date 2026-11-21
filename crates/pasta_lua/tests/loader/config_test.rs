@@ -1,13 +1,10 @@
-//! Phase A: loader/config.rs のインラインテストを外部化
-//!
-//! from_str: #[cfg(test)] 除去 → pub に昇格
-//! default_lua_search_paths, default_log_file_path: pub に昇格
+//! loader/config.rs のテスト。
 
 use pasta_lua::loader::{LoggingConfig, PastaConfig, PersistenceConfig, default_log_file_path};
 
 use pasta_lua::loader::DebugFileConfig;
 
-/// 3.3: `[debug]` の古いキー（型の合わない `port` を含む）は黙って読み飛ばし、`enabled` だけを読む。
+/// `[debug]` の古いキー（型の合わない `port` を含む）は黙って読み飛ばし、`enabled` だけを読む。
 #[test]
 fn debug_file_config_skips_old_keys() {
     let parsed: DebugFileConfig = toml::from_str(
@@ -90,7 +87,6 @@ key2 = 42
     let config = PastaConfig::from_str(toml_str).unwrap();
     assert!(config.loader.debug_mode);
 
-    // Check custom fields (loader should be excluded)
     assert!(!config.custom_fields.contains_key("loader"));
     assert_eq!(
         config.custom_fields.get("ghost_name"),
@@ -101,7 +97,6 @@ key2 = 42
         Some(&toml::Value::String("1.0.0".to_string()))
     );
 
-    // Check nested table
     let user_data = config.custom_fields.get("user_data").unwrap();
     if let toml::Value::Table(t) = user_data {
         assert_eq!(
@@ -120,7 +115,6 @@ fn test_deserialize_without_loader_section() {
 ghost_name = "NoLoaderGhost"
 "#;
     let config = PastaConfig::from_str(toml_str).unwrap();
-    // Should use defaults for loader
     assert_eq!(config.loader.pasta_patterns, vec!["dic/**/*.pasta"]);
     assert_eq!(
         config.custom_fields.get("ghost_name"),
@@ -138,7 +132,6 @@ fn test_logging_config_default() {
 
 #[test]
 fn test_logging_config_to_filter_directive_with_filter() {
-    // filter優先: filterが設定されている場合はfilterを返す
     let config = LoggingConfig {
         file_path: default_log_file_path(),
         level: "info".to_string(),
@@ -149,7 +142,6 @@ fn test_logging_config_to_filter_directive_with_filter() {
 
 #[test]
 fn test_logging_config_to_filter_directive_with_level_only() {
-    // filterなし: levelを返す
     let config = LoggingConfig {
         file_path: default_log_file_path(),
         level: "warn".to_string(),
@@ -160,7 +152,6 @@ fn test_logging_config_to_filter_directive_with_level_only() {
 
 #[test]
 fn test_logging_config_to_filter_directive_default() {
-    // デフォルト: "info"
     let config = LoggingConfig::default();
     assert_eq!(config.to_filter_directive(), "info");
 }
@@ -208,7 +199,6 @@ filter = "debug,pasta_shiori=warn,pasta_lua::runtime=trace"
         logging.filter,
         Some("debug,pasta_shiori=warn,pasta_lua::runtime=trace".to_string())
     );
-    // filter優先
     assert_eq!(
         logging.to_filter_directive(),
         "debug,pasta_shiori=warn,pasta_lua::runtime=trace"
@@ -286,7 +276,7 @@ debug_mode = true
     assert!(config.persistence().is_none());
 }
 
-/// 3.1〜3.4: 設計の表の 5 行（既定・`my.toml.d/save.toml`・`save.json`・`data.bin`・`save.dat`）。
+/// 5 通り（既定・`my.toml.d/save.toml`・`save.json`・`data.bin`・`save.dat`）。
 /// `obfuscate = true` は末尾の `.toml` だけを `.dat` に替え、`.dat` はそのまま、ほかは `.dat` を足す。
 #[test]
 fn test_persistence_effective_file_path() {
@@ -322,7 +312,7 @@ fn test_persistence_effective_file_path() {
     }
 }
 
-/// 1.3, 2.3, 7.1: 撤去したキー（`[lua] libs`・`[logging] rotation_days`）を書いた
+/// 撤去したキー（`[lua] libs`・`[logging] rotation_days`）を書いた
 /// `pasta.toml` でも読み込みが成功し、`[logging]` の他の 3 項目は書いたとおりに効き、
 /// `[lua] libs` に書いた `env` で `@env` が有効にならない。
 #[test]
@@ -368,7 +358,7 @@ filter = "warn,pasta_lua=debug"
     );
 }
 
-/// 5.1: 不正な `[logging] file_path`（`profile/` の下にない `profile.log`）でも、ローダは
+/// 不正な `[logging] file_path`（`profile/` の下にない `profile.log`）でも、ローダは
 /// 既定のログファイルのロガーを登録して起動を続ける。warn の内容は専用バイナリの
 /// `logging_file_path_fallback_test.rs` で見る（購読者がプロセスに 1 つのため）。
 #[test]
@@ -400,8 +390,7 @@ fn invalid_log_file_path_falls_back_to_default_logger() {
 }
 
 // ============================================================================
-// actor-display-style Task 2.1 — `[actor."名前"].font` の読み込み（ActorFontLoader）
-// Requirements 1.1, 1.5, 7.1〜7.4
+// `[actor."名前"].font` の読み込み（ActorFontLoader）
 // ============================================================================
 
 /// `custom_fields` の `actor."名前"` の表を取り出す
@@ -429,7 +418,7 @@ fn font_error(toml_str: &str) -> String {
         .to_string()
 }
 
-/// 1.1 / 2.1: インライン表は書いた順のタグ列になる（名前順ではない）
+/// インライン表は書いた順のタグ列になる（名前順ではない）
 #[test]
 fn actor_font_inline_table_keeps_written_order() {
     let toml_str = r#"[actor."おじさん"]
@@ -442,7 +431,7 @@ font = { underline = true, height = 30, color = "90,110,140", bold = false }
     );
 }
 
-/// 1.1 / 2.1: `[actor."X".font]` 節も書いた順
+/// `[actor."X".font]` 節も書いた順
 #[test]
 fn actor_font_section_keeps_written_order() {
     let toml_str = r#"[actor."おじさん"]
@@ -459,7 +448,7 @@ height = -2
     );
 }
 
-/// 1.1 / 2.1: ドット付きキーも書いた順
+/// ドット付きキーも書いた順
 #[test]
 fn actor_font_dotted_keys_keep_written_order() {
     let toml_str = r#"[actor."ギャル"]
@@ -481,7 +470,7 @@ fn actor_font_empty_table_becomes_empty_string() {
     assert_eq!(font_of(toml_str, "おじさん"), "");
 }
 
-/// 1.5: `font` 以外のキーの値は変わらず、`font` の無いアクターも変わらない
+/// `font` 以外のキーの値は変わらず、`font` の無いアクターも変わらない
 #[test]
 fn actor_font_leaves_other_keys_untouched() {
     let toml_str = r#"[actor."おじさん"]
@@ -521,7 +510,7 @@ fn actor_font_ignores_missing_or_non_table_actor() {
     );
 }
 
-/// 7.1: 知らない属性名（大文字違いを含む）は読み込みエラー
+/// 知らない属性名（大文字違いを含む）は読み込みエラー
 #[test]
 fn actor_font_unknown_attribute_is_load_error() {
     let toml_str = r#"[actor."おじさん"]
@@ -534,7 +523,7 @@ font = { Color = "1,2,3" }
     assert!(msg.contains("(line 3)"), "{msg}");
 }
 
-/// 7.2: 型違い・空文字列は読み込みエラー（1 つの表の誤りはまとめて出す）
+/// 型違い・空文字列は読み込みエラー（1 つの表の誤りはまとめて出す）
 #[test]
 fn actor_font_wrong_type_and_empty_are_load_errors() {
     let toml_str = r#"[actor."おじさん"]
@@ -550,7 +539,7 @@ name = ""
     assert!(msg.contains("name (line 6)"), "{msg}");
 }
 
-/// 7.3: `]`・`\` を含む値は読み込みエラー
+/// `]`・`\` を含む値は読み込みエラー
 #[test]
 fn actor_font_tag_breaking_values_are_load_errors() {
     let toml_str = r#"[actor."おじさん"]
@@ -563,7 +552,7 @@ font.name = 'a\b'
     assert!(msg.contains("name (line 3)"), "{msg}");
 }
 
-/// 7.4: 表でない `font` は読み込みエラー（アクター名・行）
+/// 表でない `font` は読み込みエラー（アクター名・行）
 #[test]
 fn actor_font_not_table_is_load_error() {
     let toml_str = "[actor.\"おじさん\"]\nspot = 0\nfont = \"red\"\n";
@@ -587,7 +576,7 @@ font = { bad_a = 1 }
     assert!(!msg.contains("bad_b"), "{msg}");
 }
 
-/// 1.1: ランタイムの `@pasta_config` の `actor."名前".font` がタグ列の文字列になり、
+/// ランタイムの `@pasta_config` の `actor."名前".font` がタグ列の文字列になり、
 /// 誤りはローダーの読み込みエラーになる
 #[test]
 fn actor_font_reaches_pasta_config_and_errors_fail_load() {

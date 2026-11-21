@@ -1,6 +1,5 @@
-//! Phase A: code_generator.rs のインラインテストを外部化
-//!
-//! generate_action, generate_var_set を pub に昇格済み
+//! code_generator.rs のテスト。
+
 
 use pasta_dsl::parser::{Action, Args, Expr, FnScope, SetValue, Span, VarScope, VarSet};
 use pasta_lua::TranspileError;
@@ -115,7 +114,7 @@ fn test_generate_header() {
 }
 
 // ========================================================================
-// VarSet with WordRef tests (Requirement 1.1, 1.2, 1.3, 4.1)
+// VarSet with WordRef tests
 // ========================================================================
 
 #[test]
@@ -218,7 +217,7 @@ fn test_generate_var_set_expr_still_works() {
 }
 
 // ========================================================================
-// Requirement 1: ＠＊XX() → GLOBAL.XX 展開テスト
+// ＠＊XX() → GLOBAL.XX 展開テスト
 // ========================================================================
 
 #[test]
@@ -289,7 +288,7 @@ fn test_generate_global_fn_call_in_var_set_rhs() {
 }
 
 // ========================================================================
-// Requirement 2.4, 2.5: ＄＝expr 式文コード生成テスト
+// ＄＝expr 式文コード生成テスト
 // ========================================================================
 
 #[test]

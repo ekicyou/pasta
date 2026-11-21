@@ -1,7 +1,6 @@
--- 実行時の失敗 14 か所の現行の挙動の特性化テスト (failure-output-unification 1.1)
+-- 実行時の失敗 14 か所の現行の挙動の特性化テスト
 -- 失敗の対応表 #1〜#13 と act:failure を Lua の API から直接呼び、ログの警告の文言・戻り値・積むトークンを固定する。
--- 以降のタスクでは、載せ替えた種類の期待値（主に積むトークンの表記）だけを書き換える。
--- 今は警告を出さない状況（値なし・空の名前）で警告も表記も出ないことも固定する（要件 2.11）。
+-- 今は警告を出さない状況（値なし・空の名前）で警告も表記も出ないことも固定する。
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect

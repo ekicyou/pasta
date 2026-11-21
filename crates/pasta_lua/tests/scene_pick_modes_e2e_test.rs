@@ -1,14 +1,14 @@
-//! scene-pick-modes の端から端のテスト（task 7.1。要件 9.4）。
+//! 重み・順番・単語の重みの端から端のテスト。
 //!
 //! 重み・順番・単語の重みを書いた辞書で一時ゴーストを作って `PastaLoader::load_with_config` で読み込み
 //! （辞書の読み込み → 辞書確定）、`SHIORI.request` の応答と `@pasta_search` の検索で選ばれ方を確かめる。
 //!
-//! - 重み 5:2:1 の 1 巡の回数を、イベント・Call・完全一致・選択肢・ローカルシーンの道で（1.1・1.4）
-//! - `＠シーン数` の数え方が重みで変わらない（1.5）
-//! - 順番の巡回と最初への戻り・定義の順に左右されない・再読み込みと乱数の差し替えで最初から（2.1〜2.4・2.7・2.10）
-//! - 条件で外れた番号の飛ばし（2.8）、混ざりの warn とシャッフル（3.1）
-//! - 単語の重み 3 つの値の形 × グローバル・ローカル・アクター辞書・前方一致・重ね（5.3・5.5〜5.7）、値 300 個
-//! - 各読み込みエラーの文に位置・値が入る（3.2・3.3・4.2・4.4・5.8）
+//! - 重み 5:2:1 の 1 巡の回数を、イベント・Call・完全一致・選択肢・ローカルシーンの道で
+//! - `＠シーン数` の数え方が重みで変わらない
+//! - 順番の巡回と最初への戻り・定義の順に左右されない・再読み込みと乱数の差し替えで最初から
+//! - 条件で外れた番号の飛ばし、混ざりの warn とシャッフル
+//! - 単語の重み 3 つの値の形 × グローバル・ローカル・アクター辞書・前方一致・重ね、値 300 個
+//! - 各読み込みエラーの文に位置・値が入る
 //!
 //! 重みの回数は 1 巡（重みの合計の回数）で数えるので、シャッフルの並びに依らない。
 //! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従う。
@@ -238,7 +238,7 @@ fn count_scene(runtime: &PastaLuaRuntime, method: &str, name: &str) -> i64 {
         .unwrap()
 }
 
-/// 1.1・1.4: 5:2:1 の重みが、1 巡（8 回）でイベント・Call・完全一致・選択肢の道に 5・2・1 回出る。
+/// 5:2:1 の重みが、1 巡（8 回）でイベント・Call・完全一致・選択肢の道に 5・2・1 回出る。
 /// ローカルシーンでも 2:1。重みの書き方は全角・`weight`・整数の小数を混ぜる。
 #[test]
 fn weight_round_counts_on_every_path() {
@@ -284,7 +284,7 @@ fn weight_round_counts_on_every_path() {
     assert_eq!(got, counts(&[("L2", 2), ("L1", 1)]), "local");
 }
 
-/// 1.5: `＠シーン数` の数え方（count_scene・count_scene_exact）は重みで変わらない。
+/// `＠シーン数` の数え方（count_scene・count_scene_exact）は重みで変わらない。
 #[test]
 fn scene_count_ignores_weight() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -297,7 +297,7 @@ fn scene_count_ignores_weight() {
     assert_eq!(count_scene(&runtime, "count_scene_exact", "完全重み"), 3);
 }
 
-/// 2.1〜2.3・2.7・2.10: 番号の順に巡り、最後の次は最初へ戻る。定義の順（30・10・20）に左右されない。
+/// 番号の順に巡り、最後の次は最初へ戻る。定義の順に左右されない。
 /// イベント・Call・完全一致・選択肢・ローカルシーンの道で同じ。
 #[test]
 fn order_cycles_on_every_path() {
@@ -340,7 +340,7 @@ fn order_cycles_on_every_path() {
     assert_eq!(seq, ["LO1", "LO2", "LO1"], "local");
 }
 
-/// 2.4: 辞書の再読み込み・乱数の差し替えで、覚えた番号が消えて最初からに戻る。
+/// 辞書の再読み込み・乱数の差し替えで、覚えた番号が消えて最初からに戻る。
 #[test]
 fn order_restarts_after_reload_and_selector_reset() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -362,7 +362,7 @@ fn order_restarts_after_reload_and_selector_reset() {
     assert_eq!(pick(&runtime), "巡A", "selector reset restarts");
 }
 
-/// 2.8: 条件で外れた番号は飛ばされ、満たせば次の巡で選ばれる。
+/// 条件で外れた番号は飛ばされ、満たせば次の巡で選ばれる。
 #[test]
 fn order_skips_unmet_number() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -379,7 +379,7 @@ fn order_skips_unmet_number() {
     assert_eq!(pick(), "条3");
 }
 
-/// 3.1: 順番の有る・無いが混ざると、探した名前と理由の warn を出してシャッフル（乱数の差し替えの並び）で選ぶ。
+/// 順番の有る・無いが混ざると、探した名前と理由の warn を出してシャッフル（乱数の差し替えの並び）で選ぶ。
 #[traced_test]
 #[test]
 fn mixed_order_warns_and_shuffles() {
@@ -397,7 +397,7 @@ fn mixed_order_warns_and_shuffles() {
     assert!(logs_contain("順番の有るものと無いものが混ざっている"));
 }
 
-/// 5.3・5.5〜5.7: 単語の重みが 3 つの値の形 × グローバル・ローカル・アクター辞書で効く。
+/// 単語の重みが 3 つの値の形 × グローバル・ローカル・アクター辞書で効く。
 /// 前方一致で集めた値（`色_淡`）も重みの回数だけ乗り、同じ値の重ねは足し合わせる。
 #[test]
 fn word_weight_on_every_dictionary() {
@@ -468,7 +468,7 @@ fn load_error_of(pasta: &str) -> String {
     }
 }
 
-/// 3.2・3.3・4.2・4.4・5.8: 各読み込みエラーで読み込みが止まり、文に位置・値が入る。
+/// 各読み込みエラーで読み込みが止まり、文に位置・値が入る。
 #[test]
 fn load_errors_stop_with_position_and_value() {
     for (pasta, expected) in [

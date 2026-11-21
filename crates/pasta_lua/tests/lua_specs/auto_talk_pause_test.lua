@@ -1,6 +1,5 @@
 -- auto_talk_pause_test.lua
--- 自動トークの停止・再開（AutoTalkSwitch）のテスト (ontalk-suppression 2.3)
--- Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 1.7, 2.2, 2.6, 2.8, 3.1, 3.2, 3.4, 4.1, 4.2, 4.5, 5.1
+-- 自動トークの停止・再開（AutoTalkSwitch）のテスト
 --
 -- entry の依存閉包を同一インスタンス集合として一括新規ロードする（shiori_entry_test と同方針）。
 local describe = require("lua_test.test").describe
@@ -247,7 +246,7 @@ describe("AutoTalkSwitch - 再開の後の時計", function()
         GLOBAL.resume_auto_talk(act)
         expect(dispatcher.dispatch(act_at(t))):toBe(nil)
         expect(dispatcher.dispatch(act_at(t + cfg.talk_interval_min - 1))):toBe(nil)
-        -- 間隔を過ぎれば、捨てずに残した続きが出る（5.1）
+        -- 間隔を過ぎれば、捨てずに残した続きが出る
         expect(dispatcher.dispatch(act_at(t + cfg.talk_interval_max))):toBe(co)
     end)
 

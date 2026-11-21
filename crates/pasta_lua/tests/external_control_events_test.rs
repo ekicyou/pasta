@@ -1,15 +1,15 @@
-//! external-control-events の結合テスト（task 3）。
+//! 外部制御イベントの結合テスト。
 //!
 //! デバッグを無効にしたゴーストを一時フォルダに作って `PastaLoader::load_with_config` で読み込み、
 //! `SHIORI.request` に GET のリクエスト（SecurityLevel: local）を渡して確かめる。
 //! 既定のハンドラの読み込み（`event/init.lua` の 1 行）が効いていることも、このテストで確かめる。
 //!
-//! - 2 ビートのシーンで 200 の Value が 1 ビート目だけで、続きが `STORE.co_scene` に置かれる（1.5・2.1・5.1）
-//! - 前方一致と既定の別名で当たる（1.1・1.2）
-//! - 引数が文字列のまま渡り、出力を積まない呼び先で 204（1.4・1.6・1.7）
-//! - `自動トーク停止` で 204 と停止の状態（1.6）
-//! - `"01"` を代入した後に話すシーンで `01` が出る（3.2・3.6）
-//! - 無い名前で表記付きの 200（4.2・4.6）、エラーを投げる関数で止まるエラーの応答（2.3）
+//! - 2 ビートのシーンで 200 の Value が 1 ビート目だけで、続きが `STORE.co_scene` に置かれる
+//! - 前方一致と既定の別名で当たる
+//! - 引数が文字列のまま渡り、出力を積まない呼び先で 204
+//! - `自動トーク停止` で 204 と停止の状態
+//! - `"01"` を代入した後に話すシーンで `01` が出る
+//! - 無い名前で表記付きの 200、エラーを投げる関数で止まるエラーの応答
 //!
 //! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従う。
 
@@ -128,7 +128,7 @@ fn lua_bool(runtime: &PastaLuaRuntime, code: &str) -> bool {
     runtime.lua().load(code).eval::<bool>().unwrap()
 }
 
-/// 1.5・2.1・5.1: デバッグが無効でも、2 ビートのシーンの 1 ビート目だけを返し、続きを置く。
+/// デバッグが無効でも、2 ビートのシーンの 1 ビート目だけを返し、続きを置く。
 #[test]
 fn call_function_plays_first_beat_and_places_continuation() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -150,7 +150,7 @@ fn call_function_plays_first_beat_and_places_continuation() {
     );
 }
 
-/// 1.1・1.2: 前方一致と既定の別名で当たる。
+/// 前方一致と既定の別名で当たる。
 #[test]
 fn call_function_finds_by_prefix_and_alias() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -163,7 +163,7 @@ fn call_function_finds_by_prefix_and_alias() {
     assert!(value.contains("ふだんの会話"), "default alias: {value}");
 }
 
-/// 1.4・1.6・1.7: 引数は文字列のまま渡り、出力を積まない呼び先は 204。
+/// 引数は文字列のまま渡り、出力を積まない呼び先は 204。
 #[test]
 fn call_function_passes_string_args_and_returns_204() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -186,7 +186,7 @@ fn call_function_passes_string_args_and_returns_204() {
     );
 }
 
-/// 1.6: `自動トーク停止` で 204 と停止の状態。
+/// `自動トーク停止` で 204 と停止の状態。
 #[test]
 fn call_function_pauses_auto_talk() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -206,7 +206,7 @@ fn call_function_pauses_auto_talk() {
     );
 }
 
-/// 3.1・3.9: 型を省いた `01` を代入した後に話すシーンで `01` が出て、値は文字列のまま。
+/// 型を省いた `01` を代入した後に話すシーンで `01` が出て、値は文字列のまま。
 #[test]
 fn set_save_variable_then_scene_speaks_the_string() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -233,7 +233,7 @@ fn set_save_variable_then_scene_speaks_the_string() {
     assert!(value.contains("番号は01"), "assigned value spoken: {value}");
 }
 
-/// 4.2・4.6・4.8・5.4: 無い名前で 200 と表記。待っている続きは残り、
+/// 無い名前で 200 と表記。待っている続きは残り、
 /// `＊OnPastaCallFunction` へのフォールバックも起きない。
 #[test]
 fn call_function_reports_not_found() {
@@ -269,7 +269,7 @@ fn call_function_reports_not_found() {
     );
 }
 
-/// 2.3: エラーを投げる関数で、ふだんのイベントと同じ止まるエラーの応答になる。
+/// エラーを投げる関数で、ふだんのイベントと同じ止まるエラーの応答になる。
 #[test]
 fn call_function_error_gives_stop_response() {
     let temp = tempfile::TempDir::new().unwrap();

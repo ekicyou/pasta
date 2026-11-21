@@ -1,4 +1,4 @@
--- pasta.failure（失敗の報告の唯一の出口）の単体テスト (failure-output-unification 1.2・2.1〜2.3)
+-- pasta.failure（失敗の報告の唯一の出口）の単体テスト
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect

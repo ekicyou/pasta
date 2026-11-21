@@ -1,6 +1,4 @@
-//! Task 2.5 — スコープ定義ヘッダの全 record 配線（RecordWiring / scope_gen）。
-//!
-//! 仕様参照・検証戦略の詳細は下記セクションバナーを参照。
+//! スコープ定義ヘッダの全 record 配線（RecordWiring / scope_gen）。
 
 use pasta_dsl::parser::parse_str;
 use pasta_dsl::parser::{ActorScope, GlobalSceneScope, LocalSceneScope, Span};
@@ -31,26 +29,17 @@ fn span_at(line: usize) -> Span {
 }
 
 // ============================================================================
-// Task 2.5 — スコープ定義ヘッダの record 配線（RecordWiring / scope_gen）
+// スコープ定義ヘッダの record 配線（RecordWiring / scope_gen）
 //
-// 仕様参照（`.kiro/specs/completed/pasta-source-map/`）:
-// - requirements.md **1.1**: 生成 `.lua` 行に由来 `.pasta` 位置を記録する。
-// - requirements.md **1.4**: 主要構文種別（スコープ・分岐を含む）を網羅して記録する。
-// - requirements.md **1.5**: scope定義（アクター/グローバルシーン/ローカルシーン）が `.lua` へ
-//   生成される時、その定義ヘッダ行を `.pasta` 位置へ記録し、定義ヘッダ行を `.pasta` の位置で
-//   引けるようにする（`span.start_line` ＝ `.pasta` 定義ヘッダ行）。
-//
-// design.md "RecordWiring"（324 行）: scope `generate_*`（actor/global/local scene）は
-// scope ヘッダの `.lua` 出力行で `scope.span` を記録する（`span.start_line` ＝ 定義ヘッダ行）。
-//
-// 検証戦略: 3 型の scope は公開 `generate_*` を直接呼べるため、明示 span を与えた AST ノードを
-// 渡し、捕捉 sink が「ヘッダ `.lua` 行 → 定義ヘッダ `.pasta` 行」を記録することを表明する。
-// `generate_choice` / `generate_choice_timeout`（分岐, 1.4）は private のため、実 `.pasta` を
+// scope `generate_*`（actor/global/local scene）は scope ヘッダの `.lua` 出力行で `scope.span` を記録する
+// （`span.start_line` ＝ 定義ヘッダ行）。3 型の scope は公開 `generate_*` を直接呼べるため、明示 span を
+// 与えた AST ノードを渡し、捕捉 sink が「ヘッダ `.lua` 行 → 定義ヘッダ `.pasta` 行」を記録することを表明する。
+// `generate_choice` / `generate_choice_timeout`（分岐）は private のため、実 `.pasta` を
 // `transpile_with_source_map` に通し、`act:choice(...)` / `act:choice_timeout(...)` 出力行が分岐
 // `.pasta` 行へ対応づくことを表明する。
 // ============================================================================
 
-/// アクター定義ヘッダ（`local ACTOR = PASTA.create_actor(...)`）が定義ヘッダ `.pasta` 行へ対応づく（1.5）。
+/// アクター定義ヘッダ（`local ACTOR = PASTA.create_actor(...)`）が定義ヘッダ `.pasta` 行へ対応づく。
 #[test]
 fn actor_header_records_definition_pasta_line() {
     let mut sink = LinePairSink::default();
@@ -78,7 +67,7 @@ fn actor_header_records_definition_pasta_line() {
         .position(|l| l.contains("PASTA.create_actor("))
         .map(|i| i as u32 + 1)
         .expect("actor header line must be emitted");
-    // 1.5: ヘッダ `.lua` 行が定義ヘッダ `.pasta` 行(9)へ記録される。これにより BP 対象になる。
+    // ヘッダ `.lua` 行が定義ヘッダ `.pasta` 行へ記録される。これにより BP 対象になる。
     assert!(
         sink.records.contains(&(header_line, 9)),
         "1.5: actor header .lua line {header_line} must map to .pasta definition header line 9; records = {:?}",
@@ -86,7 +75,7 @@ fn actor_header_records_definition_pasta_line() {
     );
 }
 
-/// グローバルシーン定義ヘッダ（`local SCENE = PASTA.create_scene(...)`）が定義ヘッダ `.pasta` 行へ対応づく（1.5）。
+/// グローバルシーン定義ヘッダ（`local SCENE = PASTA.create_scene(...)`）が定義ヘッダ `.pasta` 行へ対応づく。
 #[test]
 fn global_scene_header_records_definition_pasta_line() {
     let mut sink = LinePairSink::default();
@@ -110,7 +99,7 @@ fn global_scene_header_records_definition_pasta_line() {
         .position(|l| l.contains("PASTA.create_scene("))
         .map(|i| i as u32 + 1)
         .expect("global scene header line must be emitted");
-    // 1.5: ヘッダ `.lua` 行が定義ヘッダ `.pasta` 行(21)へ記録される。
+    // ヘッダ `.lua` 行が定義ヘッダ `.pasta` 行へ記録される。
     assert!(
         sink.records.contains(&(header_line, 21)),
         "1.5: global scene header .lua line {header_line} must map to .pasta definition header line 21; records = {:?}",
@@ -118,7 +107,7 @@ fn global_scene_header_records_definition_pasta_line() {
     );
 }
 
-/// ローカルシーン定義ヘッダ（`function SCENE.<fn>(act, ...)`）が定義ヘッダ `.pasta` 行へ対応づく（1.5）。
+/// ローカルシーン定義ヘッダ（`function SCENE.<fn>(act, ...)`）が定義ヘッダ `.pasta` 行へ対応づく。
 #[test]
 fn local_scene_header_records_definition_pasta_line() {
     let mut sink = LinePairSink::default();
@@ -131,9 +120,8 @@ fn local_scene_header_records_definition_pasta_line() {
         let mut scene = LocalSceneScope::named("サブ会話".to_string());
         scene.span = span_at(30);
         let actors: Vec<pasta_dsl::parser::SceneActorItem> = Vec::new();
-        // task 2.1 で `parent_ref`（親 global の join-key 断片 `"{base}#{counter}"`）が
-        // 追加された。本テストは行マッピング記録のみを観測するため、親参照は任意の決定的
-        // 値で良い（record_scene の join_key 構築にのみ使われ、record_line 記録には影響しない）。
+        // `parent_ref`（親 global の join-key 断片 `"{base}#{counter}"`）は行マッピング記録に影響しないため、
+        // 任意の決定的値で良い（record_scene の join_key 構築にのみ使われる）。
         codegen
             .generate_local_scene(&scene, 1, &actors, "会話#1", "会話")
             .unwrap();
@@ -145,7 +133,7 @@ fn local_scene_header_records_definition_pasta_line() {
         .position(|l| l.starts_with("function SCENE."))
         .map(|i| i as u32 + 1)
         .expect("local scene function header line must be emitted");
-    // 1.5: 関数ヘッダ `.lua` 行が定義ヘッダ `.pasta` 行(30)へ記録される。
+    // 関数ヘッダ `.lua` 行が定義ヘッダ `.pasta` 行へ記録される。
     assert!(
         sink.records.contains(&(header_line, 30)),
         "1.5: local scene header .lua line {header_line} must map to .pasta definition header line 30; records = {:?}",
@@ -153,7 +141,7 @@ fn local_scene_header_records_definition_pasta_line() {
     );
 }
 
-/// 統合: スタートシーン（無名）ヘッダ（`function SCENE.__start__(act, ...)`）も定義ヘッダ行へ対応づく（1.5）。
+/// 統合: スタートシーン（無名）ヘッダ（`function SCENE.__start__(act, ...)`）も定義ヘッダ行へ対応づく。
 ///
 /// 実 `.pasta` を `transpile_with_source_map` に通し、グローバルシーン定義行とスタートシーン関数ヘッダ行が
 /// それぞれ実 span 由来の `.pasta` 定義ヘッダ行へ対応づくことを実証する。
@@ -214,7 +202,7 @@ fn integration_scope_headers_map_to_real_pasta_lines() {
     );
 }
 
-/// 分岐（choice, 1.4）: `act:choice(...)` 出力行が分岐 `.pasta` 行へ対応づく。
+/// 分岐（choice）: `act:choice(...)` 出力行が分岐 `.pasta` 行へ対応づく。
 ///
 /// `generate_choice` は private のため、実 `.pasta` を `transpile_with_source_map` に通して検証する。
 #[test]
@@ -235,7 +223,7 @@ fn choice_records_choice_pasta_line_via_pipeline() {
         .position(|l| l.contains("act:choice("))
         .map(|i| i as u32 + 1)
         .expect("output must contain an act:choice(...) line");
-    // 1.4: 分岐の出力行が分岐元 .pasta 行(3)へ対応づく。
+    // 分岐の出力行が分岐元 .pasta 行へ対応づく。
     assert!(
         sink.records.contains(&(choice_lua_line, 3)),
         "1.4: choice output line {choice_lua_line} must map to .pasta choice line 3; records = {:?}",
@@ -243,12 +231,12 @@ fn choice_records_choice_pasta_line_via_pipeline() {
     );
 }
 
-/// 分岐タイムアウト（!select cue, 1.4）: `act:choice_timeout(...)` 出力行が cue `.pasta` 行へ対応づく。
+/// 分岐タイムアウト（!select cue）: `act:choice_timeout(...)` 出力行が cue `.pasta` 行へ対応づく。
 ///
 /// `generate_choice_timeout` は private のため、実 `.pasta` を `transpile_with_source_map` に通して検証する。
 #[test]
 fn choice_timeout_records_cue_pasta_line_via_pipeline() {
-    // 行1: 空, 行2: ＊選択シーン, 行3: !select(5)（select cue 行）, 行4: ＠？挨拶
+    // 行1: 空, 行2: ＊選択シーン, 行3: !select（select cue 行）, 行4: ＠？挨拶
     let source = "\n＊選択シーン\n    !select(5)\n    ＠？挨拶\n";
     let file = parse_str(source, "select.pasta").expect("parse ok");
 
@@ -264,7 +252,7 @@ fn choice_timeout_records_cue_pasta_line_via_pipeline() {
         .position(|l| l.contains("act:choice_timeout("))
         .map(|i| i as u32 + 1)
         .expect("output must contain an act:choice_timeout(...) line");
-    // 1.4: select cue の出力行が cue 元 .pasta 行(3)へ対応づく。
+    // select cue の出力行が cue 元 .pasta 行へ対応づく。
     assert!(
         sink.records.contains(&(timeout_lua_line, 3)),
         "1.4: choice_timeout output line {timeout_lua_line} must map to .pasta cue line 3; records = {:?}",
@@ -273,9 +261,9 @@ fn choice_timeout_records_cue_pasta_line_via_pipeline() {
 }
 
 // ============================================================================
-// Lua ブロックの素通しと行の対応（ponytail-lua-transpiler 要件 7.1・7.3）
+// Lua ブロックの素通しと行の対応
 //
-// アクター辞書（4〜8 行）とローカルシーン（16〜20 行）の Lua ブロックに、要件 1.2 の 5 行
+// アクター辞書（4〜8 行）とローカルシーン（16〜20 行）の Lua ブロックに、5 行
 // （長い文字列と `end` の前の空行）を置く。
 // ============================================================================
 
@@ -303,7 +291,7 @@ end
 ```
 ";
 
-/// 要件 1.2 の 5 行（ブロックの内容）
+/// ブロックの内容の 5 行
 const BLOCK_LINES: [&str; 5] = ["local MSG = [[", "こんにちは", "", "end", "]]"];
 
 /// 生成コードの中で `BLOCK_LINES` が続いた行として現れる先頭の行（1 始まり）を全部返す。
@@ -317,7 +305,7 @@ fn block_start_lines(lua: &str) -> Vec<u32> {
         .collect()
 }
 
-/// 7.1（1.1・1.3）: アクター辞書とローカルシーンのブロックの内容が、字下げも空行の削除もなく、
+/// アクター辞書とローカルシーンのブロックの内容が、字下げも空行の削除もなく、
 /// 続いた行としてそのまま出る。
 #[test]
 fn lua_block_content_is_emitted_verbatim_in_actor_and_local_scene() {
@@ -329,7 +317,7 @@ fn lua_block_content_is_emitted_verbatim_in_actor_and_local_scene() {
     );
 }
 
-/// 7.3（2.3・2.4）: ブロックの各行の `.lua` の行が `.pasta` のその行を指す。シンクの
+/// ブロックの各行の `.lua` の行が `.pasta` のその行を指す。シンクの
 /// 記録（最終の行に直した対応表）と `init_scene` に渡す対応の両方で、空行より後の行も合う。
 #[test]
 fn lua_block_lines_map_to_their_pasta_lines_in_sink_and_init_scene() {
@@ -378,7 +366,7 @@ fn lua_block_lines_map_to_their_pasta_lines_in_sink_and_init_scene() {
     }
 }
 
-/// アクター辞書の単語定義の各行が、`.pasta` の単語定義の行へ対応づく（ponytail-lua-transpiler 5.1・7.4）。
+/// アクター辞書の単語定義の各行が、`.pasta` の単語定義の行へ対応づく。
 #[test]
 fn actor_word_definition_lines_map_to_their_pasta_lines() {
     // 行1: ％さくら, 行2: ＠通常, 行3: ＠照れ

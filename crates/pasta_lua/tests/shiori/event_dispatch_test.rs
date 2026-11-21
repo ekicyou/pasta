@@ -1,7 +1,4 @@
 //! Integration tests for pasta.shiori.event module – core dispatching.
-//!
-//! Tests verify REG/EVENT module loading, event dispatching, error handling,
-//! default boot handlers, and integration with the RES module.
 
 use crate::common;
 
@@ -10,7 +7,7 @@ use common::{
 };
 
 // ============================================================================
-// Task 1.1, 3.1: REG Module Tests
+// REG Module Tests
 // ============================================================================
 
 #[test]
@@ -66,7 +63,7 @@ fn test_reg_allows_handler_registration() {
 }
 
 // ============================================================================
-// Task 2.1-2.7, 3.2-3.4: EVENT Module Tests
+// EVENT Module Tests
 // ============================================================================
 
 #[test]
@@ -182,7 +179,7 @@ fn test_event_fire_handles_nil_id() {
 #[test]
 fn test_event_fire_catches_handler_error() {
     let runtime = create_runtime_with_pasta_path();
-    // 表記を出さない設定では今の 500 のまま（runtime-error-balloon 6.5）
+    // 表記を出さない設定では今の 500 のまま
     pin_balloon_warning_off(&runtime);
 
     let result = runtime.exec(
@@ -212,7 +209,7 @@ fn test_event_fire_catches_handler_error() {
 #[test]
 fn test_error_message_no_newline() {
     let runtime = create_runtime_with_pasta_path();
-    // 表記を出さない設定では今の 500 のまま（runtime-error-balloon 6.5）
+    // 表記を出さない設定では今の 500 のまま
     pin_balloon_warning_off(&runtime);
 
     let result = runtime.exec(
@@ -247,7 +244,7 @@ fn test_error_message_no_newline() {
 #[test]
 fn test_event_fire_handles_empty_error_message() {
     let runtime = create_runtime_with_pasta_path();
-    // 表記を出さない設定では今の 500 のまま（runtime-error-balloon 6.5）
+    // 表記を出さない設定では今の 500 のまま
     pin_balloon_warning_off(&runtime);
 
     // Note: In mlua, error("") still includes file location information,
@@ -282,10 +279,10 @@ fn test_event_fire_handles_empty_error_message() {
 }
 
 // ============================================================================
-// Task 4.1, 4.2: Integration Tests
+// Integration Tests
 // ============================================================================
 
-/// Task 4.1: Tests integration with RES module (RES.ok, RES.no_content, RES.err)
+/// Tests integration with RES module (RES.ok, RES.no_content, RES.err)
 #[test]
 fn test_event_module_with_res_module() {
     let runtime = create_runtime_with_pasta_path();
@@ -322,7 +319,7 @@ fn test_event_module_with_res_module() {
     assert_shiori_response(&value_as_str(&res1).unwrap(), "200 OK", Some("Hello World"));
 }
 
-/// Task 4.2: Tests complete handler registration and dispatch flow
+/// Tests complete handler registration and dispatch flow
 #[test]
 fn test_handler_registration_and_dispatch() {
     let runtime = create_runtime_with_pasta_path();
@@ -446,7 +443,7 @@ fn test_custom_onboot_overrides_default() {
 }
 
 // ============================================================================
-// Task 2.4: Unregistered Event Fallback Tests (Additional)
+// Unregistered Event Fallback Tests (Additional)
 // ============================================================================
 
 /// Tests that nil Reference access returns nil
@@ -488,7 +485,7 @@ fn test_nil_reference_access() {
 }
 
 // ============================================================================
-// Default Event Handlers: choice_select.lua (Task 4.3)
+// Default Event Handlers: choice_select.lua
 // ============================================================================
 
 /// Tests that default OnChoiceSelectEx handler is registered via choice_select.lua

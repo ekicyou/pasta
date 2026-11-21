@@ -1,6 +1,4 @@
 //! 動的コール（＞expr）のエンドツーエンド統合テスト
-//!
-//! Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
 
 use crate::common;
 
@@ -22,7 +20,7 @@ fn transpile_with_context(source: &str) -> (String, TranspileContext) {
 }
 
 // ========================================================================
-// R3.1: 動的コール＞＄target でシーンが呼び出される
+// 動的コール＞＄target でシーンが呼び出される
 // ========================================================================
 
 #[test]
@@ -38,10 +36,8 @@ fn test_dynamic_call_resolves_scene() {
     let (lua_code, ctx) = transpile_with_context(source);
     let lua = create_runtime_with_search(ctx).unwrap();
 
-    // Load the transpiled code — registers scenes
     lua.load(&lua_code).exec().unwrap();
 
-    // Verify Lua code contains act:call_key(var.target, "var.target")
     assert!(
         lua_code.contains(r#"act:call_key(var.target, "var.target")"#),
         "Dynamic call should use act:call_key(var.target, \"var.target\"). Code:\n{lua_code}"
@@ -49,7 +45,7 @@ fn test_dynamic_call_resolves_scene() {
 }
 
 // ========================================================================
-// R3.1 + R3.4: Lua ブロック変数代入→動的コール
+// Lua ブロック変数代入→動的コール
 // ========================================================================
 
 #[test]
@@ -61,7 +57,6 @@ fn test_dynamic_call_code_gen_output() {
 "#;
     let (lua_code, _ctx) = transpile_with_context(source);
 
-    // Verify the generated code pattern
     assert!(
         lua_code.contains(r#"var.target = "挨拶""#),
         "Variable assignment not found. Code:\n{lua_code}"
@@ -78,7 +73,7 @@ fn test_dynamic_call_code_gen_output() {
 }
 
 // ========================================================================
-// R3.3: 候補不在→失敗表記（act:call が【シーンが見つからない：…】を積んで nil を返す）
+// 候補不在→失敗表記（act:call が【シーンが見つからない：…】を積んで nil を返す）
 // ここではトランスパイル・ロードが通りシーンが登録されることだけを確かめる
 // （失敗表記の出力は lua_specs/act_call_restore_test.lua と pasta_shiori の E2E で確かめる）
 // ========================================================================
@@ -93,10 +88,8 @@ fn test_dynamic_call_no_match_returns_nil() {
     let (lua_code, ctx) = transpile_with_context(source);
     let lua = create_runtime_with_search(ctx).unwrap();
 
-    // Load and execute — should not panic
     lua.load(&lua_code).exec().unwrap();
 
-    // Execute finalize_scene to wire up scenes
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
@@ -120,13 +113,12 @@ fn test_dynamic_call_no_match_returns_nil() {
         .eval()
         .unwrap();
 
-    // Scene should be registered
     let result_str = result.as_string().unwrap().to_str().unwrap().to_string();
     assert_eq!(result_str, "scene_exists");
 }
 
 // ========================================================================
-// R3.5: nil 式→早期リターン+警告ログ
+// nil 式→早期リターン+警告ログ
 // ========================================================================
 
 #[test]
@@ -164,7 +156,7 @@ fn test_nil_guard_in_act_call() {
 }
 
 // ========================================================================
-// R4.1 + R4.2: 静的コール不変（Lua 出力）
+// 静的コール不変（Lua 出力）
 // ========================================================================
 
 #[test]

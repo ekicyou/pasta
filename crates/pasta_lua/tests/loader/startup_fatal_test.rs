@@ -2,8 +2,7 @@
 //!
 //! `main` / `pasta.shiori.entry` / `pasta.scene_dic` のロード失敗はいずれも致命であり、
 //! `PastaLoader::load` が `Err` を返し、その表示文字列に「起動モジュール名」と
-//! 「根本原因」の両方が含まれることを検証する
-//! （要件 4.1 / 4.5 / 4.9 / 5.1 / 5.2 / 5.5）。
+//! 「根本原因」の両方が含まれることを検証する。
 
 use crate::common;
 
@@ -44,7 +43,7 @@ fn assert_context_and_cause(message: &str, module: &str, cause_marker: &str) {
     );
 }
 
-/// 要件 5.2: 利用者初期化スクリプト（`main`）の構文エラーは致命。
+/// 利用者初期化スクリプト（`main`）の構文エラーは致命。
 #[test]
 fn broken_main_lua_is_fatal_with_context_and_cause() {
     // `a b` の形は LuaJIT の構文エラーとなり、メッセージに後続トークンが出る。
@@ -53,7 +52,7 @@ fn broken_main_lua_is_fatal_with_context_and_cause() {
     assert_context_and_cause(&message, "main", "PASTA_BROKEN_MAIN_B");
 }
 
-/// 要件 4.1 / 4.5: SHIORI 応答モジュールの実行時エラーは致命。
+/// SHIORI 応答モジュールの実行時エラーは致命。
 #[test]
 fn entry_runtime_error_is_fatal_with_context_and_cause() {
     let temp = ghost_with_script(
@@ -63,7 +62,7 @@ fn entry_runtime_error_is_fatal_with_context_and_cause() {
     let message = load_error_message(&temp);
     assert_context_and_cause(&message, "pasta.shiori.entry", "PASTA_ENTRY_RUNTIME_MARKER");
 
-    // 要件 4.7: 根本原因は複数行・スタックトレース込みで欠落なく残る。
+    // 根本原因は複数行・スタックトレース込みで欠落なく残る。
     // `require_startup_module` の error ログの `error` フィールドはこの原因部分そのものを
     // 出力するため、ここで全文が保たれていることが確認できればログ側も同一である。
     let (context_line, cause) = message
@@ -79,7 +78,7 @@ fn entry_runtime_error_is_fatal_with_context_and_cause() {
     );
 }
 
-/// 要件 4.9: 入れ子の `require` によるモジュール未検出も同じ経路で致命になる。
+/// 入れ子の `require` によるモジュール未検出も同じ経路で致命になる。
 #[test]
 fn entry_requiring_missing_module_is_fatal_with_context_and_cause() {
     let temp = ghost_with_script(
@@ -94,7 +93,7 @@ fn entry_requiring_missing_module_is_fatal_with_context_and_cause() {
     );
 }
 
-/// 要件 5.1: シーン辞書モジュールの失敗は従来どおり致命（分類は共通ヘルパ経由）。
+/// シーン辞書モジュールの失敗は従来どおり致命（分類は共通ヘルパ経由）。
 #[test]
 fn scene_dic_failure_is_fatal_with_context_and_cause() {
     let temp = ghost_with_script("pasta/scene_dic.lua", r#"error("PASTA_SCENE_DIC_MARKER")"#);
@@ -131,7 +130,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CaptureWriter {
     }
 }
 
-/// 要件 4.7 / 5.3: 起動モジュールの失敗が構造化フィールド付き error ログとして
+/// 起動モジュールの失敗が構造化フィールド付き error ログとして
 /// 欠落なく記録されることを固定する。
 ///
 /// `book/src/reference/startup.md` の切り分け手順は「ログを `fatal=true` で検索する」
@@ -140,7 +139,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CaptureWriter {
 ///
 /// 捕捉に `tracing-test` の `logs_contain` を使わないのは、あれが捕捉バッファを行単位に
 /// 分割し「スパン名（= テスト関数名）を含む行」だけを走査するためで、複数行フィールドの
-/// 2 行目以降（`stack traceback:` 以下）が観測できず要件 4.7 の「欠落なく」を
+/// 2 行目以降（`stack traceback:` 以下）が観測できず「欠落なく」を
 /// 検証できないことを実測で確認したため。ここではテストスレッドにだけ装着する
 /// fmt subscriber で生の描画結果を捕捉する。
 /// （`X-ERROR-REASON` は意図的に単一行である点と対照的であることに注意。）
@@ -172,12 +171,12 @@ fn startup_failure_log_carries_module_fatal_and_multiline_cause() {
 
     let logged = String::from_utf8(buffer.lock().unwrap().clone()).expect("ログは UTF-8");
 
-    // 要件 5.3: 失敗した起動モジュール名が `module` フィールドとして識別できる。
+    // 失敗した起動モジュール名が `module` フィールドとして識別できる。
     assert!(
         logged.contains(r#"module="pasta.shiori.entry""#),
         "`module` フィールドに起動モジュール名が無い: {logged}"
     );
-    // 要件 5.3: 致命かどうかが `fatal` フィールドで識別できる（マニュアルの grep 対象）。
+    // 致命かどうかが `fatal` フィールドで識別できる（マニュアルの grep 対象）。
     // フィールド区切りの空白込みで照合する。空白を外すと `is_fatal=true` のような
     // 別名フィールドでも通ってしまい、リネームを検出できない。
     assert!(
@@ -185,7 +184,7 @@ fn startup_failure_log_carries_module_fatal_and_multiline_cause() {
         "`fatal=true` フィールドが無い: {logged}"
     );
 
-    // 要件 4.7: `error` フィールドは根本原因を複数行・スタックトレース込みで保持する。
+    // `error` フィールドは根本原因を複数行・スタックトレース込みで保持する。
     let cause = logged
         .split_once("error=")
         .expect("`error` フィールドが無い")

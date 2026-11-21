@@ -1,4 +1,4 @@
--- pasta.shiori.stop（止まるエラーの表記）の単体テスト (runtime-error-balloon 3.2)
+-- pasta.shiori.stop（止まるエラーの表記）の単体テスト
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -132,7 +132,7 @@ describe("STOP.detail（エラー文の整え）", function()
 end)
 
 -- ============================================================================
--- 控え・名前・応答 (runtime-error-balloon 3.3)
+-- 控え・名前・応答
 -- ============================================================================
 
 --- 警告を記録するログ・balloon_warning の代役・読み込んだ Lua のファイルの表を差し込んで body を実行し、元へ戻す
@@ -402,7 +402,7 @@ describe("STOP.response（表記付きの応答）", function()
 end)
 
 -- ============================================================================
--- 記録を運ぶ止まるエラー (scene-condition-attributes 3.1・3.7)
+-- 記録を運ぶ止まるエラー
 -- ============================================================================
 
 describe("STOP.response（条件に合うシーンが無い）", function()

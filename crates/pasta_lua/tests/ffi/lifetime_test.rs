@@ -1,4 +1,4 @@
-//! DLL の参照の寿命の確かめ（要件 7.x・9.8）。
+//! DLL の参照の寿命の確かめ。
 //!
 //! DLL のモジュールはプロセス全体で共有されるので、`GetModuleHandleW` の有無で
 //! 「まだ読み込まれているか」を見る。
@@ -50,7 +50,7 @@ fn module_path(h: usize) -> String {
     String::from_utf16_lossy(&buf[..len as usize])
 }
 
-/// `ffi.load` の戻り値を捨てて GC しても、先に取った関数が呼べる（7.1）。
+/// `ffi.load` の戻り値を捨てて GC しても、先に取った関数が呼べる。
 #[test]
 fn dropped_clib_keeps_functions_callable_after_gc() {
     let _guard = lock();
@@ -85,7 +85,7 @@ fn dropped_clib_keeps_functions_callable_after_gc() {
     assert_nothing_loaded("VM を落とした後");
 }
 
-/// `ffi.gc` の後始末を残したまま落としても落ちない。落とした後は何も残らず、新しい VM で読み直せる（7.2・7.3・9.8）。
+/// `ffi.gc` の後始末を残したまま落としても落ちない。落とした後は何も残らず、新しい VM で読み直せる。
 #[test]
 fn closing_with_pending_ffi_gc_frees_dlls_and_reload_works() {
     let _guard = lock();
@@ -128,7 +128,7 @@ fn closing_with_pending_ffi_gc_frees_dlls_and_reload_works() {
     assert_nothing_loaded("2 つ目の VM を落とした後");
 }
 
-/// 取り違えで失敗した B の DLL は残らない（7.4）。
+/// 取り違えで失敗した B の DLL は残らない。
 #[test]
 fn collision_failure_leaves_nothing_of_b() {
     let _guard = lock();

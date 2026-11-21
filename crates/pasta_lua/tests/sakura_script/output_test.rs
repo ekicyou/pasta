@@ -1,7 +1,4 @@
 //! Integration tests for sakura script output and configuration.
-//!
-//! Covers: output examples (Requirement 7), TalkConfig TOML integration,
-//! and comprehensive wait value verification.
 
 use crate::common;
 
@@ -9,7 +6,7 @@ use common::create_sakura_test_runtime_with_config;
 use pasta_lua::loader::TalkConfig;
 
 // ============================================
-// Requirement 7: Output Examples
+// Output Examples
 // ============================================
 
 #[test]
@@ -170,7 +167,6 @@ fn test_all_wait_types_comprehensive() {
     };
     let lua = create_sakura_test_runtime_with_config(&config);
 
-    // Test individual punctuation types with distinct wait values
     // あ(General) 、(Comma) い(General) 。(Period) う(General) ！(Strong) え(General) ‥‥(Leader×2) お(General) 、、、。(Consecutive: max=Period)
     let result: String = lua
         .load(
@@ -213,7 +209,6 @@ fn test_individual_punctuation_wait_values() {
     };
     let lua = create_sakura_test_runtime_with_config(&config);
 
-    // Test comma individually
     let comma_result: String = lua
         .load(
             r#"
@@ -225,7 +220,6 @@ fn test_individual_punctuation_wait_values() {
         .unwrap();
     assert_eq!(comma_result, r"あ\_w[50]、\_w[150]");
 
-    // Test period individually
     let period_result: String = lua
         .load(
             r#"
@@ -237,7 +231,6 @@ fn test_individual_punctuation_wait_values() {
         .unwrap();
     assert_eq!(period_result, r"あ\_w[50]。\_w[250]");
 
-    // Test strong (exclamation) individually
     let strong_result: String = lua
         .load(
             r#"
@@ -249,7 +242,6 @@ fn test_individual_punctuation_wait_values() {
         .unwrap();
     assert_eq!(strong_result, r"あ\_w[50]！\_w[350]");
 
-    // Test strong (question) individually
     let question_result: String = lua
         .load(
             r#"
@@ -261,7 +253,6 @@ fn test_individual_punctuation_wait_values() {
         .unwrap();
     assert_eq!(question_result, r"あ\_w[50]？\_w[350]");
 
-    // Test leader individually
     let leader_result: String = lua
         .load(
             r#"

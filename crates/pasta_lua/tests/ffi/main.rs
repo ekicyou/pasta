@@ -1,6 +1,4 @@
-// tests/ffi/main.rs
-//
-// `ffi.load` の置き換えの統合テストのエントリーポイント（lua-cmodule-robustness）。
+// `ffi.load` の置き換えの統合テストのエントリーポイント。
 // DLL のモジュールはプロセス全体で共有されるので、ほかのテストのバイナリから切り離す。
 // common ヘルパー（`PASTA_DEBUG` を中和する #[ctor] を含む）は #[path] で tests/common/ を参照する。
 #![cfg(windows)]

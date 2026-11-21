@@ -1,6 +1,5 @@
 -- ============================================================================
--- Task 4.2: OnChoiceSelectEx 自動ルーティングハンドラテスト
--- Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
+-- OnChoiceSelectEx 自動ルーティングハンドラテスト
 -- ============================================================================
 
 local describe = require("lua_test.test").describe
@@ -58,7 +57,7 @@ describe("OnChoiceSelectEx auto-routing handler", function()
     end
 
     -- ================================================================
-    -- 3.1: マッチ実行 — 選択IDがシーンにマッチしたら実行
+    -- マッチ実行 — 選択IDがシーンにマッチしたら実行
     -- ================================================================
     test("returns thread when choice_id matches a scene (3.1)", function()
         setup()
@@ -92,7 +91,7 @@ describe("OnChoiceSelectEx auto-routing handler", function()
     end)
 
     -- ================================================================
-    -- 3.2: 複数マッチ → SCENE.search が正しく呼ばれている
+    -- 複数マッチ → SCENE.search が正しく呼ばれている
     -- (シャッフル＆順次消費は SCENE.search/co_exec 内部処理)
     -- ================================================================
     test("delegates shuffle/consumption to SCENE.search (3.2)", function()
@@ -132,7 +131,7 @@ describe("OnChoiceSelectEx auto-routing handler", function()
     end)
 
     -- ================================================================
-    -- 3.3: 非マッチ時 → nil を返す（EVENT.fire が 204 に変換）
+    -- 非マッチ時 → nil を返す（EVENT.fire が 204 に変換）
     -- ================================================================
     test("returns nil when no scene matches choice_id (3.3)", function()
         setup()
@@ -150,7 +149,7 @@ describe("OnChoiceSelectEx auto-routing handler", function()
     end)
 
     -- ================================================================
-    -- 3.4: ローカル→グローバル検索 — STORE.last_global_scene をスコープに使用
+    -- ローカル→グローバル検索 — STORE.last_global_scene をスコープに使用
     -- ================================================================
     test("searches local scope first, then global (3.4)", function()
         setup()
@@ -222,7 +221,7 @@ describe("OnChoiceSelectEx auto-routing handler", function()
     end)
 
     -- ================================================================
-    -- call-execution-correctness 2.4: Reference2（選択肢を出したシーン）を最初の探索範囲にする
+    -- Reference2（選択肢を出したシーン）を最初の探索範囲にする
     -- ================================================================
     local function capture_scopes(ref2)
         local scopes = {}
@@ -267,7 +266,7 @@ describe("OnChoiceSelectEx auto-routing handler", function()
     end)
 
     -- ================================================================
-    -- 3.5: 明示的 OnChoiceSelectEx シーン優先
+    -- 明示的 OnChoiceSelectEx シーン優先
     -- ================================================================
     test("explicit OnChoiceSelectEx scene takes priority over auto-routing (3.5)", function()
         setup()
@@ -385,7 +384,7 @@ describe("OnChoiceSelectEx auto-routing handler", function()
     end)
 
     -- ================================================================
-    -- scene-condition-attributes 3.4: 条件漏れ（2.6, 3.2）
+    -- 条件漏れ
     -- ================================================================
     --- scope（ローカルは名前・グローバルは "<global>"）ごとの戻り値 { result, miss } で SCENE.search を差し替える
     local function stub_search(results, calls)

@@ -1,6 +1,5 @@
 -- ACT_IMPL.find_scene 5段階フォールバック検索テスト
--- Task 4: act:find_scene() 単体テスト
--- Requirements: 1.1, 1.3, 2.3, 2.4
+-- act:find_scene() 単体テスト
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -16,7 +15,7 @@ local function reload_fresh_modules()
     return require("pasta.act"), require("pasta.global")
 end
 
--- Task 4.1: Level 1 — current_scene ローカル検索
+-- Level 1 — current_scene ローカル検索
 describe("act:find_scene - Level 1 (current_scene)", function()
     test("current_scene[key] から関数を取得できる", function()
         local act = ACT.new({})
@@ -44,7 +43,7 @@ describe("act:find_scene - Level 1 (current_scene)", function()
     end)
 end)
 
--- Task 4.2: Level 2 — SCENE.search スコープ付き検索
+-- Level 2 — SCENE.search スコープ付き検索
 describe("act:find_scene - Level 2 (SCENE.search scoped)", function()
     local original_search
 
@@ -81,7 +80,7 @@ describe("act:find_scene - Level 2 (SCENE.search scoped)", function()
     end)
 end)
 
--- Task 4.3: Level 3 — GLOBAL テーブル（本仕様の主要修正点）
+-- Level 3 — GLOBAL テーブル
 describe("act:find_scene - Level 3 (GLOBAL)", function()
     test("GLOBAL[key] から関数を取得できる", function()
         -- モジュール同期: act.lua が参照する GLOBAL と同一テーブルを取得
@@ -114,7 +113,7 @@ describe("act:find_scene - Level 3 (GLOBAL)", function()
     end)
 end)
 
--- Task 4.4: Level 5 — スコープなし全体検索
+-- Level 5 — スコープなし全体検索
 describe("act:find_scene - Level 5 (SCENE.search scopeless)", function()
     local original_search
 
@@ -148,7 +147,7 @@ describe("act:find_scene - Level 5 (SCENE.search scopeless)", function()
     end)
 end)
 
--- Task 4.5: 全レベル未発見で nil
+-- 全レベル未発見で nil
 describe("act:find_scene - all levels miss", function()
     local original_search
 
@@ -179,7 +178,7 @@ describe("act:find_scene - all levels miss", function()
     end)
 end)
 
--- Task 4.6: find_scene は関数を返すが実行しない
+-- find_scene は関数を返すが実行しない
 describe("act:find_scene - returns function without executing", function()
     test("ハンドラーが実行されていないことを確認する", function()
         local executed = false
@@ -197,7 +196,7 @@ describe("act:find_scene - returns function without executing", function()
     end)
 end)
 
--- Task 4.7: 優先順位検証（L1 > L3）
+-- 優先順位検証（L1 > L3）
 describe("act:find_scene - Priority", function()
     test("L1 と L3 の両方に同じキーがある場合 L1 が優先", function()
         local fresh_ACT, fresh_GLOBAL = reload_fresh_modules()

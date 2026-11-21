@@ -10,11 +10,10 @@ local function create_mock_act(req)
 end
 
 -- ============================================================================
--- Task 3.1: create_scene_thread() ヘルパー関数
--- Task 3.2: check_hour() thread返却形式
--- Task 3.3: check_talk() チェイントーク継続ロジック
--- Task 3.4: dispatch() thread返却対応
--- Requirements: 3.1, 4.1-4.4, 5.1-5.5
+-- create_scene_thread() ヘルパー関数
+-- check_hour() thread返却形式
+-- check_talk() チェイントーク継続ロジック
+-- dispatch() thread返却対応
 -- ============================================================================
 
 describe("virtual_dispatcher - thread返却", function()

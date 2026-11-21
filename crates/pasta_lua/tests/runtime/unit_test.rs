@@ -1,6 +1,4 @@
-//! Phase A: runtime/mod.rs のインラインテストを外部化
-//!
-//! 全テストが公開 API のみ使用しているため可視性変更不要
+//! RuntimeConfig・to_stdlib・validate_and_warn・lua_require の公開 API テスト。
 
 use mlua::StdLib;
 use mlua::prelude::*;
@@ -100,14 +98,12 @@ fn test_to_stdlib_rejects_removed_std_utf8() {
 fn test_to_stdlib_subtraction() {
     let config = RuntimeConfig::from_libs(vec!["std_all".into(), "-std_io".into()]);
     let stdlib = config.to_stdlib().unwrap();
-    // ALL_SAFE minus IO
     let expected = StdLib::ALL_SAFE ^ (StdLib::ALL_SAFE & StdLib::IO);
     assert_eq!(stdlib, expected);
 }
 
 #[test]
 fn test_to_stdlib_order_independent() {
-    // Subtraction first, then addition - should still work
     let config1 = RuntimeConfig::from_libs(vec!["-std_io".into(), "std_all".into()]);
     let config2 = RuntimeConfig::from_libs(vec!["std_all".into(), "-std_io".into()]);
 
@@ -140,7 +136,7 @@ fn test_to_stdlib_unknown_library_error() {
 #[test]
 fn test_to_stdlib_ignores_non_std_names() {
     // Names without the std_ prefix (including the removed module names
-    // assertions/testing/env/regex/json/yaml) are silently skipped (1.5).
+    // assertions/testing/env/regex/json/yaml) are silently skipped.
     let config = RuntimeConfig::from_libs(vec![
         "std_table".into(),
         "assertions".into(),
@@ -151,7 +147,6 @@ fn test_to_stdlib_ignores_non_std_names() {
         "yaml".into(),
     ]);
     let stdlib = config.to_stdlib().unwrap();
-    // Only std_table should be processed
     assert_eq!(stdlib, StdLib::TABLE);
 }
 
@@ -187,7 +182,6 @@ fn test_default_equals_new() {
 #[test]
 fn test_validate_and_warn_safe_config() {
     let config = RuntimeConfig::new();
-    // Should not panic
     config.validate_and_warn();
 }
 
@@ -195,7 +189,6 @@ fn test_validate_and_warn_safe_config() {
 #[test]
 fn test_validate_and_warn_unsafe_config() {
     let config = RuntimeConfig::full();
-    // Should not panic, even with unsafe libs
     config.validate_and_warn();
 }
 
@@ -203,11 +196,9 @@ fn test_validate_and_warn_unsafe_config() {
 #[test]
 fn test_validate_and_warn_detects_std_debug() {
     let config = RuntimeConfig::from_libs(vec!["std_debug".into()]);
-    // The method should run without error
     // Actual warning output is verified by log inspection
     config.validate_and_warn();
 
-    // Verify that the logic correctly identifies std_debug
     assert!(config.libs.contains(&"std_debug".to_string()));
 }
 
@@ -217,11 +208,10 @@ fn test_validate_and_warn_detects_std_all_unsafe() {
     let config = RuntimeConfig::from_libs(vec!["std_all_unsafe".into()]);
     config.validate_and_warn();
 
-    // Verify that the logic correctly identifies std_all_unsafe
     assert!(config.libs.contains(&"std_all_unsafe".to_string()));
 }
 
-/// `env` in libs no longer warns; `std_debug` still does (1.7).
+/// `env` in libs no longer warns; `std_debug` still does.
 #[tracing_test::traced_test]
 #[test]
 fn test_validate_and_warn_ignores_env_but_warns_std_debug() {
@@ -239,7 +229,6 @@ fn test_validate_and_warn_respects_debug_subtraction() {
     let config = RuntimeConfig::from_libs(vec!["std_all_unsafe".into(), "-std_debug".into()]);
     config.validate_and_warn();
 
-    // Verify subtraction is detected
     assert!(config.libs.iter().any(|lib| lib == "-std_debug"));
 }
 
@@ -247,7 +236,6 @@ fn test_validate_and_warn_respects_debug_subtraction() {
 #[test]
 fn test_validate_and_warn_empty_libs() {
     let config = RuntimeConfig::from_libs(vec![]);
-    // Should not panic with empty configuration
     config.validate_and_warn();
 }
 
@@ -255,31 +243,26 @@ fn test_validate_and_warn_empty_libs() {
 #[test]
 fn test_validate_and_warn_minimal() {
     let config = RuntimeConfig::minimal();
-    // Should not panic and should not trigger any warnings
     config.validate_and_warn();
 
-    // Verify minimal has no security-sensitive options
     assert!(!config.libs.contains(&"std_debug".to_string()));
     assert!(!config.libs.contains(&"std_all_unsafe".to_string()));
 }
 
 // ============================================================================
-// lua_require() tests (lua-module-path-resolution spec)
+// lua_require() tests
 // ============================================================================
 
 #[test]
 fn test_lua_require_existing_module() {
-    // Test that lua_require can load a built-in module
     let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
 
-    // Pre-register a test module in package.loaded
     let test_module = lua.create_table().unwrap();
     test_module.set("name", "test_module").unwrap();
     let package: LuaTable = lua.globals().get("package").unwrap();
     let loaded: LuaTable = package.get("loaded").unwrap();
     loaded.set("test_module", test_module).unwrap();
 
-    // Use lua_require to load it
     let result = lua_require(&lua, "test_module");
     assert!(result.is_ok(), "Should successfully require test_module");
 
@@ -294,13 +277,11 @@ fn test_lua_require_existing_module() {
 
 #[test]
 fn test_lua_require_nonexistent_module() {
-    // Test that lua_require returns error for non-existent module
     let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
 
     let result = lua_require(&lua, "nonexistent_module_xyz123");
     assert!(result.is_err(), "Should fail for non-existent module");
 
-    // Error message should contain module name
     let err = result.unwrap_err();
     let err_str = err.to_string();
     assert!(
@@ -312,17 +293,14 @@ fn test_lua_require_nonexistent_module() {
 
 #[test]
 fn test_lua_require_dotted_module_name() {
-    // Test that lua_require handles dotted module names (e.g., "pasta.shiori.entry")
     let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
 
-    // Pre-register a nested module
     let entry_module = lua.create_table().unwrap();
     entry_module.set("initialized", true).unwrap();
     let package: LuaTable = lua.globals().get("package").unwrap();
     let loaded: LuaTable = package.get("loaded").unwrap();
     loaded.set("pasta.shiori.entry", entry_module).unwrap();
 
-    // Use lua_require with dotted name
     let result = lua_require(&lua, "pasta.shiori.entry");
     assert!(
         result.is_ok(),

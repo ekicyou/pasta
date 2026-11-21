@@ -1,4 +1,4 @@
-//! `@pasta_search` の条件つき検索（scene-condition-attributes 2.3）。
+//! `@pasta_search` の条件つき検索。
 //!
 //! `search_scene(name, gsn, var, save)`・`search_scene_exact(...)` の 3 つの結果
 //! （見つかった・名前が無い・条件漏れ）と、表を渡さないと条件も優先の段も見ないこと。
@@ -101,7 +101,7 @@ fn test_missing_table_is_treated_as_empty() {
 
 #[test]
 fn test_passing_no_tables_ignores_conditions() {
-    // 表を渡さなければ条件を見ない（名指しの引き。2.9）
+    // 表を渡さなければ条件を見ない（名指しの引き）
     let result = run(
         create_context(),
         r#"

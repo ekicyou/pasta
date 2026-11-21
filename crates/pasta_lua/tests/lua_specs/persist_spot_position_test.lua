@@ -1,11 +1,11 @@
--- persist-spot-position feature tests
+-- スポット位置継続保持のテスト
 -- Tests for STORE.actor_spots initialization, reset, and SHIORI_ACT.build() STORE integration
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
 -- ============================================================================
--- Task 5.1: store.lua actor_spots初期化テスト
+-- store.lua actor_spots初期化テスト
 -- ============================================================================
 
 describe("STORE.actor_spots - 初期化 (Task 5.1)", function()
@@ -23,7 +23,7 @@ describe("STORE.actor_spots - 初期化 (Task 5.1)", function()
 end)
 
 -- ============================================================================
--- Task 5.2: store.lua reset()動作テスト
+-- store.lua reset()動作テスト
 -- ============================================================================
 
 describe("STORE.actor_spots - reset() (Task 5.2)", function()
@@ -56,7 +56,7 @@ describe("STORE.actor_spots - reset() (Task 5.2)", function()
 end)
 
 -- ============================================================================
--- Task 6.1: SHIORI_ACT_IMPL.build() STORE読み書きフロー
+-- SHIORI_ACT_IMPL.build() STORE読み書きフロー
 -- ============================================================================
 
 describe("SHIORI_ACT.build() - STORE.actor_spots連携 (Task 6.1)", function()
@@ -125,7 +125,7 @@ describe("SHIORI_ACT.build() - STORE.actor_spots連携 (Task 6.1)", function()
 end)
 
 -- ============================================================================
--- Task 6.2: シーン連続実行: スポット値の引き継ぎ
+-- シーン連続実行: スポット値の引き継ぎ
 -- ============================================================================
 
 describe("SHIORI_ACT.build() - シーン連続実行でスポット値引き継ぎ (Task 6.2)", function()
@@ -181,7 +181,7 @@ describe("SHIORI_ACT.build() - シーン連続実行でスポット値引き継�
 end)
 
 -- ============================================================================
--- Task 6.3: CONFIG未設定時のデフォルト動作
+-- CONFIG未設定時のデフォルト動作
 -- ============================================================================
 
 describe("SHIORI_ACT.build() - CONFIG未設定時のデフォルト動作 (Task 6.3)", function()

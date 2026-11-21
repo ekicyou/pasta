@@ -1,11 +1,11 @@
 -- Save persistence tests
--- Tests for store-save-persistence feature
+-- Tests 
 -- Updated: STORE.save is deprecated, now using pasta.save via ctx.save
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
--- Task 3.1: pasta.save module tests
+-- pasta.save module tests
 describe("pasta.save - persistence module", function()
     test("pasta.save returns a table", function()
         local save = require("pasta.save")
@@ -22,7 +22,7 @@ describe("pasta.save - persistence module", function()
     end)
 end)
 
--- Task 3.2: pasta.store no longer has save field
+-- pasta.store no longer has save field
 describe("pasta.store - save field removed", function()
     test("STORE.save is nil (deprecated)", function()
         local STORE = require("pasta.store")
@@ -39,7 +39,7 @@ describe("pasta.store - save field removed", function()
     end)
 end)
 
--- ontalk-suppression Task 1: 止めている印はセッション常駐（読み込み直後 false・reset で false・保存しない）
+-- 止めている印はセッション常駐（読み込み直後 false・reset で false・保存しない）
 describe("pasta.store - auto_talk_paused", function()
     test("読み込み直後は false", function()
         package.loaded["pasta.store"] = nil
@@ -63,7 +63,7 @@ describe("pasta.store - auto_talk_paused", function()
     end)
 end)
 
--- Task 3.3: pasta.act uses pasta.save
+-- pasta.act uses pasta.save
 describe("pasta.act - save from pasta.save", function()
     test("ACT.new() returns act with save from pasta.save", function()
         local SAVE = require("pasta.save")

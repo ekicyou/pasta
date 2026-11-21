@@ -1,4 +1,4 @@
--- act:call_restore / act:restore_scene / act:failure のテスト (call-execution-correctness 2.1)
+-- act:call_restore / act:restore_scene / act:failure のテスト
 -- 途中の Call から戻った後に実行中のシーンを呼び出し前へ戻す口と、失敗表記の唯一の出口
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
@@ -337,7 +337,7 @@ describe("act:failure → group_by_actor → sakura_builder", function()
         end)
     end)
 
-    -- 受け入れた差（design.md ActFailure）: raw_script は段落区切りの改行を出さないので、
+    -- raw_script は段落区切りの改行を出さないので、
     -- 戻った先が発言以外で始まると、改行は失敗表記の後（次の発言の前）に出る
     test("戻った先が発言以外で始まる: 段落区切りの改行は失敗表記の後に出る", function()
         with_captured_act(function(ACT)
@@ -521,7 +521,7 @@ describe("act:call の失敗の分岐", function()
 end)
 
 -- ============================================================================
--- 式の関数呼び出し・＠＊関数・単語の関数ハンドラの後の文脈 (call-execution-correctness 2.3)
+-- 式の関数呼び出し・＠＊関数・単語の関数ハンドラの後の文脈
 -- ============================================================================
 
 --- 呼び出しの戻り値を個数つきで受ける
@@ -736,7 +736,7 @@ describe("act が書いた名前と行の対応を控える (runtime-error-ballo
     end)
 end)
 
--- ACT の段の関数の戻り値の正規化 (ponytail-lua-scripts 7.2)
+-- ACT の段の関数の戻り値の正規化
 describe("ACTOR.drop_self と ACT の段の戻り値の正規化", function()
     --- 生成コードと同じ形（話者:talk((…))）で 1 行を作り、talk のトークンの文字列をつないで返す
     local function said(act)

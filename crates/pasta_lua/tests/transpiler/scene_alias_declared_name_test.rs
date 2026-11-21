@@ -1,8 +1,8 @@
-//! 宣言側の別名置き換え（scene-name-alias task 3）。
+//! 宣言側の別名置き換え。
 //!
 //! トランスパイラの設定に別名表を渡すと、グローバルシーンの宣言名が置き換え後の名前になり、
 //! 登録・通し番号・単語のモジュール名・生成コードの基本名・突合キー・ローカルの親名の
-//! すべてに同じ値が使われることを確かめる（1.2, 1.3, 3.1, 4.1, 4.2, 4.7, 7.1, 8.3）。
+//! すべてに同じ値が使われることを確かめる。
 
 use pasta_dsl::parse_str;
 use pasta_lua::code_gen::source_map::SourceMapSink;
@@ -75,7 +75,7 @@ const KAIWA: &str = "\
 　　さくら：やあ。
 ";
 
-/// 既定表のもとで `＊会話` の名前はすべて OnTalk 系になる（1.2, 3.1, 4.1, 8.3）。
+/// 既定表のもとで `＊会話` の名前はすべて OnTalk 系になる。
 #[test]
 fn builtin_default_replaces_declared_name_everywhere() {
     let out = transpile(KAIWA, SceneAliasTable::builtin_default());
@@ -102,7 +102,7 @@ fn builtin_default_replaces_declared_name_everywhere() {
     let scenes = out.context.scene_registry.all_scenes();
     assert_eq!(scenes[0].name, "OnTalk");
     assert_eq!(scenes[1].parent.as_deref(), Some("OnTalk"));
-    // ローカルシーン名は置き換えない（4.7）
+    // ローカルシーン名は置き換えない
     assert_eq!(scenes[1].name, "挨拶");
 
     // シーン単語のモジュール名
@@ -114,14 +114,14 @@ fn builtin_default_replaces_declared_name_everywhere() {
         .map(|e| e.key.as_str())
         .collect();
     assert!(word_keys.contains(&":OnTalk_1:話題"), "{word_keys:?}");
-    // アクター単語は置き換えない（4.7）
+    // アクター単語は置き換えない
     assert!(
         word_keys.contains(&":__actor_さくら__:通常"),
         "{word_keys:?}"
     );
 }
 
-/// `＊OnTalk`・`＊会話`・単独 `＊`（`会話` を受け継ぐ）は同じ基本名の出現順で採番される（1.3, 4.2, 7.3）。
+/// `＊OnTalk`・`＊会話`・単独 `＊`（`会話` を受け継ぐ）は同じ基本名の出現順で採番される。
 #[test]
 fn alias_real_name_and_continuation_share_numbering() {
     let source = "\
@@ -159,7 +159,7 @@ fn alias_real_name_and_continuation_share_numbering() {
     );
 }
 
-/// `＊会話・朝` とローカル `・会話` は置き換わらない（3.1 完全一致・4.7）。
+/// `＊会話・朝` とローカル `・会話` は置き換わらない。
 #[test]
 fn non_exact_and_local_names_are_not_replaced() {
     let source = "\
@@ -189,7 +189,7 @@ fn non_exact_and_local_names_are_not_replaced() {
     );
 }
 
-/// 行の対応は名前に依存しない（7.1）。
+/// 行の対応は名前に依存しない。
 #[test]
 fn line_records_are_independent_of_aliases() {
     let with = transpile(KAIWA, SceneAliasTable::builtin_default());

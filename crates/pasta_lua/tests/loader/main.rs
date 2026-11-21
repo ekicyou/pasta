@@ -1,5 +1,3 @@
-// tests/loader/main.rs
-//
 // ローダー関連の統合テストをグルーピングするエントリーポイント。
 // common ヘルパーは #[path] で tests/common/ を参照する。
 

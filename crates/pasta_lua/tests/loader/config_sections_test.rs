@@ -1,8 +1,7 @@
-//! Phase A: loader/config.rs のインラインテストを外部化（クラスタ分割 C2）
+//! loader/config.rs のインラインテストを外部化したもの。
 //!
-//! 本ファイルは Lua 検索パス / G1 未カバー公開挙動 / GhostConfig SSOT のクラスタを
-//! 担う。core 設定セクション（loader/logging/persistence/lua/[debug]）は
-//! config_test.rs 側に残置（C2 凝集境界・600行上限）。
+//! 本ファイルは Lua 検索パス / 未カバー公開挙動 / GhostConfig SSOT を担う。core 設定セクション
+//! （loader/logging/persistence/lua/[debug]）は config_test.rs 側に置く。
 
 use pasta_lua::loader::{
     GhostConfig, LoaderConfig, LoaderError, PastaConfig, PersistenceConfig, TalkConfig,
@@ -10,11 +9,11 @@ use pasta_lua::loader::{
 };
 
 // ========================================
-// Lua Search Path tests (lua-module-path-resolution spec)
+// Lua Search Path tests
 // ========================================
 
 // ============================================================================
-// G1 (review-improvement-loop cell 3.14): untested public behavior
+// untested public behavior
 // ============================================================================
 
 // ----- PastaConfig::load (ファイルベース読み込み) -----
@@ -22,7 +21,7 @@ use pasta_lua::loader::{
 // NOTE: load の成功経路は tests/loader/startup_test.rs::test_config_load_with_file、
 // ファイル欠落→ConfigNotFound は同 test_config_load_not_found（バリアント＋パス検証）と
 // src/loader/error.rs::test_config_not_found_display（Display メッセージ検証）で既カバー。
-// 本セルで真に新規なのは「不正 TOML → LoaderError::Config」経路のみ。
+// 新規なのは「不正 TOML → LoaderError::Config」経路のみ。
 
 /// 壊れた TOML は Config（パースエラー）になること。
 /// （load の3経路中、唯一の未カバー経路。成功/NotFound は startup_test.rs で既カバー）
@@ -85,7 +84,7 @@ level = 1
 // NOTE: TalkConfig の既定値（禁則文字2フィールドを除く）・直接デシリアライズ・部分上書きは
 // tests/sakura_script/output_test.rs の test_talk_config_default /
 // test_talk_config_from_toml_full / test_talk_config_partial_override で既カバー。
-// 本セルの増分は (1) 禁則文字2フィールドの既定値、(2) PastaConfig::talk() アクセサ経路。
+// 本ファイルの増分は禁則文字2フィールドの既定値と PastaConfig::talk() アクセサ経路。
 
 /// 禁則文字2フィールドの既定値固定。
 /// （output_test.rs の test_talk_config_default は chars_line_start_prohibited /
@@ -156,7 +155,7 @@ fn test_persistence_effective_file_path_appends_dat_for_other_ext() {
 
 #[test]
 fn test_default_lua_search_paths_contains_user_scripts() {
-    // Requirement 1.2: scripts should be at priority 2 (second position)
+    // scripts should be at priority 2 (second position)
     let paths = default_lua_search_paths();
     assert_eq!(paths.len(), 5, "Should have 5 search paths");
     assert_eq!(
@@ -174,7 +173,7 @@ fn test_default_lua_search_paths_contains_user_scripts() {
 
 #[test]
 fn test_default_lua_search_paths_user_scripts_priority() {
-    // Requirement 1.3: scripts (index 1) should come before profile/pasta/pasta_scripts (index 2)
+    // scripts (index 1) should come before profile/pasta/pasta_scripts (index 2)
     let paths = default_lua_search_paths();
     let scripts_pos = paths.iter().position(|p| p == "scripts");
     let pasta_scripts_pos = paths
@@ -211,7 +210,7 @@ fn test_loader_config_default_includes_user_scripts() {
 
 /// `[ghost]` の SHIORI デフォルト値の単一供給源（SSOT）。
 /// `GhostConfig::default()` が現行 Lua リテラルと同値の
-/// `180 / 300 / 30 / 1.5 / 1.5` をそのまま返すことを固定する（要件 1.2 / 1.3 / 3.3）。
+/// `180 / 300 / 30 / 1.5 / 1.5` をそのまま返すことを固定する。
 #[test]
 fn test_ghost_config_default_values() {
     let config = GhostConfig::default();
@@ -225,7 +224,7 @@ fn test_ghost_config_default_values() {
 
 // ----- [ghost] 実体化（補完後形状）の公開API検証 -----
 //
-// 要件 6.3 / 3.1 / 3.3: ロード後の単一補完ステップ（apply_shiori_defaults）が
+// ロード後の単一補完ステップ（apply_shiori_defaults）が
 // `from_str`（公開パースエントリ）経路上で1回適用され、`[ghost]` を書かなくても
 // 補完後の `custom_fields` に `ghost` セクションが実体化することを、公開API境界で固定する。
 // （クレート内 parse_materializes_ghost_section_with_defaults の公開API版ミラー。
@@ -244,11 +243,11 @@ fn materialized_ghost_table(config: &PastaConfig) -> &toml::Table {
 
 /// `[ghost]` を一切書かない設定を **公開API** `PastaConfig::from_str` でパースすると、
 /// 補完後の `custom_fields` に `ghost` テーブルが実体化し、5つの SSOT 既定値
-/// （180 / 300 / 30 / 1.5 / 1.5）が揃うこと。
+/// が揃うこと。
 ///
 /// もし補完（apply_shiori_defaults）が parse 経路から外れれば、`ghost` キー自体が
 /// 欠落して `materialized_ghost_table` の expect が失敗するため、このテストは
-/// 実体化コントラクトを境界でピン留めする（タスク 2.3 の配線が存在するため通る）。
+/// 実体化コントラクトを境界でピン留めする。
 #[test]
 fn test_from_str_materializes_ghost_defaults_when_section_omitted() {
     // `[ghost]` を含まない最小構成（`[actor]` のみ）。

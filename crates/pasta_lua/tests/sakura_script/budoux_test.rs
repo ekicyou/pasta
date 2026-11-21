@@ -1,12 +1,9 @@
 //! Integration tests for budoux line breaker via Lua API.
-//!
-//! Tests SAKURA.break_lines() called from Lua, verifying
-//! correct line breaking with various inputs and edge cases.
 
 use crate::common::create_sakura_test_runtime;
 
 // ============================================
-// Task 5.1: Lua API break_lines tests
+// Lua API break_lines tests
 // ============================================
 
 #[test]
@@ -376,8 +373,6 @@ fn test_talk_to_script_budoux_last_value_repeats() {
 
 // ============================================
 // SSP にそろえたタグの読み取り: 囲みとエスケープの途中に改行が入らない
-// （paragraph-break-tag-only-talk 6.5）
-// Requirement: 8.2, 9.2
 // ============================================
 
 /// budoux を設定したアクターで `talk_to_script` を呼ぶ（既定値: 通常の字のウェイトは出ない）
@@ -396,7 +391,7 @@ fn talk_with_budoux(input: &str) -> String {
 
 #[test]
 fn test_talk_to_script_budoux_no_break_inside_literal_region() {
-    // 囲みは幅 0 の 1 単位として前の字に付いて運ばれ、中の字の間に改行は入らない（9.2）
+    // 囲みは幅 0 の 1 単位として前の字に付いて運ばれ、中の字の間に改行は入らない
     assert_eq!(
         talk_with_budoux(r"今日は\_?いい天気ですね\_?明日も晴れるでしょう"),
         r"今日は\_?いい天気ですね\_?\n明日も\n晴れるでしょう"
@@ -405,7 +400,7 @@ fn test_talk_to_script_budoux_no_break_inside_literal_region() {
 
 #[test]
 fn test_talk_to_script_budoux_no_break_right_after_non_unit_backslash() {
-    // 単位にならない `\` の直後に改行を挿むと `\\n` ができるので、改行は `\` の前に入れる（7.10）
+    // 単位にならない `\` の直後に改行を挿むと `\\n` ができるので、改行は `\` の前に入れる
     let out = talk_with_budoux(r"今日は\いい天気ですね");
     assert!(!out.contains(r"\\"), "`\\` が作られた: {out}");
     assert_eq!(out.replace(r"\n", ""), r"今日は\いい天気ですね");
@@ -413,7 +408,7 @@ fn test_talk_to_script_budoux_no_break_right_after_non_unit_backslash() {
 
 #[test]
 fn test_talk_to_script_budoux_no_break_inside_percent_escape() {
-    // `\%` は幅 0 の 1 単位として前の字に付いて運ばれ、`\%` の前にも間にも改行は入らない（8.2）
+    // `\%` は幅 0 の 1 単位として前の字に付いて運ばれ、`\%` の前にも間にも改行は入らない
     assert_eq!(
         talk_with_budoux(r"今日は\%いい天気ですね"),
         r"今日は\%\nいい\n天気ですね"
@@ -421,8 +416,7 @@ fn test_talk_to_script_budoux_no_break_inside_percent_escape() {
 }
 
 // ============================================
-// 列の状態の表と新しいアクター設定（vertical-balloon-lines 2.4）
-// Requirement: 1.1, 1.2, 1.3, 1.4, 1.6, 3.5, 3.6, 3.7, 6.3, 6.5, 6.6
+// 列の状態の表と新しいアクター設定
 // ============================================
 
 /// Lua のコードを評価して文字列を返す
@@ -434,7 +428,7 @@ const LONG_TALK: &str = "私は今日学校へ行って友達と一緒に勉強�
 
 #[test]
 fn test_talk_to_script_two_args_same_as_nil_column() {
-    // 2 つの引数の呼び方は、3 つ目に nil を渡したのと同じ・戻り値は文字列 1 つ（6.5）
+    // 2 つの引数の呼び方は、3 つ目に nil を渡したのと同じ・戻り値は文字列 1 つ
     let lua = create_sakura_test_runtime_with_config(&budoux_talk_config());
     let (two, three, count): (String, String, i64) = lua
         .load(format!(
@@ -454,7 +448,7 @@ fn test_talk_to_script_two_args_same_as_nil_column() {
 
 #[test]
 fn test_budoux_newlines_ratio_makes_newline_with_percent() {
-    // 1.8 → \n[180]、1.0・無し → \n（1.1・1.2・1.3）
+    // 1.8 → \n[180]、1.0・無し → \n
     let run = |newlines: &str| {
         eval_str(&format!(
             r#"
@@ -473,7 +467,7 @@ fn test_budoux_newlines_ratio_makes_newline_with_percent() {
 
 #[test]
 fn test_column_table_is_written_back() {
-    // 成功した後に line・width・jump を書き戻す（6.3）
+    // 成功した後に line・width・jump を書き戻す
     let (out, line, width, jump): (String, i64, i64, bool) = create_sakura_test_runtime()
         .load(format!(
             r#"
@@ -531,7 +525,7 @@ fn test_column_table_not_written_on_error() {
 
 #[test]
 fn test_column_advances_without_budoux() {
-    // アクターが nil・budoux の無いアクターでも列の状態は進み、出力は変わらない（決定 3）
+    // アクターが nil・budoux の無いアクターでも列の状態は進み、出力は変わらない
     let lua = create_sakura_test_runtime();
     let (n_out, n_line, n_width, c_line, c_jump): (String, i64, i64, i64, bool) = lua
         .load(
@@ -569,7 +563,7 @@ fn test_column_advances_without_budoux() {
 
 #[test]
 fn test_new_keys_not_read_without_budoux() {
-    // budoux が無い・空なら budoux_newlines・budoux_jump を読まない（1.4・3.6）
+    // budoux が無い・空なら budoux_newlines・budoux_jump を読まない
     let out = eval_str(&format!(
         r#"
         local SAKURA = require "@pasta_sakura_script"
@@ -588,7 +582,7 @@ fn test_new_keys_not_read_without_budoux() {
 
 #[test]
 fn test_break_lines_recounts_after_existing_newline() {
-    // 元からある \n の後を数え直す（6.6）。数え直さないと「天気」の前で割る
+    // 元からある \n の後を数え直す。数え直さないと「天気」の前で割る
     let out = eval_str(
         r#"
         local SAKURA = require "@pasta_sakura_script"
@@ -600,7 +594,7 @@ fn test_break_lines_recounts_after_existing_newline() {
 
 #[test]
 fn test_jump_widths_conformance_with_jump_tag() {
-    // budoux = [40]・budoux_jump = [40, 28] で \_l[-295,0] を挟む長い台詞（3.7）
+    // budoux = [40]・budoux_jump = [40, 28] で \_l[-295,0] を挟む長い台詞
     let part = "今日はとても良い天気なので、公園まで散歩に出かけようと思います。途中で友達に会ったら、一緒にお茶でも飲みに行きたいですね。";
     let out = eval_str(&format!(
         r#"

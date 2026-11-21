@@ -1,6 +1,5 @@
 -- ============================================================================
--- Task 4: EVENT.no_entry のthread返却対応テスト
--- Requirements: 3.2
+-- EVENT.no_entry のthread返却対応テスト
 -- ============================================================================
 
 local describe = require("lua_test.test").describe

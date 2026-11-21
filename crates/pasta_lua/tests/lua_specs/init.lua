@@ -6,15 +6,15 @@
 --   2. 下記の specs テーブルにモジュール名を追加
 
 local specs = {
-    "actor_word_test",                   -- actor-word-dictionary feature tests
-    "store_save_test",                   -- store-save-table feature tests
-    "persistence_spec",                  -- store-save-persistence feature tests
+    "actor_word_test",                   -- actor word dictionary tests
+    "store_save_test",                   -- store save table tests
+    "persistence_spec",                  -- store save persistence tests
     "act_impl_call_test",                -- ACT_IMPL.call 4段階検索テスト
     "act_test",                          -- pasta.act トークンバッファリファクタリング tests
-    "act_grouping_test",                 -- pasta.act グループ化機能 tests (actor-talk-grouping)
+    "act_grouping_test",                 -- pasta.act グループ化機能 tests
     "sakura_builder_test",               -- pasta.shiori.sakura_builder トークン変換テスト
     -- 本物の @pasta_sakura_script を使うので mocks_test（reset で消す）より前に置く
-    "line_newlines_test",                -- 行の頭の印と継ぎ目・組み立ての行の改行のテスト (actor-line-newlines)
+    "line_newlines_test",                -- 行の頭の印と継ぎ目・組み立ての行の改行のテスト
     "shiori_act_test",                   -- pasta.shiori.act さくらスクリプトビルダーテスト
     "virtual_dispatcher_spec",           -- OnTalk/OnHour virtual event dispatcher tests
     "store_coroutine_test",              -- STORE.co_scene coroutine management tests
@@ -27,54 +27,54 @@ local specs = {
     "act_build_early_return_test",       -- ACT:build() / SHIORI_ACT:build() 早期リターンテスト
     "global_chaintalk_call_test",        -- GLOBAL チェイントーク関数登録・L3解決テスト
     "global_chaintalk_integration_test", -- GLOBAL チェイントーク EVENT.fire 統合テスト
-    "persist_spot_position_test",        -- persist-spot-position スポット位置継続保持テスト
+    "persist_spot_position_test",        -- スポット位置継続保持テスト
     "transfer_req_to_var_test",          -- transfer_req_to_var req→var展開テスト
     "act_method_fallback_test",          -- ACT_IMPL.call Level 4 actメソッドフォールバックテスト
     "act_find_scene_test",               -- ACT_IMPL.find_scene 5段階フォールバック検索テスト
     "global_fallback_integration_test",  -- GLOBAL フォールバック統合テスト & DSL+GLOBAL 優先順位テスト
     "act_find_act_handler_test",         -- ACT_IMPL.find_act_handler / find_handler フォールバック検索テスト
     "proxy_find_handler_test",           -- PROXY_IMPL.find_actor_handler / find_handler 検索テスト
-    "set_property_test",                 -- ACT_IMPL.set_property / escape_tag_arg テスト (property-write-helpers)
+    "set_property_test",                 -- ACT_IMPL.set_property / escape_tag_arg テスト
     "mocks_test",                        -- lua_test.mocks install/reset/custom stub テスト
-    "callback_module_test",              -- CALLBACK.try_route / sweep テスト (shiori-async-talk)
-    "get_property_test",                 -- get_property バリデーション・タグ発行テスト (shiori-async-talk)
-    "store_last_global_scene_test",      -- STORE.last_global_scene フィールドテスト (choice-definition-dsl)
-    "act_choice_test",                   -- act:choice / act:choice_timeout トークン蓄積テスト (choice-definition-dsl)
-    "act_init_scene_global_record_test",  -- init_scene グローバルシーン名記録テスト (choice-definition-dsl)
-    "choice_select_test",                 -- OnChoiceSelectEx 自動ルーティングハンドラテスト (choice-definition-dsl)
-    "config_get_test",                    -- pasta.config PASTA_CONFIG.get テスト (review-improvement-loop 3.46)
-    "scene_registry_test",                -- pasta.scene レジストリ・search ガード・co_exec テスト (review-improvement-loop 3.46)
-    "word_builder_test",                  -- pasta.word ビルダー境界・resolve_value テスト (review-improvement-loop 3.46)
-    "actor_module_test",                  -- pasta.actor キャッシュ・ビルダー・プロキシ後処理テスト (review-improvement-loop 3.46)
-    "config_actor_init_test",             -- CONFIG.actor 由来初期化（spot 転送・name 補完）テスト (review-improvement-loop 3.46)
-    "act_word_expr_test",                 -- pasta.act word/expr_fn 後処理・call nil ガードテスト (review-improvement-loop 3.46)
-    "pasta_init_test",                    -- PASTA 公開 API リダイレクト・GLOBAL エイリアステスト (review-improvement-loop 3.46)
-    "shiori_entry_test",                  -- pasta.shiori.entry 統合テスト (review-improvement-loop 3.48)
-    "virtual_dispatcher_pause_gate_test", -- 止める門・restart_timers テスト (ontalk-suppression 2.1)
-    "mouse_test",                         -- event.mouse 候補の名前・アクター名テスト (touch-poke-shortcuts 3.1)
-    "mouse_pause_test",                   -- 止めている間のつつき・撫での既定ハンドラテスト (ontalk-suppression 2.2)
-    "auto_talk_pause_test",               -- 自動トークの停止・再開と別名のテスト (ontalk-suppression 2.3)
-    "store_appearance_test",              -- STORE.appearance 外見状態のセッション常駐テスト (actor-surface-restore 1.3)
-    "appearance_test",                    -- pasta.shiori.appearance タグ走査・サーフェス観測テスト (actor-surface-restore 2.1)
-    "act_dynamic_ref_test",               -- 動的参照のキー解決・警告テスト (dynamic-word-reference 2.1)
-    "act_runtime_safety_test",            -- 生成コードが呼ぶ存在確認付き act メソッドのテスト (dsl-codegen-runtime-safety 1.1)
-    "actor_proxy_act_delegation_test",    -- プロキシが呼ぶ関数の第 1 引数（置き場所で決まる）と戻り値の正規化テスト (actor-proxy-act-delegation 1.2)
-    "act_concat_test",                    -- PASTA.str 連結の被演算子の文字列化・警告テスト (expr-nil-coercion 1.2)
-    "act_call_restore_test",              -- 途中の Call の文脈復元・失敗表記テスト (call-execution-correctness 2.1)
-    "failure_sites_test",                 -- 実行時の失敗 14 か所の現行の挙動の特性化テスト (failure-output-unification 1.1)
-    "failure_test",                       -- pasta.failure 失敗の報告の唯一の出口の単体テスト (failure-output-unification 1.2)
-    "stop_test",                          -- pasta.shiori.stop 止まるエラーの場所の見分け・エラー文の整えテスト (runtime-error-balloon 3.2)
-    "virtual_clock_test",                 -- pasta.shiori.clock 仮想時刻のずれ・合図・読み取り・時刻と日付の表テスト (tutorial-ssp-gaps 2.1)
-    "event_clock_hook_test",              -- EVENT.fire 入口の時計のフック（合図と返事を見せる）テスト (tutorial-ssp-gaps 3.1)
-    "actor_style_test",                   -- pasta.shiori.actor_style 装いの出し入れ・出し直し・素通しテスト (actor-display-style 2.3)
-    "scene_play_event_test",              -- co_exec_exact・co_exec_registered・既定のハンドラのテスト (scene-play-event 3.1, 3.2)
-    "chain_talk_interrupt_test",          -- 続きの決まり・台詞の判定・はっきり捨てる印・予約の確かめ・中断の台詞のテスト (chain-talk-interrupt 3.2・3.3)
-    "external_control_event_test",        -- 外からの操作のイベントの既定のハンドラのテスト (external-control-events 1.2)
-    "reg_handler_chain_test",             -- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1, 2.x)
-    "recommend_menu_test",                -- おすすめメニューの組み込みと既定のハンドラのテスト (recommend-menu-scenes 3.1)
-    "scene_attrs_test",                   -- SCENE.attrs・set_attrs・STORE.scene_attrs のテスト (scene-attribute-store 4.2)
-    "scene_condition_test",               -- イベントの act の自動転記・条件漏れの扱いのテスト (scene-condition-attributes 3.2)
-    "sys_resume_event_test",              -- OnSysResume スリープ明けのおしゃべり (onhour-talk-recount 3.1–4.5, 6.3–6.6)
+    "callback_module_test",              -- CALLBACK.try_route / sweep テスト
+    "get_property_test",                 -- get_property バリデーション・タグ発行テスト
+    "store_last_global_scene_test",      -- STORE.last_global_scene フィールドテスト
+    "act_choice_test",                   -- act:choice / act:choice_timeout トークン蓄積テスト
+    "act_init_scene_global_record_test",  -- init_scene グローバルシーン名記録テスト
+    "choice_select_test",                 -- OnChoiceSelectEx 自動ルーティングハンドラテスト
+    "config_get_test",                    -- pasta.config PASTA_CONFIG.get テスト
+    "scene_registry_test",                -- pasta.scene レジストリ・search ガード・co_exec テスト
+    "word_builder_test",                  -- pasta.word ビルダー境界・resolve_value テスト
+    "actor_module_test",                  -- pasta.actor キャッシュ・ビルダー・プロキシ後処理テスト
+    "config_actor_init_test",             -- CONFIG.actor 由来初期化（spot 転送・name 補完）テスト
+    "act_word_expr_test",                 -- pasta.act word/expr_fn 後処理・call nil ガードテスト
+    "pasta_init_test",                    -- PASTA 公開 API リダイレクト・GLOBAL エイリアステスト
+    "shiori_entry_test",                  -- pasta.shiori.entry 統合テスト
+    "virtual_dispatcher_pause_gate_test", -- 止める門・restart_timers テスト
+    "mouse_test",                         -- event.mouse 候補の名前・アクター名テスト
+    "mouse_pause_test",                   -- 止めている間のつつき・撫での既定ハンドラテスト
+    "auto_talk_pause_test",               -- 自動トークの停止・再開と別名のテスト
+    "store_appearance_test",              -- STORE.appearance 外見状態のセッション常駐テスト
+    "appearance_test",                    -- pasta.shiori.appearance タグ走査・サーフェス観測テスト
+    "act_dynamic_ref_test",               -- 動的参照のキー解決・警告テスト
+    "act_runtime_safety_test",            -- 生成コードが呼ぶ存在確認付き act メソッドのテスト
+    "actor_proxy_act_delegation_test",    -- プロキシが呼ぶ関数の第 1 引数（置き場所で決まる）と戻り値の正規化テスト
+    "act_concat_test",                    -- PASTA.str 連結の被演算子の文字列化・警告テスト
+    "act_call_restore_test",              -- 途中の Call の文脈復元・失敗表記テスト
+    "failure_sites_test",                 -- 実行時の失敗 14 か所の現行の挙動の特性化テスト
+    "failure_test",                       -- pasta.failure 失敗の報告の唯一の出口の単体テスト
+    "stop_test",                          -- pasta.shiori.stop 止まるエラーの場所の見分け・エラー文の整えテスト
+    "virtual_clock_test",                 -- pasta.shiori.clock 仮想時刻のずれ・合図・読み取り・時刻と日付の表テスト
+    "event_clock_hook_test",              -- EVENT.fire 入口の時計のフック（合図と返事を見せる）テスト
+    "actor_style_test",                   -- pasta.shiori.actor_style 装いの出し入れ・出し直し・素通しテスト
+    "scene_play_event_test",              -- co_exec_exact・co_exec_registered・既定のハンドラのテスト
+    "chain_talk_interrupt_test",          -- 続きの決まり・台詞の判定・はっきり捨てる印・予約の確かめ・中断の台詞のテスト
+    "external_control_event_test",        -- 外からの操作のイベントの既定のハンドラのテスト
+    "reg_handler_chain_test",             -- REG:register で重ねたハンドラ（鎖）のテスト
+    "recommend_menu_test",                -- おすすめメニューの組み込みと既定のハンドラのテスト
+    "scene_attrs_test",                   -- SCENE.attrs・set_attrs・STORE.scene_attrs のテスト
+    "scene_condition_test",               -- イベントの act の自動転記・条件漏れの扱いのテスト
+    "sys_resume_event_test",              -- OnSysResume スリープ明けのおしゃべり
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

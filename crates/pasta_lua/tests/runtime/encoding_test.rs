@@ -1,10 +1,5 @@
 //! Encoding integration tests for pasta_lua.
 //!
-//! Tests the complete integration of encoding functionality including:
-//! - package.path setting (UTF-8 無変換・要件 2.1)
-//! - @enc module UTF-8/ANSI conversion
-//! - Japanese path require support
-//!
 //! どのテストも一時ゴーストを本番の読み込み（`PastaLoader::load`）に通した VM で確かめる。
 
 use crate::common::{copy_fixture_into, copy_fixture_to_temp};
@@ -29,7 +24,6 @@ fn create_test_runtime() -> (TempDir, PastaLuaRuntime) {
 fn test_enc_module_require() {
     let (_temp, runtime) = create_test_runtime();
 
-    // Should be able to require @enc module
     let result: mlua::Table = runtime
         .exec(r#"return require "@enc""#)
         .unwrap()
@@ -37,11 +31,9 @@ fn test_enc_module_require() {
         .unwrap()
         .clone();
 
-    // Check _VERSION exists
     let version: String = result.get("_VERSION").unwrap();
     assert_eq!(version, "0.1.0");
 
-    // Check _DESCRIPTION exists
     let desc: String = result.get("_DESCRIPTION").unwrap();
     assert!(desc.contains("Encoding"));
 }
@@ -84,7 +76,6 @@ fn test_enc_to_utf8_ascii() {
 fn test_enc_type_error_handling() {
     let (_temp, runtime) = create_test_runtime();
 
-    // Test with number instead of string
     let script = r#"
         local enc = require "@enc"
         local result, err = enc.to_ansi(12345)
@@ -118,7 +109,6 @@ fn test_enc_nil_handling() {
 }
 
 /// to_ansi に不正な UTF-8 バイト列を渡すと (nil, "invalid UTF-8 ...") を返す
-/// （review-improvement-loop セル 3.16 / G1 追加: 入力検証エラーパス）。
 #[test]
 fn test_enc_to_ansi_invalid_utf8_input_error() {
     let (_temp, runtime) = create_test_runtime();
@@ -283,7 +273,7 @@ fn test_package_path_set_correctly() {
         .unwrap()
         .clone();
 
-    // 検索パス設定は検索パスの各項目から組んだ文字列と**バイト同一**である（要件 2.1 / 3.1 / 3.2）。
+    // 検索パス設定は検索パスの各項目から組んだ文字列と**バイト同一**である。
     assert_eq!(
         path.as_bytes().as_ref(),
         expected_package_path(temp.path()).as_bytes()
@@ -307,7 +297,7 @@ fn test_package_path_with_japanese_base() {
         .as_string()
         .unwrap()
         .clone();
-    // 非 ANSI パスでも ANSI へ変換せず、UTF-8 のまま設定される（要件 2.1 / 3.8）。
+    // 非 ANSI パスでも ANSI へ変換せず、UTF-8 のまま設定される。
     let expected = expected_package_path(&base);
     assert_eq!(path.as_bytes().as_ref(), expected.as_bytes());
     assert_eq!(
@@ -327,7 +317,6 @@ fn test_pasta_config_module_still_works() {
     let temp = copy_fixture_to_temp("with_custom_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // @pasta_config should still work
     let script = r#"
         local config = require "@pasta_config"
         return config.ghost_name
@@ -346,7 +335,6 @@ fn test_pasta_config_module_still_works() {
 
 #[test]
 fn test_runtime_new_api_unchanged() {
-    // PastaLuaRuntime::new should work with TranspileContext
     let context = TranspileContext::new();
     let runtime = PastaLuaRuntime::new(context);
     assert!(runtime.is_ok());
@@ -354,7 +342,6 @@ fn test_runtime_new_api_unchanged() {
 
 #[test]
 fn test_runtime_with_config_api_unchanged() {
-    // PastaLuaRuntime::with_config should work
     let context = TranspileContext::new();
     let runtime = PastaLuaRuntime::with_config(context, RuntimeConfig::minimal());
     assert!(runtime.is_ok());

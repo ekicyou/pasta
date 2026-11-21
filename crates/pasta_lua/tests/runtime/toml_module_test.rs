@@ -1,4 +1,4 @@
-//! Integration tests for the `@toml` module (mlua-stdlib-removal 2.1).
+//! Integration tests for the `@toml` module.
 
 use crate::common::{copy_fixture_to_temp, create_empty_context};
 

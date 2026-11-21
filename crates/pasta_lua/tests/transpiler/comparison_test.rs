@@ -1,7 +1,7 @@
 //! Comparison and structure integration tests for pasta_lua transpiler.
 //!
-//! - Line-by-line comparison against reference implementation (Requirement 6)
-//! - MAJOR-4: FileItem出現順処理・シャドーイング・属性非継承テスト
+//! - Line-by-line comparison against reference implementation
+//! - FileItem出現順処理・シャドーイング・属性非継承テスト
 
 use crate::common;
 
@@ -10,7 +10,7 @@ use pasta_dsl::parse_str;
 use pasta_lua::LuaTranspiler;
 
 // ============================================================================
-// Requirement 6: Integration Test with Line-by-Line Comparison
+// Integration Test with Line-by-Line Comparison
 // ============================================================================
 
 /// Mismatch information for detailed reporting
@@ -62,7 +62,7 @@ fn normalize_lua_lines(code: &str) -> Vec<String> {
         .collect()
 }
 
-/// Compare two Lua code strings line by line (Requirement 6)
+/// Compare two Lua code strings line by line
 fn compare_lua_output(expected: &str, actual: &str) -> (Vec<LineMismatch>, TestStatistics) {
     let expected_lines = normalize_lua_lines(expected);
     let actual_lines = normalize_lua_lines(actual);
@@ -132,7 +132,6 @@ fn generate_mismatch_report(mismatches: &[LineMismatch], stats: &TestStatistics)
         "================================================================================\n\n",
     );
 
-    // Statistics summary
     report.push_str("【統計情報】\n");
     report.push_str(&format!("  総行数:       {}\n", stats.total_lines));
     report.push_str(&format!("  一致行数:     {}\n", stats.matched_lines));
@@ -140,14 +139,12 @@ fn generate_mismatch_report(mismatches: &[LineMismatch], stats: &TestStatistics)
     report.push_str(&format!("  一致率:       {:.1}%\n", stats.match_rate()));
     report.push('\n');
 
-    // Mismatch pattern classification
     report.push_str("【不一致パターン分類】\n");
     report.push_str(&format!("  内容差異:     {}\n", stats.content_differences));
     report.push_str(&format!("  欠落行:       {}\n", stats.missing_lines));
     report.push_str(&format!("  余剰行:       {}\n", stats.extra_lines));
     report.push('\n');
 
-    // Detailed mismatch list (limit to first 20 for readability)
     if !mismatches.is_empty() {
         report.push_str("【不一致詳細】\n");
         report.push_str(
@@ -177,16 +174,14 @@ fn generate_mismatch_report(mismatches: &[LineMismatch], stats: &TestStatistics)
     report
 }
 
-/// Requirement 6: Full line-by-line comparison test
+/// Full line-by-line comparison test
 /// sample.pasta → Lua トランスパイル出力を sample.lua と比較
 #[test]
 fn test_transpile_sample_pasta_line_comparison() {
-    // Load sample files
     let sample_pasta = include_str!("../fixtures/sample.pasta");
     let sample_lua = include_str!("../fixtures/sample.lua");
     let sample_expected = include_str!("../fixtures/sample.expected.lua");
 
-    // Parse and transpile
     let file = parse_str(sample_pasta, "sample.pasta").unwrap();
 
     let transpiler = LuaTranspiler::default();
@@ -200,17 +195,13 @@ fn test_transpile_sample_pasta_line_comparison() {
         .join("tests/fixtures/sample.generated.lua");
     std::fs::write(&output_path, &generated_lua).expect("Failed to write sample.generated.lua");
 
-    // Normalize line endings for comparison (handles Git autocrlf differences)
     let generated_normalized = normalize_line_endings(&generated_lua);
     let expected_normalized = normalize_line_endings(sample_expected);
 
-    // Compare line by line (using normalized versions)
     let (mismatches, stats) = compare_lua_output(sample_lua, &generated_normalized);
 
-    // Generate and print report
     let report = generate_mismatch_report(&mismatches, &stats);
 
-    // Print report for debugging (visible in test output with --nocapture)
     eprintln!("{}", report);
 
     // Strict equality check with expected output (normalized)
@@ -226,7 +217,6 @@ fn test_transpile_sample_pasta_line_comparison() {
         "Comparison completed. See report above for details. Generated output saved to crates/pasta_lua/tests/fixtures/sample.generated.lua"
     );
 
-    // Report statistics even on success
     println!("\n【テスト結果サマリー】");
     println!(
         "  一致率: {:.1}% ({}/{})",
@@ -237,10 +227,10 @@ fn test_transpile_sample_pasta_line_comparison() {
 }
 
 // ============================================================================
-// MAJOR-4: FileItem出現順処理・シャドーイング・属性非継承テスト
+// FileItem出現順処理・シャドーイング・属性非継承テスト
 // ============================================================================
 
-/// MAJOR-4: FileItem出現順処理の検証
+/// FileItem出現順処理の検証
 /// アクターとシーンがファイル内出現順に処理されることを確認
 #[test]
 fn test_file_item_order_preserved() {
@@ -311,7 +301,7 @@ fn global_decl_attrs(source: &str) -> Vec<Vec<(String, String)>> {
         .collect()
 }
 
-/// ファイル属性の行は後の行で丸ごと置き換わる（累積しない・要件 3.2）。
+/// ファイル属性の行は後の行で丸ごと置き換わる（累積しない）。
 /// 同じ行の中の同じ名前は後勝ちで 1 つに畳まれる
 #[test]
 fn test_file_attr_replaced_by_later_line() {
@@ -335,8 +325,8 @@ fn test_file_attr_replaced_by_later_line() {
     );
 }
 
-/// MAJOR-4: アクター辞書を挟んでもファイル属性はシーンへ受け継がれ、
-/// アクター辞書の配下の属性はどのシーンにも入らない（要件 5.6）
+/// アクター辞書を挟んでもファイル属性はシーンへ受け継がれ、
+/// アクター辞書の配下の属性はどのシーンにも入らない
 #[test]
 fn test_actor_does_not_inherit_file_attrs() {
     let source = r#"
@@ -360,7 +350,7 @@ fn test_actor_does_not_inherit_file_attrs() {
     assert!(lua_code.contains("create_actor(\"さくら\")"));
 }
 
-/// MAJOR-4: グローバル単語がFileItem出現順に登録されることの検証
+/// グローバル単語がFileItem出現順に登録されることの検証
 #[test]
 fn test_global_word_registration_order() {
     use pasta_dsl::parser::{FileItem, KeyWords, PastaFile, Span};
@@ -399,13 +389,10 @@ fn test_global_word_registration_order() {
     let mut output = Vec::new();
     let context = transpiler.transpile(&file, &mut output).unwrap();
 
-    // 登録順序を確認
     let entries = context.word_registry.all_entries();
-    // グローバル単語が2つ登録されていることを確認
     let global_entries: Vec<_> = entries.iter().filter(|e| !e.key.contains(":")).collect();
     assert_eq!(global_entries.len(), 2);
 
-    // 名前で確認
     assert!(entries.iter().any(|e| e.key == "挨拶1"));
     assert!(entries.iter().any(|e| e.key == "挨拶2"));
 }

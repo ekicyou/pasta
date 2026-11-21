@@ -104,7 +104,7 @@ fn test_transpile_fullwidth_cue_marker_passthrough() {
     );
 }
 
-/// Requirements.md sample ("起動挨拶") should transpile without error.
+/// The sample ("起動挨拶") should transpile without error.
 #[test]
 fn test_transpile_requirements_sample_scene() {
     let pasta = r#"

@@ -1,4 +1,4 @@
-//! date-var-calendar task 3.4: 読み込みの段 1.6（行事の表 `calendar.csv`）の結合テスト。
+//! 行事の表 `calendar.csv` の読み込みの結合テスト。
 
 use crate::common;
 
@@ -43,7 +43,7 @@ fn upper_case_file_name_is_read() {
 
 #[test]
 fn line_errors_name_file_and_line() {
-    // Req 5.1〜5.5: 引用符・欄の数・日付の形・存在しない日・空の名前
+    // 引用符・欄の数・日付の形・存在しない日・空の名前
     let cases = [
         ("0101,\"a\"", "quote"),
         ("0101", "2 fields"),

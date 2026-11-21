@@ -1,11 +1,11 @@
-//! 補完・最小起動・SSOT ガードの統合テスト（pasta-config-restructure task 5.2）。
+//! 補完・最小起動・SSOT ガードの統合テスト。
 //!
 //! 検証対象:
-//! 1. 最小起動＋辞書読込 (R2.2 / R2.5 / R6.4)
-//! 2. 最小/フル等価 — `@pasta_config.ghost.*` の Rust/Lua 一貫性 (R3.1 / R3.3)
-//! 3. `[actor]` 不在警告で起動/補完が停止しない (R2.3)
+//! 1. 最小起動＋辞書読込
+//! 2. 最小/フル等価 — `@pasta_config.ghost.*` の Rust/Lua 一貫性
+//! 3. `[actor]` 不在警告で起動/補完が停止しない
 //! 4. SSOT ガード: ドキュメント・Lua フォールバックリテラルと
-//!    `GhostConfig::default()` の一致によるドリフト検出 (R5.4 / R5.5)
+//!    `GhostConfig::default()` の一致によるドリフト検出
 
 use crate::common;
 
@@ -33,7 +33,7 @@ fn read_pasta_config_ghost_number(runtime: &pasta_lua::PastaLuaRuntime, key: &st
 }
 
 // ============================================================================
-// 1. 最小起動＋辞書読込 (R2.2 / R2.5 / R6.4)
+// 1. 最小起動＋辞書読込
 // ============================================================================
 
 /// 最小構成（`[actor]` のみ ＋ `dic/talk.pasta` 直下）で起動でき、
@@ -44,11 +44,10 @@ fn minimal_actor_only_starts_and_loads_dic_directly() {
     let temp = copy_fixture_to_temp("minimal_actor_only");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // 起動後ランタイムが実行可能であること（R2.2）。
     let alive = runtime.exec("return 1 + 1").unwrap();
     assert_eq!(alive.as_i64(), Some(2));
 
-    // `dic/` 直下の `talk.pasta` が既定 glob で発見・登録されたこと（R2.5 / R6.4）。
+    // `dic/` 直下の `talk.pasta` が既定 glob で発見・登録されたこと。
     // ローダはトランスパイル結果を scene_dic.lua に列挙する。
     let scene_dic_path = temp
         .path()
@@ -62,11 +61,11 @@ fn minimal_actor_only_starts_and_loads_dic_directly() {
 }
 
 // ============================================================================
-// 2. 最小/フル等価 — @pasta_config.ghost.* の Rust/Lua 一貫性 (R3.1 / R3.3)
+// 2. 最小/フル等価 — @pasta_config.ghost.* の Rust/Lua 一貫性
 // ============================================================================
 
 /// 最小構成（`[actor]` のみ）と、SSOT 値を明示した等価なフル記述で、
-/// 補完後の `custom_fields.ghost` が Rust 側で同値になること（R3.1）。
+/// 補完後の `custom_fields.ghost` が Rust 側で同値になること。
 #[test]
 fn minimal_and_full_ghost_are_equivalent_in_rust() {
     // 最小: [ghost] 省略 → 補完で実体化。
@@ -104,14 +103,12 @@ fn minimal_and_full_ghost_are_equivalent_in_rust() {
 
 /// 最小構成（`[actor]` のみ）とフル記述の双方を **実ランタイムで起動** し、
 /// Lua から読み出した `@pasta_config.ghost.*` が SSOT 既定値と一致すること。
-/// Rust 補完と Lua 露出の一貫性を実際の経路で証明する（R3.3）。
+/// Rust 補完と Lua 露出の一貫性を実際の経路で証明する。
 #[test]
 fn minimal_and_full_expose_same_ghost_to_lua() {
-    // 最小構成フィクスチャ（[actor] のみ）を実起動。
     let minimal_temp = copy_fixture_to_temp("minimal_actor_only");
     let minimal_runtime = PastaLoader::load(minimal_temp.path()).unwrap();
 
-    // SSOT 既定値が Lua の @pasta_config.ghost に露出していること（R3.3）。
     assert_eq!(
         read_pasta_config_ghost_number(&minimal_runtime, "spot_newlines"),
         default_spot_newlines(),
@@ -120,12 +117,12 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
         read_pasta_config_ghost_number(&minimal_runtime, "choice_newlines"),
         default_choice_newlines(),
     );
-    // vertical-balloon-lines 5.6: 省いた [ghost] で after_choice_newlines の既定 1.0 が Lua から読める。
+    // 省いた [ghost] で after_choice_newlines の既定 1.0 が Lua から読める。
     assert_eq!(
         read_pasta_config_ghost_number(&minimal_runtime, "after_choice_newlines"),
         default_after_choice_newlines(),
     );
-    // actor-line-newlines 1.2 / 1.6: 省いた [ghost] で line_newlines の既定 0.0 が Lua から読める。
+    // 省いた [ghost] で line_newlines の既定 0.0 が Lua から読める。
     assert_eq!(
         read_pasta_config_ghost_number(&minimal_runtime, "line_newlines"),
         default_line_newlines(),
@@ -144,7 +141,6 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
         default_hour_margin() as f64,
     );
 
-    // フル記述（SSOT 値を明示）を別の一時ツリーで実起動し、同値を確認。
     let full_temp = copy_fixture_to_temp("minimal_actor_only");
     std::fs::write(
         full_temp.path().join("pasta.toml"),
@@ -180,7 +176,7 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
 
 /// `choice_newlines` だけを省いた `[ghost]`（ほかの 4 キーは既定と違う値を明示）で
 /// **実ランタイムを起動** し、Lua から読み出した `@pasta_config.ghost.choice_newlines` が
-/// 既定値で補われ、書いたキーはそのまま届くこと（choice-line-layout 2.9）。
+/// 既定値で補われ、書いたキーはそのまま届くこと。
 #[test]
 fn choice_newlines_alone_omitted_is_filled_for_lua() {
     let temp = copy_fixture_to_temp("minimal_actor_only");
@@ -207,11 +203,11 @@ fn choice_newlines_alone_omitted_is_filled_for_lua() {
 }
 
 // ============================================================================
-// 3. [actor] 不在警告で起動/補完が停止しない (R2.3)
+// 3. [actor] 不在警告で起動/補完が停止しない
 // ============================================================================
 
 /// `[actor]` を含まない設定で起動し、不在警告が1回発火し、かつ起動・補完が
-/// 停止しないこと（R2.3）。警告メッセージは production の `apply_shiori_defaults`
+/// 停止しないこと。警告メッセージは production の `apply_shiori_defaults`
 /// が発する実フレーズで照合する（span/test 名と誤マッチしない識別句）。
 #[tracing_test::traced_test]
 #[test]
@@ -225,12 +221,10 @@ fn actor_absence_warns_without_halting_startup() {
     )
     .unwrap();
 
-    // 起動が停止しない（Ok を返す）こと。
     let runtime = PastaLoader::load(temp.path()).unwrap();
     let alive = runtime.exec("return 7").unwrap();
     assert_eq!(alive.as_i64(), Some(7));
 
-    // actor 不在警告が発火していること（production の実フレーズで照合）。
     assert!(
         logs_contain("No [actor] section is defined"),
         "actor 不在時には起動を妨げない警告が発火するべき (R2.3)"
@@ -238,10 +232,10 @@ fn actor_absence_warns_without_halting_startup() {
 }
 
 // ============================================================================
-// 4. SSOT ガード: ドキュメント・Lua リテラルと SSOT の一致 (R5.4 / R5.5)
+// 4. SSOT ガード: ドキュメント・Lua リテラルと SSOT の一致
 // ============================================================================
 
-/// SSOT アンカー: `GhostConfig::default()` が確定既定値（180/300/30/1.5/1.5）で
+/// SSOT アンカー: `GhostConfig::default()` が確定既定値で
 /// あること。これがドリフト検出の基準点となる。
 #[test]
 fn ghost_config_default_is_ssot_anchor() {
@@ -274,8 +268,7 @@ fn repo_root() -> PathBuf {
 }
 
 /// マニュアルの pasta.toml リファレンス章（`book/src/reference/pasta-toml.md`）に
-/// 記載の ghost 既定値が SSOT と一致すること（R5.4 / R5.5、
-/// manual-ssot-authority 4.3–4.5）。章の記載が独立に乖離した場合に失敗する。
+/// 記載の ghost 既定値が SSOT と一致すること。章の記載が独立に乖離した場合に失敗する。
 /// 読み先はマニュアル章であり、スキル側の生成物は読まない。
 #[test]
 fn config_reference_doc_matches_ssot() {
@@ -342,20 +335,20 @@ fn config_reference_doc_matches_ssot() {
     expect_row("hour_margin", d.hour_margin.to_string());
     // spot_newlines は浮動小数（"1.5"）。
     expect_row("spot_newlines", format!("{:?}", d.spot_newlines));
-    // choice_newlines も浮動小数（"1.5"）。choice-line-layout 5.5。
+    // choice_newlines も浮動小数（"1.5"）。
     expect_row("choice_newlines", format!("{:?}", d.choice_newlines));
-    // after_choice_newlines も浮動小数（"1.0"）。vertical-balloon-lines 7.4。
+    // after_choice_newlines も浮動小数（"1.0"）。
     expect_row(
         "after_choice_newlines",
         format!("{:?}", d.after_choice_newlines),
     );
-    // line_newlines も浮動小数（"0.0"）。actor-line-newlines 7.1。
+    // line_newlines も浮動小数（"0.0"）。
     expect_row("line_newlines", format!("{:?}", d.line_newlines));
 }
 
-/// Lua フォールバックリテラルが SSOT と一致すること（R5.5）。
+/// Lua フォールバックリテラルが SSOT と一致すること。
 /// `act.lua`（spot_newlines = 1.5、choice_newlines = 1.5）および `virtual_dispatcher.lua`
-/// （180/300/30）のハードコード既定を SSOT と突き合わせ、将来の乖離を捕捉する。
+/// のハードコード既定を SSOT と突き合わせ、将来の乖離を捕捉する。
 #[test]
 fn lua_fallback_literals_match_ssot() {
     let scripts = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("pasta_scripts");
@@ -369,13 +362,13 @@ fn lua_fallback_literals_match_ssot() {
         act_lua.contains(&format!("\"spot_newlines\", {spot_default}")),
         "act.lua の spot_newlines フォールバックリテラルが SSOT ({spot_default}) と不一致 (R5.5)"
     );
-    // act.lua: choice_newlines の Lua 側フォールバックリテラル（choice-line-layout 2.9）。
+    // act.lua: choice_newlines の Lua 側フォールバックリテラル。
     let choice_default = format!("{:?}", d.choice_newlines); // "1.5"
     assert!(
         act_lua.contains(&format!("\"choice_newlines\", {choice_default}")),
         "act.lua の choice_newlines フォールバックリテラルが SSOT ({choice_default}) と不一致 (choice-line-layout 2.9)"
     );
-    // act.lua: after_choice_newlines の Lua 側フォールバックリテラル（vertical-balloon-lines 5.6）。
+    // act.lua: after_choice_newlines の Lua 側フォールバックリテラル。
     let after_choice_default = format!("{:?}", d.after_choice_newlines); // "1.0"
     assert!(
         act_lua.contains(&format!(
@@ -383,7 +376,7 @@ fn lua_fallback_literals_match_ssot() {
         )),
         "act.lua の after_choice_newlines フォールバックリテラルが SSOT ({after_choice_default}) と不一致 (vertical-balloon-lines 5.6)"
     );
-    // act.lua: line_newlines の Lua 側フォールバックリテラル（actor-line-newlines 1.2）。
+    // act.lua: line_newlines の Lua 側フォールバックリテラル。
     let line_default = format!("{:?}", d.line_newlines); // "0.0"
     assert!(
         act_lua.contains(&format!("\"line_newlines\", {line_default}")),
@@ -414,7 +407,7 @@ fn lua_fallback_literals_match_ssot() {
 }
 
 // ============================================================================
-// 5. 完全後方互換の回帰確認 (R3.5 / R4.5 / R6.1 / R6.2)
+// 5. 完全後方互換の回帰確認
 // ============================================================================
 
 /// `[actor]` 不在警告の識別フレーズ。production の `apply_shiori_defaults`
@@ -425,7 +418,7 @@ const ACTOR_ABSENCE_PHRASE: &str = "No [actor] section is defined";
 /// `[package]` を含む従来のフル記述（hello-pasta 形式）。`[package]`（エンジン
 /// プロファイル専用）＋ `[actor]` ＋ 明示 `[ghost]`（SSOT とは**異なる**値）＋
 /// その他セクション（`[loader]` / `[talk]`）を網羅する。明示 `[ghost]` 値が補完で
-/// 上書きされないこと（no-clobber）を検証できるよう、既定とは違う値を入れる。
+/// 上書きされないことを検証できるよう、既定とは違う値を入れる。
 const LEGACY_FULL_CONFIG: &str = "\
 [package]\n\
 name = \"hello-pasta\"\n\
@@ -453,7 +446,7 @@ script_wait_normal = 40\n";
 
 /// `[package]` を含むフル記述が**エラーなく**ロードでき、`[package]` が
 /// `custom_fields` にそのまま保持され（害なく・警告なし）、明示 `[ghost]` 値が
-/// 補完で**上書きされない**こと（R4.5 / R6.1 / R6.2）。
+/// 補完で**上書きされない**こと。
 ///
 /// あわせて、`#[traced_test]` で `[actor]` 不在警告フレーズが**出ない**ことを
 /// 確認する（フル記述は `[actor]` を含むため）。
@@ -483,8 +476,8 @@ fn legacy_full_config_with_package_loads_cleanly() {
         Some("2021"),
     );
 
-    // 明示 `[ghost]` 値は補完で上書きされない（no-clobber, R6.1）。SSOT 既定
-    // （180/300/30/1.5/1.5）ではなく、作者の書いた値（90/200/15/2.5/3.5）が残ること。
+    // 明示 `[ghost]` 値は補完で上書きされない（no-clobber）。
+    // SSOT 既定ではなく、作者の書いた値が残ること。
     let ghost = config
         .custom_fields
         .get("ghost")
@@ -516,7 +509,7 @@ fn legacy_full_config_with_package_loads_cleanly() {
         Some(3.5),
     );
 
-    // `[actor]` を含むので不在警告は発火しない（無警告起動の確認, R6.2）。
+    // `[actor]` を含むので不在警告は発火しない（無警告起動の確認）。
     assert!(
         !logs_contain(ACTOR_ABSENCE_PHRASE),
         "[actor] を含むフル記述で actor 不在警告が出てはならない (R6.2)"
@@ -525,7 +518,7 @@ fn legacy_full_config_with_package_loads_cleanly() {
 
 /// `[package]` を含むフル記述で**実ランタイムが起動**でき（無警告・無挙動変化）、
 /// 明示 `[ghost]` 値が Lua の `@pasta_config.ghost.*` にそのまま露出すること
-/// （補完が明示値をクロバーしない＝R6.1、実起動経路での後方互換＝R6.3/R6.4）。
+/// （補完が明示値をクロバーしない・実起動経路での後方互換）。
 #[tracing_test::traced_test]
 #[test]
 fn legacy_full_config_starts_runtime_without_warning() {
@@ -533,13 +526,12 @@ fn legacy_full_config_starts_runtime_without_warning() {
     let temp = copy_fixture_to_temp("minimal_actor_only");
     std::fs::write(temp.path().join("pasta.toml"), LEGACY_FULL_CONFIG).unwrap();
 
-    // フル記述で実起動が成功する（Ok）。
     let runtime = PastaLoader::load(temp.path())
         .expect("legacy full config must start a real runtime (R6.1/R6.3)");
     let alive = runtime.exec("return 21 + 21").unwrap();
     assert_eq!(alive.as_i64(), Some(42));
 
-    // 明示 ghost 値が Lua 側にそのまま露出する（補完で上書きされていない, R6.1）。
+    // 明示 ghost 値が Lua 側にそのまま露出する（補完で上書きされていない）。
     assert_eq!(
         read_pasta_config_ghost_number(&runtime, "talk_interval_min"),
         90.0,
@@ -562,17 +554,15 @@ fn legacy_full_config_starts_runtime_without_warning() {
 }
 
 /// `pasta.toml` 不在は引き続き既存の `LoaderError::ConfigNotFound` で弾かれる
-/// （ファイル不在を許容しない＝R3.5）。最小化対象は記述量であって、ファイルの
+/// （ファイル不在を許容しない）。最小化対象は記述量であって、ファイルの
 /// 存在自体は必須のまま。
 #[test]
 fn missing_pasta_toml_is_rejected_with_config_not_found() {
-    // pasta.toml を含まない空ディレクトリ。
     let temp = tempfile::TempDir::new().unwrap();
 
     let err = PastaConfig::load(temp.path())
         .expect_err("file absence must be rejected, not tolerated (R3.5)");
 
-    // 既存の specific なエラー variant（ConfigNotFound）で弾かれること。
     assert!(
         matches!(err, LoaderError::ConfigNotFound(_)),
         "ファイル不在は既存の ConfigNotFound で弾かれるべき (R3.5)。実際: {err:?}"

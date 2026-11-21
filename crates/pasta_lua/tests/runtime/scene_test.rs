@@ -1,14 +1,4 @@
 //! Runtime Scene E2E Tests for pasta_lua.
-//!
-//! These tests verify scene dictionary and word dictionary runtime execution:
-//! - Scene dictionary prefix search and random selection
-//! - Word dictionary random selection and replacement
-//! - Actor word scope resolution
-//! - Complete flow from Pasta to output
-//!
-//! # Requirements Coverage
-//! - Requirement 7.1: Untested area tests
-//! - Requirement 7.2: Runtime E2E tests
 
 use crate::common;
 
@@ -43,15 +33,12 @@ fn test_e2e_pipeline_basic() {
     let source = "＊挨拶\n  さくら：「こんにちは！」\n";
     let lua_code = transpile(source);
 
-    // Execute transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Call finalize_scene
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Verify scene can be searched (シーン名は「挨拶」)
     let result: (String, String) = lua
         .load(
             r#"
@@ -70,7 +57,7 @@ fn test_e2e_pipeline_basic() {
 }
 
 // ============================================================================
-// E2E Fixture Tests (Task 2.1)
+// E2E Fixture Tests
 // ============================================================================
 
 /// Test that runtime_e2e_scene.pasta fixture parses and transpiles correctly
@@ -79,7 +66,6 @@ fn test_fixture_scene_parses() {
     let source = include_str!("../fixtures/e2e/runtime_e2e_scene.pasta");
     let lua_code = transpile(source);
 
-    // Verify 3 挨拶 scenes are registered
     assert!(
         lua_code.contains("挨拶おはよう"),
         "Should contain 挨拶おはよう scene"
@@ -100,7 +86,6 @@ fn test_fixture_word_parses() {
     let source = include_str!("../fixtures/e2e/runtime_e2e_word.pasta");
     let lua_code = transpile(source);
 
-    // Verify word definitions are present
     assert!(
         lua_code.contains("挨拶言葉"),
         "Should contain 挨拶言葉 word definition"
@@ -117,7 +102,6 @@ fn test_fixture_actor_word_parses() {
     let source = include_str!("../fixtures/e2e/runtime_e2e_actor_word.pasta");
     let lua_code = transpile(source);
 
-    // Verify actor definitions are present
     assert!(
         lua_code.contains("create_actor(\"さくら\")"),
         "Should contain さくら actor"
@@ -133,14 +117,10 @@ fn test_fixture_actor_word_parses() {
 }
 
 // ============================================================================
-// Task 2.2: Scene Dictionary E2E Tests
+// Scene Dictionary E2E Tests
 // ============================================================================
 
-/// Test scene prefix search and random selection (Task 2.2)
-///
-/// Verifies:
-/// - Prefix "挨拶" matches all 3 scenes
-/// - Multiple calls with cache consumption return all candidates
+/// Test scene prefix search and random selection
 #[test]
 fn test_scene_prefix_search_and_random_selection() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -153,7 +133,6 @@ fn test_scene_prefix_search_and_random_selection() {
         .exec()
         .unwrap();
 
-    // Search with prefix "挨拶" - should match おはよう/こんにちは/こんばんは
     let results: Vec<String> = lua
         .load(
             r#"
@@ -171,13 +150,11 @@ fn test_scene_prefix_search_and_random_selection() {
         .eval()
         .unwrap();
 
-    // Verify we got results (at least one match)
     assert!(
         !results.is_empty(),
         "Should find at least one scene with prefix 挨拶"
     );
 
-    // Check that all results contain 挨拶
     for result in &results {
         assert!(
             result.contains("挨拶"),
@@ -188,14 +165,10 @@ fn test_scene_prefix_search_and_random_selection() {
 }
 
 // ============================================================================
-// Task 2.3: Word Dictionary E2E Tests
+// Word Dictionary E2E Tests
 // ============================================================================
 
-/// Test word random selection (Task 2.3)
-///
-/// Verifies:
-/// - Global word "挨拶言葉" returns one of 3 values
-/// - Multiple calls with cache consumption eventually return all values
+/// Test word random selection
 #[test]
 fn test_word_random_selection_and_replacement() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -208,7 +181,6 @@ fn test_word_random_selection_and_replacement() {
         .exec()
         .unwrap();
 
-    // Search for word "挨拶言葉" multiple times
     let results: Vec<String> = lua
         .load(
             r#"
@@ -226,13 +198,11 @@ fn test_word_random_selection_and_replacement() {
         .eval()
         .unwrap();
 
-    // Verify we got results
     assert!(
         !results.is_empty(),
         "Should find at least one word for 挨拶言葉"
     );
 
-    // All values should be one of: おはよう、こんにちは、こんばんは
     let valid_values = ["おはよう", "こんにちは", "こんばんは"];
     for result in &results {
         assert!(
@@ -245,18 +215,14 @@ fn test_word_random_selection_and_replacement() {
 }
 
 // ============================================================================
-// Task 2.4: Actor Word Scope E2E Tests
+// Actor Word Scope E2E Tests
 // ============================================================================
 
-/// Test actor word scope resolution (Task 2.4)
+/// Test actor word scope resolution
 ///
 /// NOTE: Current search_word API does not support actor parameter.
 /// This test verifies the current behavior (global-only search).
 /// Actor-scoped word search is tracked as a future enhancement.
-///
-/// Verifies:
-/// - Global word search works
-/// - Actor scope is not yet implemented in search_word
 #[test]
 fn test_actor_word_scope_resolution() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -269,7 +235,6 @@ fn test_actor_word_scope_resolution() {
         .exec()
         .unwrap();
 
-    // Global 一人称 should be "私"
     let global_pronoun: Option<String> = lua
         .load(
             r#"
@@ -293,31 +258,23 @@ fn test_actor_word_scope_resolution() {
 }
 
 // ============================================================================
-// Task 2.5: Complete Flow E2E Test
+// Complete Flow E2E Test
 // ============================================================================
 
-/// Test complete flow from Pasta to output (Task 2.5)
-///
-/// Verifies:
-/// - Transpile → Execute → Finalize → Search works end-to-end
-/// - Both scene and word search work together
+/// Test complete flow from Pasta to output
 #[test]
 fn test_complete_flow_pasta_to_output() {
     let lua = create_runtime_with_finalize().unwrap();
 
-    // Use the scene fixture
     let source = include_str!("../fixtures/e2e/runtime_e2e_scene.pasta");
     let lua_code = transpile(source);
 
-    // Step 1: Execute transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Step 2: Finalize
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Step 3: Verify both scenes and search work
     let (scene_found, scene_name): (bool, Option<String>) = lua
         .load(
             r#"
@@ -335,7 +292,6 @@ fn test_complete_flow_pasta_to_output() {
         "Scene name should contain 'メイン'"
     );
 
-    // Verify scene prefix search also works
     let prefix_found: bool = lua
         .load(
             r#"
@@ -351,16 +307,14 @@ fn test_complete_flow_pasta_to_output() {
 }
 
 // ============================================================================
-// Actor Word Shuffle Tests (actor-dict-word-shuffle spec)
+// Actor Word Shuffle Tests
 // ============================================================================
 
-/// Task 2.1: アクタースコープ単語のシャッフル＆順次消費をプロキシ経由で検証
+/// アクタースコープ単語のシャッフル＆順次消費をプロキシ経由で検証
 ///
 /// PROXY_IMPL.word() → Level 2 (SEARCH:search_word) → WordTable のシャッフルパスが
 /// 正しく動作し、3値すべてが順次消費されることを確認する。
 /// set_word_selector() でモックセレクタを注入して決定論的に検証する。
-///
-/// Requirements: 1.1, 1.2, 1.3, 2.1, 3.1
 #[test]
 fn test_actor_word_shuffle_via_proxy() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -404,18 +358,15 @@ fn test_actor_word_shuffle_via_proxy() {
         .eval()
         .unwrap();
 
-    // 3 値すべてが順次消費されることを検証
     assert_eq!(results.len(), 3, "Should get 3 results");
     assert_eq!(results[0], "\\s[0]", "First should be \\s[0]");
     assert_eq!(results[1], "\\s[100]", "Second should be \\s[100]");
     assert_eq!(results[2], "\\s[200]", "Third should be \\s[200]");
 }
 
-/// Task 2.2: アクタースコープからグローバルへのフォールバック検証
+/// アクタースコープからグローバルへのフォールバック検証
 ///
 /// アクター辞書に存在しない単語がグローバル単語にフォールバックすることを確認する。
-///
-/// Requirements: 3.2
 #[test]
 fn test_actor_word_fallback_to_global() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -452,11 +403,9 @@ fn test_actor_word_fallback_to_global() {
     );
 }
 
-/// Task 2.3: 単一値アクター単語の後方互換性
+/// 単一値アクター単語の後方互換性
 ///
 /// アクター辞書に単一値定義された単語が常に同じ値を返すことを確認する。
-///
-/// Requirements: 1.4, 3.3
 #[test]
 fn test_actor_word_single_value_backward_compat() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -491,7 +440,6 @@ fn test_actor_word_single_value_backward_compat() {
         .eval()
         .unwrap();
 
-    // 3回とも同じ値
     assert_eq!(results.len(), 3, "Should get 3 results");
     for (i, val) in results.iter().enumerate() {
         assert_eq!(
@@ -505,10 +453,10 @@ fn test_actor_word_single_value_backward_compat() {
 }
 
 // ============================================================================
-// 空ローカルシーン E2E Tests (optional-action-local-scene)
+// 空ローカルシーン E2E Tests
 // ============================================================================
 
-/// 名前付き空ローカルシーンのE2Eテスト (Req 4.1)
+/// 名前付き空ローカルシーンのE2Eテスト
 ///
 /// `・分岐会話無し` の直後に `・分岐会話アリ` が続く構文をパース→トランスパイル→実行する。
 /// アクション行なし分岐と通常分岐の混在を検証する。
@@ -519,15 +467,12 @@ fn test_e2e_empty_local_scene() {
     let source = "＊サンプル\n\u{3000}ぱすた：分岐するよ！\n\u{3000}\u{3000}＞分岐\n\n\u{3000}\u{3000}・分岐会話無し\n\u{3000}\u{3000}・分岐会話アリ\n\u{3000}ぱすた：分岐したよ！\n";
     let lua_code = transpile(source);
 
-    // Execute transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Call finalize_scene
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Verify scene can be searched
     let result: (String, String) = lua
         .load(
             r#"
@@ -545,7 +490,7 @@ fn test_e2e_empty_local_scene() {
     );
 }
 
-/// 空スタートスコープのE2Eテスト (Req 4.2)
+/// 空スタートスコープのE2Eテスト
 ///
 /// `local_start_scene_scope` がアクション行0個で直接ローカルシーンに分かれるケースを検証する。
 #[test]
@@ -555,15 +500,12 @@ fn test_e2e_empty_start_scope_local_scene() {
     let source = "＊空スタート\n\u{3000}\u{3000}・分岐A\n\u{3000}ぱすた：Aルート！\n";
     let lua_code = transpile(source);
 
-    // Execute transpiled code
     lua.load(&lua_code).exec().unwrap();
 
-    // Call finalize_scene
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
 
-    // Verify scene can be searched
     let result: (String, String) = lua
         .load(
             r#"

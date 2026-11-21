@@ -1,12 +1,11 @@
-//! Source-map seam tests for the Lua code generator (Task 5.1).
+//! Source-map seam tests for the Lua code generator.
 //!
-//! These tests prove the R4 feasibility seam:
+//! These tests prove the source-map seam:
 //! - With NO sink attached, generated Lua is byte-identical to before (covered by
 //!   the existing insta snapshots; here we assert the inert default explicitly).
 //! - With a CAPTURING sink attached, the generator records `(out_line -> .pasta span)`
 //!   pairs for the representative action-emitting path, proving `.pasta`<->`.lua`
-//!   line correspondence is RESOLVABLE (Requirement 4.1) via a real recording seam
-//!   (Requirement 4.2).
+//!   line correspondence is RESOLVABLE via a real recording seam.
 //! - The `out_line` counter accurately tracks the number of generated output lines.
 
 use pasta_dsl::parser::{Action, Span};
@@ -159,7 +158,7 @@ fn test_out_line_counter_matches_emitted_line_count() {
 }
 
 /// A line containing concatenation maps back to its own `.pasta` line, the same
-/// way a line containing arithmetic does (string-concat-operator Req 6.5).
+/// way a line containing arithmetic does.
 #[test]
 fn test_concat_line_maps_to_its_pasta_line_like_arith() {
     use pasta_dsl::parser::parse_str;
@@ -192,24 +191,14 @@ fn test_concat_line_maps_to_its_pasta_line_like_arith() {
     assert_eq!(pasta_line_of("act:call("), vec![4]);
 }
 
-/// Task 8.2 — ゼロコスト/サンドボックス **集約回帰ゲート（バイト一致サブ）**。
+/// ゼロコスト/サンドボックス **集約回帰ゲート（バイト一致サブ）**。
 ///
-/// このモジュールは「本番 transpile（sink 非装着）出力のバイト不変」を **一箇所に集約** し、
-/// 対応する要件へ明示マッピングする durable な回帰ゲートである。R5.2/5.3/5.5 のランタイム不変
-/// 条件は `tests/runtime/debug_integration_test.rs` の同名モジュールが受け持つ（ランタイム
-/// アクセスが要るため分割。本モジュールは code_gen 本番 API に届く transpiler ターゲット側）。
-///
-/// 要件マッピング（`.kiro/specs/completed/pasta-vscode-lua-debug/requirements.md`）:
-/// - **R4.6**: スライス無効時、実証スライスのコード経路を本番動作へ露出せず追加コストを与えない。
-///   → 本番 transpile（sink=None）は出力にゼロバイトも追加しない。
-/// - **R5.2**: 無効時、本番実行の挙動に追加コストを与えない（出力バイト一致＝回帰なし）。
-///
-/// design.md 参照: "Performance/Regression"（無効ビルドでのトランスパイル出力バイト一致・
-/// `SourceMapSink=None`・回帰なし）、"DebugConfig & Gate"（4.6 = None sink / feature gate）、
-/// および本ファイル冒頭が依拠する insta スナップショット群（5.1）が standing gate。
+/// 「本番 transpile（sink 非装着）出力のバイト不変」を一箇所に集約する durable な回帰ゲート。
+/// ランタイム不変条件は `tests/runtime/debug_integration_test.rs` の同名モジュールが受け持つ
+/// （ランタイムアクセスが要るため分割。本モジュールは code_gen 本番 API に届く transpiler ターゲット側）。
 ///
 /// 既存の `test_no_sink_is_byte_identical_and_records_nothing`（action 単位）と insta
-/// スナップショット（5.1）に加え、ここでは **本番 transpile API 全体**（`LuaTranspiler`）を
+/// スナップショットに加え、ここでは **本番 transpile API 全体**（`LuaTranspiler`）を
 /// 代表 `.pasta` 入力に通し、(a) 既知 golden とのバイト完全一致、(b) 複数回実行の決定性、
 /// (c) `None` sink がゼロバイトも足さないこと、を直接表明する。
 mod zero_cost_sandbox_regression {
@@ -236,7 +225,7 @@ mod zero_cost_sandbox_regression {
         output
     }
 
-    /// **R5.2 — 決定性**: 本番 transpile を 2 回独立に走らせると、生成バイトは完全一致する。
+    /// **決定性**: 本番 transpile を 2 回独立に走らせると、生成バイトは完全一致する。
     /// sink 非装着パスが非決定的な副作用を持たないこと（= ゼロコスト・回帰なし）の直接証明。
     #[test]
     fn r5_2_production_transpile_is_deterministic_byte_for_byte() {
@@ -250,7 +239,7 @@ mod zero_cost_sandbox_regression {
         assert!(!run1.is_empty(), "fixture must produce real output bytes");
     }
 
-    /// **R4.6 — None sink はゼロバイトも追加しない**（バイト golden）。
+    /// **None sink はゼロバイトも追加しない**（バイト golden）。
     ///
     /// `source_map: Option<&mut dyn SourceMapSink>` フィールドは常に存在し、本番では既定
     /// `None`。その存在が出力へ一切のバイトを足さないことを、既知 golden との完全一致で表明。
@@ -264,7 +253,7 @@ mod zero_cost_sandbox_regression {
 
         // 既知 golden: 本番 transpile（scene scaffold + 2 talk アクション）の完全出力。
         // None sink でも余分な行・余分なバイトは一切付かない（シームはゼロバイト）。
-        // init_scene の 4 つ目の行の対応はシンクの有無によらず出る（runtime-error-balloon 2.5）。
+        // init_scene の 4 つ目の行の対応はシンクの有無によらず出る。
         let golden = "\
 local PASTA = require \"pasta\"
 local GLOBAL = require \"pasta.global\"

@@ -1,5 +1,5 @@
 -- pasta.store / pasta.actor の CONFIG.actor 由来初期化テスト
--- review-improvement-loop cell 3.46 (G1): モジュールロード時に 1 度だけ実行される
+-- モジュールロード時に 1 度だけ実行される
 -- CONFIG.actor 初期化パス（store.lua の spot 転送・actor.lua のメタテーブル付与と
 -- name 補完）が未カバーだった（既存 persist_spot_position_test は CONFIG 未定義時のみ）。
 --

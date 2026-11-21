@@ -62,7 +62,6 @@ fn test_transpile_sample_pasta_header() {
     let transpiler = LuaTranspiler::default();
     let mut output = Vec::new();
 
-    // Parse the sample - returns PastaFile directly
     let file = parse_str(SAMPLE_PASTA, "test.pasta").unwrap();
 
     let result = transpiler.transpile(&file, &mut output);
@@ -70,7 +69,6 @@ fn test_transpile_sample_pasta_header() {
 
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify header
     assert!(
         lua_code.contains("local PASTA = require \"pasta\""),
         "Missing PASTA require statement"
@@ -87,7 +85,6 @@ fn test_transpile_sample_pasta_actors() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify actor definitions (Requirement 3a)
     assert!(
         lua_code.contains("PASTA.create_actor(\"さくら\")"),
         "Missing actor さくら"
@@ -97,7 +94,6 @@ fn test_transpile_sample_pasta_actors() {
         "Missing actor うにゅう"
     );
 
-    // Verify actor attributes with symmetric API: ACTOR:create_word(key):entry(...) (actor-word-dictionary)
     assert!(
         lua_code.contains("ACTOR:create_word(\"通常\"):entry([=[\\s[0]]=])"),
         "Missing さくら.通常 attribute with create_word API"
@@ -122,25 +118,22 @@ fn test_transpile_sample_pasta_scenes() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify scene definition (Requirement 3b)
-    // Counter is now assigned by Lua runtime, not transpiler (Requirement 8.5)
+    // Counter is assigned by the Lua runtime, not the transpiler
     assert!(
         lua_code.contains("PASTA.create_scene(\"メイン\")"),
         "Missing scene メイン"
     );
 
-    // Verify entry point function (Requirement 3c)
     assert!(
         lua_code.contains("function SCENE.__start__(act, ...)"),
         "Missing __start__ function"
     );
 
-    // Verify session initialization
     assert!(
         lua_code.contains("local args = { ... }"),
         "Missing args initialization"
     );
-    // 書いたシーン名と行の対応を渡す（__start__ はローカル名の代わりに nil・runtime-error-balloon 2.4, 2.5）
+    // 書いたシーン名と行の対応を渡す（__start__ はローカル名の代わりに nil）
     assert!(
         lua_code.contains(r#"local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|"#),
         "Missing session initialization: {}",
@@ -154,7 +147,6 @@ fn test_transpile_sample_pasta_scenes() {
         lua_code
     );
 
-    // Verify local scene function (Requirement 3c)
     assert!(
         lua_code.contains("function SCENE.自己紹介_"),
         "Missing 自己紹介 local scene function"
@@ -171,7 +163,6 @@ fn test_transpile_sample_pasta_actions() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify talk actions (Requirement 3d)
     assert!(
         lua_code.contains("act:actor_proxy(\"さくら\"):talk(\"こんにちは。\")"),
         "Missing さくら talk action"
@@ -192,11 +183,8 @@ fn test_transpile_do_end_scope_separation() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Normalize line endings for reliable pattern matching
     let lua_code = normalize_line_endings(&lua_code);
 
-    // Verify do...end scope separation (Requirement 1)
-    // Count do/end pairs
     let do_count = lua_code.matches("\ndo\n").count() + lua_code.matches("do\n").count();
     let end_count = lua_code.matches("\nend\n").count() + lua_code.matches("end\n").count();
 
@@ -234,7 +222,6 @@ fn test_string_literalizer_in_transpile() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify long string format for SakuraScript with brackets
     assert!(
         lua_code.contains("[=[\\s[0]]=]"),
         "SakuraScript should use [=[...]=] format due to brackets"
@@ -250,18 +237,15 @@ fn test_transpile_reference_sample_structure() {
     let actors = get_actor_scopes(&file);
     let scenes = get_global_scene_scopes(&file);
 
-    // Verify the sample parses correctly
     assert_eq!(actors.len(), 2, "Expected 2 actors");
     assert_eq!(scenes.len(), 2, "Expected 2 global scenes");
 
-    // Transpile
     let transpiler = LuaTranspiler::default();
     let mut output = Vec::new();
 
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify key structural elements
     assert!(
         lua_code.contains("PASTA.create_actor(\"さくら\")"),
         "Missing actor さくら"
@@ -270,7 +254,7 @@ fn test_transpile_reference_sample_structure() {
         lua_code.contains("PASTA.create_actor(\"うにゅう\")"),
         "Missing actor うにゅう"
     );
-    // Counter is now assigned by Lua runtime, not transpiler (Requirement 8.5)
+    // Counter is assigned by the Lua runtime, not the transpiler
     assert!(
         lua_code.contains("PASTA.create_scene(\"メイン\")"),
         "Missing scene メイン"
@@ -328,7 +312,7 @@ fn test_debug_dump_generated_lua() {
                 // Count ends to find the right scope boundary
             }
         }
-        // Counter now assigned by Lua runtime, so check for base name
+        // Counter is assigned by the Lua runtime, so check for the base name
         if line.contains("会話分岐") && line.contains("PASTA.create_scene") {
             break;
         }
@@ -336,13 +320,12 @@ fn test_debug_dump_generated_lua() {
     eprintln!("=== END ===\n");
 }
 
-/// Requirement 6: Verify specific code patterns match reference
+/// Verify specific code patterns match reference
 #[test]
 fn test_transpile_reference_code_patterns() {
     let sample_pasta = include_str!("../fixtures/sample.pasta");
     let sample_lua = include_str!("../fixtures/sample.lua");
 
-    // Parse and transpile
     let file = parse_str(sample_pasta, "sample.pasta").unwrap();
 
     let transpiler = LuaTranspiler::default();
@@ -350,7 +333,6 @@ fn test_transpile_reference_code_patterns() {
     transpiler.transpile(&file, &mut output).unwrap();
     let generated_lua = String::from_utf8(output).unwrap();
 
-    // Extract code lines (non-comment) from reference
     let reference_patterns: Vec<&str> = sample_lua
         .lines()
         .filter(|line| {
@@ -360,14 +342,12 @@ fn test_transpile_reference_code_patterns() {
         .map(|line| line.trim())
         .collect();
 
-    // Check that key patterns from reference exist in generated output
     let generated_normalized = generated_lua.replace("    ", "\t");
 
     let mut missing_patterns = Vec::new();
     let mut found_count = 0;
 
     for pattern in &reference_patterns {
-        // Normalize pattern for comparison
         let pattern_normalized = pattern.replace("    ", "\t");
         if generated_normalized.contains(&pattern_normalized) || generated_lua.contains(*pattern) {
             found_count += 1;
@@ -376,7 +356,6 @@ fn test_transpile_reference_code_patterns() {
         }
     }
 
-    // Report missing patterns
     if !missing_patterns.is_empty() {
         eprintln!("\n【参照実装に存在するが生成出力に欠落しているパターン】");
         for (idx, pattern) in missing_patterns.iter().take(10).enumerate() {
@@ -395,7 +374,6 @@ fn test_transpile_reference_code_patterns() {
         reference_patterns.len()
     );
 
-    // Assert reasonable coverage
     assert!(
         coverage >= 50.0,
         "Pattern coverage too low: {:.1}%. Expected at least 50%.",
@@ -404,7 +382,7 @@ fn test_transpile_reference_code_patterns() {
 }
 
 /// `init_scene` には、別名で置き換える前・記号を識別子に直す前の、書いたとおりの名前を
-/// 文字列で渡す。単独の `＊` 行は受け継いだ名前を渡す（runtime-error-balloon 2.4, 2.7）。
+/// 文字列で渡す。単独の `＊` 行は受け継いだ名前を渡す。
 #[test]
 fn test_init_scene_receives_written_scene_names() {
     let source = "\
@@ -487,7 +465,7 @@ pub(crate) fn init_scene_line_maps(lua_code: &str) -> Vec<(String, Vec<(u32, u32
 }
 
 /// `init_scene` の行の対応は、ローカルシーンの関数の行とシーンの Lua のブロックの行を
-/// `.pasta` の行へ結ぶ。シンクを付けても生成コードは変わらない（runtime-error-balloon 2.5, 5.7）。
+/// `.pasta` の行へ結ぶ。シンクを付けても生成コードは変わらない。
 #[test]
 fn test_init_scene_line_map_points_to_pasta_lines() {
     let source = "\

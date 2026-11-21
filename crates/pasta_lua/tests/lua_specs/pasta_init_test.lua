@@ -1,5 +1,5 @@
 -- pasta（pasta/init.lua 公開 API）と pasta.global のエイリアス同一性テスト
--- review-improvement-loop cell 3.46 (G1): トランスパイラー出力が依存する
+-- トランスパイラー出力が依存する
 -- PASTA 公開 API のリダイレクト束縛と finalize_scene スタブ契約を固定する
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test

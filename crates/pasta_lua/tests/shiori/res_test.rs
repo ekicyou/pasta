@@ -1,13 +1,10 @@
 //! Integration tests for pasta.shiori.res module (SHIORI/3.0 response builder).
-//!
-//! Tests verify that the RES module correctly generates SHIORI/3.0 responses.
 
 use crate::common;
 
 use common::{create_empty_context, get_scripts_dir};
 use pasta_lua::PastaLuaRuntime;
 
-/// Helper to create a runtime with package.path configured for pasta modules.
 fn create_runtime_with_pasta_path() -> PastaLuaRuntime {
     let ctx = create_empty_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
@@ -359,7 +356,7 @@ fn test_defensive_nil_handling() {
 }
 
 // ============================================================================
-// Integration: シーンの変数の改行で応答が割れない（ponytail-lua-scripts 3.1、要件 2.4）
+// Integration: シーンの変数の改行で応答が割れない
 // ============================================================================
 
 #[test]

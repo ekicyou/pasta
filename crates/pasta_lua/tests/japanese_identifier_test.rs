@@ -4,7 +4,6 @@ use mlua::prelude::*;
 fn test_japanese_identifier_support() -> LuaResult<()> {
     let lua = Lua::new();
 
-    // 日本語識別子のテスト
     let result: String = lua
         .load(
             r#"

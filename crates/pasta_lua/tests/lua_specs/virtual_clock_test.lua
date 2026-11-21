@@ -1,6 +1,5 @@
--- pasta.shiori.clock 仮想時刻のずれを持つ時計の単体テスト (tutorial-ssp-gaps 2.1)
+-- pasta.shiori.clock 仮想時刻のずれを持つ時計の単体テスト
 -- 合図の見込み・返事からのずれ・今の時刻と日付の表・読み取りのスクリプト
--- Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 7.1, 7.3
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect

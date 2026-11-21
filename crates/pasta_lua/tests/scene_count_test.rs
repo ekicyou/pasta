@@ -1,6 +1,5 @@
-//! scene-count の結合テスト。一時ゴーストを `PastaLoader::load` で実物のランタイムとして起こし、
-//! `@pasta_search` の `count_scene`・`count_scene_exact` の数え方を確かめる
-//! （requirements 1.1〜1.6・2.1〜2.3・5.1〜5.3・8.1）。
+//! `count_scene`・`count_scene_exact` の結合テスト。一時ゴーストを `PastaLoader::load` で実物のランタイムとして起こし、
+//! `@pasta_search` の数え方を確かめる。
 //! `mod common` の宣言により `PASTA_DEBUG` 中和ガード（`#[ctor]`）が適用される。
 
 mod common;
@@ -115,7 +114,7 @@ return EVENT.fire({{ id = "{id}", method = "get", version = 30 }})"#
     value_as_str(&value).expect("応答が文字列でない")
 }
 
-/// 1.1・2.1・1.3・1.5・5.3: 前方一致 5・完全一致 3・名前が続くシーン 2。ローカルシーン `・雑談` は数えず、
+/// 前方一致 5・完全一致 3・名前が続くシーン 2。ローカルシーン `・雑談` は数えず、
 /// `＆` の属性を書いたシーンも数に入り、`雑談・朝` は照合用の名前 `雑談_朝` に揃って数えられる。
 #[test]
 fn counts_prefix_and_exact_global_candidates() {
@@ -128,7 +127,7 @@ fn counts_prefix_and_exact_global_candidates() {
     assert_eq!(count(&runtime, "count_scene_exact", "雑談・朝"), 2);
 }
 
-/// 1.6・2.3: 無い名前は前方一致・完全一致とも 0 で、警告が出ない（別名を当てて見つからないときも）。
+/// 無い名前は前方一致・完全一致とも 0 で、警告が出ない（別名を当てて見つからないときも）。
 #[traced_test]
 #[test]
 fn missing_name_counts_zero_without_warning() {
@@ -154,7 +153,7 @@ fn missing_name_counts_zero_without_warning() {
     assert!(!logs_contain("Scene not found"));
 }
 
-/// 3.7 の前提・1.1: `main.lua` で Lua から登録したグローバルシーンも数える。
+/// `main.lua` で Lua から登録したグローバルシーンも数える。
 #[test]
 fn counts_scenes_registered_from_lua() {
     let (_temp, runtime) = load_ghost(INTRO_PASTA, Some(INTRO_MAIN_LUA));
@@ -163,7 +162,7 @@ fn counts_scenes_registered_from_lua() {
     assert_eq!(count(&runtime, "count_scene", "雑談"), 5);
 }
 
-/// 1.4・2.3: 既定の別名 `会話` → `OnTalk`。前方一致は `＊OnTalk朝` を入れて `＊会話・朝` を入れず、
+/// 既定の別名 `会話` → `OnTalk`。前方一致は `＊OnTalk朝` を入れて `＊会話・朝` を入れず、
 /// 完全一致は `＊OnTalk朝` を入れない（`OnTalk` と同じ数）。`会話・朝` は揃えた `会話_朝` で数える。
 #[test]
 fn alias_is_applied_before_counting() {
@@ -176,7 +175,7 @@ fn alias_is_applied_before_counting() {
     assert_eq!(count(&runtime, "count_scene_exact", "会話・朝"), 1);
 }
 
-/// 1.2・2.2: 検索を候補の数だけ回して出た登録名の種類の数が、数えた数と等しい（巡回は重ならない）。
+/// 検索を候補の数だけ回して出た登録名の種類の数が、数えた数と等しい（巡回は重ならない）。
 #[test]
 fn count_equals_distinct_search_candidates() {
     let cases = [
@@ -203,7 +202,7 @@ fn count_equals_distinct_search_candidates() {
     }
 }
 
-/// 5.1・5.2: 同じ選び手の並びを与えた 2 つのランタイムで、片方だけ `＞雑談` の間に数を挟んでも、
+/// 同じ選び手の並びを与えた 2 つのランタイムで、片方だけ `＞雑談` の間に数を挟んでも、
 /// 選ばれた並びが同じ（2 巡ぶん）。
 #[test]
 fn counting_does_not_change_next_selection() {
@@ -331,7 +330,7 @@ fn value_of(response: &str) -> &str {
     &rest[..rest.find("\r\n").unwrap_or(rest.len())]
 }
 
-/// 3.3〜3.6・8.2: アクション行・変数代入と式・Call・Lua の 4 通りで同じ数（英語名と日本語名も同じ）。
+/// アクション行・変数代入と式・Call・Lua の 4 通りで同じ数（英語名と日本語名も同じ）。
 #[traced_test]
 #[test]
 fn four_call_styles_return_same_count() {
@@ -359,7 +358,7 @@ fn four_call_styles_return_same_count() {
     assert_eq!(log_lines!(" WARN "), 0);
 }
 
-/// 4.1・4.2: 値なし・空文字列・真偽値は失敗表記とログ 1 行を出して 0 を返す。
+/// 値なし・空文字列・真偽値は失敗表記とログ 1 行を出して 0 を返す。
 #[traced_test]
 #[test]
 fn bad_arguments_report_and_return_zero() {
@@ -389,7 +388,7 @@ fn bad_arguments_report_and_return_zero() {
     }
 }
 
-/// 4.3・4.4: 数値の引数は報告なしの 0。余分な引数は 1 つ目で数え、引数付きで呼ばれたシーンの中から
+/// 数値の引数は報告なしの 0。余分な引数は 1 つ目で数え、引数付きで呼ばれたシーンの中から
 /// Call の形で呼んでも（呼んだシーンの引数が後ろに足される）何も出ない。
 #[traced_test]
 #[test]
@@ -405,7 +404,7 @@ fn number_and_extra_arguments_are_silent() {
     assert!(!logs_contain("bad argument"));
 }
 
-/// 4.5: `[logging] balloon_warning = false` なら表記を出さず、ログだけ出す。
+/// `[logging] balloon_warning = false` なら表記を出さず、ログだけ出す。
 #[traced_test]
 #[test]
 fn balloon_warning_off_logs_only() {
@@ -415,7 +414,7 @@ fn balloon_warning_off_logs_only() {
     assert_eq!(log_lines!("シーン数: bad argument: name=nil"), 1);
 }
 
-/// 4.6: act 無しで Lua から誤った引数を渡してもエラーにならず、ログだけ出して 0 を返す。
+/// act 無しで Lua から誤った引数を渡してもエラーにならず、ログだけ出して 0 を返す。
 #[traced_test]
 #[test]
 fn lua_call_without_act_logs_only() {
@@ -429,7 +428,7 @@ fn lua_call_without_act_logs_only() {
     assert_eq!(log_lines!("scene_count: bad argument: name='true'"), 1);
 }
 
-/// 5.4: `＊シーン数` を書いた辞書でも、`＞シーン数（「雑談」）` は組み込みの関数を呼ぶ。
+/// `＊シーン数` を書いた辞書でも、`＞シーン数（「雑談」）` は組み込みの関数を呼ぶ。
 #[test]
 fn builtin_wins_over_scene_of_same_name() {
     let (_temp, runtime) = load_ghost(CALL_PASTA, Some(CALL_MAIN_LUA));

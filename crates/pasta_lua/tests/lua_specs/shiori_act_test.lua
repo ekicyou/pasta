@@ -380,11 +380,11 @@ describe("SHIORI_ACT - build()", function()
         local result2 = act:build()
 
         expect(result1:find("\\s%[5%]")):toBeTruthy()
-        expect(result2):toBe(nil) -- nil after auto-reset (act-build-early-return)
+        expect(result2):toBe(nil) -- nil after auto-reset
     end)
 end)
 
--- actor-surface-restore Task 3.2: STORE.appearance をビルダーへ渡す（直接変更方式）
+-- STORE.appearance をビルダーへ渡す（直接変更方式）
 describe("SHIORI_ACT - build() STORE.appearance連携 (actor-surface-restore)", function()
     test("2.7/4.1: act 経由でストアの外見状態が更新され、後続ビルドの \\p[0] 直後に \\s[10] を復旧する", function()
         local STORE = require("pasta.store")
@@ -397,7 +397,7 @@ describe("SHIORI_ACT - build() STORE.appearance連携 (actor-surface-restore)", 
         act:talk(actors.sakura, "A1"):surface(3)
         act:build()
 
-        -- 直接変更方式: 同じ表がその場で更新される（サーフェスIDは出力どおりの文字列で記録: 1.5）
+        -- 直接変更方式: 同じ表がその場で更新される（サーフェスIDは出力どおりの文字列で記録）
         expect(STORE.appearance):toBe(appearance)
         expect(appearance.actors["うにゅう"].surface):toBe("10")
         expect(appearance.actors["さくら"].surface):toBe("3")
@@ -562,8 +562,7 @@ describe("SHIORI_ACT - req field", function()
 end)
 
 -- ============================================================================
--- Task 4.1: transfer_date_to_var() テスト
--- Requirements: 1.1, 1.2, 1.3, 1.4
+-- transfer_date_to_var() テスト
 -- ============================================================================
 
 describe("SHIORI_ACT - transfer_date_to_var()", function()
@@ -734,7 +733,7 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
         end
     end)
 
-    -- date-var-calendar: ＄祝日・＄行事（@pasta_calendar から引く）
+    -- ＄祝日・＄行事（@pasta_calendar から引く）
     local function date_req(y, m, d)
         return { id = "OnSecondChange", date = { year = y, month = m, day = d, hour = 0, min = 0, sec = 0, wday = 0 } }
     end
@@ -798,8 +797,7 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
 end)
 
 -- ============================================================================
--- tutorial-ssp-gaps: transfer_date_to_var() は仮想の日時を移す
--- Requirements: 2.2
+-- transfer_date_to_var() は仮想の日時を移す
 -- ============================================================================
 
 describe("SHIORI_ACT - transfer_date_to_var() 仮想の日時", function()
@@ -888,7 +886,7 @@ describe("SHIORI_ACT - transfer_date_to_var() 仮想の日時", function()
 end)
 
 -- ============================================================================
--- act-token-grouping-fix: さくらスクリプトのバイト比較
+-- さくらスクリプトのバイト比較
 -- 先頭（と clear_spot の後、発言より前）の表示制御はアクター未指定として積んだ位置に出る。
 -- clear_spot は現在のグループを閉じる。set_spot（spot）はグループを閉じない。
 -- 前提: 既定サーフェスを持たないアクター（さくら＝立ち位置 0、うにゅう＝立ち位置 1）。
@@ -1054,8 +1052,8 @@ describe("SHIORI_ACT - clear_spot を挟む出力のバイト比較 (act-token-g
 end)
 
 -- ============================================================================
--- choice-line-layout: act:choice の行の配置（Task 2.2）
--- act:choice で積んだ選択肢にも、選択肢行と同じ配置が当たる（2.6）。
+-- act:choice の行の配置
+-- act:choice で積んだ選択肢にも、選択肢行と同じ配置が当たる。
 -- 期待値は sakura_builder_test.lua の「字 → 選択肢 → 選択肢」と同じ並びである。
 -- ============================================================================
 
@@ -1069,7 +1067,7 @@ describe("SHIORI_ACT - choice-line-layout: act:choice の行の配置", function
         STORE.reset()
     end)
 
-    -- Task 2.3: act:sakura_script(話し手, "\\c") は、DSL の台詞の行に書いた \c が生成する呼び出し
+    -- act:sakura_script(話し手, "\\c") は、DSL の台詞の行に書いた \c が生成する呼び出し
     test("7.1/7.2: 台詞に書いた \\c の後は、act:choice の前にも、話し手が戻った後の talk の前にも区切りが出ない", function()
         local act, sakura, kero, STORE = new_bytes_act()
         act:talk(sakura, "まえおき")

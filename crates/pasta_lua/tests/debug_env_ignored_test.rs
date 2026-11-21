@@ -1,4 +1,4 @@
-//! 古い環境変数を読まないことの結合テスト（debug-mcp-runtime 3.4）。
+//! 古い環境変数を読まないことの結合テスト。
 //!
 //! `PASTA_DEBUG_PORT`・`PASTA_DEBUG_SOURCE_MODE`・`PASTA_DEBUG_SOURCE_MAP_SIDECAR` を置いた
 //! プロセスで有効なゴーストを読み込み、`.lua.map` が書かれず、待ち受けのログが出ないことを確かめる。

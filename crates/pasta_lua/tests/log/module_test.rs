@@ -1,11 +1,4 @@
 //! Unit tests for the @pasta_log module.
-//!
-//! Tests cover:
-//! - All 5 log level functions (trace/debug/info/warn/error)
-//! - Value conversion (string, number, boolean, table, nil)
-//! - Caller information capture (source, line, function name)
-//! - Table TOML one-line conversion with size/depth limits
-//! - Edge cases (empty args, circular refs, large tables)
 
 use mlua::{Lua, StdLib, Table};
 use tracing_test::traced_test;
@@ -14,11 +7,9 @@ use tracing_test::traced_test;
 fn create_test_lua_with_log() -> Lua {
     let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
 
-    // Register the log module
     let log_module =
         pasta_lua::runtime::log::register(&lua).expect("Failed to register log module");
 
-    // Put it in package.loaded
     let package: Table = lua.globals().get("package").unwrap();
     let loaded: Table = package.get("loaded").unwrap();
     loaded.set("@pasta_log", log_module).unwrap();
@@ -27,7 +18,7 @@ fn create_test_lua_with_log() -> Lua {
 }
 
 // ============================================================================
-// Requirement 1.1: 5-level log functions
+// 5-level log functions
 // ============================================================================
 
 #[traced_test]
@@ -111,7 +102,7 @@ fn test_log_error_outputs_message() {
 }
 
 // ============================================================================
-// Requirement 1.3: String argument
+// String argument
 // ============================================================================
 
 #[traced_test]
@@ -131,7 +122,7 @@ fn test_log_string_value() {
 }
 
 // ============================================================================
-// Requirement 1.4: Non-string value conversion
+// Non-string value conversion
 // ============================================================================
 
 #[traced_test]
@@ -231,14 +222,13 @@ fn test_log_array_table_as_toml_inline() {
 }
 
 // ============================================================================
-// Requirement 1.5: nil / no argument
+// nil / no argument
 // ============================================================================
 
 #[traced_test]
 #[test]
 fn test_log_nil_value() {
     let lua = create_test_lua_with_log();
-    // Should not error
     lua.load(
         r#"
         local log = require "@pasta_log"
@@ -253,7 +243,6 @@ fn test_log_nil_value() {
 #[test]
 fn test_log_no_argument() {
     let lua = create_test_lua_with_log();
-    // Calling with no argument should not error
     lua.load(
         r#"
         local log = require "@pasta_log"
@@ -265,7 +254,7 @@ fn test_log_no_argument() {
 }
 
 // ============================================================================
-// Requirement 1.4: Table size limit (>1000 elements)
+// Table size limit (>1000 elements)
 // ============================================================================
 
 #[traced_test]
@@ -290,7 +279,7 @@ fn test_log_large_table_abbreviated() {
 }
 
 // ============================================================================
-// Requirement 2.1-2.2: Caller information
+// Caller information
 // ============================================================================
 
 #[traced_test]
@@ -346,7 +335,7 @@ fn test_log_contains_caller_fn() {
 }
 
 // ============================================================================
-// Requirement 3.3: Module metadata
+// Module metadata
 // ============================================================================
 
 #[test]
@@ -382,7 +371,7 @@ fn test_module_has_description() {
 }
 
 // ============================================================================
-// Requirement 3.1: Module accessible via require
+// Module accessible via require
 // ============================================================================
 
 #[test]
@@ -456,12 +445,10 @@ fn test_log_circular_reference_no_error() {
     )
     .exec()
     .unwrap();
-
-    // Should not crash — tostring fallback
 }
 
 // ============================================================================
-// toml-serialization Requirement 6: 表は TOML の値の書き方で 1 行
+// 表は TOML の値の書き方で 1 行
 // ============================================================================
 
 /// Lua のコードを走らせる（ログを捕まえるのは呼ぶ側の traced_test）。
