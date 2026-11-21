@@ -85,7 +85,6 @@ pub(crate) fn parse_global_scene_start(
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::global_scene_line => {
-                // Named scene
                 for scene_inner in inner.into_inner() {
                     match scene_inner.as_rule() {
                         Rule::id => result = (scene_inner.as_str().to_string(), false),
@@ -95,7 +94,6 @@ pub(crate) fn parse_global_scene_start(
                 }
             }
             Rule::global_scene_continue_line => {
-                // Continuation scene - inherit name from last
                 let Some(name) = last_name else {
                     let span = inner.as_span();
                     let (line, col) = span.start_pos().line_col();
@@ -140,7 +138,6 @@ pub(crate) fn parse_scene_actors_line(
 ) -> Result<Vec<SceneActorItem>, ParseError> {
     let mut items = Vec::new();
 
-    // scene_actors_line = { pad ~ actor_marker ~ actors ~ or_comment_eol }
     // actors is a silent rule, so actors_item pairs appear directly
     for inner in pair.into_inner() {
         if inner.as_rule() == Rule::actors_item {
@@ -175,7 +172,6 @@ pub(crate) fn parse_actors_item(
                 name = inner.as_str().to_string();
             }
             Rule::digit_id => {
-                // 全角数字を半角に正規化してパース
                 let normalized = normalize_number_str(inner.as_str());
                 // 文法が数字だけを通すので、失敗は範囲の外だけ
                 let n = normalized.parse::<u32>().map_err(|_| {
@@ -194,7 +190,6 @@ pub(crate) fn parse_actors_item(
         }
     }
 
-    // C#のenum採番ルールを適用
     // 飽和加算: 明示番号 u32::MAX などでの整数オーバーフロー panic を防止
     // （不正入力ハードニング。通常範囲の番号では挙動不変）
     let number = explicit_number.unwrap_or(*next_number);

@@ -1,13 +1,10 @@
 //! キューコマンド行（!行）の AST 型と PEG 文法ルールのテスト
-//!
-//! Task 1: AST 型定義テスト（CueCommandNode, ScopedName, CueArgToken）
-//! Task 2: PEG 文法ルールテスト（cue_cmd_line 関連ルール）
 
 use pasta_dsl::parser::*;
 use pest::Parser as PestParser;
 
 // ============================================================================
-// Task 1: AST Type Construction Tests
+// AST Type Construction Tests
 // ============================================================================
 
 #[test]
@@ -139,12 +136,11 @@ fn test_local_scene_item_cue_command_variant() {
 }
 
 // ============================================================================
-// Task 2: PEG Grammar Rule Parsing Tests
+// PEG Grammar Rule Parsing Tests
 // ============================================================================
 
 #[test]
 fn test_pest_cue_cmd_line_simple() {
-    // !clear (command only, no scope, no args)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  !clear\n");
     assert!(
         result.is_ok(),
@@ -155,7 +151,6 @@ fn test_pest_cue_cmd_line_simple() {
 
 #[test]
 fn test_pest_cue_cmd_line_with_scope() {
-    // !emote@笑顔 (command + scope, no args)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  !emote@笑顔\n");
     assert!(
         result.is_ok(),
@@ -166,7 +161,6 @@ fn test_pest_cue_cmd_line_with_scope() {
 
 #[test]
 fn test_pest_cue_cmd_line_with_args() {
-    // !yield(10.0) (command + args, no scope)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  !yield(10.0)\n");
     assert!(
         result.is_ok(),
@@ -177,7 +171,6 @@ fn test_pest_cue_cmd_line_with_args() {
 
 #[test]
 fn test_pest_cue_cmd_line_with_scope_and_args() {
-    // !emote@普通(normal) (command + scope + args)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  !emote@普通(normal)\n");
     assert!(
         result.is_ok(),
@@ -188,7 +181,6 @@ fn test_pest_cue_cmd_line_with_scope_and_args() {
 
 #[test]
 fn test_pest_cue_cmd_line_fullwidth_marker() {
-    // ！clear (full-width exclamation mark)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  ！clear\n");
     assert!(
         result.is_ok(),
@@ -199,7 +191,6 @@ fn test_pest_cue_cmd_line_fullwidth_marker() {
 
 #[test]
 fn test_pest_cue_cmd_line_scoped_with_actor() {
-    // !emote@さくら:笑顔(smile) (scoped ident with actor:name)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  !emote@さくら:笑顔(smile)\n");
     assert!(
         result.is_ok(),
@@ -210,7 +201,6 @@ fn test_pest_cue_cmd_line_scoped_with_actor() {
 
 #[test]
 fn test_pest_cue_cmd_line_multiple_args() {
-    // !choice@はい(yes, 「はい、行きましょう！」) (multiple args with string literal)
     let result = PastaParser2::parse(
         Rule::cue_cmd_line,
         "  !choice@はい(yes, 「はい、行きましょう！」)\n",
@@ -224,14 +214,12 @@ fn test_pest_cue_cmd_line_multiple_args() {
 
 #[test]
 fn test_pest_cue_cmd_line_at_ref_arg() {
-    // !seek(@名前, 1.0) (at-ref argument)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  !seek(@名前, 1.0)\n");
     assert!(result.is_ok(), "AtRef arg should parse: {:?}", result.err());
 }
 
 #[test]
 fn test_pest_cue_cmd_line_with_comment() {
-    // !clear # comment (inline comment)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  !clear # コメント\n");
     assert!(
         result.is_ok(),
@@ -242,7 +230,6 @@ fn test_pest_cue_cmd_line_with_comment() {
 
 #[test]
 fn test_pest_cue_cmd_line_fullwidth_parens() {
-    // ！選択待ち（30） (full-width parens and marker)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  ！選択待ち（30）\n");
     assert!(
         result.is_ok(),
@@ -253,7 +240,6 @@ fn test_pest_cue_cmd_line_fullwidth_parens() {
 
 #[test]
 fn test_pest_cue_cmd_line_empty_args() {
-    // !select() (empty argument list)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  !select()\n");
     assert!(
         result.is_ok(),
@@ -264,7 +250,6 @@ fn test_pest_cue_cmd_line_empty_args() {
 
 #[test]
 fn test_pest_cue_cmd_line_arg_with_colons() {
-    // !route_add(shell, actor:さくら:shell) (arg containing colons)
     let result = PastaParser2::parse(
         Rule::cue_cmd_line,
         "  !route_add(shell, actor:さくら:shell)\n",
@@ -278,7 +263,6 @@ fn test_pest_cue_cmd_line_arg_with_colons() {
 
 #[test]
 fn test_pest_cue_cmd_line_integer_arg() {
-    // !select(30) (integer argument)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  !select(30)\n");
     assert!(
         result.is_ok(),
@@ -289,7 +273,6 @@ fn test_pest_cue_cmd_line_integer_arg() {
 
 #[test]
 fn test_pest_cue_cmd_line_negative_number_arg() {
-    // !offset(-5.0) (negative number argument)
     let result = PastaParser2::parse(Rule::cue_cmd_line, "  !offset(-5.0)\n");
     assert!(
         result.is_ok(),
@@ -299,12 +282,11 @@ fn test_pest_cue_cmd_line_negative_number_arg() {
 }
 
 // ============================================================================
-// Task 2: Full Script Integration Tests
+// Full Script Integration Tests
 // ============================================================================
 
 #[test]
 fn test_full_script_with_cue_cmd_parses() {
-    // Full script with ! lines inside a scene (requirements sample)
     let source = concat!(
         "\u{ff0a}起動挨拶\n",
         "\n",
@@ -334,7 +316,6 @@ fn test_full_script_with_cue_cmd_parses() {
 
 #[test]
 fn test_cue_cmd_does_not_break_existing_scenes() {
-    // Scene without cue commands should parse as before
     let source = "＊挨拶\n  Alice：こんにちは\n  ：続きです\n";
     let result = parse_str(source, "test.pasta");
     assert!(
@@ -359,7 +340,6 @@ fn test_cue_cmd_does_not_break_existing_scenes() {
 
 #[test]
 fn test_mixed_scene_cue_and_action_lines() {
-    // Scene with both action lines and cue command lines
     let source = concat!(
         "＊混在テスト\n",
         "    !emote@普通(normal)\n",
@@ -378,7 +358,6 @@ fn test_mixed_scene_cue_and_action_lines() {
 
 #[test]
 fn test_cue_cmd_in_local_scene() {
-    // Cue command inside a local scene
     let source = concat!(
         "＊テスト\n",
         "    Alice：こんにちは\n",
@@ -395,18 +374,16 @@ fn test_cue_cmd_in_local_scene() {
 }
 
 // ============================================================================
-// Task 2: Grammar Rule Token Structure Tests
+// Grammar Rule Token Structure Tests
 // ============================================================================
 
 #[test]
 fn test_pest_cue_cmd_line_inner_structure_simple() {
-    // Verify the inner token structure of a simple cue command
     let pairs = PastaParser2::parse(Rule::cue_cmd_line, "  !clear\n").unwrap();
     let cmd_line = pairs.into_iter().next().unwrap();
     assert_eq!(cmd_line.as_rule(), Rule::cue_cmd_line);
 
     let inner: Vec<_> = cmd_line.into_inner().collect();
-    // Should have cue_cmd_name
     assert!(
         inner.iter().any(|p| p.as_rule() == Rule::cue_cmd_name),
         "Should contain cue_cmd_name"
@@ -424,7 +401,6 @@ fn test_pest_cue_cmd_line_inner_structure_with_scope() {
     let cmd_line = pairs.into_iter().next().unwrap();
     let inner: Vec<_> = cmd_line.into_inner().collect();
 
-    // Should have cue_cmd_name and cue_cmd_scope
     let name_pair = inner
         .iter()
         .find(|p| p.as_rule() == Rule::cue_cmd_name)
@@ -457,7 +433,6 @@ fn test_pest_cue_cmd_line_inner_structure_with_args() {
 
 #[test]
 fn test_pest_cue_scoped_ident_simple() {
-    // Verify cue_scoped_ident captures the full text as atomic
     let pairs = PastaParser2::parse(Rule::cue_cmd_line, "  !emote@普通(normal)\n").unwrap();
     let cmd_line = pairs.into_iter().next().unwrap();
     let scope_pair = cmd_line
@@ -465,7 +440,6 @@ fn test_pest_cue_scoped_ident_simple() {
         .find(|p| p.as_rule() == Rule::cue_cmd_scope)
         .unwrap();
 
-    // cue_cmd_scope = { at ~ cue_scoped_ident }
     let scoped_ident = scope_pair
         .into_inner()
         .find(|p| p.as_rule() == Rule::cue_scoped_ident)

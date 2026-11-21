@@ -94,7 +94,6 @@ impl SceneTable {
         registry: crate::registry::SceneRegistry,
         random_selector: Box<dyn RandomSelector>,
     ) -> Self {
-        // Build Vec storage with ID assignment
         // Note: Internal IDs are 0-based Vec indices (SceneRegistry's 1-based IDs are not carried over)
         let labels: Vec<SceneInfo> = registry
             .all_scenes()
@@ -114,18 +113,12 @@ impl SceneTable {
             })
             .collect();
 
-        // Build BTreeMap prefix index with key conversion
-        // Unified key format with WordTable:
-        // - Local: `:parent:local_name`
-        // - Global: `global_name`
         let mut prefix_index: BTreeMap<String, Vec<_>> = BTreeMap::new();
         for scene in &labels {
-            // Convert fn_name to search key
             let search_key = Self::fn_name_to_search_key(&scene.fn_name, scene.parent.is_some());
 
             let entry = prefix_index.entry(search_key).or_default();
 
-            // Allow duplicates for search key (multiple scenes with same prefix)
             // fn_name uniqueness is not validated (SceneRegistry does not check it)
             entry.push(scene.id);
         }
@@ -155,14 +148,12 @@ impl SceneTable {
         use crate::registry::SceneRegistry;
         let (global, local) = fn_name.split_once("::").unwrap_or((fn_name, ""));
         if is_local {
-            // Local scene: "会話_1::選択肢_1" → ":会話_1:選択肢"
             format!(
                 ":{}:{}",
                 global,
                 SceneRegistry::split_registered_name(local).0
             )
         } else {
-            // Global scene: "会話_1::__start__" → "会話"
             SceneRegistry::split_registered_name(global).0.to_string()
         }
     }
@@ -186,10 +177,8 @@ impl SceneTable {
         search_key: &str,
         cond: Option<CondFn<'_>>,
     ) -> Result<SceneId, SceneTableError> {
-        // Phase 1: Collect candidates from a single scope (no fallback)
         let candidate_ids = self.collect_scene_candidates(module_name, search_key)?;
 
-        // Phase 2: 条件と優先の段で 1 つ選ぶ
         let cache_key = SceneCacheKey::new(module_name, search_key, false, None);
         self.select_from_cache(cache_key, candidate_ids, search_key, cond)
     }
@@ -317,7 +306,6 @@ impl SceneTable {
             scene: search_key.to_string(),
         };
 
-        // 1. 述語があれば全候補を 1 回だけ評価し、今の段を求める
         let (ok, tier) = match cond {
             None => (None, i64::MIN),
             Some(cond) => {
@@ -381,13 +369,11 @@ impl SceneTable {
             ids
         };
 
-        // 2. 並びが無ければ作る
         let cached = cache.entry(cache_key).or_insert_with(|| CachedSelection {
             candidates: new_round(),
             next_index: 0,
         });
 
-        // 3・4. 次の位置から見る。末尾か段より低い候補に来たら 1 回だけ始め直す
         for round in 0..2 {
             if round == 1 {
                 cached.candidates = new_round();
@@ -436,14 +422,12 @@ impl SceneTable {
         module_name: &str,
         prefix: &str,
     ) -> Result<Vec<SceneId>, SceneTableError> {
-        // Validate prefix
         if prefix.is_empty() {
             return Err(SceneTableError::InvalidScene {
                 scene: prefix.to_string(),
             });
         }
 
-        // If module_name is empty, search global only
         if module_name.is_empty() {
             let mut global_candidates = Vec::new();
             for (key, ids) in self
@@ -451,7 +435,6 @@ impl SceneTable {
                 .range::<str, _>((Bound::Included(prefix), Bound::Unbounded))
                 .take_while(|(k, _)| k.starts_with(prefix))
             {
-                // Skip local keys (start with ':')
                 if !key.starts_with(':') {
                     global_candidates.extend(ids.iter().copied());
                 }

@@ -1,7 +1,4 @@
 //! AST visitor methods for semantic token generation: scope-level visitors.
-//!
-//! This file exceeds the 300-line guideline as documented in the design spec
-//! (guideline exception: tightly-coupled visitor methods).
 
 use pasta_dsl::parser::ast::*;
 
@@ -121,7 +118,7 @@ impl super::AnalysisEngine {
 
     fn visit_keywords(word: &KeyWords, source: &str, tokens: &mut Vec<RawToken>) {
         if word.span.is_valid() {
-            // 重みの `＠数` を NUMBER、その間を WORD で出す。値の途中の `＠` は weight_spans に入らないので WORD のまま（要件 7.1・7.2）
+            // 重みの `＠数` を NUMBER、その間を WORD で出す。値の途中の `＠` は weight_spans に入らないので WORD のまま
             let (mut line, mut byte) = (word.span.start_line, word.span.start_byte);
             for w in &word.weight_spans {
                 // add_token_from_span は行とバイトだけを読む
@@ -142,7 +139,7 @@ impl super::AnalysisEngine {
                 ..word.span
             };
             Self::add_token_from_span(&rest, source, token_type::WORD, 0, tokens);
-            // 囲まない値は `＃` 以降も span に入るので何も出ない（要件 4.4）
+            // 囲まない値は `＃` 以降も span に入るので何も出ない
             push_trailing_comment(source, word.span.start_line, word.span.end_byte, tokens);
         }
     }

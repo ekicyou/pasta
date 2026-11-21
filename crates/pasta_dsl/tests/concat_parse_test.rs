@@ -1,4 +1,4 @@
-//! 連結演算子 ＆／&（string-concat-operator）のパーステスト
+//! 連結演算子 ＆／& のパーステスト
 //!
 //! 受理（全角・半角・空白・位置ごと）、既存構文の不変、パースエラーの切り分けを固定する。
 //! 文法仕様: `bin_op` に `concat_op = @{ amp }` を加えただけで、木は優先順位なしの左結合。
@@ -148,7 +148,7 @@ fn assert_parse_error_at_amp(line: &str) {
 }
 
 // ---------------------------------------------------------------------------
-// 1.1・1.2・1.4: 全角・半角・空白の有無で同じ木
+// 全角・半角・空白の有無で同じ木
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -197,7 +197,7 @@ fn test_concat_mixed_with_arith_keeps_left_assoc_tree() {
 }
 
 // ---------------------------------------------------------------------------
-// 1.5: 被演算子は算術と同じ（変数・関数呼び出し・数値・負数・文字列・括弧）
+// 被演算子は算術と同じ（変数・関数呼び出し・数値・負数・文字列・括弧）
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -243,7 +243,7 @@ fn test_concat_accepts_all_arith_operand_kinds() {
 }
 
 // ---------------------------------------------------------------------------
-// 1.6・4.4・6.2: 式の位置ごとの受理
+// 式の位置ごとの受理
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -371,7 +371,7 @@ fn test_concat_in_talk_line_fn_call_args() {
 }
 
 // ---------------------------------------------------------------------------
-// 4.1–4.3: 式以外の位置の ＆ は不変
+// 式以外の位置の ＆ は不変
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -514,15 +514,15 @@ fn test_concat_leaves_comments_unchanged() {
 }
 
 // ---------------------------------------------------------------------------
-// 4.5–4.8・5.1・5.2: パースエラーのまま残る形
+// パースエラーのまま残る形
 // ---------------------------------------------------------------------------
 
 #[test]
 fn test_concat_call_target_followed_by_name_is_error() {
-    // 4.5: ＆ の直後が名前（属性フィルター構文のために残す）
+    // ＆ の直後が名前（属性フィルター構文のために残す）
     assert_parse_error_at_amp("＞＄名前＆k＝v");
     assert_parse_error_at_amp("＞シーン名＆k＝v");
-    // 4.6: 静的ターゲット（名前）の直後の ＆
+    // 静的ターゲット（名前）の直後の ＆
     assert_parse_error_at_amp("＞挨拶＆＄種類");
     // 対照: 被演算子の開始文字が続けば受理される
     assert!(matches!(
@@ -533,7 +533,7 @@ fn test_concat_call_target_followed_by_name_is_error() {
 
 #[test]
 fn test_concat_word_ref_followed_by_amp_is_error() {
-    // 4.7: 単語参照は項でない
+    // 単語参照は項でない
     assert_parse_error_at_amp("＄x＝＠単語名＆category＝food");
     assert_parse_error_at_amp("＄x＝＠単語名＆「a」");
     // 対照: 単語参照だけの右辺は従来どおり受理
@@ -547,14 +547,13 @@ fn test_concat_word_ref_followed_by_amp_is_error() {
 
 #[test]
 fn test_concat_rhs_must_start_with_operand_char() {
-    // 4.8: ＆ の直後に名前（識別子）は置けない
+    // ＆ の直後に名前（識別子）は置けない
     assert_parse_error_at_amp("＄x＝「a」＆name");
     assert_parse_error_at_amp("＄x＝＠f（「a」＆name）");
 }
 
 #[test]
 fn test_concat_missing_operand_is_error() {
-    // 5.1
     assert_parse_error_at_amp("＄x＝「a」＆");
     assert_parse_error_at_amp("＄x＝＆「a」");
     assert_parse_error_at_amp("＄x＝「a」＆＆「b」");
@@ -563,7 +562,6 @@ fn test_concat_missing_operand_is_error() {
 
 #[test]
 fn test_concat_unbalanced_paren_is_error() {
-    // 5.2
     assert_parse_error_at_amp("＄x＝（「a」＆＄b");
     assert_parse_error_at_amp("＄x＝「a」＆＄b）");
     assert_parse_error_at_amp("＄x＝（「a」＆（＄b）");

@@ -180,7 +180,7 @@ pub(crate) fn parse_key_words(pair: Pair<Rule>, filename: &str) -> Result<KeyWor
                         Ok(n) => n,
                         Err(_) => return Err(err("の重みが大きすぎます".to_string())),
                     };
-                    // 並びが持てる要素の数の上限（ターゲットで決まり、空きメモリに依らない）。それより下のメモリ不足は設計の Risks どおり受け入れる
+                    // 並びが持てる要素の数の上限（ターゲットで決まり、空きメモリに依らない）。それより下のメモリ不足は受け入れる
                     let max_len = isize::MAX as usize / std::mem::size_of::<String>();
                     if n > max_len - words.len() {
                         return Err(err("の重みが大きすぎます".to_string()));
@@ -244,7 +244,6 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>, filename: &str) -> Result<VarSet, 
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::id | Rule::property_id => {
-                // The first id is the variable name
                 if name.is_none() {
                     name = Some(inner.as_str().to_string());
                 }
@@ -274,14 +273,12 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>, filename: &str) -> Result<VarSet, 
                 if let Some(op) = bin_op_from_rule(rule) {
                     operators.push(op);
                 } else if let Some(expr) = try_parse_expr(inner, filename)? {
-                    // Parse as expression (term)
                     terms.push(expr);
                 }
             }
         }
     }
 
-    // Build value based on whether we have a (static or dynamic) word_ref or expr
     let value = word_ref_value.unwrap_or_else(|| {
         SetValue::Expr(if terms.is_empty() {
             Expr::BlankString

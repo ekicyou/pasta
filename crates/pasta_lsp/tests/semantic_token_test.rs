@@ -1,4 +1,4 @@
-//! セマンティックトークン識別テスト (Task 7.1)
+//! セマンティックトークン識別テスト
 //!
 //! 14トークンタイプ個別識別テスト、AST→トークン変換の正確性テスト
 
@@ -14,7 +14,6 @@ fn test_token_global_scene_marker() {
     let source = "＊挨拶\n  Alice：こんにちは\n";
     let result = AnalysisEngine::analyze(source);
     assert!(!result.tokens.is_empty(), "トークンが生成される");
-    // First token should be the global scene marker (NAMESPACE = 1)
     assert_eq!(result.tokens[0].token_type, token_type::NAMESPACE);
 }
 
@@ -28,7 +27,6 @@ fn test_token_local_scene_marker() {
     // Named local scene (with ・ or - marker) should emit one.
     let source = "＊挨拶\n  Alice：こんにちは\n  ・ランダム\n    Bob：OK\n";
     let result = AnalysisEngine::analyze(source);
-    // Should contain scene token type (2) for the named local scene
     let has_scene = result
         .tokens
         .iter()
@@ -45,14 +43,12 @@ fn test_token_actor_name_and_colon() {
     let source = "＊挨拶\n  Alice：こんにちは\n";
     let result = AnalysisEngine::analyze(source);
 
-    // Should contain actorName token (8)
     let has_actor_name = result
         .tokens
         .iter()
         .any(|t| t.token_type == token_type::ACTOR_NAME);
     assert!(has_actor_name, "アクター名トークンが含まれる");
 
-    // Should contain operator token (13) for colon
     let has_operator = result
         .tokens
         .iter()
@@ -115,7 +111,6 @@ fn test_multiple_token_types_in_document() {
 #[test]
 fn test_token_empty_source() {
     let result = AnalysisEngine::analyze("");
-    // Empty source should produce empty tokens
     assert!(result.tokens.is_empty());
     assert!(result.diagnostics.is_empty());
 }
@@ -125,7 +120,6 @@ fn test_token_syntax_error_generates_diagnostics() {
     // Intentionally malformed source
     let source = "これは構文的に壊れています\n壊れた行\n";
     let result = AnalysisEngine::analyze(source);
-    // Should generate diagnostics
     assert!(
         !result.diagnostics.is_empty(),
         "構文エラー時にDiagnosticsが生成される"
@@ -147,7 +141,7 @@ fn test_tokens_are_delta_encoded() {
 }
 
 // ============================================================================
-// 宣言の行の名前・属性・行末のコメント（要件 4.1・4.2）
+// 宣言の行の名前・属性・行末のコメント
 // ============================================================================
 
 /// 誤りの無い文字の、指定した行（0 始まり）のトークン（桁・長さ・種類）
@@ -239,7 +233,7 @@ fn test_decl_attr_mid_value_quote_is_plain() {
     );
 }
 
-/// 条件の形（`：` を持たない）も宣言行で属性の色になる（scene-attribute-store 要件 7.5）
+/// 条件の形（`：` を持たない）も宣言行で属性の色になる
 #[test]
 fn test_decl_condition_attr() {
     let source = "＊雑談＆＄＊変数＞１００\n  Alice：OK\n";
@@ -285,7 +279,7 @@ fn test_decl_without_comment_unchanged() {
 }
 
 // ============================================================================
-// 宣言の行のほかの、行末のコメントを書ける行（要件 4.3・4.4・5.7・6.5）
+// 宣言の行のほかの、行末のコメントを書ける行
 // ============================================================================
 
 use token_type::CODE_BLOCK;
@@ -328,7 +322,7 @@ fn test_trailing_comment_fenced_word_def() {
     );
 }
 
-/// 囲まない単語の値・台詞の `＃` は本文（要件 4.4）
+/// 囲まない単語の値・台詞の `＃` は本文
 #[test]
 fn test_hash_in_body_is_not_comment() {
     assert_eq!(
@@ -391,7 +385,7 @@ fn test_trailing_comment_cue_command() {
     }
 }
 
-/// 選択肢の行は行末のコメントだけ（部品の色は足さない。要件 5.7）
+/// 選択肢の行は行末のコメントだけ（部品の色は足さない）
 #[test]
 fn test_trailing_comment_choice_only() {
     let tail = "＊次\n  Alice：OK\n";

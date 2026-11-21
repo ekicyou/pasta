@@ -1,7 +1,7 @@
 //! 選択肢行（＠？行）の PEG 文法ルールテスト
 //!
-//! Task 1.1: choice_line 文法規則のパーステスト
-//! Task 1.2: AST 構築テスト（ChoiceNode / parse_choice_line）
+//! choice_line 文法規則のパーステスト
+//! AST 構築テスト（ChoiceNode / parse_choice_line）
 
 use pasta_dsl::parser::*;
 use pest::Parser as PestParser;
@@ -83,7 +83,6 @@ fn test_choice_line_parse_tree_shorthand() {
     assert_eq!(choice.as_rule(), Rule::choice_line);
 
     let inner: Vec<_> = choice.into_inner().collect();
-    // choice_line should contain: id (and optionally choice_label)
     assert_eq!(inner.len(), 1, "省略形は id のみ");
     assert_eq!(inner[0].as_rule(), Rule::id);
     assert_eq!(inner[0].as_str(), "target");
@@ -96,7 +95,6 @@ fn test_choice_line_parse_tree_with_label() {
     assert_eq!(choice.as_rule(), Rule::choice_line);
 
     let inner: Vec<_> = choice.into_inner().collect();
-    // choice_line should contain: id, choice_label
     assert_eq!(inner.len(), 2, "括弧形は id + choice_label");
     assert_eq!(inner[0].as_rule(), Rule::id);
     assert_eq!(inner[0].as_str(), "target");
@@ -125,7 +123,7 @@ fn test_choice_line_in_scene_context() {
 }
 
 // ============================================================================
-// Task 1.2: AST-level parse tests (ChoiceNode / parse_choice_line)
+// AST-level parse tests (ChoiceNode / parse_choice_line)
 // ============================================================================
 
 /// Parse source and extract ChoiceNodes from the first global scene's local scenes.

@@ -1,6 +1,4 @@
 //! 単語の値の後ろの重み `＠数` のセマンティックトークンテスト
-//!
-//! Requirements 7.1, 7.2
 
 use pasta_lsp::analysis::{AnalysisEngine, token_type};
 

@@ -1,7 +1,6 @@
 //! 全角数字変数（digit_id）のパーサーテスト
 //!
 //! `＄０`〜`＄９` がパーサーで正しく `VarScope::Args(N)` に解決されることを検証。
-//! req-var-expansion ギャップ分析の実証テスト。
 
 use pasta_dsl::parser::{Action, FileItem, GlobalSceneScope, LocalSceneItem, VarScope, parse_str};
 
@@ -45,7 +44,6 @@ fn find_var_refs_in_scene(scene: &GlobalSceneScope) -> Vec<(String, VarScope)> {
 
 #[test]
 fn test_fullwidth_digit_0_parsed_as_args_0() {
-    // ＄０ がパースされて VarScope::Args(0) になることを確認
     let input = "＊テスト\n　さくら：＄０\n";
     let result = parse_str(input, "test.pasta");
     assert!(result.is_ok(), "Parse failed: {:?}", result.err());
@@ -69,7 +67,6 @@ fn test_fullwidth_digit_0_parsed_as_args_0() {
 
 #[test]
 fn test_fullwidth_digit_1_to_9_parsed_as_args() {
-    // ＄１〜＄９ がそれぞれ VarScope::Args(1)〜Args(9) になることを確認
     for i in 1u8..=9 {
         let zenkaku = char::from_u32('０' as u32 + i as u32).unwrap();
         let input = format!("＊テスト{}\n　さくら：＄{}\n", i, zenkaku);
@@ -99,7 +96,6 @@ fn test_fullwidth_digit_1_to_9_parsed_as_args() {
 
 #[test]
 fn test_halfwidth_digit_0_also_parsed_as_args() {
-    // 半角 $0 も VarScope::Args(0) に解決されることを確認（既存動作の回帰テスト）
     let input = "＊テスト\n　さくら：$0\n";
     let result = parse_str(input, "test.pasta");
     assert!(result.is_ok(), "Parse failed: {:?}", result.err());
@@ -116,7 +112,6 @@ fn test_halfwidth_digit_0_also_parsed_as_args() {
 
 #[test]
 fn test_multidigit_fullwidth_parsed_as_args() {
-    // ＄１０ のような多桁全角数字もパースされることを確認
     let input = "＊テスト\n　さくら：＄１０\n";
     let result = parse_str(input, "test.pasta");
     assert!(

@@ -105,8 +105,6 @@ impl SceneRegistry {
     ) -> i64 {
         let id = (self.scenes.len() + 1) as i64;
 
-        // Local scene function name: parent module + local function
-        // Format: 親_番号::子_番号
         // local_counter is the same number CodeGenerator's generate_local_scene uses
         let fn_name = format!(
             "{}::{}",
@@ -150,7 +148,6 @@ impl SceneRegistry {
     ) -> i64 {
         let id = (self.scenes.len() + 1) as i64;
 
-        // fn_name format: "FullName::__start__"
         let fn_name = format!("{}::__start__", full_name);
 
         let entry = SceneEntry {
@@ -164,7 +161,6 @@ impl SceneRegistry {
         self.scenes.push(entry);
         let global_id = id;
 
-        // Register local scenes (excluding __start__)
         for (local_name, local_attrs) in locals {
             if local_name != "__start__" {
                 let local_id = (self.scenes.len() + 1) as i64;
@@ -311,10 +307,8 @@ mod tests {
     fn test_register_local_label() {
         let mut registry = SceneRegistry::new();
 
-        // Register parent first
         let (parent_id, parent_counter) = registry.register_global("会話", Vec::new());
 
-        // Register local scene
         let local_id = registry.register_local("選択肢", "会話", parent_counter, 1, Vec::new());
 
         assert_eq!(parent_id, 1);
@@ -323,7 +317,6 @@ mod tests {
         let local_label = registry.all_scenes()[local_id as usize - 1];
         assert_eq!(local_label.name, "選択肢");
         assert_eq!(local_label.parent, Some("会話".to_string()));
-        // Local scene function is in parent module: 親_番号::子名_番号
         assert_eq!(local_label.fn_name, "会話_1::選択肢_1");
     }
 
@@ -435,7 +428,7 @@ mod tests {
         ];
         registry.register_global_raw("Scene1", &locals, attrs.clone());
 
-        // The global keeps its own; each local carries only what it was given (3.8)
+        // The global keeps its own; each local carries only what it was given
         let scenes = registry.all_scenes();
         assert_eq!(scenes[0].attributes, attrs);
         assert_eq!(scenes[1].attributes, Vec::new());

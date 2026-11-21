@@ -98,7 +98,6 @@ impl Span {
     /// - `Ok(&str)`: The substring corresponding to this span
     /// - `Err(SpanError)`: If byte offsets are out of bounds or invalid
     pub fn extract_source<'a>(&self, source: &'a str) -> Result<&'a str, SpanError> {
-        // Check if span is valid (not default/uninitialized)
         if !self.is_valid() {
             return Err(SpanError::InvalidSpan);
         }
@@ -112,7 +111,6 @@ impl Span {
             });
         }
 
-        // Check UTF-8 boundaries
         if !source.is_char_boundary(self.start_byte) {
             return Err(SpanError::InvalidUtf8Boundary {
                 byte: self.start_byte,
@@ -133,7 +131,6 @@ impl Span {
     /// which indicates an uninitialized or default span.
     /// A valid span must have end_byte > 0.
     pub fn is_valid(&self) -> bool {
-        // A valid span must have non-zero end_byte
         self.end_byte > 0
     }
 }

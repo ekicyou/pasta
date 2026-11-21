@@ -1,4 +1,4 @@
-//! 入力のたびの構文の診断（要件 1・2.3・11.1）
+//! 入力のたびの構文の診断
 //!
 //! 全体の解析の誤り 1 件を、保存時の検査と同じ文で、本当の位置の点にする。
 
@@ -59,7 +59,7 @@ fn test_last_line_without_newline() {
 
 #[test]
 fn test_missing_final_newline_is_reported() {
-    // 改行を補わない（R3）。保存時と同じく、最後の行の終わりに 1 件
+    // 改行を補わない。保存時と同じく、最後の行の終わりに 1 件
     let d = AnalysisEngine::analyze("＊挨拶\n  さくら：やあ");
     assert_eq!(d.diagnostics.len(), 1, "{:?}", d.diagnostics);
     let p = d.diagnostics[0].range.start;
@@ -109,7 +109,7 @@ fn test_concat_missing_operand_has_one_diagnostic() {
     assert_eq!((p.line, p.character), (1, 9));
 }
 
-/// 同じ文字を保存時の検査に渡した syntax の報告と、行・桁（UTF-16 に直して）・文が一致する（要件 2.3）
+/// 同じ文字を保存時の検査に渡した syntax の報告と、行・桁（UTF-16 に直して）・文が一致する
 #[test]
 fn test_matches_validate_ghost_syntax_finding() {
     let input = GhostInput {

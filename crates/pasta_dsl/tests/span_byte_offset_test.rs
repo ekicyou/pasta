@@ -1,8 +1,4 @@
 //! Span byte offset extension tests.
-//!
-//! TDD: Tests for Span structure extension with byte offsets.
-//! These tests verify the Span byte offset functionality specified in
-//! ast-source-span-mapping requirements.
 
 use pasta_dsl::parser::{
     ActionLine, FileItem, GlobalSceneScope, LocalSceneItem, Span, SpanError, parse_str,
@@ -36,12 +32,11 @@ fn first_action_line(scene: &GlobalSceneScope) -> &ActionLine {
 }
 
 // ============================================================================
-// Task 1.1: Span バイトオフセットフィールドのテスト
+// Span バイトオフセットフィールドのテスト
 // ============================================================================
 
 #[test]
 fn test_span_new_with_6_arguments() {
-    // Span::new() が 6 フィールドを正しく設定することを確認
     let span = Span::new(1, 5, 2, 10, 4, 20);
 
     assert_eq!(span.start_line, 1);
@@ -66,12 +61,11 @@ fn test_span_default_initializes_all_to_zero() {
 }
 
 // ============================================================================
-// Task 1.3: ソース参照 API のテスト
+// ソース参照 API のテスト
 // ============================================================================
 
 #[test]
 fn test_span_extract_source_returns_correct_slice() {
-    // extract_source() が正確なスライスを返すことを確認
     let source = "Hello, World!";
     let span = Span::new(1, 1, 1, 6, 0, 5);
 
@@ -82,7 +76,6 @@ fn test_span_extract_source_returns_correct_slice() {
 
 #[test]
 fn test_span_extract_source_utf8_multibyte() {
-    // UTF-8 マルチバイト文字でオフセット正確性を確認
     let source = "こんにちは、世界！";
     // "こん" = 6 bytes (2 chars × 3 bytes each)
     let span = Span::new(1, 1, 1, 3, 0, 6);
@@ -142,7 +135,6 @@ fn test_span_extract_source_invalid_utf8_boundary() {
 
 #[test]
 fn test_span_extract_source_invalid_span() {
-    // 無効な Span（start_byte == end_byte == 0）でエラー
     let source = "Hello";
     let span = Span::default();
 
@@ -156,7 +148,6 @@ fn test_span_extract_source_invalid_span() {
 
 #[test]
 fn test_span_is_valid() {
-    // is_valid() が default Span を無効と判定することを確認
     let default_span = Span::default();
     assert!(!default_span.is_valid());
 
@@ -169,12 +160,11 @@ fn test_span_is_valid() {
 }
 
 // ============================================================================
-// Task 6.2: パーサー統合テストの拡張
+// パーサー統合テストの拡張
 // ============================================================================
 
 #[test]
 fn test_parser_span_has_byte_offsets_ascii() {
-    // ASCII スクリプトで各節のバイトオフセット検証
     let source = "＊挨拶\n  Alice：Hello\n";
     let ast = parse_str(source, "test.pasta").unwrap();
 
@@ -188,11 +178,9 @@ fn test_parser_span_has_byte_offsets_ascii() {
 
 #[test]
 fn test_parser_span_byte_offset_utf8() {
-    // UTF-8 マルチバイト文字でオフセット正確性を確認
     let source = "＊挨拶\n  太郎：こんにちは\n";
     let ast = parse_str(source, "test.pasta").unwrap();
 
-    // シーンの Span を確認
     let scenes = get_global_scene_scopes(&ast);
     assert!(!scenes.is_empty());
 
@@ -202,7 +190,6 @@ fn test_parser_span_byte_offset_utf8() {
 
 #[test]
 fn test_parser_span_extract_source_matches_original() {
-    // パース結果の各節の Span で元ソースを抽出できることを確認
     let source = "＊挨拶\n  Alice：Hello\n";
     let ast = parse_str(source, "test.pasta").unwrap();
 

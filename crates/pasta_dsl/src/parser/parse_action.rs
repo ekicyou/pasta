@@ -255,7 +255,6 @@ pub(crate) fn parse_args(pair: Pair<Rule>, filename: &str) -> Result<Args, Parse
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::positional_arg => {
-                // Collect all terms and operators for this positional argument
                 // Grammar: expr = term ~ bin*, where bin = bin_op ~ term
                 // Since expr and bin are silent rules, we get term, op, term, op, term...
                 if let Some(expr) = parse_expr_from_parts(inner, filename)? {
@@ -346,7 +345,6 @@ pub(crate) fn parse_key_arg(
             for kv_inner in inner.into_inner() {
                 match kv_inner.as_rule() {
                     Rule::id => {
-                        // The first id is the key name
                         if key.is_empty() {
                             key = kv_inner.as_str().to_string();
                         }

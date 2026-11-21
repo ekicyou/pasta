@@ -1,6 +1,4 @@
 //! 単語の値の後ろの `＠整数`（重み）のパーステスト
-//!
-//! Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.8, 9.2
 
 use pasta_dsl::parser::*;
 
@@ -146,7 +144,7 @@ fn too_large_weight_is_syntax_error() {
     }
 }
 
-/// `＠数` が無い行は今と同じ構文木（9.2）
+/// `＠数` が無い行は今と同じ構文木
 #[test]
 fn lines_without_weight_are_unchanged() {
     let kw = global_word("＠w：a、「b、c」、\\s[1]、「」、x＠y、 d  \n");

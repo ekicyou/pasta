@@ -10,7 +10,6 @@ mod visit_action;
 mod visit_expr;
 mod visit_scope;
 
-// Re-export public API (preserve existing import paths)
 pub use scenes::{SceneKind, SceneNode};
 pub use text_utils::{get_line_text, line_byte_offset};
 pub use token_types::*;
@@ -53,7 +52,7 @@ pub struct Position {
     pub character: u32,
 }
 
-/// 報告 1 件を、幅の無い点の Error の診断にする（行・桁が無ければ 1 行目の頭。要件 11.2）
+/// 報告 1 件を、幅の無い点の Error の診断にする（行・桁が無ければ 1 行目の頭）
 fn finding_to_diagnostic(finding: &pasta_check::validate::Finding, source: &str) -> Diagnostic {
     let line = finding.line.map_or(0, |l| l.saturating_sub(1));
     let character = finding.column.map_or(0, |c| {
@@ -145,7 +144,6 @@ impl AnalysisEngine {
         for (line_idx, line_text) in source.lines().enumerate() {
             let trimmed = line_text.trim_start();
             if !skipped(line_idx) && (trimmed.starts_with('＃') || trimmed.starts_with('#')) {
-                // Emit a COMMENT token for the entire line
                 let line_len = utf8_len_to_utf16(line_text);
                 if line_len > 0 {
                     tokens.push(RawToken {
@@ -167,7 +165,7 @@ mod tests {
     use super::*;
     use pasta_check::validate::{Finding, FindingKind};
 
-    /// 位置の無い報告は 1 行目の頭の点にする（要件 11.2）
+    /// 位置の無い報告は 1 行目の頭の点にする
     #[test]
     fn finding_without_position_goes_to_file_head() {
         let finding = Finding::new(FindingKind::Syntax, "<lsp>", None, None, "構文エラー: x");

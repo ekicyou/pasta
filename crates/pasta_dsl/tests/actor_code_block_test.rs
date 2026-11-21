@@ -1,6 +1,4 @@
 //! ActorScope code_blocks パーサーテスト
-//!
-//! タスク1.3: code_blockを含むactor_scopeが正しくパースされることを検証
 
 use pasta_dsl::parser::{FileItem, parse_str};
 
@@ -18,7 +16,6 @@ end
 
     let ast = parse_str(source, "test.pasta").expect("パース成功すべし");
 
-    // ActorScopeが1つあることを確認
     let actors: Vec<_> = ast
         .items
         .iter()
@@ -38,7 +35,6 @@ end
     assert_eq!(actor.words.len(), 1, "単語定義は1つ");
     assert_eq!(actor.words[0].name(), "通常");
 
-    // code_blocksが正しく格納されることを検証
     assert_eq!(actor.code_blocks.len(), 1, "code_blockは1つであるべし");
 
     let code_block = &actor.code_blocks[0];

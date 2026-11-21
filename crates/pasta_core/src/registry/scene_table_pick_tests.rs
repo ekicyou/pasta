@@ -48,7 +48,7 @@ fn pick_n(table: &mut SceneTable, n: usize) -> Vec<usize> {
         .collect()
 }
 
-/// 重み 3・2・1 の候補は 1 巡にそれぞれ 3・2・1 回出る（1.1・1.2）
+/// 重み 3・2・1 の候補は 1 巡にそれぞれ 3・2・1 回出る
 #[test]
 fn test_weights_put_scene_n_times_in_round() {
     let (mut table, calls) = table_with(
@@ -65,14 +65,14 @@ fn test_weights_put_scene_n_times_in_round() {
     assert_eq!(calls.lock().unwrap().len(), 2);
 }
 
-/// 重みは `＆優先` の段とも組み合わさる: 優先の降順の安定な並べ替えは今のまま（9.3）
+/// 重みは `＆優先` の段とも組み合わさる: 優先の降順の安定な並べ替えは今のまま
 #[test]
 fn test_weights_keep_priority_order() {
     let (mut table, _) = table_with(vec![vec![decl("重み", 2)], vec![decl("優先", 1)]], vec![]);
     assert_eq!(pick_n(&mut table, 3), vec![1, 0, 0]);
 }
 
-/// 重み 1 だけの並びは今と同じ配列・同じ乱数の消費（9.1）
+/// 重み 1 だけの並びは今と同じ配列・同じ乱数の消費
 #[test]
 fn test_weight_one_keeps_todays_round_and_rng_use() {
     let (mut table, calls) = table_with(vec![vec![], vec![decl("重み", 1)], vec![]], vec![2, 0, 1]);
@@ -108,7 +108,7 @@ fn order(n: i64) -> Vec<SceneAttr> {
     vec![decl("順番", n)]
 }
 
-/// 全部に順番があれば番号の順に巡り、最初へ戻る。乱数を使わない（2.1・2.2・2.3・8.4）
+/// 全部に順番があれば番号の順に巡り、最初へ戻る。乱数を使わない
 #[test]
 fn test_order_cycles_without_shuffle() {
     let (mut table, calls) = table_with(vec![order(10), order(20), order(30)], vec![2, 1, 0]);
@@ -117,7 +117,7 @@ fn test_order_cycles_without_shuffle() {
     assert_eq!(table.take_pick_warning(), None);
 }
 
-/// 番号は飛んでいてよく、間に足した番号は間に入る。`index` も同じ意味（2.5・2.6）
+/// 番号は飛んでいてよく、間に足した番号は間に入る。`index` も同じ意味
 #[test]
 fn test_order_inserted_number_goes_between() {
     let (mut table, _) = table_with(
@@ -127,14 +127,14 @@ fn test_order_inserted_number_goes_between() {
     assert_eq!(pick_n(&mut table, 5), vec![0, 3, 1, 2, 0]);
 }
 
-/// 出す順は番号だけで決まり、登録の順に左右されない（2.7）
+/// 出す順は番号だけで決まり、登録の順に左右されない
 #[test]
 fn test_order_ignores_registration_order() {
     let (mut table, _) = table_with(vec![order(30), order(10), order(20)], vec![]);
     assert_eq!(pick_n(&mut table, 4), vec![1, 2, 0, 1]);
 }
 
-/// 条件で外れた番号は飛ばす（2.8）
+/// 条件で外れた番号は飛ばす
 #[test]
 fn test_order_skips_excluded_by_condition() {
     let (mut table, _) = table_with(vec![order(10), order(20), order(30)], vec![2, 1, 0]);
@@ -150,7 +150,7 @@ fn test_order_skips_excluded_by_condition() {
     assert_eq!(picks, vec![0, 2, 0]);
 }
 
-/// 一部だけに順番があれば理由を控えてシャッフルで選ぶ。控えは読むと空・選ぶたびに空（3.1）
+/// 一部だけに順番があれば理由を控えてシャッフルで選ぶ。控えは読むと空・選ぶたびに空
 #[test]
 fn test_order_mixed_falls_back_to_shuffle() {
     let (mut table, calls) = table_with(vec![order(10), vec![]], vec![1, 0]);
@@ -169,7 +169,7 @@ fn test_order_mixed_falls_back_to_shuffle() {
     assert_eq!(table.take_pick_warning(), None, "選ぶたびに空にする");
 }
 
-/// 番号が重なれば理由（番号）を控えてシャッフルで選ぶ（3.1）
+/// 番号が重なれば理由（番号）を控えてシャッフルで選ぶ
 #[test]
 fn test_order_duplicate_falls_back_to_shuffle() {
     let (mut table, calls) = table_with(vec![order(10), order(10), order(20)], vec![2, 0, 1]);
@@ -181,7 +181,7 @@ fn test_order_duplicate_falls_back_to_shuffle() {
     );
 }
 
-/// どれにも順番が無ければ黙ってシャッフル（9.1）
+/// どれにも順番が無ければ黙ってシャッフル
 #[test]
 fn test_no_order_no_warning() {
     let (mut table, _) = table_with(vec![vec![], vec![]], vec![]);
@@ -189,7 +189,7 @@ fn test_no_order_no_warning() {
     assert_eq!(table.take_pick_warning(), None);
 }
 
-/// 乱数の差し替えで覚えた番号も消え、最初からに戻る（2.4）
+/// 乱数の差し替えで覚えた番号も消え、最初からに戻る
 #[test]
 fn test_replace_selector_resets_order() {
     let (mut table, _) = table_with(vec![order(10), order(20), order(30)], vec![2, 1, 0]);
@@ -208,7 +208,7 @@ fn test_order_remembered_per_cache_key() {
     assert_eq!(pick_n(&mut table, 1), vec![1]);
 }
 
-/// 同じ名前の中の番号の重なりを、グローバル（別名を置き換えた後の名前）とローカルで組にして返す（3.3）
+/// 同じ名前の中の番号の重なりを、グローバル（別名を置き換えた後の名前）とローカルで組にして返す
 #[test]
 fn test_duplicate_orders_global_and_local() {
     let mut registry = SceneRegistry::new();
@@ -240,7 +240,7 @@ fn test_duplicate_orders_global_and_local() {
     );
 }
 
-/// 重なりが無ければ空。順番の無いシーンは数えない（3.3）
+/// 重なりが無ければ空。順番の無いシーンは数えない
 #[test]
 fn test_duplicate_orders_empty_without_overlap() {
     let (table, _) = table_with(vec![order(10), order(20), vec![], vec![]], vec![]);
