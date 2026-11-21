@@ -132,7 +132,7 @@
   - _Dispatch: mechanical — 言い回しを要件が決めている_
   - _Requirements: 9.6, 9.7, 9.8_
 
-- [ ] 5.4 スキルの `references/` を作り直す
+- [x] 5.4 スキルの `references/` を作り直す
   - `node book/tools/gen-skill-refs.mjs` で、2 つのスキルの `references/` を作り直す（手で書かない）
   - 作り直した後に `--check` が鮮度の違いなしで通る
   - _Depends: 5.1, 5.2, 5.3_
