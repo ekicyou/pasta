@@ -6,8 +6,7 @@ mod common;
 
 use pasta_lua::mlua::Lua;
 
-mod lua_request_bridge {
-}
+mod lua_request_bridge {}
 
 fn create_test_lua() -> Lua {
     Lua::new()

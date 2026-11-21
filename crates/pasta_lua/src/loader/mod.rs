@@ -328,7 +328,6 @@ impl PastaLoader {
             }
         }
 
-
         Ok(())
     }
 }

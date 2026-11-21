@@ -1,6 +1,5 @@
 //! code_generator.rs のテスト。
 
-
 use pasta_dsl::parser::{Action, Args, Expr, FnScope, SetValue, Span, VarScope, VarSet};
 use pasta_lua::TranspileError;
 use pasta_lua::code_gen::LuaCodeGenerator;

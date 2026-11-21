@@ -51,11 +51,11 @@ export function installHljsNeutralizer(win) {
       return fn;
     }
     var wrapped = function (el) {
-      // language-pasta は原処理を呼ばずスキップ（事前 span を破壊しない・3.1）。
+      // language-pasta は原処理を呼ばずスキップ（事前 span を破壊しない）。
       if (isPastaElement(el)) {
         return undefined;
       }
-      // それ以外は原処理へそのまま委譲し戻り値も返す（既存挙動不変・3.2）。
+      // それ以外は原処理へそのまま委譲し戻り値も返す（既存挙動不変）。
       return fn.apply(this, arguments);
     };
     wrapped.__pastaNeutralized = true;

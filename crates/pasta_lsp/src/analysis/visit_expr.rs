@@ -415,6 +415,7 @@ impl super::AnalysisEngine {
         line_text: &str,
     ) {
         if let Expr::FnCall { args, .. } | Expr::DynamicFnCall { args, .. } = fn_expr {
+            // Find opening paren
             if let Some(paren_pos) = find_open_paren(text) {
                 let paren_len =
                     Self::push_char_op_token(text, paren_pos, base_offset, line, tokens, line_text);

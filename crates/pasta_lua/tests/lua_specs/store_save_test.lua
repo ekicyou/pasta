@@ -1,6 +1,5 @@
 -- Save persistence tests
--- Tests 
--- Updated: STORE.save is deprecated, now using pasta.save via ctx.save
+-- STORE.save は非推奨。保存は ctx.save 経由の pasta.save で行う。
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect

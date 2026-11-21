@@ -476,7 +476,7 @@ fn test_dynamic_fn_call_as_call_target() {
 
 #[test]
 fn test_dynamic_fn_call_with_invalid_args_splits_into_word_ref_and_talk() {
-        // 静的の `＠f（時間：朝）` と同じく、単語参照＋台詞に分かれる
+    // 静的の `＠f（時間：朝）` と同じく、単語参照＋台詞に分かれる
     assert_eq!(
         shapes_of("＠f（時間：朝）"),
         vec!["WordRef(f)", "Talk(（時間：朝）)"]

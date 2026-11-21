@@ -272,7 +272,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         self.generate_local_scene_items(&scene.items)?;
 
-
         self.end_block()?;
         self.line_map_slots.push(super::LineMapSlot {
             init_line,
