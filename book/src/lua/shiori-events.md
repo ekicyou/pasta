@@ -874,7 +874,7 @@ raise_event(event = "OnPastaSceneAt", references = ["dic/boot.pasta", "42", "{ '
 
 **デバッグが有効なときだけ動く**
 
-- `pasta.toml` の `[debug]` の `enabled = true` か、環境変数 `PASTA_DEBUG` でデバッグを有効にしたときだけ働く（[[debug]](../reference/pasta-toml.md#debugデバッグ)・[デバッグの有効化](../debug/index.md#デバッグの有効化)）。
+- `pasta.toml` の `[debug]` の `enabled = true`、保存変数 `＄＊デバッグ`・`＄＊debug` の `true`、環境変数 `PASTA_DEBUG` のどれかでデバッグを有効にしたときだけ働く（[[debug]](../reference/pasta-toml.md#debugデバッグ)・[デバッグの有効化](../debug/index.md#デバッグの有効化)）。
 - デバッグが無効なときは、何もせずに 204 No Content を返し、ログに警告を 1 行書く。
 - `SecurityLevel` が `external` のリクエストは、デバッグが有効でも何もせずに 204 No Content を返し、ログに警告を 1 行書く。
 - 断るときは引数を見ないので、失敗の表記は出ない。204 の理由は、pasta のログ（既定は `profile/pasta/logs/pasta.log`）でだけ分かる。
@@ -924,6 +924,7 @@ get_log(log_type = "error", ghost_name = "<ルート>", since_id = <覚えた番
 
 - `reload` を呼ぶ前に、pasta のログ（既定は `ghost/master/profile/pasta/logs/pasta.log`。場所は [`[logging]`](../reference/pasta-toml.md#loggingログ出力) の `file_path` で変わる）の終わりの位置を覚える。
 - `reload` の後は、pasta のログに増えた行に `SHIORI load entry completed` の行が出るまで待つ。この行が読み込みの終わりの印である。`loaded=true` なら読み込めた。`loaded=false` なら読み込めていない。
+- 印の行の前に、`Debug enabled` か `Debug disabled` の行が出る。デバッグが有効になったかは、この行で分かる。
 - 印の行が出ないときは、[読み込みの終わりを確かめられない](../debug/troubleshooting.md#読み込みの終わりを確かめられない)を見る。
 
 **誤りを数える**

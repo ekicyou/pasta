@@ -114,6 +114,8 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 2. `LoggingConfig::to_filter_directive` の文字列（`filter` があればそれ、無ければ `level`。`level` の既定は `"info"`）を解釈できれば、それを使う。
 3. どちらも使えなければ、標準エラーに警告を出して `"info"` にする。
 
+どの枝で作っても、最後に `pasta::load_entry=info`（読み込みの終わりの行）と `pasta::debug_state=info`（ローダのデバッグの有効・無効の行）の指示を足す。後から足した指示が作者の同じ target の指示に勝つので、この 2 つの target の info は、`PASTA_LOG`・`filter`・`level` によらず必ず通る。
+
 フィルタは登録簿の項目（設置パス）ごとに 1 つある。項目を作ったときは既定の設定でこの順をたどり、段階 1.5 は毎回、`[logging]` の設定（無ければ既定の設定）で作り直したフィルタをその項目に入れる。再読み込みで `[logging]` を消すと、フィルタは既定に戻る。あるゴーストの `[logging]` は、そのゴーストのログだけに効く。
 
 購読者は `registry().with(fmt::layer().with_writer(GlobalLoggerRegistry).with_filter(RegistryFilter))` の 1 つで、プロセスに 1 つの量の設定は持たない。購読者のフィルタ `RegistryFilter` は、イベントごとに下の振り分けの規則と同じ決まりで項目を選び、その項目のフィルタで判定する。

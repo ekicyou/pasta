@@ -90,7 +90,7 @@ load_with_config(base_dir, runtime_config)
 - 4 のトランスパイルでは、`.pasta` をパースした後に `pasta_file.path` をゴーストのフォルダーから見たパス（`CacheManager::get_relative_path`。Windows では `dic\天気.pasta`）に置き換えてからトランスパイラに渡す。このパスは生成コードの行の対応（`init_scene` の 4 つ目の引数。[init_scene の引数](transpiler.md#init_scene-の引数)）を埋めるのにだけ使う。パースのエラー文は置き換える前の絶対パスのままである。
 - 4 の統計（トランスパイル・省略・失敗・コピーの件数）は、`[loader] debug_mode` が `true` のときだけ info ログに出る。孤立キャッシュは `CacheManager::find_orphaned_caches` が `debug_mode` に関わらず件数と各パスを 1 回ずつ警告する。キャッシュへの保存は `debug_mode` に関わらず行う。
 - 4 と 5.5 は、別名表を持たせた同じ 1 つのトランスパイラ（`transpiler_for`）を使う。キャッシュの `.lua` の宣言名と、シーンマップの照合の鍵の宣言名は、常に同じ別名表から決まる。6 では同じ表を `RuntimeConfig.scene_aliases` に入れて `@pasta_search` へ渡すため、宣言と検索にも同じ表が効く（[シーン・単語レジストリとシーン検索](registry-search.md#辞書確定)）。
-- 5.5 の要否は、`pasta.toml` の `[debug]` と環境変数 `PASTA_DEBUG` を `resolve_enabled` で判定した 1 回だけで決める（[有効化の判定](debug.md#有効化の判定)）。無効なら何も作らず、6 にシーンマップを渡さない。VM はシーンマップの有無でデバッグの有効・無効を知る。
+- 5.5 の要否は、環境変数 `PASTA_DEBUG`・保存ファイルの保存変数 `デバッグ`・`debug`・`pasta.toml` の `[debug]` を `resolve_enabled` で判定した 1 回だけで決める。保存ファイルは、`PASTA_DEBUG` で決まらないときだけ、この段階（Lua の起動の前）で読む（[有効化の判定](debug.md#有効化の判定)）。無効なら何も作らず、6 にシーンマップを渡さない。VM はシーンマップの有無でデバッグの有効・無効を知る。
 - 6 の中で VM を作り、モジュールを登録し、`main`・`pasta.shiori.entry`・`pasta.scene_dic` を `require` する。その順序と失敗の扱いは [VM の構築とモジュール登録](execution-model.md#vm-の構築とモジュール登録) が書く。
 
 どの段階の `LoaderError` も `load_with_config` の戻り値としてそのまま返り、SHIORI 層がロード失敗として扱う。利用者から見た失敗の示され方は [起動シーケンス](../reference/startup.md#2-起動シーケンス) を参照する。
