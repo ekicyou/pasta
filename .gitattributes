@@ -7,6 +7,7 @@
 /crates/pasta_lua/scripts/** text=auto eol=crlf
 /about.hbs text=auto eol=crlf
 /about-pasta_check.hbs text=auto eol=crlf
+/crates/pasta_lua/scriptlibs/luacheck/vendor/sha1/LICENSE text=auto eol=crlf
 /.claude/skills/pasta-ghost-authoring/** text=auto eol=crlf
 /.claude/skills/pasta-lua-coding/** text=auto eol=crlf
 /.claude/skills/pasta-check/** text=auto eol=crlf
