@@ -1,1 +1,13 @@
 * text=auto eol=lf
+
+# 配布物（release.ps1 が取り出したまま nar・zip に詰めるもの）は、今まで配ってきたバイト（Windows のリリース CI の取り出し＝CRLF）を保つ。
+# hello-pasta は変えると updates.txt のハッシュが変わり、利用者のネットワーク更新が取り直しになる。
+/crates/pasta_sample_ghost/ghosts/** text=auto eol=crlf
+/crates/pasta_sample_ghost/starter/** text=auto eol=crlf
+/crates/pasta_lua/scripts/** text=auto eol=crlf
+/about.hbs text=auto eol=crlf
+/about-pasta_check.hbs text=auto eol=crlf
+/.claude/skills/pasta-ghost-authoring/** text=auto eol=crlf
+/.claude/skills/pasta-lua-coding/** text=auto eol=crlf
+/.claude/skills/pasta-check/** text=auto eol=crlf
+/LICENSE text=auto eol=crlf
