@@ -15,7 +15,7 @@ export const SCAN_TIMEOUT_MS = 2000;
 export interface ToolArgsMap {
   get_property: { property_name: 'baseware.name'; ghost_name: string };
   get_log: { log_type: 'error' | 'script'; ghost_name: string; since_id?: number; max_count?: number };
-  reload: { target: 'shiori'; ghost_name: string };
+  reload: { target: 'shiori' | 'ghost'; ghost_name: string };
   raise_event: {
     event: 'OnPastaSceneAt' | 'OnPastaDumpVariables' | 'OnPastaSetSaveVariable';
     references: readonly string[];

@@ -40,8 +40,8 @@
                 "icon": "$(play)"
             },
             {
-                "command": "pasta.reloadShiori",
-                "title": "SHIORI をリロード",
+                "command": "pasta.reloadGhost",
+                "title": "ゴーストをリロード",
                 "category": "Pasta",
                 "icon": "$(refresh)"
             },
@@ -69,7 +69,7 @@
                     "when": "resourceLangId == pasta"
                 },
                 {
-                    "command": "pasta.reloadShiori",
+                    "command": "pasta.reloadGhost",
                     "group": "navigation@2",
                     "when": "resourceLangId == pasta || resourceLangId == lua || resourceFilename =~ /^pasta\\.toml$/i"
                 },

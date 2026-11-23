@@ -90,7 +90,7 @@ async function main() {
   registerDevCommands(context as any, { ports: [a.port, b.port, brokenPort], timing: DEFAULT_TIMING, sleep });
 
   await test('registers the 5 commands and one output channel', async () => {
-    for (const id of ['pasta.runSceneAtCursor', 'pasta.reloadShiori', 'pasta.showSaveVariables', 'pasta.enableShioriDebug', 'pasta.disableShioriDebug']) {
+    for (const id of ['pasta.runSceneAtCursor', 'pasta.reloadGhost', 'pasta.showSaveVariables', 'pasta.enableShioriDebug', 'pasta.disableShioriDebug']) {
       assert.ok(vscode.registeredCommands.has(id), id);
     }
     assert.strictEqual(context.subscriptions.length, 6);
@@ -113,7 +113,7 @@ async function main() {
     openEditor(g.dic);
     vscode.window.activeTextEditor.document.isUntitled = true;
     const m = vscode.shownMessages.length;
-    await run('pasta.reloadShiori');
+    await run('pasta.reloadGhost');
     assert.match(messagesSince(m)[0].message, /ゴーストを特定できません/);
   });
 
@@ -121,7 +121,7 @@ async function main() {
     const file = `${tmp}/loose/a.pasta`;
     openEditor(file);
     const m = vscode.shownMessages.length;
-    await run('pasta.reloadShiori');
+    await run('pasta.reloadGhost');
     assert.strictEqual(messagesSince(m)[0].kind, 'warning');
     assert.ok(messagesSince(m)[0].message.includes('ゴーストのフォルダの中のファイルではありません'));
     assert.ok(messagesSince(m)[0].message.includes(file));
@@ -134,7 +134,7 @@ async function main() {
     openEditor(g.dic);
     const m = vscode.shownMessages.length;
     const o = vscode.outputLines.length;
-    await run('pasta.reloadShiori');
+    await run('pasta.reloadGhost');
     const msg = messagesSince(m);
     assert.strictEqual(msg.length, 1);
     assert.strictEqual(msg[0].kind, 'warning');
@@ -156,7 +156,7 @@ async function main() {
     const q = vscode.quickPickCalls.length;
     vscode.setNextQuickPickSelection(undefined); // close the pick
     const m = vscode.shownMessages.length;
-    await run('pasta.reloadShiori');
+    await run('pasta.reloadGhost');
     assert.deepStrictEqual(vscode.quickPickCalls.slice(q).map((c) => c.items),
       [[`SSP（127.0.0.1:${a.port}）`, `areka（127.0.0.1:${b.port}）`]]);
     assert.deepStrictEqual(reloads(), before);
@@ -164,9 +164,10 @@ async function main() {
 
     vscode.setNextQuickPickSelection(`areka（127.0.0.1:${b.port}）`);
     const o = vscode.outputLines.length;
-    await run('pasta.reloadShiori');
+    await run('pasta.reloadGhost');
     assert.deepStrictEqual(reloads(), [before[0], before[1] + 1]);
-    assert.ok(outputSince(o).some((l) => /^\[\d\d:\d\d:\d\d\] SHIORI をリロード — テストゴースト（.*）→ areka 127\.0\.0\.1:\d+$/.test(l)
+    assert.strictEqual(callsOf(b, 'reload').at(-1)!.arguments.target, 'ghost');
+    assert.ok(outputSince(o).some((l) => /^\[\d\d:\d\d:\d\d\] ゴーストをリロード — テストゴースト（.*）→ areka 127\.0\.0\.1:\d+$/.test(l)
       && l.includes(g.root) && l.includes(String(b.port))), outputSince(o).join('\n'));
 
     const q2 = vscode.quickPickCalls.length;
@@ -203,11 +204,11 @@ async function main() {
     a.state.runningRoots = [g.root];
     b.state.runningRoots = [];
     openEditor(g.dic);
-    await run('pasta.reloadShiori'); // remembers SSP on a.port
+    await run('pasta.reloadGhost'); // remembers SSP on a.port
     a.state.basewareName = 'areka-on-same-port';
     const probes = callsOf(a, 'get_property').length;
     const o = vscode.outputLines.length;
-    await run('pasta.reloadShiori');
+    await run('pasta.reloadGhost');
     assert.ok(callsOf(a, 'get_property').length >= probes + 2, 'identify, then a fresh scan');
     assert.ok(outputSince(o).some((l) => l.includes(`→ areka-on-same-port 127.0.0.1:${a.port}`)), outputSince(o).join('\n'));
     a.state.basewareName = 'SSP';
@@ -218,11 +219,11 @@ async function main() {
     a.state.runningRoots = [g.root];
     b.state.runningRoots = [];
     openEditor(g.dic);
-    await run('pasta.reloadShiori'); // remembers a
+    await run('pasta.reloadGhost'); // remembers a
     a.state.runningRoots = [];
     b.state.runningRoots = [g.root];
     const before = callsOf(b, 'reload').length;
-    await run('pasta.reloadShiori');
+    await run('pasta.reloadGhost');
     assert.strictEqual(callsOf(b, 'reload').length, before + 1);
   });
 
@@ -234,11 +235,11 @@ async function main() {
     openEditor(g.dic);
     const m = vscode.shownMessages.length;
     const before = callsOf(a, 'reload').length;
-    await Promise.all([run('pasta.reloadShiori'), run('pasta.reloadShiori')]);
+    await Promise.all([run('pasta.reloadGhost'), run('pasta.reloadGhost')]);
     a.state.reloadDelayMs = 0;
     assert.strictEqual(callsOf(a, 'reload').length, before + 1);
     assert.deepStrictEqual(messagesSince(m).map((x) => [x.kind, x.message]), [['warning', 'このゴーストへのコマンドが進んでいます']]);
-    await run('pasta.reloadShiori'); // released afterwards
+    await run('pasta.reloadGhost'); // released afterwards
     assert.strictEqual(callsOf(a, 'reload').length, before + 2);
   });
 
@@ -250,7 +251,7 @@ async function main() {
     openEditor(g.dic);
     const m = vscode.shownMessages.length;
     const o = vscode.outputLines.length;
-    await run('pasta.reloadShiori'); // only the broken port "runs" it
+    await run('pasta.reloadGhost'); // only the broken port "runs" it
     assert.deepStrictEqual(messagesSince(m).map((x) => x.kind), ['error']);
     assert.ok(outputSince(o).some((l) => l.includes('Broken 127.0.0.1')));
     assert.ok(outputSince(o).some((l) => l.includes('読み込み直しを頼めませんでした')), outputSince(o).join('\n'));
@@ -286,10 +287,10 @@ async function main() {
     assert.deepStrictEqual(messagesSince(m).map((x) => [x.kind, x.message]), [['warning', '読み込みの終わりを確かめられませんでした']]);
   });
 
-  await test('5.8: SHIORI をリロード summarises what increased before a time-out and never plays', async () => {
+  await test('5.8: ゴーストをリロード summarises what increased before a time-out and never plays', async () => {
     a.state.reloadLog = ['warn'];
     const { m, o, scenes } = onlyOn(a, b);
-    await run('pasta.reloadShiori');
+    await run('pasta.reloadGhost');
     resetServer(a);
     assert.strictEqual(callsOf(a, 'raise_event').length, scenes);
     assert.ok(outputSince(o).some((l) => l.includes('警告 1 件')), outputSince(o).join('\n'));
@@ -356,7 +357,7 @@ async function main() {
     assert.strictEqual(callsOf(a, 'reload').length, reloads);
   });
 
-  for (const id of ['pasta.runSceneAtCursor', 'pasta.reloadShiori']) {
+  for (const id of ['pasta.runSceneAtCursor', 'pasta.reloadGhost']) {
     await test(`4.2 / 5.2: ${id} saves only the dirty .pasta / .lua / pasta.toml under the root, before reload`, async () => {
       const { g } = onlyOn(a, b);
       const other = makeGhost();
@@ -464,7 +465,7 @@ async function main() {
     const { uri } = argTarget();
     const reloads = callsOf(a, 'reload').length;
     const dumps = callsOf(a, 'raise_event').filter((c) => c.arguments.event === 'OnPastaDumpVariables').length;
-    await run('pasta.reloadShiori', uri);
+    await run('pasta.reloadGhost', uri);
     await run('pasta.showSaveVariables', uri);
     vscode.workspace.textDocuments.length = 0;
     assert.strictEqual(callsOf(a, 'reload').length, reloads + 1);
@@ -501,7 +502,7 @@ async function main() {
     const m = vscode.shownMessages.length;
     const events = callsOf(a, 'raise_event').length;
     const reloads = callsOf(a, 'reload').length;
-    const reloading = run('pasta.reloadShiori');
+    const reloading = run('pasta.reloadGhost');
     // The lock is taken only after the ghost resolves, so wait until the reload has reached the server.
     for (let i = 0; i < 400 && callsOf(a, 'reload').length === reloads; i++) {
       await new Promise((r) => setTimeout(r, 5));

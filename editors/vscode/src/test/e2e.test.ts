@@ -73,13 +73,13 @@ test('declares the 5 dev commands (category Pasta) and their right-click order a
   const ghostSource = 'resourceLangId == pasta || resourceLangId == lua || resourceFilename =~ /^pasta\\.toml$/i';
   assert.deepStrictEqual(
     pkg.contributes.commands.map((c: any) => [c.command, c.category]),
-    [['pasta.runSceneAtCursor', 'Pasta'], ['pasta.reloadShiori', 'Pasta'], ['pasta.showSaveVariables', 'Pasta'], ['pasta.enableShioriDebug', 'Pasta'], ['pasta.disableShioriDebug', 'Pasta']]
+    [['pasta.runSceneAtCursor', 'Pasta'], ['pasta.reloadGhost', 'Pasta'], ['pasta.showSaveVariables', 'Pasta'], ['pasta.enableShioriDebug', 'Pasta'], ['pasta.disableShioriDebug', 'Pasta']]
   );
   assert.deepStrictEqual(
     pkg.contributes.menus['editor/context'].map((c: any) => [c.command, c.group, c.when]),
     [
       ['pasta.runSceneAtCursor', 'navigation@1', 'resourceLangId == pasta'],
-      ['pasta.reloadShiori', 'navigation@2', ghostSource],
+      ['pasta.reloadGhost', 'navigation@2', ghostSource],
       ['pasta.showSaveVariables', 'navigation@3', ghostSource],
     ]
   );

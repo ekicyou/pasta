@@ -69,10 +69,10 @@ const COMMANDS: readonly Command[] = [
     },
   },
   {
-    id: 'pasta.reloadShiori', title: 'SHIORI をリロード', accepts: isGhostSource, saves: true,
+    id: 'pasta.reloadGhost', title: 'ゴーストをリロード', accepts: isGhostSource, saves: true,
     run: async (ctx) => {
-      const o = await reloadAndWait(ctx);
-      return { ...formatReload(o), failure: o.kind === 'refused' ? o.result : undefined };
+      const o = await reloadAndWait(ctx, 'ghost');
+      return { ...formatReload(o, 'ghost'), failure: o.kind === 'refused' ? o.result : undefined };
     },
   },
   {

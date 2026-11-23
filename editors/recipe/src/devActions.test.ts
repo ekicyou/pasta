@@ -168,13 +168,14 @@ function setup(opts: SetupOpts = {}) {
 test("リロードは見出しの行と拡張と同じ要約を出し、動かす面を見せ、devBegin・devEnd で包む（2.1・4.2）", async () => {
   const s = setup();
   await s.actions.reload();
-  assert.match(s.lines[0], /^\[\d\d:\d\d:\d\d\] SHIORI をリロード — ゴースト（C:\\g）→ SSP 127\.0\.0\.1:9801$/);
+  assert.match(s.lines[0], /^\[\d\d:\d\d:\d\d\] ゴーストをリロード — ゴースト（C:\\g）→ SSP 127\.0\.0\.1:9801$/);
   assert.equal(s.lines.at(-1), "読み込みは誤り無く終わりました");
   assert.deepEqual(s.notices, []);
   assert.ok(s.shown.length > 0 && s.shown.every((f) => f === "run"));
   assert.equal(s.count("dev_begin"), 1);
   assert.equal(s.count("dev_end"), 1);
   assert.deepEqual(s.tools().filter((t) => t === "reload"), ["reload"]);
+  assert.ok(s.fio.posts.some((p) => JSON.parse(p.body).params?.arguments?.target === "ghost"), "ゴースト全体を読み込み直す");
 });
 
 test("速い 2 回押しの 2 本目は重なりの文言で止め、2 回目の devBegin を呼ばない（5.1）", async () => {
@@ -182,7 +183,7 @@ test("速い 2 回押しの 2 本目は重なりの文言で止め、2 回目の
   const s = setup({ begin: new Promise<void>((r) => (release = () => r())) });
   const first = s.actions.reload();
   await s.actions.reload();
-  assert.match(s.lines[0], new RegExp(`SHIORI をリロード — ${BUSY}（g）$`));
+  assert.match(s.lines[0], new RegExp(`ゴーストをリロード — ${BUSY}（g）$`));
   assert.deepEqual(s.notices, [`warning: ${BUSY}`]);
   release();
   await first;
@@ -196,7 +197,7 @@ test("速い 2 回押しの 2 本目は重なりの文言で止め、2 回目の
 test("descript.txt が無ければ何も送らず、ゴーストのフォルダとして扱えないと出し、devEnd を呼ぶ（3.6）", async () => {
   const s = setup({ descript: false });
   await s.actions.reload();
-  assert.match(s.lines[0], new RegExp(`SHIORI をリロード — ${noDescript(info.master).replace(/[\\()（）]/g, "\\$&")}$`));
+  assert.match(s.lines[0], new RegExp(`ゴーストをリロード — ${noDescript(info.master).replace(/[\\()（）]/g, "\\$&")}$`));
   assert.deepEqual(s.notices, [`warning: ${noDescript(info.master)}`]);
   assert.deepEqual(s.tools(), []);
   assert.equal(s.count("dev_end"), 1);

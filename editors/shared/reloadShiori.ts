@@ -42,7 +42,10 @@ export type ReloadOutcome =
       pastaLog: PastaLogLocation;     // 場所と、file_path を読めなかったときの添え書き
     };
 
-export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
+/** shiori は辞書だけ、ghost は SHIORI とシェルなどゴースト全体 */
+export type ReloadTarget = 'shiori' | 'ghost';
+
+export async function reloadAndWait(ctx: FlowContext, target: ReloadTarget = 'shiori'): Promise<ReloadOutcome> {
   const { io, endpoint: { port }, ghost: { root, master }, timing } = ctx;
   const pastaLog = pastaLogPath(io, master, await readText(io, io.join(master, 'pasta.toml')));
   let cursor = await openLogCursor(io, pastaLog.path);
@@ -50,7 +53,7 @@ export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
   if (typeof sinceId !== 'number') {
     return { kind: 'refused', result: sinceId };
   }
-  const reload = await callTool(io, port, 'reload', { target: 'shiori', ghost_name: root }, timing.callTimeoutMs);
+  const reload = await callTool(io, port, 'reload', { target, ghost_name: root }, timing.callTimeoutMs);
   if (reload.kind !== 'ok') {
     return { kind: 'refused', result: reload };
   }
@@ -108,9 +111,9 @@ export function blocksPlayback(outcome: ReloadOutcome): boolean {
 
 const TIMEOUT_TEXT = '読み込みの終わりを確かめられませんでした';
 
-export function formatReload(outcome: ReloadOutcome): { lines: string[]; notice?: string } {
+export function formatReload(outcome: ReloadOutcome, target: ReloadTarget = 'shiori'): { lines: string[]; notice?: string } {
   if (outcome.kind === 'refused') {
-    const text = `SHIORI の読み込み直しを頼めませんでした: ${describeResult(outcome.result)}`;
+    const text = `${target === 'ghost' ? 'ゴーストの' : 'SHIORI の'}読み込み直しを頼めませんでした: ${describeResult(outcome.result)}`;
     return { lines: [text], notice: text };
   }
   const { finished, errors, warnings } = outcome;
