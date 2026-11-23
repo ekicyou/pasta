@@ -130,7 +130,7 @@ export async function startFakeMcpServer(init: Partial<FakeState> = {}): Promise
         };
       }
       case 'reload': {
-        if (a.target !== 'shiori') return ng(`NG:Unknown target ${String(a.target)}`);
+        if (a.target !== 'shiori' && a.target !== 'ghost') return ng(`NG:Unknown target ${String(a.target)}`);
         if (!isRunning(a.ghost_name)) return notRunning();
         const lines = state.reloadLog.map(pastaLogLine);
         const file = pastaLogOf(a.ghost_name);

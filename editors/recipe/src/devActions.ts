@@ -108,12 +108,12 @@ export class DevActions {
 
   reload(): Promise<void> {
     return this.#execute({
-      title: "SHIORI をリロード",
+      title: "ゴーストをリロード",
       saves: true,
       run: async (ctx) => {
-        const o = await reloadAndWait(ctx);
+        const o = await reloadAndWait(ctx, "ghost");
         this.#observe(ctx, o);
-        return { ...formatReload(o), failure: o.kind === "refused" ? o.result : undefined };
+        return { ...formatReload(o, "ghost"), failure: o.kind === "refused" ? o.result : undefined };
       },
     });
   }

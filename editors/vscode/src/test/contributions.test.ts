@@ -4,7 +4,7 @@
 // cannot reach: the "right-click top display (.pasta)" + "command
 // registration / menu contribution" acceptance items. They read package.json
 // directly (no vscode mock needed) and assert the contribution surface:
-//   - contributes.commands has pasta.runSceneAtCursor + pasta.reloadShiori.
+//   - contributes.commands has pasta.runSceneAtCursor + pasta.reloadGhost.
 //   - editor/context: runSceneAtCursor ALWAYS shown for .pasta (NOT debug-gated)
 //     and ordered first in the navigation group (top display).
 //   - no DAP declarations: debuggers, breakpoints, onDebug, debug/toolBar,
@@ -43,7 +43,7 @@ const pkg: PackageJson = JSON.parse(
 );
 
 const RUN_COMMAND = 'pasta.runSceneAtCursor';
-const RELOAD_COMMAND = 'pasta.reloadShiori';
+const RELOAD_COMMAND = 'pasta.reloadGhost';
 const OLD_COMMAND = 'pasta.debug.playScene';
 
 // =============================================================================
@@ -78,9 +78,9 @@ test('contributes.commands registers pasta.runSceneAtCursor with a title (R1.1)'
   assert.ok(typeof e!.title === 'string' && e!.title.length > 0, 'it must have a title');
 });
 
-test('contributes.commands registers pasta.reloadShiori with a title (R9.1)', () => {
+test('contributes.commands registers pasta.reloadGhost with a title (R9.1)', () => {
   const e = commandEntry(RELOAD_COMMAND);
-  assert.ok(e, 'pasta.reloadShiori must be a registered command');
+  assert.ok(e, 'pasta.reloadGhost must be a registered command');
   assert.ok(typeof e!.title === 'string' && e!.title.length > 0, 'it must have a title');
 });
 
@@ -131,7 +131,7 @@ test('contributes.commands is exactly the 5 dev commands, all in category Pasta'
     pkg.contributes.commands.map((c) => [c.command, c.title, (c as { category?: string }).category]),
     [
       [RUN_COMMAND, '▶ シーンを実行', 'Pasta'],
-      [RELOAD_COMMAND, 'SHIORI をリロード', 'Pasta'],
+      [RELOAD_COMMAND, 'ゴーストをリロード', 'Pasta'],
       [DUMP_COMMAND, '保存変数を表示', 'Pasta'],
       [ENABLE_COMMAND, ENABLE_DEBUG, 'Pasta'],
       [DISABLE_COMMAND, DISABLE_DEBUG, 'Pasta'],

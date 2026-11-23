@@ -1011,7 +1011,7 @@ function ghostValidatorCreated(fromCollection: number, fromWatcher: number): { c
 const REQUIREMENT_EXAMPLE = '＊挨拶\n  さくら：やあ\n  ・朝\n    さくら：おはよう\n＊\n  さくら：またね\n';
 
 // 5 つのコマンドは activate が 1 回で登録する
-const DEV_COMMANDS = ['pasta.runSceneAtCursor', 'pasta.reloadShiori', 'pasta.showSaveVariables', 'pasta.enableShioriDebug', 'pasta.disableShioriDebug'];
+const DEV_COMMANDS = ['pasta.runSceneAtCursor', 'pasta.reloadGhost', 'pasta.showSaveVariables', 'pasta.enableShioriDebug', 'pasta.disableShioriDebug'];
 function assertDevCommandsRegistered(): void {
   for (const id of DEV_COMMANDS) {
     assert.ok(mock.registeredCommands.has(id), `${id} must be registered by activate`);

@@ -89,7 +89,7 @@ saveButton.addEventListener("click", () => {
 });
 // 開始の画面では今の CSS がツールバーごと隠す
 const reloadButton = document.createElement("button");
-reloadButton.textContent = "SHIORI をリロード";
+reloadButton.textContent = "ゴーストをリロード";
 reloadButton.addEventListener("click", () => void devActions.reload());
 const debugButton = document.createElement("button");
 debugButton.textContent = ENABLE_DEBUG;
