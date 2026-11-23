@@ -159,11 +159,11 @@
 
 | 項目 | 値 |
 | -- | -- |
-| 撮った日 | 2026-11-15 |
-| 版 | pasta-recipe 0.6.1（コミット 46581809 から手元で作ったもの）・`pasta.dll` 0.6.1・SSP 2.9.34（`ssp.exe` のファイルの版 2.9.34.3000） |
-| 画面 | 2880×1800・Windows の表示の拡大 100%（撮影の間だけ。元は 200%） |
+| 撮った日 | 2026-11-23 |
+| 版 | pasta-recipe 0.6.3（コミット 1bbda5ad から手元で作ったもの）・`pasta.dll` 0.6.3・SSP 2.9.37（`ssp.exe` のファイルの版 2.9.37.3000） |
+| 画面 | 2880×1800・Windows の表示の拡大 100%（撮影の間だけ。元は 200%）・タスクバーは上（撮る範囲から外す） |
 | 切り抜く範囲 | 画面の (1600, 1000) から 1280×800 |
-| 書き出し | 1152×720（medium・720p）・30 fps・62.4 秒・4.6 MB・音声なし |
+| 書き出し | 1152×720（medium・720p）・30 fps・66.7 秒・4.7 MB・音声なし |
 
 ### 窓とゴーストの置き方
 
@@ -177,14 +177,26 @@
 | 女の子の吹き出し | (2498, 1198)–(2833, 1367) |
 | 男の子の吹き出し | (2210, 1442)–(2545, 1538) |
 
-- ゴーストは `\![move,--X=…,--Y=1300,--time=0,--base=screen,--option=ignore-sticky-window]` で置き、吹き出しは `\![set,balloonoffset,244,-102]`（女の子）・`\![set,balloonoffset,97,142]`（男の子）で寄せる。
+- ゴーストと吹き出しの位置は、写しのシェルの `descript.txt` に書く（`sakura.defaultleft,2589`・`sakura.defaulttop,1300`・`kero.defaultleft,2448`・`kero.defaulttop,1300`・`sakura.balloon.offsetx,244`・`sakura.balloon.offsety,-102`・`kero.balloon.offsetx,97`・`kero.balloon.offsety,142`）。`\![move]` で置いても、readonly の SSP ではゴーストをリロードすると既定の位置へ戻るためである。
 - 窓の撮影の並びは `%APPDATA%\io.github.ekicyou.pasta-recipe\layout.toml` に `tree_width = 260`・`panels_height = 240`・`left_share = 0.42`・`swapped = false` と書く。出力を左に置くのは、ゴーストが出力を隠さないためである（アプリの既定は `swapped = true`）。
 - 起動のたびに、WebView2 のデバッグポート 9333 から CDP で `--tree-width`・`--panels-height` が当たったかを読む。外れていたら起動し直す（最初の起動だけ読まれなかったことが 1 回あった。原因は不明）。
 
 ### 写しの用意
 
 - `crates/pasta_sample_ghost/ghosts/hello-pasta/` を `C:\pasta-demo\hello-pasta` へ写し、`descript.txt` の `name` を `hello-pasta-demo` にする（SSP に入っている同名のゴーストとぶつからないため）。
-- 写しの変更は 3 つ。トークの間隔を長くする（動画の間に勝手に喋らせない）・`[debug]` を有効にする・`10-save.pasta` を動画に要る分に絞って `＊天気` を足す。
+- 写しの変更は 3 つ。トークの間隔を長くする（動画の間に勝手に喋らせない）・`10-save.pasta` を次の 9 行にする・シェルの `descript.txt` に上の位置を書く。`[debug]` はサンプルで有効のまま使う。
+
+```pasta
+＃ 10 段目：覚えていてほしい
+
+＊会話
+　＄＊回数＝＄＊回数＋１
+　女の子：＠キラキラ　この話をするのは＄＊回数　回目だよ！
+　男の子：＠困惑　……ずっと数えてたの？
+
+＊天気
+　女の子：今日の天気は＄天気　だって。
+```
 - 撮る前に毎回、写しの `profile/` を消し、`10-save.pasta` を絞った状態に戻す。
 
 ### 操作の台本
