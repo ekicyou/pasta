@@ -358,6 +358,7 @@ Opus
 - `novel-backlog-rollback`（2026-11-20 に `novel-checkpoint-rollback` から分けた）: フェーズ 2（SSP の対応待ち）。
 - `novel-areka-output`（2026-11-20 に `cue-command-runtime`・`novel-talk-flow` から分けた）: フェーズ 3（areka 待ち）。
 - `scene-exact-match`・`shiori-debug-toggle` は、2026-11-20 の棚卸で 0.7.0 の推奨に入れた（承認待ち）。
+- `line-end-wait`（2026-11-25 起票。ghost_dev の「窓際のぱすたさん」の作者の要望）: 中身は台帳の行にある。ほかの spec に依存しない。`sakura_builder.lua` を `cue-command-runtime` などと共有する。
 
 ## 依存の更新（2026-10-24 起票）
 
@@ -402,7 +403,7 @@ Opus
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。背景と舞台を使わない SSP の物語にする（2026-11-19 の決定）ので、SSP の実機で確かめる。Dependencies: cue-command-runtime, scene-stage-attributes, novel-talk-flow, novel-checkpoint-rollback, novel-save-slots, novel-areka-contract
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
-
+- [ ] line-end-wait -- 行末の句読点（と句読点の無い行末・リーダー）の後の待ちを、行の途中とは別に `[talk]` と `[actor."名前"]` で設定できるようにする。未設定なら今と同じ出力。行末は、アクション行・継続行の終わり（`act:line()` の継ぎ目を、行末の待ちのためにも付ける）。演出のために消す手段は、推奨が案 A（行末のキーが効く行末だけ、すぐ後ろに書いた `\_w[…]` が自動の待ちを置き換える。`\_w[0]` で消せる）。ghost_dev の辞書の書き換えは対象外（2026-11-25 起票）。版は未定。Dependencies: none
 
 ## Existing Spec Updates
 
