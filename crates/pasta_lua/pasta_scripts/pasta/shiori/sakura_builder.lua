@@ -351,6 +351,95 @@ local function read_unit(text, pos, stop, is_talk)
 end
 BUILDER._internal.read_unit = read_unit
 
+--- 継ぎ目の並びに位置 pos があるか
+local function has_seam(seams, pos)
+    for _, p in ipairs(seams or {}) do
+        if p == pos then
+            return true
+        end
+    end
+    return false
+end
+
+--- 位置 pos の単位が引数のある `\_w[…]` か
+local function author_wait_at(text, pos)
+    if text:byte(pos) ~= 92 then -- 92 は `\`
+        return false
+    end
+    local name, arg = APPEARANCE.tag_at(text, pos)
+    return name == "_w" and arg ~= nil
+end
+
+--- 行末の単位（トークン k の pos で終わる）のすぐ後ろに作者の `\_w[…]` が続くか。
+--- テキストの終わりなら、次のトークンが継ぎ目の無い sakura_script のときだけその頭を見る
+local function author_wait_after(tokens, k, pos)
+    local inner = tokens[k]
+    if has_seam(inner.seams, pos + 1) then
+        return false
+    end
+    local text = tostring(inner.text)
+    if pos < #text then
+        return author_wait_at(text, pos + 1)
+    end
+    local nxt = tokens[k + 1]
+    return nxt ~= nil and nxt.type == "sakura_script" and nxt.text ~= nil
+        and not has_seam(nxt.seams, 1) and author_wait_at(tostring(nxt.text), 1)
+end
+
+--- 行を閉じる。最後の見える単位 last があれば、その終わりを行末として ends に記録する
+--- @return nil 閉じた後の last
+local function close_line(ends, tokens, last)
+    if last ~= nil then
+        local list = ends[last.k] or {}
+        ends[last.k] = list
+        list[#list + 1] = { pos = last.pos, author_wait = author_wait_after(tokens, last.k, last.pos) }
+    end
+    return nil
+end
+
+--- トークン k のテキストを単位ごとに読み、継ぎ目で行を閉じる（継ぎ目の扱いは join_lines と同じ）
+--- @return table|nil last まだ閉じていない行の最後の見える単位 { k, pos }
+local function walk_text(ends, tokens, k, last)
+    local inner = tokens[k]
+    local text = tostring(inner.text)
+    local seams = inner.seams or {}
+    local is_talk = inner.type == "talk"
+    local s, pos = 1, 1
+    while pos <= #text do
+        while seams[s] and seams[s] <= pos do
+            last = close_line(ends, tokens, last)
+            s = s + 1
+        end
+        local next_pos, visible = read_unit(text, pos, seams[s] or (#text + 1), is_talk)
+        if visible then
+            last = { k = k, pos = next_pos - 1 }
+        end
+        pos = next_pos
+    end
+    if seams[s] then -- テキストの終わり（#text + 1）の継ぎ目
+        last = close_line(ends, tokens, last)
+    end
+    return last
+end
+
+--- まとまりの内側トークン列から、トークンごとの行末を求める
+--- @param tokens table[] まとまりの内側トークン（結合済み）
+--- @return table<integer, table[]> トークンの添字 → { pos = 元のテキストの行末の字の最後のバイト, author_wait = 真偽 } の並び
+local function find_line_ends(tokens)
+    local ends, last = {}, nil
+    for k, inner in ipairs(tokens) do
+        local t = inner.type
+        if (t == "talk" or t == "sakura_script") and inner.text ~= nil then
+            last = walk_text(ends, tokens, k, last)
+        elseif t == "choice" then
+            last = close_line(ends, tokens, last)
+        end
+    end
+    close_line(ends, tokens, last)
+    return ends
+end
+BUILDER._internal.find_line_ends = find_line_ends
+
 --- 継ぎ目に達したときの行の状態。保留のまま来たら（字の無い行の後）その位置に改行を出し、保留は立てたまま
 --- @param column table 列の状態
 --- @param out string[] 差し込んだテキストの片
