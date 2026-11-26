@@ -289,6 +289,9 @@ const LINE_ENDS_SHAPE_ERROR: &str =
 /// `line_ends` の表を読む。範囲の外の位置は捨てる（境目に当たらない位置は待ちの規則が捨てる）。
 fn read_line_ends(t: &Table, text_len: usize) -> LuaResult<Vec<LineEnd>> {
     let shape = || mlua::Error::external(LINE_ENDS_SHAPE_ERROR);
+    if t.raw_len() == 0 && t.contains_key("pos")? {
+        return Err(shape());
+    }
     let mut v = Vec::new();
     for i in 1..=t.raw_len() {
         let Value::Table(item) = t.get::<Value>(i)? else {
