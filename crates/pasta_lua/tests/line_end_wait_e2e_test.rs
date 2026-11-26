@@ -479,11 +479,9 @@ fn line_end_keys_keep_budoux_breaks_and_mid_line_waits() {
         let mut line_ends = 0;
         for (i, ((_, a), (_, b))) in without.iter().zip(&with).enumerate() {
             let next = without[i + 1..].first().map_or("", |(t, _)| *t);
-            let at_line_end = [
-                "\\s[5]", "\\n[180]", "\\_l[", "\\e", "雨", "ひ", "\\n雨", "\\nひ",
-            ]
-            .iter()
-            .any(|h| next.starts_with(h));
+            let at_line_end = ["\\s[5]", "\\n[180]", "\\_l[", "\\e", "\\n雨", "\\nひ"]
+                .iter()
+                .any(|h| next.starts_with(h));
             if at_line_end {
                 line_ends += 1;
             } else {
