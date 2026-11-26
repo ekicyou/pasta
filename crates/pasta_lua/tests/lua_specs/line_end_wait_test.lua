@@ -234,3 +234,87 @@ describe("find_line_ends - 作者の待ち", function()
         end)):toEqual({ "雨？[E] \\_w" })
     end)
 end)
+
+local function join_lines(inner, column, ratio, ends)
+    return require("pasta.shiori.sakura_builder")._internal.join_lines(inner, column, ratio, ends)
+end
+
+-- まとまりごとに行末を求め、1 つの列の状態で join_lines を順に通し、写した位置の字を確かめる。
+-- 戻り値は差し込んだ後の台詞を並べたもの（行末に [E] を付ける）
+local function joined(fill, ratio)
+    local ACT = require("pasta.act")
+    local act = ACT.new({ sakura = { name = "さくら", spot = 0 } })
+    act._line_newlines = ratio
+    act.current_scene = {}
+    for k, v in pairs(WORDS) do
+        act.current_scene[k] = v
+    end
+    fill(act, act.actors.sakura)
+    local out = {}
+    for _, group in ipairs(act:build()) do
+        if group.type == "actor" then
+            local src = find_line_ends(group.tokens)
+            local column = { line = 1, width = 0, jump = false }
+            local tokens, ends = {}, {}
+            for k, inner in ipairs(group.tokens) do
+                local orig = inner.text and tostring(inner.text)
+                local text, mapped = join_lines(inner, column, ratio, src[k] or {})
+                for i, e in ipairs(mapped) do
+                    local o = src[k][i].pos
+                    local a = o
+                    while orig:byte(a) >= 0x80 and orig:byte(a) < 0xC0 do -- UTF-8 の続きのバイト
+                        a = a - 1
+                    end
+                    local ch = orig:sub(a, o)
+                    expect(tostring(text):sub(e.pos - #ch + 1, e.pos)):toBe(ch)
+                    expect(e.author_wait):toBe(src[k][i].author_wait)
+                end
+                tokens[k] = { type = inner.type, text = text }
+                ends[k] = mapped
+            end
+            out[#out + 1] = render(tokens, ends)
+        end
+    end
+    return out
+end
+
+describe("join_lines - 行末の位置の写し替え", function()
+    test("行の改行を差し込むと、行末の位置が差し込んだ後のテキストの行末の字に当たる", function()
+        expect(joined(function(act, s)
+            act:line():talk(s, "一行目。"):line():talk(s, "二行目。"):line():talk(s, "三行目")
+        end, 1.8)):toEqual({ "一行目。[E]\\n[180]二行目。[E]\\n[180]三行目[E]" })
+    end)
+
+    test("継続行の頭のタグ・行末の後ろの表情と作者の待ちがあっても当たる", function()
+        expect(joined(function(act, s)
+            act:line():talk(s, "なら。"):talk(s, act:word("笑顔"))
+            act:line():talk(s, act:word("左")):talk(s, "続き"):sakura_script(s, "\\_w[500]")
+            act:line():talk(s, "雨？"):talk(s, act:word("間"))
+        end, 1.8)):toEqual({ "なら。[E]\\s[5]\\_l[-283,0]続き[EW] \\_w[500] \\n[180]雨？[EW]\\_w[500]" })
+    end)
+
+    test("行の印の無い台詞は差し込まず、位置も変わらない", function()
+        expect(joined(function(act, s)
+            act:talk(s, "ab。"):talk(s, "cd")
+        end, 1.8)):toEqual({ "ab。cd[E]" })
+    end)
+
+    test("line_newlines が nil・0 なら、テキストも行末も受け取ったまま返す", function()
+        for _, ratio in ipairs({ false, 0 }) do
+            local inner = { type = "talk", text = "一行目。二行目", seams = { 1, 13 } }
+            local ends = { { pos = 12, author_wait = false } }
+            local text, out = join_lines(inner, { line = 1, width = 0 }, ratio or nil, ends)
+            expect(text):toBe(inner.text)
+            expect(out == ends):toBe(true)
+        end
+    end)
+
+    test("受け取った行末の表を書き換えない", function()
+        local ends = { { pos = 12, author_wait = false }, { pos = 21, author_wait = true } }
+        local inner = { type = "talk", text = "一行目。二行目", seams = { 1, 13 } }
+        local text, out = join_lines(inner, { line = 1, width = 0, joinable = true }, 1.8, ends)
+        expect(text):toBe("\\n[180]一行目。\\n[180]二行目")
+        expect(ends):toEqual({ { pos = 12, author_wait = false }, { pos = 21, author_wait = true } })
+        expect(out):toEqual({ { pos = 19, author_wait = false }, { pos = 35, author_wait = true } })
+    end)
+end)

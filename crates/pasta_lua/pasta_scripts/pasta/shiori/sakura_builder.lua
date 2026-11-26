@@ -471,28 +471,57 @@ local function step_unit(column, out, tag, visible, moves)
     end
 end
 
---- 台詞に行の改行を差し込む（line_newlines が nil・0 なら台詞を読まない）
+--- 行末の位置を、差し込んだ片の分だけずらした新しい並びにする
+--- @param ends table[] 元のテキストの行末
+--- @param pieces table[] 差し込んだ片 { pos = 元の位置（この字の前に入った）, len = バイト数 }
+--- @return table[]
+local function shift_ends(ends, pieces)
+    local out = {}
+    for i, e in ipairs(ends) do
+        local pos = e.pos
+        for _, p in ipairs(pieces) do
+            if p.pos <= e.pos then
+                pos = pos + p.len
+            end
+        end
+        out[i] = { pos = pos, author_wait = e.author_wait }
+    end
+    return out
+end
+
+--- 台詞に行の改行を差し込み、行末の位置を差し込んだ後のテキストの位置に写す（line_newlines が nil・0 なら台詞を読まない）
 --- @param inner table talk・sakura_script のトークン（seams: 行の頭のバイト位置の昇順）
 --- @param column table 話し手のスポットの列の状態（joinable・line_pending を読み書きする）
 --- @param ratio number|nil config.line_newlines
---- @return any 変換に渡すテキスト（差し込まなければ inner.text をそのまま返す）
-local function join_lines(inner, column, ratio)
+--- @param ends table[]|nil 元のテキストの行末 { pos, author_wait }
+--- @return any text 変換に渡すテキスト（差し込まなければ inner.text をそのまま返す）
+--- @return table[]|nil ends 写した行末（差し込まなければ受け取ったまま）
+local function join_lines(inner, column, ratio, ends)
     if ratio == nil or ratio == 0 or inner.text == nil then
-        return inner.text
+        return inner.text, ends
     end
     local tag = line_newline_tag(ratio)
     local text = tostring(inner.text)
     local seams = inner.seams or {}
     local is_talk = inner.type == "talk"
-    local out, k, pos = {}, 1, 1
+    local out, pieces, k, pos = {}, {}, 1, 1
+    local function note(n)
+        for _ = n + 1, #out do
+            pieces[#pieces + 1] = { pos = pos, len = #tag }
+        end
+    end
     while pos <= #text do
         -- 単位の途中に落ちた継ぎ目は、その単位の後で達したとみなす
         while seams[k] and seams[k] <= pos do
+            local n = #out
             reach_seam(column, out, tag)
+            note(n)
             k = k + 1
         end
         local next_pos, visible, moves = read_unit(text, pos, seams[k] or (#text + 1), is_talk)
+        local n = #out
         step_unit(column, out, tag, visible, moves)
+        note(n)
         out[#out + 1] = text:sub(pos, next_pos - 1)
         pos = next_pos
     end
@@ -501,10 +530,11 @@ local function join_lines(inner, column, ratio)
     end
     local s = table.concat(out)
     if s == text then
-        return inner.text
+        return inner.text, ends
     end
-    return s
+    return s, ends and shift_ends(ends, pieces)
 end
+BUILDER._internal.join_lines = join_lines
 
 --- 区切りを出して 1 列進める。区切りを出す所はすべてここを通す
 --- @param buffer table tracking_buffer
