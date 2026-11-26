@@ -79,7 +79,13 @@ impl WaitValues {
             comma: config.script_wait_comma,
             strong: config.script_wait_strong,
             leader: config.script_wait_leader,
-            line_end: LineEndWaits::default(),
+            line_end: LineEndWaits {
+                normal: config.script_wait_normal_eol,
+                period: config.script_wait_period_eol,
+                comma: config.script_wait_comma_eol,
+                strong: config.script_wait_strong_eol,
+                leader: config.script_wait_leader_eol,
+            },
         }
     }
 

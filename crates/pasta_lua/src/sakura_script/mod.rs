@@ -23,6 +23,12 @@
 //! -- budoux の無いアクター・nil でも、列の状態は進める（改行は入れない）。
 //! local col = {}
 //! SAKURA.talk_to_script(CONFIG.actor.sakura, "こんにちは。", col)
+//!
+//! -- 4 つ目の引数は行末の並び { { pos = 整数, author_wait = 真偽 }, ... }。
+//! -- pos は行末の字の最後のバイトの位置（1 始まり）。空の表は行末なし。
+//! -- 省くと最後の見える字が行末（直後に \_w[…] があれば作者の待ち）。
+//! -- 行末には script_wait_*_eol（アクター → [talk]）の値が入る。
+//! SAKURA.talk_to_script(CONFIG.actor.sakura, "雨？", nil, { { pos = 6 } })
 //! ```
 //!
 //! アクターの `budoux` が空でない表のときだけ、`budoux_newlines`（改行の幅の倍率。
@@ -34,9 +40,10 @@ pub mod wait_inserter;
 
 use crate::loader::TalkConfig;
 use mlua::{Lua, Result as LuaResult, Table, Value};
+use pasta_core::LINE_END_WAIT_KEYS;
 use std::sync::Arc;
-use tokenizer::Tokenizer;
-use wait_inserter::{LineEndWaits, WaitValues};
+use tokenizer::{Token, Tokenizer};
+use wait_inserter::{LineEnd, LineEndWaits, WaitValues};
 
 /// Module version.
 const VERSION: &str = "1.0.0";
@@ -81,8 +88,9 @@ pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table> {
 
     let state_clone = Arc::clone(&state);
     let talk_to_script = lua.create_function(
-        move |_lua, (actor, talk, column): (Value, Option<String>, Option<Table>)| {
-            talk_to_script_impl(&state_clone, actor, talk, column)
+        move |_lua, args: (Value, Option<String>, Option<Table>, Value)| {
+            let (actor, talk, column, line_ends) = args;
+            talk_to_script_impl(&state_clone, actor, talk, column, line_ends)
         },
     )?;
 
@@ -105,6 +113,7 @@ fn talk_to_script_impl(
     actor: Value,
     talk: Option<String>,
     column: Option<Table>,
+    line_ends: Value,
 ) -> LuaResult<String> {
     // Return empty string for nil or empty input
     let talk = match talk {
@@ -116,7 +125,13 @@ fn talk_to_script_impl(
 
     let tokens = state.tokenizer.tokenize(&talk);
 
-    let result = wait_inserter::insert_waits(&tokens, &wait_values, &[]);
+    let line_ends = match &line_ends {
+        Value::Nil => default_line_ends(&tokens),
+        Value::Table(t) => read_line_ends(t, talk.len())?,
+        _ => return Err(mlua::Error::external(LINE_ENDS_SHAPE_ERROR)),
+    };
+
+    let result = wait_inserter::insert_waits(&tokens, &wait_values, &line_ends);
 
     // budoux の改行（列の状態を受け取ったら、budoux が無くても状態は進める）
     let ab = read_actor_break(&actor)?;
@@ -246,6 +261,11 @@ fn resolve_wait_values(actor: &Value, defaults: &WaitValues) -> LuaResult<WaitVa
 
     let get_wait =
         |key: &str, default: i64| -> i64 { actor_table.get::<i64>(key).ok().unwrap_or(default) };
+    let get_eol = |key: &str, default: Option<i64>| -> Option<i64> {
+        actor_table.get::<i64>(key).ok().or(default)
+    };
+    let [normal_eol, period_eol, comma_eol, strong_eol, leader_eol] = LINE_END_WAIT_KEYS;
+    let d = &defaults.line_end;
 
     Ok(WaitValues {
         normal: get_wait("script_wait_normal", defaults.normal),
@@ -253,8 +273,50 @@ fn resolve_wait_values(actor: &Value, defaults: &WaitValues) -> LuaResult<WaitVa
         comma: get_wait("script_wait_comma", defaults.comma),
         strong: get_wait("script_wait_strong", defaults.strong),
         leader: get_wait("script_wait_leader", defaults.leader),
-        line_end: LineEndWaits::default(),
+        line_end: LineEndWaits {
+            normal: get_eol(normal_eol, d.normal),
+            period: get_eol(period_eol, d.period),
+            comma: get_eol(comma_eol, d.comma),
+            strong: get_eol(strong_eol, d.strong),
+            leader: get_eol(leader_eol, d.leader),
+        },
     })
+}
+
+const LINE_ENDS_SHAPE_ERROR: &str =
+    "talk_to_script の line_ends は { pos = 整数, author_wait = 真偽 } の並びで渡してください";
+
+/// `line_ends` の表を読む。範囲の外の位置は捨てる（境目に当たらない位置は待ちの規則が捨てる）。
+fn read_line_ends(t: &Table, text_len: usize) -> LuaResult<Vec<LineEnd>> {
+    let shape = || mlua::Error::external(LINE_ENDS_SHAPE_ERROR);
+    let mut v = Vec::new();
+    for i in 1..=t.raw_len() {
+        let Value::Table(item) = t.get::<Value>(i)? else {
+            return Err(shape());
+        };
+        let pos = item.get::<i64>("pos").map_err(|_| shape())?;
+        // usize に直す前に見る（x86 では i64 が usize に収まらない）
+        if pos <= 0 || pos > text_len as i64 {
+            continue;
+        }
+        v.push(LineEnd {
+            end: pos as usize,
+            author_wait: item.get::<bool>("author_wait")?,
+        });
+    }
+    Ok(v)
+}
+
+/// `line_ends` を省いたときの行末: 最後の見える字。直後が `\_w[…]` なら作者の待ち。
+fn default_line_ends(tokens: &[Token]) -> Vec<LineEnd> {
+    let Some(k) = tokens.iter().rposition(Token::shows_text) else {
+        return Vec::new();
+    };
+    let end = tokens[..=k].iter().map(|t| t.text.len()).sum();
+    let author_wait = tokens.get(k + 1).is_some_and(|t| {
+        t.kind == tokenizer::TokenKind::SakuraScript && t.text.starts_with(r"\_w[")
+    });
+    vec![LineEnd { end, author_wait }]
 }
 
 /// Implementation of break_lines Lua function.
