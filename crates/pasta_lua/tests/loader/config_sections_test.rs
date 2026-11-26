@@ -119,6 +119,129 @@ chars_period = "."
 }
 
 #[test]
+fn test_talk_config_line_end_fields_read() {
+    let toml_str = r#"
+[talk]
+script_wait_normal_eol = 10
+script_wait_period_eol = 20
+script_wait_comma_eol = 30
+script_wait_strong_eol = 40
+script_wait_leader_eol = 50
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    let talk = config.talk().expect("talk section should exist");
+    assert_eq!(talk.script_wait_normal_eol, Some(10));
+    assert_eq!(talk.script_wait_period_eol, Some(20));
+    assert_eq!(talk.script_wait_comma_eol, Some(30));
+    assert_eq!(talk.script_wait_strong_eol, Some(40));
+    assert_eq!(talk.script_wait_leader_eol, Some(50));
+}
+
+#[test]
+fn test_talk_config_line_end_fields_default_none() {
+    let config = PastaConfig::from_str("[talk]\nscript_wait_period = 1500\n").unwrap();
+    let talk = config.talk().expect("talk section should exist");
+    assert_eq!(talk.script_wait_normal_eol, None);
+    assert_eq!(talk.script_wait_period_eol, None);
+    assert_eq!(talk.script_wait_comma_eol, None);
+    assert_eq!(talk.script_wait_strong_eol, None);
+    assert_eq!(talk.script_wait_leader_eol, None);
+    let d = TalkConfig::default();
+    assert_eq!(d.script_wait_leader_eol, None);
+}
+
+fn line_end_error(toml_str: &str) -> String {
+    PastaConfig::from_str(toml_str)
+        .expect_err("non-integer line-end key must fail to load")
+        .to_string()
+}
+
+#[test]
+fn test_line_end_key_wrong_type_in_talk_fails_load() {
+    let cases = [
+        ("\"1200\"", "文字列"),
+        ("1200.0", "浮動小数点数"),
+        ("true", "真偽値"),
+        ("{ a = 1 }", "表"),
+    ];
+    for (value, label) in cases {
+        let toml_str =
+            format!("[talk]\nscript_wait_period = 1500\nscript_wait_strong_eol = {value}\n");
+        let msg = line_end_error(&toml_str);
+        assert!(
+            msg.contains(&format!(
+                "script_wait_strong_eol は整数（ミリ秒）で書いてください: {label}が書かれています; at [talk] (line 3)"
+            )),
+            "{value}: {msg}"
+        );
+    }
+}
+
+#[test]
+fn test_line_end_key_wrong_type_in_actor_fails_load() {
+    let toml_str = r#"
+[actor."妹"]
+spot = 1
+script_wait_normal_eol = "abc"
+"#;
+    let msg = line_end_error(toml_str);
+    assert!(
+        msg.contains(
+            "script_wait_normal_eol は整数（ミリ秒）で書いてください: 文字列が書かれています; at [actor.\"妹\"] (line 4)"
+        ),
+        "{msg}"
+    );
+}
+
+#[test]
+fn test_line_end_key_errors_joined_in_order() {
+    let toml_str = r#"
+[actor."姉"]
+script_wait_comma_eol = "x"
+
+[actor."妹"]
+script_wait_leader_eol = 1.5
+script_wait_normal_eol = true
+
+[talk]
+script_wait_period_eol = [1]
+script_wait_normal_eol = 1.0
+"#;
+    let msg = line_end_error(toml_str);
+    let expected = [
+        "script_wait_normal_eol は整数（ミリ秒）で書いてください: 浮動小数点数が書かれています; at [talk] (line 11)",
+        "script_wait_period_eol は整数（ミリ秒）で書いてください: 配列が書かれています; at [talk] (line 10)",
+        "script_wait_normal_eol は整数（ミリ秒）で書いてください: 真偽値が書かれています; at [actor.\"妹\"] (line 7)",
+        "script_wait_leader_eol は整数（ミリ秒）で書いてください: 浮動小数点数が書かれています; at [actor.\"妹\"] (line 6)",
+        "script_wait_comma_eol は整数（ミリ秒）で書いてください: 文字列が書かれています; at [actor.\"姉\"] (line 3)",
+    ];
+    assert!(msg.contains(&expected.join(", ")), "{msg}");
+}
+
+#[test]
+fn test_line_end_key_check_ignores_non_table_sections() {
+    assert!(PastaConfig::from_str("talk = 1\nactor = { \"妹\" = 2 }\n").is_ok());
+}
+
+#[test]
+fn test_valid_line_end_keys_keep_other_talk_keys() {
+    let toml_str = r#"
+[talk]
+script_wait_period = 1500
+chars_period = "."
+script_wait_strong_eol = 900
+
+[actor."妹"]
+script_wait_normal_eol = 100
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    let talk = config.talk().expect("talk section should exist");
+    assert_eq!(talk.script_wait_period, 1500);
+    assert_eq!(talk.chars_period, ".");
+    assert_eq!(talk.script_wait_strong_eol, Some(900));
+}
+
+#[test]
 fn test_talk_config_none_when_missing() {
     let config = PastaConfig::from_str("").unwrap();
     assert!(config.talk().is_none());

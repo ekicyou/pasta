@@ -2,6 +2,8 @@
 //!
 //! Inserts `\_w[ms]` wait tags based on token types and wait values.
 
+use std::collections::BTreeMap;
+
 use crate::loader::TalkConfig;
 
 use super::tokenizer::{Token, TokenKind};
@@ -19,6 +21,53 @@ pub struct WaitValues {
     pub strong: i64,
     /// Wait for leader characters (default: 200ms)
     pub leader: i64,
+    /// 行末の待ち（アクター → [talk] で決めたもの）
+    pub line_end: LineEndWaits,
+}
+
+/// 行末の待ちの値（書かれていなければ None）
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LineEndWaits {
+    pub normal: Option<i64>,
+    pub period: Option<i64>,
+    pub comma: Option<i64>,
+    pub strong: Option<i64>,
+    pub leader: Option<i64>,
+}
+
+impl LineEndWaits {
+    /// どれか 1 つでも書かれているか
+    pub fn any(&self) -> bool {
+        [
+            self.normal,
+            self.period,
+            self.comma,
+            self.strong,
+            self.leader,
+        ]
+        .iter()
+        .any(Option::is_some)
+    }
+
+    fn get(&self, kind: &TokenKind) -> Option<i64> {
+        match kind {
+            TokenKind::General => self.normal,
+            TokenKind::Period => self.period,
+            TokenKind::Comma => self.comma,
+            TokenKind::Strong => self.strong,
+            TokenKind::Leader => self.leader,
+            _ => None,
+        }
+    }
+}
+
+/// テキストの中の 1 つの行末
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LineEnd {
+    /// 行末の字の終わりのバイト位置（テキストの頭からのバイト数）
+    pub end: usize,
+    /// 行末の並びのすぐ後ろに作者の `\_w[…]` が続くか
+    pub author_wait: bool,
 }
 
 impl WaitValues {
@@ -30,7 +79,19 @@ impl WaitValues {
             comma: config.script_wait_comma,
             strong: config.script_wait_strong,
             leader: config.script_wait_leader,
+            line_end: LineEndWaits {
+                normal: config.script_wait_normal_eol,
+                period: config.script_wait_period_eol,
+                comma: config.script_wait_comma_eol,
+                strong: config.script_wait_strong_eol,
+                leader: config.script_wait_leader_eol,
+            },
         }
+    }
+
+    /// 字の種類の行末の値（行末のキーが無ければ行の途中の値）。待ちを持たない種類は None
+    pub fn line_end_value(&self, kind: &TokenKind) -> Option<i64> {
+        self.line_end.get(kind).or(self.get_wait(kind))
     }
 
     /// Get wait value for a token kind.
@@ -59,19 +120,39 @@ impl WaitValues {
 /// 4. Period/Comma/Strong/LineStartProhibited: accumulate until end of consecutive run
 /// 5. At end of consecutive punctuation: insert (max_wait - 50)ms
 /// 6. If calculated wait <= 0, skip insertion
+/// 7. At a line end a line-end key applies to, its run gets one line-end wait
+///    instead (none when the author's `\_w[…]` follows)
 ///
 /// # Arguments
 /// * `tokens` - Token sequence
 /// * `wait_values` - Wait values in milliseconds
+/// * `line_ends` - Line ends in the text (empty keeps the mid-line output)
 ///
 /// # Returns
 /// String with wait tags inserted
-pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues) -> String {
+pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues, line_ends: &[LineEnd]) -> String {
+    let plans = plan_line_ends(tokens, wait_values, line_ends);
+    let mut plans = plans.iter().peekable();
     let mut result = String::new();
     let mut pending_max_wait: Option<i64> = None;
     let mut pending_text = String::new();
 
-    for token in tokens {
+    for (i, token) in tokens.iter().enumerate() {
+        if let Some(&&plan) = plans.peek()
+            && plan.start <= i
+        {
+            if i == plan.start {
+                flush_pending(&mut result, &mut pending_text, &mut pending_max_wait);
+            }
+            pending_text.push_str(&token.text);
+            if i == plan.end {
+                pending_max_wait = plan.wait;
+                flush_pending(&mut result, &mut pending_text, &mut pending_max_wait);
+                plans.next();
+            }
+            continue;
+        }
+
         match &token.kind {
             // Rule 1: SakuraScript - output as-is, flush pending if any
             TokenKind::SakuraScript => {
@@ -128,6 +209,113 @@ pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues) -> String {
     result
 }
 
+/// 1 つの効く行末の計画
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LineEndPlan {
+    /// 並びの頭のトークンの添字（`す」` の `す`、句読点の並びの頭、または行末のトークン自身）
+    start: usize,
+    /// 行末のトークンの添字
+    end: usize,
+    /// 入れる値（50 を引く前）。直後に作者の待ちがあれば None
+    wait: Option<i64>,
+}
+
+/// 効く行末ごとの計画を、添字の順に決める
+fn plan_line_ends(
+    tokens: &[Token],
+    wait_values: &WaitValues,
+    line_ends: &[LineEnd],
+) -> Vec<LineEndPlan> {
+    if line_ends.is_empty() || !wait_values.line_end.any() {
+        return Vec::new();
+    }
+
+    let token_ends: Vec<usize> = tokens
+        .iter()
+        .scan(0, |pos, t| {
+            *pos += t.text.len();
+            Some(*pos)
+        })
+        .collect();
+
+    // 行末のトークンの添字 → 作者の待ちが続くか
+    let mut targets: BTreeMap<usize, bool> = BTreeMap::new();
+    for line_end in line_ends {
+        let k = token_ends.partition_point(|&e| e < line_end.end);
+        if token_ends.get(k) != Some(&line_end.end) {
+            continue;
+        }
+        let token = &tokens[k];
+        // 単独の `\` の後ろの待ちは `\\` になるので、行の途中と同じく入れない
+        if matches!(
+            token.kind,
+            TokenKind::SakuraScript | TokenKind::LineEndProhibited
+        ) || token.text == "\\"
+        {
+            continue;
+        }
+        *targets.entry(k).or_default() |= line_end.author_wait;
+    }
+
+    let mut plans = Vec::new();
+    // 効く行末の次から並びが始まる
+    let mut floor = 0;
+    for (&k, &author_wait) in &targets {
+        let (start, kinds): (usize, Vec<&TokenKind>) = match &tokens[k].kind {
+            kind @ (TokenKind::General | TokenKind::Leader) => (k, vec![kind]),
+            _ => {
+                let mut start = k;
+                while start > floor && in_run(&tokens[start - 1].kind) {
+                    start -= 1;
+                }
+                let puncts: Vec<&TokenKind> = tokens[start..=k]
+                    .iter()
+                    .map(|t| &t.kind)
+                    .filter(|kind| **kind != TokenKind::LineStartProhibited)
+                    .collect();
+                if !puncts.is_empty() {
+                    (start, puncts)
+                } else {
+                    // 行頭禁則の字だけの並びは、直前のふつうの字・リーダーにつく
+                    match start.checked_sub(1).map(|j| (j, &tokens[j].kind)) {
+                        Some((j, kind @ (TokenKind::General | TokenKind::Leader)))
+                            if !targets.contains_key(&j) =>
+                        {
+                            (j, vec![kind])
+                        }
+                        _ => continue,
+                    }
+                }
+            }
+        };
+
+        if !kinds
+            .iter()
+            .any(|kind| wait_values.line_end.get(kind).is_some())
+        {
+            continue;
+        }
+        let value = kinds
+            .iter()
+            .filter_map(|kind| wait_values.line_end_value(kind))
+            .max();
+        plans.push(LineEndPlan {
+            start,
+            end: k,
+            wait: if author_wait { None } else { value },
+        });
+        floor = k + 1;
+    }
+    plans
+}
+
+fn in_run(kind: &TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::Period | TokenKind::Comma | TokenKind::Strong | TokenKind::LineStartProhibited
+    )
+}
+
 /// Flush pending punctuation with wait tag.
 fn flush_pending(
     result: &mut String,
@@ -175,6 +363,7 @@ mod tests {
             comma: 500,   // effective: 450
             strong: 500,  // effective: 450
             leader: 200,  // effective: 150
+            line_end: LineEndWaits::default(),
         }
     }
 
@@ -189,7 +378,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]");
     }
@@ -203,7 +392,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"\h\s[0]あ\_w[50]");
     }
@@ -216,7 +405,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"あ\_w[50]。\_w[950]");
     }
@@ -235,7 +424,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         // All consecutive punctuation is output together with max wait
         assert_eq!(result, r"」」」！？。、\_w[950]");
@@ -249,7 +438,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"…\_w[150]…\_w[150]");
     }
@@ -262,7 +451,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"「あ\_w[50]");
     }
@@ -275,7 +464,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         // No wait tag when effective wait is 0
         assert_eq!(result, "あ");
@@ -289,7 +478,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         // No wait tag when effective wait is negative
         assert_eq!(result, "あ");
@@ -305,7 +494,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"\hあ\_w[50]。\_w[950]い\_w[50]");
     }
@@ -315,7 +504,7 @@ mod tests {
         let tokens: Vec<Token> = vec![];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, "");
     }
@@ -328,7 +517,7 @@ mod tests {
             make_token(TokenKind::General, "✌\u{FE0F}"),
         ];
 
-        let result = insert_waits(&tokens, &default_wait_values());
+        let result = insert_waits(&tokens, &default_wait_values(), &[]);
 
         assert_eq!(result, "🙆\u{200D}♀\u{FE0F}\\_w[50]✌\u{FE0F}\\_w[50]");
     }
@@ -337,7 +526,7 @@ mod tests {
     fn test_multi_codepoint_leader_token_one_wait() {
         let tokens = vec![make_token(TokenKind::Leader, "…\u{0301}")];
 
-        let result = insert_waits(&tokens, &default_wait_values());
+        let result = insert_waits(&tokens, &default_wait_values(), &[]);
 
         assert_eq!(result, "…\u{0301}\\_w[150]");
     }
@@ -350,7 +539,7 @@ mod tests {
             make_token(TokenKind::General, "あ"),
         ];
 
-        let result = insert_waits(&tokens, &default_wait_values());
+        let result = insert_waits(&tokens, &default_wait_values(), &[]);
 
         assert_eq!(result, "\\あ\\_w[50]");
     }
@@ -360,7 +549,7 @@ mod tests {
         // `\` + U+0301 is not a lone `\`: its wait does not follow `\` directly
         let tokens = vec![make_token(TokenKind::General, "\\\u{0301}")];
 
-        let result = insert_waits(&tokens, &default_wait_values());
+        let result = insert_waits(&tokens, &default_wait_values(), &[]);
 
         assert_eq!(result, "\\\u{0301}\\_w[50]");
     }
@@ -385,7 +574,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"」」」！？。、\_w[950]");
     }
@@ -406,7 +595,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]");
     }
@@ -428,11 +617,530 @@ mod tests {
             ..Default::default()
         };
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(
             result,
             r"\h\s[0]こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]"
         );
+    }
+
+    #[test]
+    fn test_line_end_value_falls_back_to_mid_line() {
+        let w = default_wait_values();
+        assert_eq!(w.line_end_value(&TokenKind::General), Some(100));
+        assert_eq!(w.line_end_value(&TokenKind::Period), Some(1000));
+        assert_eq!(w.line_end_value(&TokenKind::Comma), Some(500));
+        assert_eq!(w.line_end_value(&TokenKind::Strong), Some(500));
+        assert_eq!(w.line_end_value(&TokenKind::Leader), Some(200));
+    }
+
+    #[test]
+    fn test_line_end_value_uses_line_end_key() {
+        let w = WaitValues {
+            line_end: LineEndWaits {
+                period: Some(0),
+                leader: Some(900),
+                ..Default::default()
+            },
+            ..default_wait_values()
+        };
+        assert_eq!(w.line_end_value(&TokenKind::Period), Some(0));
+        assert_eq!(w.line_end_value(&TokenKind::Leader), Some(900));
+        assert_eq!(w.line_end_value(&TokenKind::General), Some(100));
+    }
+
+    #[test]
+    fn test_line_end_value_none_without_wait() {
+        let w = default_wait_values();
+        assert_eq!(w.line_end_value(&TokenKind::SakuraScript), None);
+        assert_eq!(w.line_end_value(&TokenKind::LineEndProhibited), None);
+        assert_eq!(w.line_end_value(&TokenKind::LineStartProhibited), None);
+    }
+
+    #[test]
+    fn test_line_end_waits_any() {
+        assert!(!LineEndWaits::default().any());
+        for w in [
+            LineEndWaits {
+                normal: Some(1),
+                ..Default::default()
+            },
+            LineEndWaits {
+                period: Some(1),
+                ..Default::default()
+            },
+            LineEndWaits {
+                comma: Some(1),
+                ..Default::default()
+            },
+            LineEndWaits {
+                strong: Some(1),
+                ..Default::default()
+            },
+            LineEndWaits {
+                leader: Some(0),
+                ..Default::default()
+            },
+        ] {
+            assert!(w.any());
+        }
+    }
+
+    fn eol(line_end: LineEndWaits) -> WaitValues {
+        WaitValues {
+            line_end,
+            ..default_wait_values()
+        }
+    }
+
+    fn strong_eol(v: i64) -> WaitValues {
+        eol(LineEndWaits {
+            strong: Some(v),
+            ..Default::default()
+        })
+    }
+
+    fn normal_eol(v: i64) -> WaitValues {
+        eol(LineEndWaits {
+            normal: Some(v),
+            ..Default::default()
+        })
+    }
+
+    fn at(end: usize) -> LineEnd {
+        LineEnd {
+            end,
+            author_wait: false,
+        }
+    }
+
+    fn plan(start: usize, end: usize, wait: Option<i64>) -> LineEndPlan {
+        LineEndPlan { start, end, wait }
+    }
+
+    /// 雨？
+    fn ame() -> Vec<Token> {
+        vec![
+            make_token(TokenKind::General, "雨"),
+            make_token(TokenKind::Strong, "？"),
+        ]
+    }
+
+    #[test]
+    fn plan_strong_line_end() {
+        let p = plan_line_ends(&ame(), &strong_eol(1200), &[at(6)]);
+        assert_eq!(p, vec![plan(1, 1, Some(1200))]);
+    }
+
+    #[test]
+    fn plan_empty_without_line_end_key() {
+        assert!(plan_line_ends(&ame(), &default_wait_values(), &[at(6)]).is_empty());
+    }
+
+    #[test]
+    fn plan_empty_without_line_ends() {
+        assert!(plan_line_ends(&ame(), &strong_eol(1200), &[]).is_empty());
+    }
+
+    #[test]
+    fn plan_empty_when_key_does_not_apply() {
+        // 「？」の行末に、ふつうの字の行末のキーは効かない
+        assert!(plan_line_ends(&ame(), &normal_eol(1250), &[at(6)]).is_empty());
+    }
+
+    #[test]
+    fn plan_ignores_end_off_token_boundary() {
+        assert!(plan_line_ends(&ame(), &strong_eol(1200), &[at(4)]).is_empty());
+        assert!(plan_line_ends(&ame(), &strong_eol(1200), &[at(7)]).is_empty());
+    }
+
+    #[test]
+    fn plan_ignores_line_end_prohibited_and_tags() {
+        let tokens = vec![
+            make_token(TokenKind::General, "あ"),
+            make_token(TokenKind::LineEndProhibited, "「"),
+        ];
+        assert!(plan_line_ends(&tokens, &normal_eol(1250), &[at(6)]).is_empty());
+
+        let tokens = vec![
+            make_token(TokenKind::General, "あ"),
+            make_token(TokenKind::SakuraScript, r"\\"),
+        ];
+        assert!(plan_line_ends(&tokens, &normal_eol(1250), &[at(5)]).is_empty());
+
+        let tokens = vec![
+            make_token(TokenKind::General, "あ"),
+            make_token(TokenKind::General, "\\"),
+        ];
+        assert!(plan_line_ends(&tokens, &normal_eol(1250), &[at(4)]).is_empty());
+    }
+
+    #[test]
+    fn plan_run_takes_longest_value() {
+        // …ね？」 : 並びは ？」
+        let tokens = vec![
+            make_token(TokenKind::General, "ね"),
+            make_token(TokenKind::Strong, "？"),
+            make_token(TokenKind::LineStartProhibited, "」"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &strong_eol(1200), &[at(9)]),
+            vec![plan(1, 2, Some(1200))]
+        );
+        // 行末の値が行の途中の値より短くても、行末の値を使う
+        assert_eq!(
+            plan_line_ends(&tokens, &strong_eol(300), &[at(9)]),
+            vec![plan(1, 2, Some(300))]
+        );
+
+        // ！？
+        let tokens = vec![
+            make_token(TokenKind::Strong, "！"),
+            make_token(TokenKind::Strong, "？"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &strong_eol(1200), &[at(6)]),
+            vec![plan(0, 1, Some(1200))]
+        );
+
+        // ？。 : 書かれていない句点は行の途中の値（1000）
+        let tokens = vec![
+            make_token(TokenKind::General, "雨"),
+            make_token(TokenKind::Strong, "？"),
+            make_token(TokenKind::Period, "。"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &strong_eol(1200), &[at(9)]),
+            vec![plan(1, 2, Some(1200))]
+        );
+        assert_eq!(
+            plan_line_ends(&tokens, &strong_eol(300), &[at(9)]),
+            vec![plan(1, 2, Some(1000))]
+        );
+    }
+
+    #[test]
+    fn plan_general_and_leader_line_end() {
+        let tokens = vec![
+            make_token(TokenKind::General, "ち"),
+            make_token(TokenKind::General, "は"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &normal_eol(1250), &[at(6)]),
+            vec![plan(1, 1, Some(1250))]
+        );
+
+        let tokens = vec![
+            make_token(TokenKind::General, "た"),
+            make_token(TokenKind::Leader, "‥"),
+            make_token(TokenKind::Leader, "‥"),
+        ];
+        let w = eol(LineEndWaits {
+            leader: Some(1250),
+            ..Default::default()
+        });
+        assert_eq!(
+            plan_line_ends(&tokens, &w, &[at(9)]),
+            vec![plan(2, 2, Some(1250))]
+        );
+    }
+
+    #[test]
+    fn plan_line_start_prohibited_after_general() {
+        // す」 : 並びは す」、字の種類は す
+        let tokens = vec![
+            make_token(TokenKind::General, "す"),
+            make_token(TokenKind::LineStartProhibited, "」"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &normal_eol(1250), &[at(6)]),
+            vec![plan(0, 1, Some(1250))]
+        );
+        assert!(plan_line_ends(&tokens, &strong_eol(1200), &[at(6)]).is_empty());
+    }
+
+    #[test]
+    fn plan_line_start_prohibited_without_char_kind() {
+        for head in [
+            make_token(TokenKind::SakuraScript, r"\s[5]"),
+            make_token(TokenKind::LineEndProhibited, "「"),
+        ] {
+            let len = head.text.len();
+            let tokens = vec![head, make_token(TokenKind::LineStartProhibited, "」")];
+            assert!(plan_line_ends(&tokens, &normal_eol(1250), &[at(len + 3)]).is_empty());
+        }
+        let tokens = vec![make_token(TokenKind::LineStartProhibited, "」")];
+        assert!(plan_line_ends(&tokens, &normal_eol(1250), &[at(3)]).is_empty());
+
+        // す が別の行末なら、」 は す につかない
+        let tokens = vec![
+            make_token(TokenKind::General, "す"),
+            make_token(TokenKind::LineStartProhibited, "」"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &normal_eol(1250), &[at(3), at(6)]),
+            vec![plan(0, 0, Some(1250))]
+        );
+    }
+
+    #[test]
+    fn plan_author_wait_has_no_value() {
+        let p = plan_line_ends(
+            &ame(),
+            &strong_eol(1200),
+            &[LineEnd {
+                end: 6,
+                author_wait: true,
+            }],
+        );
+        assert_eq!(p, vec![plan(1, 1, None)]);
+    }
+
+    #[test]
+    fn plan_merges_same_line_end_token() {
+        let p = plan_line_ends(
+            &ame(),
+            &strong_eol(1200),
+            &[
+                at(6),
+                LineEnd {
+                    end: 6,
+                    author_wait: true,
+                },
+                at(6),
+            ],
+        );
+        assert_eq!(p, vec![plan(1, 1, None)]);
+    }
+
+    #[test]
+    fn plan_keeps_short_values() {
+        // 50 と 0 も計画に残す（50 を引いて 0 以下なら出力で入れない）
+        let p = plan_line_ends(&ame(), &strong_eol(50), &[at(6)]);
+        assert_eq!(p, vec![plan(1, 1, Some(50))]);
+        let p = plan_line_ends(&ame(), &strong_eol(0), &[at(6)]);
+        assert_eq!(p, vec![plan(1, 1, Some(0))]);
+    }
+
+    #[test]
+    fn plan_run_stops_at_effective_line_end() {
+        // 雨。（行末）。（行末）: 次の行の句点は前の行の並びにつながらない
+        let tokens = vec![
+            make_token(TokenKind::General, "雨"),
+            make_token(TokenKind::Period, "。"),
+            make_token(TokenKind::Period, "。"),
+        ];
+        let w = eol(LineEndWaits {
+            period: Some(1200),
+            ..Default::default()
+        });
+        assert_eq!(
+            plan_line_ends(&tokens, &w, &[at(9), at(6)]),
+            vec![plan(1, 1, Some(1200)), plan(2, 2, Some(1200))]
+        );
+
+        // 効かない行末（！）では並びは切れない
+        let tokens = vec![
+            make_token(TokenKind::Strong, "！"),
+            make_token(TokenKind::Period, "。"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &w, &[at(3), at(6)]),
+            vec![plan(0, 1, Some(1200))]
+        );
+    }
+
+    /// ghost_dev の行の途中の値
+    fn ghost_dev(line_end: LineEndWaits) -> WaitValues {
+        WaitValues {
+            normal: 90,
+            period: 1200,
+            comma: 600,
+            strong: 750,
+            leader: 300,
+            line_end,
+        }
+    }
+
+    fn run(input: &str, w: &WaitValues, line_ends: &[LineEnd]) -> String {
+        let tokenizer = super::super::tokenizer::Tokenizer::new(&TalkConfig::default()).unwrap();
+        insert_waits(&tokenizer.tokenize(input), w, line_ends)
+    }
+
+    fn at_end(input: &str) -> LineEnd {
+        at(input.len())
+    }
+
+    fn author_at(end: usize) -> LineEnd {
+        LineEnd {
+            end,
+            author_wait: true,
+        }
+    }
+
+    fn strong(v: i64) -> WaitValues {
+        ghost_dev(LineEndWaits {
+            strong: Some(v),
+            ..Default::default()
+        })
+    }
+
+    fn normal(v: i64) -> WaitValues {
+        ghost_dev(LineEndWaits {
+            normal: Some(v),
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn output_strong_line_end() {
+        assert_eq!(
+            run("雨？", &strong(1200), &[at_end("雨？")]),
+            r"雨\_w[40]？\_w[1150]"
+        );
+    }
+
+    #[test]
+    fn output_strong_mid_line_unchanged() {
+        let s = "晴れ？それとも";
+        assert_eq!(
+            run(s, &strong(1200), &[at_end(s)]),
+            r"晴\_w[40]れ\_w[40]？\_w[700]そ\_w[40]れ\_w[40]と\_w[40]も\_w[40]"
+        );
+    }
+
+    #[test]
+    fn output_strong_run_with_closing_bracket() {
+        let s = "だよね？」";
+        assert_eq!(
+            run(s, &strong(1200), &[at_end(s)]),
+            r"だ\_w[40]よ\_w[40]ね\_w[40]？」\_w[1150]"
+        );
+    }
+
+    #[test]
+    fn output_general_line_end() {
+        let s = "こんにちは";
+        assert_eq!(
+            run(s, &normal(1250), &[at_end(s)]),
+            r"こ\_w[40]ん\_w[40]に\_w[40]ち\_w[40]は\_w[1200]"
+        );
+    }
+
+    #[test]
+    fn output_leader_line_end() {
+        let s = "た‥‥";
+        let w = ghost_dev(LineEndWaits {
+            leader: Some(1250),
+            ..Default::default()
+        });
+        assert_eq!(run(s, &w, &[at_end(s)]), r"た\_w[40]‥\_w[250]‥\_w[1200]");
+    }
+
+    #[test]
+    fn output_general_with_closing_bracket_line_end() {
+        assert_eq!(
+            run("す」", &normal(1250), &[at_end("す」")]),
+            r"す」\_w[1200]"
+        );
+    }
+
+    #[test]
+    fn output_general_with_closing_bracket_mid_line_unchanged() {
+        assert_eq!(run("す」と", &normal(1250), &[]), r"す\_w[40]」と\_w[40]");
+        let s = "す」とす」";
+        assert_eq!(
+            run(s, &normal(1250), &[at_end(s)]),
+            r"す\_w[40]」と\_w[40]す」\_w[1200]"
+        );
+    }
+
+    #[test]
+    fn output_author_wait_replaces_line_end_wait() {
+        let s = r"雨？\_w[500]";
+        assert_eq!(
+            run(s, &strong(1200), &[author_at(6)]),
+            r"雨\_w[40]？\_w[500]"
+        );
+        // 作者の待ちが次のトークンにあるとき
+        assert_eq!(run("雨？", &strong(1200), &[author_at(6)]), r"雨\_w[40]？");
+    }
+
+    #[test]
+    fn output_author_wait_without_line_end_key_unchanged() {
+        let s = r"雨？\_w[500]";
+        assert_eq!(
+            run(s, &ghost_dev(LineEndWaits::default()), &[author_at(6)]),
+            r"雨\_w[40]？\_w[700]\_w[500]"
+        );
+        // 効かない行末では作者の待ちを見ない
+        assert_eq!(
+            run(s, &normal(1250), &[author_at(6)]),
+            r"雨\_w[40]？\_w[700]\_w[500]"
+        );
+    }
+
+    #[test]
+    fn output_line_end_wait_before_tag() {
+        let w = ghost_dev(LineEndWaits {
+            period: Some(1200),
+            ..Default::default()
+        });
+        assert_eq!(run(r"。\s[5]", &w, &[at(3)]), r"。\_w[1150]\s[5]");
+    }
+
+    #[test]
+    fn output_next_line_punctuation_starts_new_run() {
+        let w = ghost_dev(LineEndWaits {
+            period: Some(1300),
+            ..Default::default()
+        });
+        assert_eq!(
+            run("雨。。", &w, &[at(6), at(9)]),
+            r"雨\_w[40]。\_w[1250]。\_w[1250]"
+        );
+        assert_eq!(
+            run("雨？、あ", &strong(1200), &[at(6)]),
+            r"雨\_w[40]？\_w[1150]、\_w[550]あ\_w[40]"
+        );
+    }
+
+    #[test]
+    fn output_short_line_end_values_insert_nothing() {
+        assert_eq!(run("雨？", &strong(50), &[at(6)]), r"雨\_w[40]？");
+        assert_eq!(run("雨？", &strong(0), &[at(6)]), r"雨\_w[40]？");
+    }
+
+    #[test]
+    fn output_unchanged_around_effective_line_end() {
+        // 行の途中の作者の待ち・効かない行末は今のまま
+        let s = r"あ\_w[500]い？う";
+        assert_eq!(
+            run(s, &strong(1200), &[at(s.len() - 3), at_end(s)]),
+            r"あ\_w[40]\_w[500]い\_w[40]？\_w[1150]う\_w[40]"
+        );
+    }
+
+    #[test]
+    fn output_lone_backslash_line_end_unchanged() {
+        let tokens = vec![
+            make_token(TokenKind::General, "は"),
+            make_token(TokenKind::General, "\\"),
+            make_token(TokenKind::General, "い"),
+        ];
+        assert_eq!(
+            insert_waits(&tokens, &normal(1250), &[at(4), at(7)]),
+            r"は\_w[40]\い\_w[1200]"
+        );
+    }
+
+    #[test]
+    fn output_without_plan_matches_mid_line() {
+        let s = r"雨？\s[5]す」と‥‥";
+        let mid = run(s, &ghost_dev(LineEndWaits::default()), &[]);
+        assert_eq!(run(s, &ghost_dev(LineEndWaits::default()), &[at(6)]), mid);
+        assert_eq!(run(s, &normal(1250), &[at(6)]), mid);
+        assert_eq!(run(s, &strong(1200), &[]), mid);
     }
 }

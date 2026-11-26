@@ -328,3 +328,11 @@
 - **触るファイル（この spec）**: 新しい Lua のファイル 2 つ（控え・スロット変数の口）、`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`（567 行。アクター状態の写しと「全部書く」）、`pasta/store.lua`（124 行）、`shiori/event/virtual_dispatcher.lua`（335 行。`co_scene` を消す所）、`novel-talk-flow` の枠（暫定設計の `pasta/play.lua`）へ早回しの判定を登録する口、マニュアルとスキル references。テストは新しいファイルに置く。
 - **触るファイル（`novel-backlog-rollback`）**: 目印（`novel-talk-flow` の枠の頭の口へ登録）、控えの列（この spec の控えのファイル）、巻き戻しの受け口（新しいファイルと `shiori/event/init.lua` の読み込みの 1 行）、控えの数の設定（`loader/config/`・`validate/config.rs`・一致テスト）。詳しくは、その brief の「測定（2026-11-20）」。
 - **要件定義のモデル**: 2 本とも Opus。
+
+## 申し送り（line-end-wait より、2026-11-26）
+
+- **変わった事実（トークン）**: `act:line()` は `[ghost] line_newlines` によらず、いつも印 `_seam_next` を立てる。`act:build()` の `talk`・`sakura_script` のトークンの表には `seams` の欄がいつも付く（意味とずらし方は今のまま）。上の「`line_newlines` が 0 でないときだけ印を立てる」は古い。
+- **変わった事実（組み立て）**: `BUILDER.build` は、アクターのまとまりごとに `find_line_ends` を 1 回呼び、トークンの添字ごとの行末（`{ pos, author_wait }`）を `emit_inner_token` → `inner_token_to_string` → `join_lines`（位置の写し替え）→ `talk_to_script(actor, text, column, line_ends)` へ渡す。行末は継ぎ目・`choice`・まとまりの終わりで閉じる。
+- **変わった事実（変換）**: `talk_to_script` に 4 つ目の引数 `line_ends` がある。省くと最後の見える字が行末になる。行末のキー（`script_wait_*_eol`）を書いたアクターだけ、行末の待ちが変わる。
+- 見直しが要る論点: この spec がまとまりの切れ目・台詞の結合・トークンの種類を変える、または台詞の外に字を出すトークンを足すなら、行末の位置が変わるか（`find_line_ends` が閉じる所と読み飛ばす型）。
+- 参照: `.kiro/specs/completed/line-end-wait/design.md` の「LineEndFinder」「Revalidation Triggers」、マニュアル `book/src/internals/talk-output.md` の「行末の待ち」。

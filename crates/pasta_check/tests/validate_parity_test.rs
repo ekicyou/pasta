@@ -332,6 +332,7 @@ fn stops_loading(kind: FindingKind) -> bool {
             | ConfigLoaderType
             | ConfigSceneAlias
             | ConfigActorFont
+            | ConfigLineEndWait
             | ConfigPatternInvalid
             | InitFileName
             | FolderMatchesPattern
@@ -597,6 +598,49 @@ font = { name = "a\\b" }
                 (
                     "pasta.toml",
                     "[actor.\"おじさん\"]\nfont = \"red\"\n".as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            true,
+        ),
+        // 行末のキー
+        (
+            "正しい行末のキー",
+            &[
+                (
+                    "pasta.toml",
+                    "[talk]
+script_wait_period_eol = 1200
+[actor.\"妹\"]
+script_wait_normal_eol = 800
+"
+                        .as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            false,
+        ),
+        (
+            "[talk] の行末のキーが浮動小数点数",
+            &[
+                (
+                    "pasta.toml",
+                    "[talk]
+script_wait_strong_eol = 1.5
+".as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            true,
+        ),
+        (
+            "アクターの行末のキーが文字列",
+            &[
+                (
+                    "pasta.toml",
+                    "[actor.\"妹\"]
+script_wait_normal_eol = \"1200\"
+".as_bytes(),
                 ),
                 ("dic/a.pasta", talk),
             ],

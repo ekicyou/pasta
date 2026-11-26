@@ -229,14 +229,11 @@ local function take_seam(self)
 end
 
 --- 行の頭の印（トランスパイラがアクション行と継続行の頭に出す）
---- 行の改行の値が nil でも 0 でもないときだけ、次に積む台詞に継ぎ目を付ける
+--- 改行の設定によらず、次に積む台詞に継ぎ目を付ける
 --- @param self Act アクションオブジェクト
 --- @return Act self メソッドチェーン用
 function ACT_IMPL.line(self)
-    local n = self._line_newlines
-    if n ~= nil and n ~= 0 then
-        self._seam_next = true
-    end
+    self._seam_next = true
     return self
 end
 

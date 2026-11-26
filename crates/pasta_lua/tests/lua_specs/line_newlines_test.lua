@@ -44,17 +44,17 @@ describe("act:line - 行の頭の印 (2.1, 6.1)", function()
         expect(act.token[1].seams):toEqual({ 1 })
     end)
 
-    test("値が 0 なら印の後のトークンに継ぎ目の欄が無い", function()
+    test("値が 0 でも印の後のトークンに継ぎ目の欄が付く", function()
         local act, sakura = new_act(0)
         act:line():talk(sakura, "字"):line():sakura_script(sakura, "\\s[5]")
-        expect(act.token[1]):toEqual({ type = "talk", actor = sakura, text = "字" })
-        expect(act.token[2]):toEqual({ type = "sakura_script", actor = sakura, text = "\\s[5]" })
+        expect(act.token[1]):toEqual({ type = "talk", actor = sakura, text = "字", seams = { 1 } })
+        expect(act.token[2]):toEqual({ type = "sakura_script", actor = sakura, text = "\\s[5]", seams = { 1 } })
     end)
 
-    test("値が nil（基の act）なら印の後のトークンに継ぎ目の欄が無い", function()
+    test("値が nil（基の act）でも印の後のトークンに継ぎ目の欄が付く", function()
         local act, sakura = new_act(nil)
         act:line():talk(sakura, "字")
-        expect(act.token[1]):toEqual({ type = "talk", actor = sakura, text = "字" })
+        expect(act.token[1]):toEqual({ type = "talk", actor = sakura, text = "字", seams = { 1 } })
     end)
 end)
 
@@ -93,11 +93,11 @@ describe("merge_consecutive_talks - 継ぎ目の位置を残す (2.1, 2.5)", fun
         expect(second.seams):toEqual({ 1 })
     end)
 
-    test("継ぎ目が無ければ結合した台詞に seams の欄が無い", function()
+    test("値が 0 でも結合した台詞に seams の欄が付く", function()
         local act, sakura = new_act(0)
         act:line():talk(sakura, "あ"):line():talk(sakura, "い")
         local tokens = act:build()[1].tokens
-        expect(tokens[1]):toEqual({ type = "talk", actor = sakura, text = "あい" })
+        expect(tokens[1]):toEqual({ type = "talk", actor = sakura, text = "あい", seams = { 1, 4 } })
     end)
 end)
 

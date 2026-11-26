@@ -397,3 +397,11 @@ ghost_dev の「ぱすた開発」セッションは、**外見として記録�
 - **触るファイル（`scene-stage-attributes`）**: `act.lua`（`init_scene` 221 行・`restore_scene` 800 行）、新しい Lua のファイル（柱の引き方・知らせの口・登録の口・ロードで打つ口）、`sakura_builder.lua`（柱の確定を最初の 1 本まで待つ入口）、`store.lua`、ローカルの登録名を渡すなら `scope_gen.rs` と見本の期待値ファイル、`scene_types.rs`（読むだけの見込み）、要れば `loader/config/`、マニュアルとスキル references。詳しくは、その brief の「測定（2026-11-20）」。
 - **触るファイル（`novel-areka-output`）**: この spec が作るタグへ直す所と覚えた値・`novel-talk-flow` の 1 本の枠への areka の枝・並びの出力・スポットの座標の設定と検査。詳しくは、その brief の「測定（2026-11-20）」。
 - **要件定義のモデル**: 3 本とも Opus。
+
+## 申し送り（line-end-wait より、2026-11-26）
+
+- **変わった事実（トークン）**: `act:line()` は `[ghost] line_newlines` によらず、いつも印 `_seam_next` を立てる。`act:build()` の `talk`・`sakura_script` のトークンの表には `seams` の欄がいつも付く（意味とずらし方は今のまま）。上の「`line_newlines` が 0 でないときだけ印を立てる」は古い。
+- **変わった事実（組み立て）**: `BUILDER.build` は、アクターのまとまりごとに `find_line_ends` を 1 回呼び、トークンの添字ごとの行末（`{ pos, author_wait }`）を `emit_inner_token` → `inner_token_to_string` → `join_lines`（位置の写し替え）→ `talk_to_script(actor, text, column, line_ends)` へ渡す。行末は継ぎ目・`choice`・まとまりの終わりで閉じる。
+- **変わった事実（変換）**: `talk_to_script` に 4 つ目の引数 `line_ends` がある。省くと最後の見える字が行末になる。行末のキー（`script_wait_*_eol`）を書いたアクターだけ、行末の待ちが変わる。
+- 見直しが要る論点: この spec がまとまりの切れ目・台詞の結合・トークンの種類を変える、または台詞の外に字を出すトークンを足すなら、行末の位置が変わるか（`find_line_ends` が閉じる所と読み飛ばす型）。
+- 参照: `.kiro/specs/completed/line-end-wait/design.md` の「LineEndFinder」「Revalidation Triggers」、マニュアル `book/src/internals/talk-output.md` の「行末の待ち」。

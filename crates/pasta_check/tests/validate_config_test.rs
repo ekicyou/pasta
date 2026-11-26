@@ -364,6 +364,64 @@ fn actor_font_error_does_not_skip_references() {
     assert!(report.stats.skip_reasons.is_empty(), "{:?}", report.lines());
 }
 
+/// 行末のキーは整数だけ。誤りごとに値の行で 1 件報告する（報告は行の順）
+#[test]
+fn line_end_wait_errors_reported_per_value_line() {
+    let found = toml_findings(
+        "[talk]\nscript_wait_normal_eol = 800\nscript_wait_strong_eol = 1.5\n[actor.\"妹\"]\nscript_wait_leader_eol = true\nscript_wait_normal_eol = \"1200\"\n[actor.\"兄\"]\nscript_wait_comma_eol = [1]\n",
+    );
+    assert_eq!(
+        found
+            .iter()
+            .map(|f| (f.code, f.line, f.message.as_str()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                FindingKind::ConfigLineEndWait,
+                Some(3),
+                "[talk] の script_wait_strong_eol は整数（ミリ秒）で書いてください: 浮動小数点数が書かれています"
+            ),
+            (
+                FindingKind::ConfigLineEndWait,
+                Some(5),
+                "[actor.\"妹\"] の script_wait_leader_eol は整数（ミリ秒）で書いてください: 真偽値が書かれています"
+            ),
+            (
+                FindingKind::ConfigLineEndWait,
+                Some(6),
+                "[actor.\"妹\"] の script_wait_normal_eol は整数（ミリ秒）で書いてください: 文字列が書かれています"
+            ),
+            (
+                FindingKind::ConfigLineEndWait,
+                Some(8),
+                "[actor.\"兄\"] の script_wait_comma_eol は整数（ミリ秒）で書いてください: 配列が書かれています"
+            ),
+        ]
+    );
+    assert!(
+        found
+            .iter()
+            .all(|f| f.severity == pasta_check::validate::Severity::Error)
+    );
+
+    // 正しい値・行末でないキー・表でない [talk] は報告しない
+    let ok = "[talk]\nscript_wait_period_eol = 1200\nscript_wait_normal = 1.5\n[actor.\"妹\"]\nscript_wait_normal_eol = -1\n";
+    assert!(toml_findings(ok).is_empty(), "{:?}", toml_findings(ok));
+    assert!(toml_findings("talk = 1\n").is_empty());
+}
+
+/// 行末のキーの誤りがあっても飛び先の検査は止めない
+#[test]
+fn line_end_wait_error_does_not_skip_references() {
+    let (mut input, files) = ghost();
+    input.pasta_toml = TomlSource::Text {
+        text: format!("{TOML}[talk]\nscript_wait_normal_eol = \"x\"\n"),
+    };
+    let report = validate_ghost(&input, &files);
+    assert!(report.has_errors());
+    assert!(report.stats.skip_reasons.is_empty(), "{:?}", report.lines());
+}
+
 #[test]
 fn missing_toml_is_config_missing_error() {
     let found = config_findings(TomlSource::Missing);

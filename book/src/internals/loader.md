@@ -40,6 +40,7 @@
 | `PastaLoader` | `crates/pasta_lua/src/loader/mod.rs` | 起動シーケンスの本体。`load`（既定の `RuntimeConfig`）と `load_with_config`（呼び出し側が渡す `RuntimeConfig`）を持つ。ディレクトリの準備も行う |
 | `PastaConfig`・`LoaderConfig` | `crates/pasta_lua/src/loader/config/mod.rs` | `pasta.toml` の読込と解析。`[loader]` を型付きの `LoaderConfig` に、それ以外を `custom_fields`（TOML の表）に分ける。SHIORI 用の既定値を補完する |
 | 装いの読み込み | `crates/pasta_lua/src/loader/config/actor_font.rs` | `[actor."名前"]` の `font` を `pasta_core` の `ActorFont` で検査し、検査済みのタグ列（文字列）に置き換える |
+| 行末のキーの検査 | `crates/pasta_lua/src/loader/config/line_end_wait.rs` | `[talk]` と `[actor."名前"]` の行末のキー（`pasta_core` の `LINE_END_WAIT_KEYS`）が整数かを確かめる |
 | 型付きの設定セクション | `crates/pasta_lua/src/loader/config/sections.rs` | `LoggingConfig`・`PersistenceConfig`・`TalkConfig`・`GhostConfig`・`DebugFileConfig` と各既定値の関数 |
 | ビルドスクリプト | `crates/pasta_lua/build.rs` | `crates/pasta_lua/pasta_scripts/` を zip に固めて `OUT_DIR` に書き出し、その MD5 を環境変数 `PASTA_SCRIPTS_MD5` としてコンパイルに渡す |
 | 決定論的 zip パッカー | `crates/pasta_lua/build_zip.rs` | ソースツリーから毎回バイト単位で同じ zip を作る純粋な関数。ビルドスクリプトとビルド決定論テスト（`crates/pasta_lua/tests/build_determinism_test.rs`）が共有する |
@@ -106,7 +107,8 @@ load_with_config(base_dir, runtime_config)
 3. `[scene.alias]` から、有効な別名表（`scene_aliases`）とその出どころ（`scene_alias_source`）を決める。無ければ既定の表（`SceneAliasTable::builtin_default` の 7 件）を使う。あれば `SceneAliasTable::with_written` が、書いたキーの既定の別名だけを、書いた配列に置き換える（見出しだけなら既定の表と等しく、出どころも既定になる）。不正な表は解析エラーになり、起動を止める（不正の種類は [不変条件と制約](#不変条件と制約)、利用者向けの説明は [pasta.toml の `[scene]`](../reference/pasta-toml.md#sceneシーン名)）。
 4. 残りの表をすべて `custom_fields` とする。`[scene]` も書いたとおりに残り、既定の別名表は書き足さない。`[loader]` 以外のセクションはこの段階では型付きの値にしない。
 5. `[actor."名前"]` の `font` を、`actor_font::apply` が `pasta_core` の `ActorFont` で検査し、`custom_fields` の中で検査済みのタグ列の文字列に置き換える（`font = { color = "90,110,140", bold = true }` は `\f[color,90,110,140]\f[bold,1]`、空の表は空文字列）。属性の書いた順は、同じ内容を `toml::de::DeTable` で読み直して値の位置から取る。不正な `font` は解析エラーになり、起動を止める（不正の種類は [不変条件と制約](#不変条件と制約)）。同じ規則で `pasta_check validate` も `config-actor-font` を報告する（利用者向けの説明は [装い（font）](../reference/pasta-toml.md#装いfont)、出し入れは [トーク出力とアピアランス](talk-output.md#装いの出し入れ)）。
-6. `apply_shiori_defaults` で SHIORI 用の既定値を補完する。
+6. `line_end_wait::check` が、`[talk]` と各 `[actor."名前"]` の行末のキーが整数かを確かめる。誤りは `[talk]` → アクター（名前順）→ キーの順に 1 つの解析エラーにまとめ、起動を止める。同じ規則で `pasta_check validate` も `config-line-end-wait` を報告する（利用者向けの説明は [行末の待ち](../reference/pasta-toml.md#行末の待ち)）。
+7. `apply_shiori_defaults` で SHIORI 用の既定値を補完する。
 
 `apply_shiori_defaults` は `custom_fields` の `[ghost]` に、書かれていないキー（`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines`・`choice_newlines`・`after_choice_newlines`・`line_newlines`）だけを `GhostConfig::default()` の値で書き足す。`[ghost]` が無ければ表を作って 7 キーとも入れる。書かれている値は上書きしないため、2 回適用しても結果は変わらない。あわせて `[actor]` が表として存在しなければ警告を 1 行出す（起動は止めない）。補完をここ 1 か所でだけ行うので、Rust 側の消費者と Lua 側（`@pasta_config`）は同じ補完後の値を見る。
 
