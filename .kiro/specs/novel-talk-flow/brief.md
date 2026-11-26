@@ -483,3 +483,12 @@ areka へ返す形: `\![parallel,1]\p[0]\s[12]\_w[200]\s[10]\_w[200]\s[12]\![par
 - **触るファイル（`choice-condition-timeout`）**: 文法 `grammar.pest` の `choice_line` 236 行・`ast/scene.rs`・`parse_scene.rs`、生成 `scope_gen.rs` の `generate_choice`・`generate_choice_timeout`、実行時 `act.lua` の `choice`・`choice_timeout`・`sakura_builder.lua` 456〜458 行・`choice_select.lua`・時間切れの受け口、`search/context.rs`・`scene_cond.rs`、検査（`references.rs`・`report.rs`・一致テスト）、LSP `visit_action.rs`、VSCode の文法定義、hello-pasta・入門 9 章・マニュアル・リリースノート。詳しくは、その brief の「測定（2026-11-20）」。
 - **触るファイル（`novel-areka-output`）**: この spec の 1 本の枠への areka の枝と、`cue-command-runtime` のタグへ直す所。詳しくは、その brief の「測定（2026-11-20）」。
 - **要件定義のモデル**: 3 本とも Opus。
+
+## 申し送り（line-end-wait より、2026-11-26）
+
+- **変わった事実（トークン）**: `act:line()` は `[ghost] line_newlines` によらず、いつも印 `_seam_next` を立てる。`act:build()` の `talk`・`sakura_script` のトークンの表には `seams` の欄がいつも付く（意味とずらし方は今のまま）。上の「`line_newlines` が 0 でないときだけ印を立てる」は古い。
+- **変わった事実（組み立て）**: `BUILDER.build` は、アクターのまとまりごとに `find_line_ends` を 1 回呼び、トークンの添字ごとの行末（`{ pos, author_wait }`）を `emit_inner_token` → `inner_token_to_string` → `join_lines`（位置の写し替え）→ `talk_to_script(actor, text, column, line_ends)` へ渡す。行末は継ぎ目・`choice`・まとまりの終わりで閉じる。
+- **変わった事実（変換）**: `talk_to_script` に 4 つ目の引数 `line_ends` がある。省くと最後の見える字が行末になる。行末のキー（`script_wait_*_eol`）を書いたアクターだけ、行末の待ちが変わる。
+- 見直しが要る論点: この spec がまとまりの切れ目・台詞の結合・トークンの種類を変える、または台詞の外に字を出すトークンを足すなら、行末の位置が変わるか（`find_line_ends` が閉じる所と読み飛ばす型）。
+- 参照: `.kiro/specs/completed/line-end-wait/design.md` の「LineEndFinder」「Revalidation Triggers」、マニュアル `book/src/internals/talk-output.md` の「行末の待ち」。
+- **クリック待ちとの順**: 行末の待ちは、自動の待ちと同じ `\_w[…]` として、行末の並びのすぐ後ろ（後ろのタグより前）に入る。この spec が組み立ての出力の末尾に `\x` を足すなら、行末の待ちはその前に来る（line-end-wait の要件 8.2）。line-end-wait は `\x` を足していないので、`\x` と並べたテストはこの spec で置く。

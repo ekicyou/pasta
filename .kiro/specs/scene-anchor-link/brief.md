@@ -210,3 +210,11 @@
   - 前回から残る議題: 名前はあるが条件に合う候補が無いアンカーのクリックを、選択肢と同じ止まるエラー（`SCENE_UNMET`）にするか、決めたとおり 204 にするか。選択肢の行に条件が入っても、アンカーには条件を書かない（Out of Boundary のまま）。振り分けを共有するので、取り出した関数の引数の形は `novel-talk-flow` と揃える。
   - 古い（前回から残る）: Current State の行番号、「`inline-word-ref` が `＠？` を単語参照として塗る」「LSP は将来実装」、Constraints の「`mod.rs:145`」、`call-attribute-filter`（入った `scene-condition-attributes` と読み、順番の待ちは無い）・`failure-output-unification`（完了）。申し送りの「12 種」は 14 種、読み込みの行の末尾は `sys_resume`。
   - 前から残るもの: `OnAnchorSelectEx` に 204 を返すと SSP は続けて `OnAnchorSelect` を送る（UKADOC。要件に書く）。`script:` で始まる ID を `\_a` がどう扱うかは確かめていない。マニュアルの色付けは VSCode の文法定義を読む（`book/tools/highlight/highlight-html.mjs` 39 行）。テストは `lua_specs/choice_select_test.lua`・`tests/shiori/event_dispatch_test.rs` に置ける。
+
+## 申し送り（line-end-wait より、2026-11-26）
+
+- **変わった事実（トークン）**: `act:line()` は `[ghost] line_newlines` によらず、いつも印 `_seam_next` を立てる。`act:build()` の `talk`・`sakura_script` のトークンの表には `seams` の欄がいつも付く（意味とずらし方は今のまま）。上の「`line_newlines` が 0 でないときだけ印を立てる」は古い。
+- **変わった事実（組み立て）**: `BUILDER.build` は、アクターのまとまりごとに `find_line_ends` を 1 回呼び、トークンの添字ごとの行末（`{ pos, author_wait }`）を `emit_inner_token` → `inner_token_to_string` → `join_lines`（位置の写し替え）→ `talk_to_script(actor, text, column, line_ends)` へ渡す。行末は継ぎ目・`choice`・まとまりの終わりで閉じる。
+- **変わった事実（変換）**: `talk_to_script` に 4 つ目の引数 `line_ends` がある。省くと最後の見える字が行末になる。行末のキー（`script_wait_*_eol`）を書いたアクターだけ、行末の待ちが変わる。
+- 見直しが要る論点: この spec がまとまりの切れ目・台詞の結合・トークンの種類を変える、または台詞の外に字を出すトークンを足すなら、行末の位置が変わるか（`find_line_ends` が閉じる所と読み飛ばす型）。
+- 参照: `.kiro/specs/completed/line-end-wait/design.md` の「LineEndFinder」「Revalidation Triggers」、マニュアル `book/src/internals/talk-output.md` の「行末の待ち」。
