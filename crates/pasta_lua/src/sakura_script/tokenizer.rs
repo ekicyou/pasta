@@ -43,6 +43,21 @@ impl Token {
             text: text.into(),
         }
     }
+
+    /// 見える字を出すトークンか（Lua の `unit_shows_text` の写し）。
+    pub fn shows_text(&self) -> bool {
+        if self.kind != TokenKind::SakuraScript {
+            return true;
+        }
+        let t = self.text.as_str();
+        if t.starts_with(r"\\") || t.starts_with(r"\%") {
+            return true;
+        }
+        if t.starts_with(r"\_?") || t.starts_with(r"\_!") {
+            return t.len() > 6 && t.ends_with(&t[..3]);
+        }
+        t.starts_with(r"\_u") || t.starts_with(r"\_m") || t.starts_with(r"\&")
+    }
 }
 
 /// Character sets for token classification.
@@ -232,6 +247,37 @@ mod tests {
 
     fn default_config() -> TalkConfig {
         TalkConfig::default()
+    }
+
+    #[test]
+    fn test_shows_text() {
+        let tokenizer = Tokenizer::new(&default_config()).unwrap();
+        let shows = |s: &str| tokenizer.tokenize(s)[0].shows_text();
+        for t in [
+            "あ",
+            "、",
+            r"\\",
+            r"\%",
+            r"\_?a\_?",
+            r"\_!a\_!",
+            r"\_u[0x01]",
+            r"\_m[0x01]",
+            r"\&[amp]",
+        ] {
+            assert!(shows(t), "{t}");
+        }
+        for t in [
+            r"\s[5]",
+            r"\_w[500]",
+            r"\n",
+            r"\_?\_?",
+            r"\_?abc",
+            r"\_?[abc]",
+            r"\_![x]",
+            r"\h",
+        ] {
+            assert!(!shows(t), "{t}");
+        }
     }
 
     #[test]

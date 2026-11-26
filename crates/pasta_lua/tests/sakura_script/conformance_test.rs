@@ -254,3 +254,71 @@ fn action_line(file: pasta_dsl::parser::PastaFile) -> Vec<Action> {
         })
         .expect("アクション行が存在すべし")
 }
+
+/// 見える字の判定: Lua の `read_unit` と `Token::shows_text` が同じ単位の並びで一致する
+#[test]
+fn conformance_shows_text() -> LuaResult<()> {
+    let lua = Lua::new();
+    let scripts = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("pasta_scripts");
+    let package_path = format!("{0}/?.lua;{0}/?/init.lua", scripts.display()).replace('\\', "/");
+    lua.globals()
+        .get::<LuaTable>("package")?
+        .set("path", package_path)?;
+    let read: LuaFunction = lua
+        .load(
+            r#"
+            package.preload["@pasta_sakura_script"] = function() return {} end
+            package.preload["@pasta_log"] = function() return {} end
+            local read_unit = require("pasta.shiori.sakura_builder")._internal.read_unit
+            return function(s)
+                local out, i = {}, 1
+                while i <= #s do
+                    local next_pos, visible = read_unit(s, i, #s + 1, true)
+                    out[#out + 1] = { s:sub(i, next_pos - 1), visible }
+                    i = next_pos
+                end
+                return out
+            end
+            "#,
+        )
+        .eval()?;
+    let tokenizer = Tokenizer::new(&TalkConfig::default()).unwrap();
+    let inputs = [
+        "こんにちは",
+        r"\\",
+        r"\%",
+        r"\_?\s[1]\_?",
+        r"\_!a\_!",
+        r"\_?\_?",
+        r"\_?abc",
+        r"\_?[abc]",
+        r"\_![x]",
+        r"\_u[0x01]",
+        r"\_m[0x01]",
+        r"\&[amp]",
+        r"\s[5]",
+        r"\_w[500]",
+        r"\n",
+        r"\h\s[0]あ",
+        r"あ\",
+        r"\あ",
+    ];
+    for input in inputs {
+        let want: Vec<bool> = tokenizer
+            .tokenize(input)
+            .iter()
+            .map(|t| t.shows_text())
+            .collect();
+        // Lua は単位ごと（タグ以外の連続は 1 単位）、Rust はクラスタごと。単位の本文を同じ規則で分けて比べる。
+        let mut got = Vec::new();
+        let out: LuaTable = read.call(input)?;
+        for unit in out.sequence_values::<LuaTable>() {
+            let unit = unit?;
+            let text: String = unit.get(1)?;
+            let visible: bool = unit.get(2)?;
+            got.extend(tokenizer.tokenize(&text).iter().map(|_| visible));
+        }
+        assert_eq!(want, got, "{input:?}");
+    }
+    Ok(())
+}

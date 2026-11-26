@@ -349,6 +349,7 @@ local function read_unit(text, pos, stop, is_talk)
     end
     return next_pos, unit_shows_text(name, literal) == true, column_move(name, arg) ~= nil
 end
+BUILDER._internal.read_unit = read_unit
 
 --- 継ぎ目に達したときの行の状態。保留のまま来たら（字の無い行の後）その位置に改行を出し、保留は立てたまま
 --- @param column table 列の状態
