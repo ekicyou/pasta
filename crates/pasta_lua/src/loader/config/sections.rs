@@ -149,7 +149,7 @@ pub struct TalkConfig {
     /// Wait for leader characters (default: 200ms)
     pub script_wait_leader: i64,
 
-    /// 行末のキー 5 つ。書かなければ None（行末のウェイトを足さない）
+    /// 行末のキー 5 つ。書かなければ None（行の途中の値を使う）
     pub script_wait_normal_eol: Option<i64>,
     pub script_wait_period_eol: Option<i64>,
     pub script_wait_comma_eol: Option<i64>,

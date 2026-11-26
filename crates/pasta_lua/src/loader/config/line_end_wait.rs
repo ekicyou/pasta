@@ -1,4 +1,4 @@
-//! `[talk]` と `[actor."名前"]` の行末のキーの型の検査（LineEndKeyCheck）。
+//! `[talk]` と `[actor."名前"]` の行末のキーの型の検査。
 
 use pasta_core::LINE_END_WAIT_KEYS;
 use toml::de::DeTable;
