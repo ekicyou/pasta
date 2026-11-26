@@ -119,6 +119,38 @@ chars_period = "."
 }
 
 #[test]
+fn test_talk_config_line_end_fields_read() {
+    let toml_str = r#"
+[talk]
+script_wait_normal_eol = 10
+script_wait_period_eol = 20
+script_wait_comma_eol = 30
+script_wait_strong_eol = 40
+script_wait_leader_eol = 50
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    let talk = config.talk().expect("talk section should exist");
+    assert_eq!(talk.script_wait_normal_eol, Some(10));
+    assert_eq!(talk.script_wait_period_eol, Some(20));
+    assert_eq!(talk.script_wait_comma_eol, Some(30));
+    assert_eq!(talk.script_wait_strong_eol, Some(40));
+    assert_eq!(talk.script_wait_leader_eol, Some(50));
+}
+
+#[test]
+fn test_talk_config_line_end_fields_default_none() {
+    let config = PastaConfig::from_str("[talk]\nscript_wait_period = 1500\n").unwrap();
+    let talk = config.talk().expect("talk section should exist");
+    assert_eq!(talk.script_wait_normal_eol, None);
+    assert_eq!(talk.script_wait_period_eol, None);
+    assert_eq!(talk.script_wait_comma_eol, None);
+    assert_eq!(talk.script_wait_strong_eol, None);
+    assert_eq!(talk.script_wait_leader_eol, None);
+    let d = TalkConfig::default();
+    assert_eq!(d.script_wait_leader_eol, None);
+}
+
+#[test]
 fn test_talk_config_none_when_missing() {
     let config = PastaConfig::from_str("").unwrap();
     assert!(config.talk().is_none());

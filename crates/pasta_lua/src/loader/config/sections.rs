@@ -149,6 +149,13 @@ pub struct TalkConfig {
     /// Wait for leader characters (default: 200ms)
     pub script_wait_leader: i64,
 
+    /// 行末のキー 5 つ。書かなければ None（行末のウェイトを足さない）
+    pub script_wait_normal_eol: Option<i64>,
+    pub script_wait_period_eol: Option<i64>,
+    pub script_wait_comma_eol: Option<i64>,
+    pub script_wait_strong_eol: Option<i64>,
+    pub script_wait_leader_eol: Option<i64>,
+
     // Character sets
     /// Period characters (default: "｡。．.")
     pub chars_period: String,
@@ -172,6 +179,11 @@ impl Default for TalkConfig {
             script_wait_comma: 500,
             script_wait_strong: 500,
             script_wait_leader: 200,
+            script_wait_normal_eol: None,
+            script_wait_period_eol: None,
+            script_wait_comma_eol: None,
+            script_wait_strong_eol: None,
+            script_wait_leader_eol: None,
             chars_period: "｡。．.".into(),
             chars_comma: "、，,".into(),
             chars_strong: "？！!?".into(),
