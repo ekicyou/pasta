@@ -493,7 +493,7 @@ fn default_line_ends(tokens: &[Token]) -> Vec<LineEnd>;
 #### ActLine（`act.lua`）
 
 - `ACT_IMPL.line` は `_line_newlines` を見ずに `_seam_next = true` を立てる。`take_seam`・`merge_consecutive_talks` は今のまま。
-- 継ぎ目の意味（行の頭のバイト位置）は変えない。`line_newlines` が nil・0 なら `join_lines` は台詞を読まずに返すので、出力は変わらない。変わるのは `act:build()` のトークンの表に `seams` の欄がいつも現れることだけ（設計ディスカッションの議題 1）。
+- 継ぎ目の意味（行の頭のバイト位置）は変えない。`line_newlines` が nil・0 なら `join_lines` は台詞を読まずに返すので、出力は変わらない。変わるのは `act:build()` のトークンの表に `seams` の欄がいつも現れることだけ（設計ディスカッションで承認）。
 - 3.9: 空行・コメント行・変数代入行・Call 行は `act:line()` を出さないので継ぎ目にならない。Call の先のシーンの行は自分の `act:line()` を出す。Call の先が Lua の関数で `act:line()` を出さずに台詞を積めば、前の行の続きになる。
 
 #### LineEndFinder（`sakura_builder.lua`）
@@ -650,10 +650,10 @@ pub fn config_line_end_wait(place: &str, key: &str, written: &str) -> String;
 
 ## Open Questions / Risks
 
-設計ディスカッション（2026-11-26）で決めること:
+設計ディスカッション（2026-11-26）の決定（どちらも推奨どおり承認）:
 
-- **議題 1（継ぎ目をいつも付ける）**: トークンの表に `seams` がいつも現れる。`actor-line-newlines` の「既定ではトークンの表が今と同じ」を改め、`line_newlines_test.lua` の 3 つのテストを直す。出力は変わらない。（推奨: いつも付ける）
-- **議題 2（4 つ目の引数の形と、Rust の見える字の写し）**: `{ pos, author_wait }` の並び、nil は最後の見える字、直接の呼び出しでは直後の `\_w` も作者の待ちとみなす。nil の既定のために `unit_shows_text` の写し（`Token::shows_text`）を Rust に置き、適合テストで保つ。（推奨: このとおり）
+- **議題 1（継ぎ目をいつも付ける）**: トークンの表に `seams` がいつも現れる。`actor-line-newlines` の「既定ではトークンの表が今と同じ」を改め、`line_newlines_test.lua` の 3 つのテストを直す。出力は変わらない。行末のための別の欄は足さない。
+- **議題 2（4 つ目の引数の形と、Rust の見える字の写し）**: `{ pos, author_wait }` の並び、nil は最後の見える字、直接の呼び出しでは直後の `\_w` も作者の待ちとみなす。nil の既定のために `unit_shows_text` の写し（`Token::shows_text`）を Rust に置き、適合テストで保つ。
 
 自明として閉じたもの:
 
