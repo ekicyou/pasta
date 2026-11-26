@@ -2,6 +2,8 @@
 //!
 //! Inserts `\_w[ms]` wait tags based on token types and wait values.
 
+use std::collections::BTreeMap;
+
 use crate::loader::TalkConfig;
 
 use super::tokenizer::{Token, TokenKind};
@@ -46,6 +48,17 @@ impl LineEndWaits {
         .iter()
         .any(Option::is_some)
     }
+
+    fn get(&self, kind: &TokenKind) -> Option<i64> {
+        match kind {
+            TokenKind::General => self.normal,
+            TokenKind::Period => self.period,
+            TokenKind::Comma => self.comma,
+            TokenKind::Strong => self.strong,
+            TokenKind::Leader => self.leader,
+            _ => None,
+        }
+    }
 }
 
 /// テキストの中の 1 つの行末
@@ -72,15 +85,7 @@ impl WaitValues {
 
     /// 字の種類の行末の値（行末のキーが無ければ行の途中の値）。待ちを持たない種類は None
     pub fn line_end_value(&self, kind: &TokenKind) -> Option<i64> {
-        let (end, mid) = match kind {
-            TokenKind::General => (self.line_end.normal, self.normal),
-            TokenKind::Period => (self.line_end.period, self.period),
-            TokenKind::Comma => (self.line_end.comma, self.comma),
-            TokenKind::Strong => (self.line_end.strong, self.strong),
-            TokenKind::Leader => (self.line_end.leader, self.leader),
-            _ => return None,
-        };
-        Some(end.unwrap_or(mid))
+        self.line_end.get(kind).or(self.get_wait(kind))
     }
 
     /// Get wait value for a token kind.
@@ -118,7 +123,7 @@ impl WaitValues {
 /// # Returns
 /// String with wait tags inserted
 pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues, line_ends: &[LineEnd]) -> String {
-    let _ = line_ends;
+    let _plan = plan_line_ends(tokens, wait_values, line_ends);
     let mut result = String::new();
     let mut pending_max_wait: Option<i64> = None;
     let mut pending_text = String::new();
@@ -178,6 +183,113 @@ pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues, line_ends: &[Lin
     flush_pending(&mut result, &mut pending_text, &mut pending_max_wait);
 
     result
+}
+
+/// 1 つの効く行末の計画
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LineEndPlan {
+    /// 並びの頭のトークンの添字（`す」` の `す`、句読点の並びの頭、または行末のトークン自身）
+    start: usize,
+    /// 行末のトークンの添字
+    end: usize,
+    /// 入れる値（50 を引く前）。直後に作者の待ちがあれば None
+    wait: Option<i64>,
+}
+
+/// 効く行末ごとの計画を、添字の順に決める
+fn plan_line_ends(
+    tokens: &[Token],
+    wait_values: &WaitValues,
+    line_ends: &[LineEnd],
+) -> Vec<LineEndPlan> {
+    if line_ends.is_empty() || !wait_values.line_end.any() {
+        return Vec::new();
+    }
+
+    let token_ends: Vec<usize> = tokens
+        .iter()
+        .scan(0, |pos, t| {
+            *pos += t.text.len();
+            Some(*pos)
+        })
+        .collect();
+
+    // 行末のトークンの添字 → 作者の待ちが続くか
+    let mut targets: BTreeMap<usize, bool> = BTreeMap::new();
+    for line_end in line_ends {
+        let k = token_ends.partition_point(|&e| e < line_end.end);
+        if token_ends.get(k) != Some(&line_end.end) {
+            continue;
+        }
+        let token = &tokens[k];
+        // 単独の `\` の後ろの待ちは `\\` になるので、行の途中と同じく入れない
+        if matches!(
+            token.kind,
+            TokenKind::SakuraScript | TokenKind::LineEndProhibited
+        ) || token.text == "\\"
+        {
+            continue;
+        }
+        *targets.entry(k).or_default() |= line_end.author_wait;
+    }
+
+    let mut plans = Vec::new();
+    // 効く行末の次から並びが始まる
+    let mut floor = 0;
+    for (&k, &author_wait) in &targets {
+        let (start, kinds): (usize, Vec<&TokenKind>) = match &tokens[k].kind {
+            kind @ (TokenKind::General | TokenKind::Leader) => (k, vec![kind]),
+            _ => {
+                let mut start = k;
+                while start > floor && in_run(&tokens[start - 1].kind) {
+                    start -= 1;
+                }
+                let puncts: Vec<&TokenKind> = tokens[start..=k]
+                    .iter()
+                    .map(|t| &t.kind)
+                    .filter(|kind| **kind != TokenKind::LineStartProhibited)
+                    .collect();
+                if !puncts.is_empty() {
+                    (start, puncts)
+                } else {
+                    // 行頭禁則の字だけの並びは、直前のふつうの字・リーダーにつく
+                    match start.checked_sub(1).map(|j| (j, &tokens[j].kind)) {
+                        Some((j, kind @ (TokenKind::General | TokenKind::Leader)))
+                            if !targets.contains_key(&j) =>
+                        {
+                            (j, vec![kind])
+                        }
+                        _ => continue,
+                    }
+                }
+            }
+        };
+
+        if !kinds
+            .iter()
+            .any(|kind| wait_values.line_end.get(kind).is_some())
+        {
+            continue;
+        }
+        let value = kinds
+            .iter()
+            .filter_map(|kind| wait_values.line_end_value(kind))
+            .max();
+        plans.push(LineEndPlan {
+            start,
+            end: k,
+            wait: if author_wait { None } else { value },
+        });
+        floor = k + 1;
+    }
+    plans
+}
+
+fn in_run(kind: &TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::Period | TokenKind::Comma | TokenKind::Strong | TokenKind::LineStartProhibited
+    )
 }
 
 /// Flush pending punctuation with wait tag.
@@ -549,5 +661,269 @@ mod tests {
         ] {
             assert!(w.any());
         }
+    }
+
+    fn eol(line_end: LineEndWaits) -> WaitValues {
+        WaitValues {
+            line_end,
+            ..default_wait_values()
+        }
+    }
+
+    fn strong_eol(v: i64) -> WaitValues {
+        eol(LineEndWaits {
+            strong: Some(v),
+            ..Default::default()
+        })
+    }
+
+    fn normal_eol(v: i64) -> WaitValues {
+        eol(LineEndWaits {
+            normal: Some(v),
+            ..Default::default()
+        })
+    }
+
+    fn at(end: usize) -> LineEnd {
+        LineEnd {
+            end,
+            author_wait: false,
+        }
+    }
+
+    fn plan(start: usize, end: usize, wait: Option<i64>) -> LineEndPlan {
+        LineEndPlan { start, end, wait }
+    }
+
+    /// 雨？
+    fn ame() -> Vec<Token> {
+        vec![
+            make_token(TokenKind::General, "雨"),
+            make_token(TokenKind::Strong, "？"),
+        ]
+    }
+
+    #[test]
+    fn plan_strong_line_end() {
+        let p = plan_line_ends(&ame(), &strong_eol(1200), &[at(6)]);
+        assert_eq!(p, vec![plan(1, 1, Some(1200))]);
+    }
+
+    #[test]
+    fn plan_empty_without_line_end_key() {
+        assert!(plan_line_ends(&ame(), &default_wait_values(), &[at(6)]).is_empty());
+    }
+
+    #[test]
+    fn plan_empty_without_line_ends() {
+        assert!(plan_line_ends(&ame(), &strong_eol(1200), &[]).is_empty());
+    }
+
+    #[test]
+    fn plan_empty_when_key_does_not_apply() {
+        // 「？」の行末に、ふつうの字の行末のキーは効かない
+        assert!(plan_line_ends(&ame(), &normal_eol(1250), &[at(6)]).is_empty());
+    }
+
+    #[test]
+    fn plan_ignores_end_off_token_boundary() {
+        assert!(plan_line_ends(&ame(), &strong_eol(1200), &[at(4)]).is_empty());
+        assert!(plan_line_ends(&ame(), &strong_eol(1200), &[at(7)]).is_empty());
+    }
+
+    #[test]
+    fn plan_ignores_line_end_prohibited_and_tags() {
+        let tokens = vec![
+            make_token(TokenKind::General, "あ"),
+            make_token(TokenKind::LineEndProhibited, "「"),
+        ];
+        assert!(plan_line_ends(&tokens, &normal_eol(1250), &[at(6)]).is_empty());
+
+        let tokens = vec![
+            make_token(TokenKind::General, "あ"),
+            make_token(TokenKind::SakuraScript, r"\\"),
+        ];
+        assert!(plan_line_ends(&tokens, &normal_eol(1250), &[at(5)]).is_empty());
+
+        let tokens = vec![
+            make_token(TokenKind::General, "あ"),
+            make_token(TokenKind::General, "\\"),
+        ];
+        assert!(plan_line_ends(&tokens, &normal_eol(1250), &[at(4)]).is_empty());
+    }
+
+    #[test]
+    fn plan_run_takes_longest_value() {
+        // …ね？」 : 並びは ？」
+        let tokens = vec![
+            make_token(TokenKind::General, "ね"),
+            make_token(TokenKind::Strong, "？"),
+            make_token(TokenKind::LineStartProhibited, "」"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &strong_eol(1200), &[at(9)]),
+            vec![plan(1, 2, Some(1200))]
+        );
+        // 行末の値が行の途中の値より短くても、行末の値を使う
+        assert_eq!(
+            plan_line_ends(&tokens, &strong_eol(300), &[at(9)]),
+            vec![plan(1, 2, Some(300))]
+        );
+
+        // ！？
+        let tokens = vec![
+            make_token(TokenKind::Strong, "！"),
+            make_token(TokenKind::Strong, "？"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &strong_eol(1200), &[at(6)]),
+            vec![plan(0, 1, Some(1200))]
+        );
+
+        // ？。 : 書かれていない句点は行の途中の値（1000）
+        let tokens = vec![
+            make_token(TokenKind::General, "雨"),
+            make_token(TokenKind::Strong, "？"),
+            make_token(TokenKind::Period, "。"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &strong_eol(1200), &[at(9)]),
+            vec![plan(1, 2, Some(1200))]
+        );
+        assert_eq!(
+            plan_line_ends(&tokens, &strong_eol(300), &[at(9)]),
+            vec![plan(1, 2, Some(1000))]
+        );
+    }
+
+    #[test]
+    fn plan_general_and_leader_line_end() {
+        let tokens = vec![
+            make_token(TokenKind::General, "ち"),
+            make_token(TokenKind::General, "は"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &normal_eol(1250), &[at(6)]),
+            vec![plan(1, 1, Some(1250))]
+        );
+
+        let tokens = vec![
+            make_token(TokenKind::General, "た"),
+            make_token(TokenKind::Leader, "‥"),
+            make_token(TokenKind::Leader, "‥"),
+        ];
+        let w = eol(LineEndWaits {
+            leader: Some(1250),
+            ..Default::default()
+        });
+        assert_eq!(
+            plan_line_ends(&tokens, &w, &[at(9)]),
+            vec![plan(2, 2, Some(1250))]
+        );
+    }
+
+    #[test]
+    fn plan_line_start_prohibited_after_general() {
+        // す」 : 並びは す」、字の種類は す
+        let tokens = vec![
+            make_token(TokenKind::General, "す"),
+            make_token(TokenKind::LineStartProhibited, "」"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &normal_eol(1250), &[at(6)]),
+            vec![plan(0, 1, Some(1250))]
+        );
+        assert!(plan_line_ends(&tokens, &strong_eol(1200), &[at(6)]).is_empty());
+    }
+
+    #[test]
+    fn plan_line_start_prohibited_without_char_kind() {
+        for head in [
+            make_token(TokenKind::SakuraScript, r"\s[5]"),
+            make_token(TokenKind::LineEndProhibited, "「"),
+        ] {
+            let len = head.text.len();
+            let tokens = vec![head, make_token(TokenKind::LineStartProhibited, "」")];
+            assert!(plan_line_ends(&tokens, &normal_eol(1250), &[at(len + 3)]).is_empty());
+        }
+        let tokens = vec![make_token(TokenKind::LineStartProhibited, "」")];
+        assert!(plan_line_ends(&tokens, &normal_eol(1250), &[at(3)]).is_empty());
+
+        // す が別の行末なら、」 は す につかない
+        let tokens = vec![
+            make_token(TokenKind::General, "す"),
+            make_token(TokenKind::LineStartProhibited, "」"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &normal_eol(1250), &[at(3), at(6)]),
+            vec![plan(0, 0, Some(1250))]
+        );
+    }
+
+    #[test]
+    fn plan_author_wait_has_no_value() {
+        let p = plan_line_ends(
+            &ame(),
+            &strong_eol(1200),
+            &[LineEnd {
+                end: 6,
+                author_wait: true,
+            }],
+        );
+        assert_eq!(p, vec![plan(1, 1, None)]);
+    }
+
+    #[test]
+    fn plan_merges_same_line_end_token() {
+        let p = plan_line_ends(
+            &ame(),
+            &strong_eol(1200),
+            &[
+                at(6),
+                LineEnd {
+                    end: 6,
+                    author_wait: true,
+                },
+                at(6),
+            ],
+        );
+        assert_eq!(p, vec![plan(1, 1, None)]);
+    }
+
+    #[test]
+    fn plan_keeps_short_values() {
+        // 50 と 0 も計画に残す（50 を引いて 0 以下なら出力で入れない）
+        let p = plan_line_ends(&ame(), &strong_eol(50), &[at(6)]);
+        assert_eq!(p, vec![plan(1, 1, Some(50))]);
+        let p = plan_line_ends(&ame(), &strong_eol(0), &[at(6)]);
+        assert_eq!(p, vec![plan(1, 1, Some(0))]);
+    }
+
+    #[test]
+    fn plan_run_stops_at_effective_line_end() {
+        // 雨。（行末）。（行末）: 次の行の句点は前の行の並びにつながらない
+        let tokens = vec![
+            make_token(TokenKind::General, "雨"),
+            make_token(TokenKind::Period, "。"),
+            make_token(TokenKind::Period, "。"),
+        ];
+        let w = eol(LineEndWaits {
+            period: Some(1200),
+            ..Default::default()
+        });
+        assert_eq!(
+            plan_line_ends(&tokens, &w, &[at(9), at(6)]),
+            vec![plan(1, 1, Some(1200)), plan(2, 2, Some(1200))]
+        );
+
+        // 効かない行末（！）では並びは切れない
+        let tokens = vec![
+            make_token(TokenKind::Strong, "！"),
+            make_token(TokenKind::Period, "。"),
+        ];
+        assert_eq!(
+            plan_line_ends(&tokens, &w, &[at(3), at(6)]),
+            vec![plan(0, 1, Some(1200))]
+        );
     }
 }
