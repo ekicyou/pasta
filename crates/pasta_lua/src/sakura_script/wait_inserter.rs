@@ -114,6 +114,8 @@ impl WaitValues {
 /// 4. Period/Comma/Strong/LineStartProhibited: accumulate until end of consecutive run
 /// 5. At end of consecutive punctuation: insert (max_wait - 50)ms
 /// 6. If calculated wait <= 0, skip insertion
+/// 7. At a line end a line-end key applies to, its run gets one line-end wait
+///    instead (none when the author's `\_w[…]` follows)
 ///
 /// # Arguments
 /// * `tokens` - Token sequence
@@ -123,12 +125,28 @@ impl WaitValues {
 /// # Returns
 /// String with wait tags inserted
 pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues, line_ends: &[LineEnd]) -> String {
-    let _plan = plan_line_ends(tokens, wait_values, line_ends);
+    let plans = plan_line_ends(tokens, wait_values, line_ends);
+    let mut plans = plans.iter().peekable();
     let mut result = String::new();
     let mut pending_max_wait: Option<i64> = None;
     let mut pending_text = String::new();
 
-    for token in tokens {
+    for (i, token) in tokens.iter().enumerate() {
+        if let Some(&&plan) = plans.peek()
+            && plan.start <= i
+        {
+            if i == plan.start {
+                flush_pending(&mut result, &mut pending_text, &mut pending_max_wait);
+            }
+            pending_text.push_str(&token.text);
+            if i == plan.end {
+                pending_max_wait = plan.wait;
+                flush_pending(&mut result, &mut pending_text, &mut pending_max_wait);
+                plans.next();
+            }
+            continue;
+        }
+
         match &token.kind {
             // Rule 1: SakuraScript - output as-is, flush pending if any
             TokenKind::SakuraScript => {
@@ -925,5 +943,198 @@ mod tests {
             plan_line_ends(&tokens, &w, &[at(3), at(6)]),
             vec![plan(0, 1, Some(1200))]
         );
+    }
+
+    /// ghost_dev の行の途中の値
+    fn ghost_dev(line_end: LineEndWaits) -> WaitValues {
+        WaitValues {
+            normal: 90,
+            period: 1200,
+            comma: 600,
+            strong: 750,
+            leader: 300,
+            line_end,
+        }
+    }
+
+    fn run(input: &str, w: &WaitValues, line_ends: &[LineEnd]) -> String {
+        let tokenizer = super::super::tokenizer::Tokenizer::new(&TalkConfig::default()).unwrap();
+        insert_waits(&tokenizer.tokenize(input), w, line_ends)
+    }
+
+    fn at_end(input: &str) -> LineEnd {
+        at(input.len())
+    }
+
+    fn author_at(end: usize) -> LineEnd {
+        LineEnd {
+            end,
+            author_wait: true,
+        }
+    }
+
+    fn strong(v: i64) -> WaitValues {
+        ghost_dev(LineEndWaits {
+            strong: Some(v),
+            ..Default::default()
+        })
+    }
+
+    fn normal(v: i64) -> WaitValues {
+        ghost_dev(LineEndWaits {
+            normal: Some(v),
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn output_strong_line_end() {
+        assert_eq!(
+            run("雨？", &strong(1200), &[at_end("雨？")]),
+            r"雨\_w[40]？\_w[1150]"
+        );
+    }
+
+    #[test]
+    fn output_strong_mid_line_unchanged() {
+        let s = "晴れ？それとも";
+        assert_eq!(
+            run(s, &strong(1200), &[at_end(s)]),
+            r"晴\_w[40]れ\_w[40]？\_w[700]そ\_w[40]れ\_w[40]と\_w[40]も\_w[40]"
+        );
+    }
+
+    #[test]
+    fn output_strong_run_with_closing_bracket() {
+        let s = "だよね？」";
+        assert_eq!(
+            run(s, &strong(1200), &[at_end(s)]),
+            r"だ\_w[40]よ\_w[40]ね\_w[40]？」\_w[1150]"
+        );
+    }
+
+    #[test]
+    fn output_general_line_end() {
+        let s = "こんにちは";
+        assert_eq!(
+            run(s, &normal(1250), &[at_end(s)]),
+            r"こ\_w[40]ん\_w[40]に\_w[40]ち\_w[40]は\_w[1200]"
+        );
+    }
+
+    #[test]
+    fn output_leader_line_end() {
+        let s = "た‥‥";
+        let w = ghost_dev(LineEndWaits {
+            leader: Some(1250),
+            ..Default::default()
+        });
+        assert_eq!(run(s, &w, &[at_end(s)]), r"た\_w[40]‥\_w[250]‥\_w[1200]");
+    }
+
+    #[test]
+    fn output_general_with_closing_bracket_line_end() {
+        assert_eq!(
+            run("す」", &normal(1250), &[at_end("す」")]),
+            r"す」\_w[1200]"
+        );
+    }
+
+    #[test]
+    fn output_general_with_closing_bracket_mid_line_unchanged() {
+        assert_eq!(run("す」と", &normal(1250), &[]), r"す\_w[40]」と\_w[40]");
+        let s = "す」とす」";
+        assert_eq!(
+            run(s, &normal(1250), &[at_end(s)]),
+            r"す\_w[40]」と\_w[40]す」\_w[1200]"
+        );
+    }
+
+    #[test]
+    fn output_author_wait_replaces_line_end_wait() {
+        let s = r"雨？\_w[500]";
+        assert_eq!(
+            run(s, &strong(1200), &[author_at(6)]),
+            r"雨\_w[40]？\_w[500]"
+        );
+        // 作者の待ちが次のトークンにあるとき
+        assert_eq!(run("雨？", &strong(1200), &[author_at(6)]), r"雨\_w[40]？");
+    }
+
+    #[test]
+    fn output_author_wait_without_line_end_key_unchanged() {
+        let s = r"雨？\_w[500]";
+        assert_eq!(
+            run(s, &ghost_dev(LineEndWaits::default()), &[author_at(6)]),
+            r"雨\_w[40]？\_w[700]\_w[500]"
+        );
+        // 効かない行末では作者の待ちを見ない
+        assert_eq!(
+            run(s, &normal(1250), &[author_at(6)]),
+            r"雨\_w[40]？\_w[700]\_w[500]"
+        );
+    }
+
+    #[test]
+    fn output_line_end_wait_before_tag() {
+        let w = ghost_dev(LineEndWaits {
+            period: Some(1200),
+            ..Default::default()
+        });
+        assert_eq!(run(r"。\s[5]", &w, &[at(3)]), r"。\_w[1150]\s[5]");
+    }
+
+    #[test]
+    fn output_next_line_punctuation_starts_new_run() {
+        let w = ghost_dev(LineEndWaits {
+            period: Some(1300),
+            ..Default::default()
+        });
+        assert_eq!(
+            run("雨。。", &w, &[at(6), at(9)]),
+            r"雨\_w[40]。\_w[1250]。\_w[1250]"
+        );
+        assert_eq!(
+            run("雨？、あ", &strong(1200), &[at(6)]),
+            r"雨\_w[40]？\_w[1150]、\_w[550]あ\_w[40]"
+        );
+    }
+
+    #[test]
+    fn output_short_line_end_values_insert_nothing() {
+        assert_eq!(run("雨？", &strong(50), &[at(6)]), r"雨\_w[40]？");
+        assert_eq!(run("雨？", &strong(0), &[at(6)]), r"雨\_w[40]？");
+    }
+
+    #[test]
+    fn output_unchanged_around_effective_line_end() {
+        // 行の途中の作者の待ち・効かない行末は今のまま
+        let s = r"あ\_w[500]い？う";
+        assert_eq!(
+            run(s, &strong(1200), &[at(s.len() - 3), at_end(s)]),
+            r"あ\_w[40]\_w[500]い\_w[40]？\_w[1150]う\_w[40]"
+        );
+    }
+
+    #[test]
+    fn output_lone_backslash_line_end_unchanged() {
+        let tokens = vec![
+            make_token(TokenKind::General, "は"),
+            make_token(TokenKind::General, "\\"),
+            make_token(TokenKind::General, "い"),
+        ];
+        assert_eq!(
+            insert_waits(&tokens, &normal(1250), &[at(4), at(7)]),
+            r"は\_w[40]\い\_w[1200]"
+        );
+    }
+
+    #[test]
+    fn output_without_plan_matches_mid_line() {
+        let s = r"雨？\s[5]す」と‥‥";
+        let mid = run(s, &ghost_dev(LineEndWaits::default()), &[]);
+        assert_eq!(run(s, &ghost_dev(LineEndWaits::default()), &[at(6)]), mid);
+        assert_eq!(run(s, &normal(1250), &[at(6)]), mid);
+        assert_eq!(run(s, &strong(1200), &[]), mid);
     }
 }
