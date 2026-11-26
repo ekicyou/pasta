@@ -840,8 +840,9 @@ mod tests {
             comma: 500,
             strong: 500,
             leader: 200,
+            ..Default::default()
         };
-        let waited = insert_waits(&tokenizer.tokenize(input), &waits);
+        let waited = insert_waits(&tokenizer.tokenize(input), &waits, &[]);
         break_fresh(&waited, widths, tokenizer.tag_regex(), &parser())
     }
 

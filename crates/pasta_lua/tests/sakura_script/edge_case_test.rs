@@ -21,6 +21,7 @@ fn test_wait_values() -> WaitValues {
         comma: 500,
         strong: 500,
         leader: 200,
+        ..Default::default()
     }
 }
 
@@ -141,7 +142,7 @@ fn test_line_start_prohibited_only_run_gets_no_wait() {
         Token::new(TokenKind::LineStartProhibited, "』"),
     ];
 
-    let result = insert_waits(&tokens, &test_wait_values());
+    let result = insert_waits(&tokens, &test_wait_values(), &[]);
 
     assert_eq!(result, "」』");
 }
@@ -155,7 +156,7 @@ fn test_line_start_prohibited_extends_run_without_raising_max() {
         Token::new(TokenKind::LineStartProhibited, "」"),
     ];
 
-    let result = insert_waits(&tokens, &test_wait_values());
+    let result = insert_waits(&tokens, &test_wait_values(), &[]);
 
     assert_eq!(result, r"、」\_w[450]");
 }
@@ -169,7 +170,7 @@ fn test_line_start_prohibited_first_then_strong_uses_strong_wait() {
         Token::new(TokenKind::Strong, "！"),
     ];
 
-    let result = insert_waits(&tokens, &test_wait_values());
+    let result = insert_waits(&tokens, &test_wait_values(), &[]);
 
     assert_eq!(result, r"」！\_w[450]");
 }
@@ -188,7 +189,7 @@ fn test_sakura_script_tag_flushes_pending_punctuation() {
         Token::new(TokenKind::General, "あ"),
     ];
 
-    let result = insert_waits(&tokens, &test_wait_values());
+    let result = insert_waits(&tokens, &test_wait_values(), &[]);
 
     assert_eq!(result, r"。\_w[950]\hあ\_w[50]");
 }
@@ -201,7 +202,7 @@ fn test_line_end_prohibited_flushes_pending_punctuation() {
         Token::new(TokenKind::General, "あ"),
     ];
 
-    let result = insert_waits(&tokens, &test_wait_values());
+    let result = insert_waits(&tokens, &test_wait_values(), &[]);
 
     assert_eq!(result, r"。\_w[950]「あ\_w[50]");
 }

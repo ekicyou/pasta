@@ -36,7 +36,7 @@ use crate::loader::TalkConfig;
 use mlua::{Lua, Result as LuaResult, Table, Value};
 use std::sync::Arc;
 use tokenizer::Tokenizer;
-use wait_inserter::WaitValues;
+use wait_inserter::{LineEndWaits, WaitValues};
 
 /// Module version.
 const VERSION: &str = "1.0.0";
@@ -116,7 +116,7 @@ fn talk_to_script_impl(
 
     let tokens = state.tokenizer.tokenize(&talk);
 
-    let result = wait_inserter::insert_waits(&tokens, &wait_values);
+    let result = wait_inserter::insert_waits(&tokens, &wait_values, &[]);
 
     // budoux の改行（列の状態を受け取ったら、budoux が無くても状態は進める）
     let ab = read_actor_break(&actor)?;
@@ -253,6 +253,7 @@ fn resolve_wait_values(actor: &Value, defaults: &WaitValues) -> LuaResult<WaitVa
         comma: get_wait("script_wait_comma", defaults.comma),
         strong: get_wait("script_wait_strong", defaults.strong),
         leader: get_wait("script_wait_leader", defaults.leader),
+        line_end: LineEndWaits::default(),
     })
 }
 

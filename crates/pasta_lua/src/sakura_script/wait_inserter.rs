@@ -19,6 +19,42 @@ pub struct WaitValues {
     pub strong: i64,
     /// Wait for leader characters (default: 200ms)
     pub leader: i64,
+    /// 行末の待ち（アクター → [talk] で決めたもの）
+    pub line_end: LineEndWaits,
+}
+
+/// 行末の待ちの値（書かれていなければ None）
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LineEndWaits {
+    pub normal: Option<i64>,
+    pub period: Option<i64>,
+    pub comma: Option<i64>,
+    pub strong: Option<i64>,
+    pub leader: Option<i64>,
+}
+
+impl LineEndWaits {
+    /// どれか 1 つでも書かれているか
+    pub fn any(&self) -> bool {
+        [
+            self.normal,
+            self.period,
+            self.comma,
+            self.strong,
+            self.leader,
+        ]
+        .iter()
+        .any(Option::is_some)
+    }
+}
+
+/// テキストの中の 1 つの行末
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LineEnd {
+    /// 行末の字の終わりのバイト位置（テキストの頭からのバイト数）
+    pub end: usize,
+    /// 行末の並びのすぐ後ろに作者の `\_w[…]` が続くか
+    pub author_wait: bool,
 }
 
 impl WaitValues {
@@ -30,7 +66,21 @@ impl WaitValues {
             comma: config.script_wait_comma,
             strong: config.script_wait_strong,
             leader: config.script_wait_leader,
+            line_end: LineEndWaits::default(),
         }
+    }
+
+    /// 字の種類の行末の値（行末のキーが無ければ行の途中の値）。待ちを持たない種類は None
+    pub fn line_end_value(&self, kind: &TokenKind) -> Option<i64> {
+        let (end, mid) = match kind {
+            TokenKind::General => (self.line_end.normal, self.normal),
+            TokenKind::Period => (self.line_end.period, self.period),
+            TokenKind::Comma => (self.line_end.comma, self.comma),
+            TokenKind::Strong => (self.line_end.strong, self.strong),
+            TokenKind::Leader => (self.line_end.leader, self.leader),
+            _ => return None,
+        };
+        Some(end.unwrap_or(mid))
     }
 
     /// Get wait value for a token kind.
@@ -63,10 +113,12 @@ impl WaitValues {
 /// # Arguments
 /// * `tokens` - Token sequence
 /// * `wait_values` - Wait values in milliseconds
+/// * `line_ends` - Line ends in the text (empty keeps the mid-line output)
 ///
 /// # Returns
 /// String with wait tags inserted
-pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues) -> String {
+pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues, line_ends: &[LineEnd]) -> String {
+    let _ = line_ends;
     let mut result = String::new();
     let mut pending_max_wait: Option<i64> = None;
     let mut pending_text = String::new();
@@ -175,6 +227,7 @@ mod tests {
             comma: 500,   // effective: 450
             strong: 500,  // effective: 450
             leader: 200,  // effective: 150
+            line_end: LineEndWaits::default(),
         }
     }
 
@@ -189,7 +242,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]");
     }
@@ -203,7 +256,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"\h\s[0]あ\_w[50]");
     }
@@ -216,7 +269,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"あ\_w[50]。\_w[950]");
     }
@@ -235,7 +288,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         // All consecutive punctuation is output together with max wait
         assert_eq!(result, r"」」」！？。、\_w[950]");
@@ -249,7 +302,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"…\_w[150]…\_w[150]");
     }
@@ -262,7 +315,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"「あ\_w[50]");
     }
@@ -275,7 +328,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         // No wait tag when effective wait is 0
         assert_eq!(result, "あ");
@@ -289,7 +342,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         // No wait tag when effective wait is negative
         assert_eq!(result, "あ");
@@ -305,7 +358,7 @@ mod tests {
         ];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"\hあ\_w[50]。\_w[950]い\_w[50]");
     }
@@ -315,7 +368,7 @@ mod tests {
         let tokens: Vec<Token> = vec![];
         let wait_values = default_wait_values();
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, "");
     }
@@ -328,7 +381,7 @@ mod tests {
             make_token(TokenKind::General, "✌\u{FE0F}"),
         ];
 
-        let result = insert_waits(&tokens, &default_wait_values());
+        let result = insert_waits(&tokens, &default_wait_values(), &[]);
 
         assert_eq!(result, "🙆\u{200D}♀\u{FE0F}\\_w[50]✌\u{FE0F}\\_w[50]");
     }
@@ -337,7 +390,7 @@ mod tests {
     fn test_multi_codepoint_leader_token_one_wait() {
         let tokens = vec![make_token(TokenKind::Leader, "…\u{0301}")];
 
-        let result = insert_waits(&tokens, &default_wait_values());
+        let result = insert_waits(&tokens, &default_wait_values(), &[]);
 
         assert_eq!(result, "…\u{0301}\\_w[150]");
     }
@@ -350,7 +403,7 @@ mod tests {
             make_token(TokenKind::General, "あ"),
         ];
 
-        let result = insert_waits(&tokens, &default_wait_values());
+        let result = insert_waits(&tokens, &default_wait_values(), &[]);
 
         assert_eq!(result, "\\あ\\_w[50]");
     }
@@ -360,7 +413,7 @@ mod tests {
         // `\` + U+0301 is not a lone `\`: its wait does not follow `\` directly
         let tokens = vec![make_token(TokenKind::General, "\\\u{0301}")];
 
-        let result = insert_waits(&tokens, &default_wait_values());
+        let result = insert_waits(&tokens, &default_wait_values(), &[]);
 
         assert_eq!(result, "\\\u{0301}\\_w[50]");
     }
@@ -385,7 +438,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"」」」！？。、\_w[950]");
     }
@@ -406,7 +459,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(result, r"こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]");
     }
@@ -428,11 +481,73 @@ mod tests {
             ..Default::default()
         };
 
-        let result = insert_waits(&tokens, &wait_values);
+        let result = insert_waits(&tokens, &wait_values, &[]);
 
         assert_eq!(
             result,
             r"\h\s[0]こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]"
         );
+    }
+
+    #[test]
+    fn test_line_end_value_falls_back_to_mid_line() {
+        let w = default_wait_values();
+        assert_eq!(w.line_end_value(&TokenKind::General), Some(100));
+        assert_eq!(w.line_end_value(&TokenKind::Period), Some(1000));
+        assert_eq!(w.line_end_value(&TokenKind::Comma), Some(500));
+        assert_eq!(w.line_end_value(&TokenKind::Strong), Some(500));
+        assert_eq!(w.line_end_value(&TokenKind::Leader), Some(200));
+    }
+
+    #[test]
+    fn test_line_end_value_uses_line_end_key() {
+        let w = WaitValues {
+            line_end: LineEndWaits {
+                period: Some(0),
+                leader: Some(900),
+                ..Default::default()
+            },
+            ..default_wait_values()
+        };
+        assert_eq!(w.line_end_value(&TokenKind::Period), Some(0));
+        assert_eq!(w.line_end_value(&TokenKind::Leader), Some(900));
+        assert_eq!(w.line_end_value(&TokenKind::General), Some(100));
+    }
+
+    #[test]
+    fn test_line_end_value_none_without_wait() {
+        let w = default_wait_values();
+        assert_eq!(w.line_end_value(&TokenKind::SakuraScript), None);
+        assert_eq!(w.line_end_value(&TokenKind::LineEndProhibited), None);
+        assert_eq!(w.line_end_value(&TokenKind::LineStartProhibited), None);
+    }
+
+    #[test]
+    fn test_line_end_waits_any() {
+        assert!(!LineEndWaits::default().any());
+        for w in [
+            LineEndWaits {
+                normal: Some(1),
+                ..Default::default()
+            },
+            LineEndWaits {
+                period: Some(1),
+                ..Default::default()
+            },
+            LineEndWaits {
+                comma: Some(1),
+                ..Default::default()
+            },
+            LineEndWaits {
+                strong: Some(1),
+                ..Default::default()
+            },
+            LineEndWaits {
+                leader: Some(0),
+                ..Default::default()
+            },
+        ] {
+            assert!(w.any());
+        }
     }
 }
