@@ -240,3 +240,187 @@ fn without_line_end_keys_keeps_current_output_with_line_newlines() {
         &cases,
     );
 }
+
+const EOL_DIC: &str = "\
+％ぱすた
+　＠笑顔：\\s[5]
+　＠間：\\_w[500]
+
+％妹
+
+＊OnIntro
+　ぱすた：明日は晴れ？それとも、雨？
+　　　　：じゃあ、行ってきます。
+
+＊OnStrongClose
+　ぱすた：そうだよね？」
+　ぱすた：本当！？
+
+＊OnPlain
+　ぱすた：こんにちは
+
+＊OnLeader
+　ぱすた：お母さんに怒られた‥‥
+
+＊OnEndQuote
+　ぱすた：行ってきます」
+　ぱすた：ます」と言う
+
+＊OnTag
+　ぱすた：行ってきます。＠笑顔
+
+＊OnAuthor
+　ぱすた：雨？\\_w[500]
+　ぱすた：雨？\\_w[0]
+　ぱすた：雨？\\_w[500]\\s[5]
+　ぱすた：雨？\\_w[300]\\_w[200]
+　ぱすた：雨？＠間
+　ぱすた：晴れ？\\_w[500]それとも
+　ぱすた：雨？\\s[5]\\_w[500]
+
+＊OnSeamAfterTag
+　ぱすた：行ってきます。＠笑顔
+　ぱすた：次。
+
+＊OnBare
+　ぱすた：雨？
+
+＊OnActors
+　妹：こんにちは？
+　ぱすた：こんにちは？
+";
+
+fn eol_toml(extra: &str) -> String {
+    format!("{TALK}{extra}\n[actor.\"ぱすた\"]\nspot = 0\n\n[actor.\"妹\"]\nspot = 1\n")
+}
+
+#[test]
+fn line_end_keys_change_only_line_ends() {
+    assert_outputs(
+        &eol_toml("script_wait_strong_eol = 1200\n"),
+        EOL_DIC,
+        &[
+            (
+                "OnIntro",
+                r"\p[0]明\_w[40]日\_w[40]は\_w[40]晴\_w[40]れ\_w[40]？\_w[700]そ\_w[40]れ\_w[40]と\_w[40]も\_w[40]、\_w[550]雨\_w[40]？\_w[1150]じ\_w[40]ゃ\_w[40]あ\_w[40]、\_w[550]行\_w[40]っ\_w[40]て\_w[40]き\_w[40]ま\_w[40]す\_w[40]。\_w[1150]\e",
+            ),
+            (
+                "OnStrongClose",
+                r"\p[0]そ\_w[40]う\_w[40]だ\_w[40]よ\_w[40]ね\_w[40]？」\_w[1150]本\_w[40]当\_w[40]！？\_w[1150]\e",
+            ),
+            (
+                "OnAuthor",
+                r"\p[0]雨\_w[40]？\_w[500]雨\_w[40]？\_w[0]雨\_w[40]？\_w[500]\s[5]雨\_w[40]？\_w[300]\_w[200]雨\_w[40]？\_w[500]晴\_w[40]れ\_w[40]？\_w[700]\_w[500]そ\_w[40]れ\_w[40]と\_w[40]も\_w[40]雨\_w[40]？\_w[1150]\s[5]\_w[500]\e",
+            ),
+        ],
+    );
+}
+
+#[test]
+fn zero_or_fifty_removes_line_end_wait() {
+    for v in [50, 0] {
+        assert_outputs(
+            &eol_toml(&format!("script_wait_strong_eol = {v}\n")),
+            EOL_DIC,
+            &[("OnBare", r"\p[0]雨\_w[40]？\e")],
+        );
+    }
+}
+
+#[test]
+fn removed_manual_wait_equals_line_end_key() {
+    assert_outputs(
+        &eol_toml("script_wait_strong_eol = 1250\n"),
+        EOL_DIC,
+        &[("OnBare", r"\p[0]雨\_w[40]？\_w[1200]\e")],
+    );
+}
+
+#[test]
+fn plain_leader_and_close_line_ends() {
+    assert_outputs(
+        &eol_toml("script_wait_normal_eol = 1250\n"),
+        EOL_DIC,
+        &[
+            (
+                "OnPlain",
+                r"\p[0]こ\_w[40]ん\_w[40]に\_w[40]ち\_w[40]は\_w[1200]\e",
+            ),
+            (
+                "OnEndQuote",
+                r"\p[0]行\_w[40]っ\_w[40]て\_w[40]き\_w[40]ま\_w[40]す」\_w[1200]ま\_w[40]す\_w[40]」と\_w[40]言\_w[40]う\_w[1200]\e",
+            ),
+            (
+                "OnAuthor",
+                r"\p[0]雨\_w[40]？\_w[700]\_w[500]雨\_w[40]？\_w[700]\_w[0]雨\_w[40]？\_w[700]\_w[500]\s[5]雨\_w[40]？\_w[700]\_w[300]\_w[200]雨\_w[40]？\_w[700]\_w[500]晴\_w[40]れ\_w[40]？\_w[700]\_w[500]そ\_w[40]れ\_w[40]と\_w[40]も\_w[1200]雨\_w[40]？\_w[700]\s[5]\_w[500]\e",
+            ),
+        ],
+    );
+    assert_outputs(
+        &eol_toml("script_wait_leader_eol = 1250\n"),
+        EOL_DIC,
+        &[(
+            "OnLeader",
+            r"\p[0]お\_w[40]母\_w[40]さ\_w[40]ん\_w[40]に\_w[40]怒\_w[40]ら\_w[40]れ\_w[40]た\_w[40]‥\_w[250]‥\_w[1200]\e",
+        )],
+    );
+}
+
+#[test]
+fn line_end_wait_goes_before_trailing_tag() {
+    assert_outputs(
+        &eol_toml("script_wait_period_eol = 1250\n"),
+        EOL_DIC,
+        &[(
+            "OnTag",
+            r"\p[0]行\_w[40]っ\_w[40]て\_w[40]き\_w[40]ま\_w[40]す\_w[40]。\_w[1200]\s[5]\e",
+        )],
+    );
+}
+
+#[test]
+fn actor_line_end_key_applies_to_that_actor_only() {
+    assert_outputs(
+        &eol_toml("script_wait_strong_eol = 1200\n").replace(
+            "[actor.\"妹\"]\nspot = 1\n",
+            "[actor.\"妹\"]\nspot = 1\nscript_wait_strong_eol = 900\n",
+        ),
+        EOL_DIC,
+        &[(
+            "OnActors",
+            r"\p[1]こ\_w[40]ん\_w[40]に\_w[40]ち\_w[40]は\_w[40]？\_w[850]\p[0]こ\_w[40]ん\_w[40]に\_w[40]ち\_w[40]は\_w[40]？\_w[1150]\e",
+        )],
+    );
+    assert_outputs(
+        &eol_toml("").replace(
+            "[actor.\"妹\"]\nspot = 1\n",
+            "[actor.\"妹\"]\nspot = 1\nscript_wait_strong_eol = 1200\n",
+        ),
+        EOL_DIC,
+        &[(
+            "OnActors",
+            r"\p[1]こ\_w[40]ん\_w[40]に\_w[40]ち\_w[40]は\_w[40]？\_w[1150]\p[0]こ\_w[40]ん\_w[40]に\_w[40]ち\_w[40]は\_w[40]？\_w[700]\e",
+        )],
+    );
+}
+
+#[test]
+fn line_end_wait_goes_before_trailing_tag_with_line_newlines() {
+    assert_outputs(
+        &format!(
+            "[ghost]
+line_newlines = 1.8
+
+{}",
+            eol_toml(
+                "script_wait_period_eol = 1250
+"
+            )
+        ),
+        EOL_DIC,
+        &[(
+            "OnSeamAfterTag",
+            r"\p[0]行\_w[40]っ\_w[40]て\_w[40]き\_w[40]ま\_w[40]す\_w[40]。\_w[1200]\s[5]\n[180]次\_w[40]。\_w[1200]\e",
+        )],
+    );
+}
