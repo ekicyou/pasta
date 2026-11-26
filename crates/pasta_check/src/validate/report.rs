@@ -30,6 +30,7 @@ pub enum FindingKind {
     ConfigLoaderType,
     ConfigSceneAlias,
     ConfigActorFont,
+    ConfigLineEndWait,
     CalendarInvalid,
     ConfigPatternInvalid,
     PatternIgnored,
@@ -358,6 +359,10 @@ pub mod msg {
         format!(
             "[actor.\"{actor}\"] の font は表で書きます（例: font = {{ color = \"90,110,140\" }}）"
         )
+    }
+    /// `place` は `[talk]`・`[actor."名前"]`、`written` は書かれていた型
+    pub fn config_line_end_wait(place: &str, key: &str, written: &str) -> String {
+        format!("{place} の {key} は整数（ミリ秒）で書いてください: {written}が書かれています")
     }
     pub fn calendar_quote() -> String {
         "行事の表に引用符（\"）は使えません".into()

@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use pasta_core::{
-    ActorFont, ActorFontError, FontInput, FontValue, FontValueProblem, SceneAliasError,
-    SceneAliasTable,
+    ActorFont, ActorFontError, FontInput, FontValue, FontValueProblem, LINE_END_WAIT_KEYS,
+    SceneAliasError, SceneAliasTable,
 };
 use serde::Deserialize;
 use toml::Spanned;
@@ -81,6 +81,7 @@ pub(crate) fn read_config(src: &TomlSource) -> (GhostConfig, Vec<Finding>) {
     }
     // 装いはシーンの集まりに関わらないので GhostConfig は変えない
     findings.extend(read_actor_fonts(text));
+    findings.extend(read_line_end_waits(text));
     (config, findings)
 }
 
@@ -315,6 +316,50 @@ fn read_actor_fonts(text: &str) -> Vec<Finding> {
     findings
 }
 
+/// pasta.dll（loader/config/line_end_wait.rs）と同じ取り出し方で行末のキーを読み、誤りを 1 つずつ返す
+fn read_line_end_waits(text: &str) -> Vec<Finding> {
+    let (Ok(table), Ok(doc)) = (toml::from_str::<toml::Table>(text), DeTable::parse(text)) else {
+        return Vec::new();
+    };
+    let mut places: Vec<(Vec<&str>, String, &toml::Table)> = Vec::new();
+    if let Some(toml::Value::Table(talk)) = table.get("talk") {
+        places.push((vec!["talk"], "[talk]".to_string(), talk));
+    }
+    if let Some(toml::Value::Table(actors)) = table.get("actor") {
+        for (name, actor) in actors {
+            if let toml::Value::Table(actor) = actor {
+                places.push((vec!["actor", name], format!("[actor.\"{name}\"]"), actor));
+            }
+        }
+    }
+    let mut findings = Vec::new();
+    for (path, place, values) in &places {
+        for key in LINE_END_WAIT_KEYS {
+            let Some(value) = values.get(key) else {
+                continue;
+            };
+            if value.is_integer() {
+                continue;
+            }
+            let pos = path
+                .iter()
+                .try_fold(doc.get_ref(), |t, segment| {
+                    entry(t, segment).and_then(|v| v.get_ref().as_table())
+                })
+                .and_then(|t| entry(t, key))
+                .map_or(text.len(), |v| v.span().start);
+            findings.push(Finding::new(
+                FindingKind::ConfigLineEndWait,
+                PATH,
+                Some(line_of(text, pos.min(text.len()))),
+                None,
+                msg::config_line_end_wait(place, key, type_label(value.type_str())),
+            ));
+        }
+    }
+    findings
+}
+
 /// 表のキーを名前で引く（キーが span つきなので走査する）
 fn entry<'a, 'i>(table: &'a DeTable<'i>, key: &str) -> Option<&'a Spanned<DeValue<'i>>> {
     table
@@ -337,6 +382,8 @@ fn font_value(value: &toml::Value) -> FontValue {
 /// toml の型の名前（`type_str`）を文言の言い方に
 fn type_label(type_name: &str) -> &'static str {
     match type_name {
+        "string" => "文字列",
+        "boolean" => "真偽値",
         "float" => "浮動小数点数",
         "array" => "配列",
         "table" => "表",
