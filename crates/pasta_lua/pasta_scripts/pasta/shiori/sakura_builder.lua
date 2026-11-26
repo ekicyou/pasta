@@ -536,6 +536,9 @@ local function join_lines(inner, column, ratio, ends)
 end
 BUILDER._internal.join_lines = join_lines
 
+-- 行末の無いトークンに渡す。nil を渡すと talk_to_script は最後の見える字を行末とみなす
+local NO_LINE_ENDS = {}
+
 --- 区切りを出して 1 列進める。区切りを出す所はすべてここを通す
 --- @param buffer table tracking_buffer
 --- @param column table 列の状態
@@ -553,12 +556,14 @@ end
 --- @param inner table グループ内トークン
 --- @param column table 話し手のスポットの列の状態（talk・sakura_script・newline・clear が動かす）
 --- @param line_newlines number|nil 行の改行の幅（config.line_newlines）
+--- @param ends table[]|nil このトークンの元のテキストの行末（find_line_ends。nil なら行末なし）
 --- @return string 変換結果（下記以外の型のトークンは空文字列）
-local function inner_token_to_string(actor, inner, column, line_newlines)
+local function inner_token_to_string(actor, inner, column, line_newlines, ends)
     local inner_type = inner.type
 
     if inner_type == "talk" or inner_type == "sakura_script" then
-        return SAKURA_SCRIPT.talk_to_script(actor, join_lines(inner, column, line_newlines), column)
+        local text, mapped = join_lines(inner, column, line_newlines, ends or NO_LINE_ENDS)
+        return SAKURA_SCRIPT.talk_to_script(actor, text, column, mapped)
     elseif inner_type == "surface" then
         return string.format("\\s[%s]", tostring(inner.id))
     elseif inner_type == "wait" then
@@ -603,8 +608,9 @@ end
 --- @param column table 話し手のスポットの列の状態
 --- @param style table 装いの状態（直接変更される）。変換後の文字列を出力の前に STYLE.through に通す
 --- @param line_newlines number|nil 行の改行の幅（config.line_newlines）
-local function emit_inner_token(buffer, actor, inner, appearance, spot, column, style, line_newlines)
-    local s = inner_token_to_string(actor, inner, column, line_newlines)
+--- @param ends table[]|nil このトークンの元のテキストの行末
+local function emit_inner_token(buffer, actor, inner, appearance, spot, column, style, line_newlines, ends)
+    local s = inner_token_to_string(actor, inner, column, line_newlines, ends)
     -- 頭が作者の書いたものかは、装いを差し込む前の出力で決める
     local by_author = head_written_by_author(inner, s)
     s = STYLE.through(style, actor, spot, s)
@@ -738,14 +744,15 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
 
             local tail_spot = last_spot or 0 -- 話し手なしのグループはスポット 0 の吹き出しに出る
             local column = column_at(columns, tail_spot) -- グループの話し手のスポットの列の状態
-            for _, inner in ipairs(token.tokens) do
+            local ends = find_line_ends(token.tokens)
+            for k, inner in ipairs(token.tokens) do
                 -- lead: 字を出すトークンか（台詞に書いた `\c` があれば、最初の `\c` より前の字だけを見る）
                 local lead, cleared, trail = text_parts(inner)
                 if inner.type == "clear" then
                     -- 現在スポットの has-text を偽へリセットし pending を破棄する。
                     -- クリアで区切るべき先行テキストが消えるため、後続テキスト直前に改行を出さない。
                     -- 最後に表示したものも消す（消した吹き出しの最初の選択肢を区切らない）。
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines, ends[k])
                     pending_break = false
                     if last_spot ~= nil then
                         spot_has_text[last_spot] = false
@@ -757,7 +764,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                     put_break(buffer, column,
                         choice_break(spot_tail[tail_spot], choice_newlines, after_choice_newlines))
                     spot_tail[tail_spot] = "choice"
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines, ends[k])
                 elseif lead then
                     -- 字を出すトークン（字のある talk・字を表示する sakura_script）。
                     -- 改行 → has-text 設定 → 本文 の順を厳守。
@@ -772,11 +779,11 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                         spot_has_text[last_spot] = true
                     end
                     spot_tail[tail_spot] = "text"
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines, ends[k])
                 else
                     -- 字の無い talk・字を表示しない sakura_script・surface・wait・newline・
                     -- choice_timeout・raw_script。変換出力のみ（has-text・pending・最後に表示したもの不変）。
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines, ends[k])
                 end
                 if cleared then
                     -- 台詞に書いた `\c`（字のある・無いどちらのトークンにも当てる）。

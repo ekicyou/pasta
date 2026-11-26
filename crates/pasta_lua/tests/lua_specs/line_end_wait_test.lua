@@ -318,3 +318,49 @@ describe("join_lines - 行末の位置の写し替え", function()
         expect(out):toEqual({ { pos = 19, author_wait = false }, { pos = 35, author_wait = true } })
     end)
 end)
+
+-- 行末のキーを書いたアクターで本物の act に積み、組み立ての出力を返す
+local function built(fill, line_newlines)
+    local ACT = require("pasta.act")
+    local act = ACT.new({
+        sakura = {
+            name = "さくら", spot = 0,
+            script_wait_strong = 50, script_wait_period = 50,
+            script_wait_strong_eol = 1200, script_wait_period_eol = 800,
+        },
+        kero = { name = "うにゅう", spot = 1 },
+    })
+    act.current_scene = {}
+    for k, v in pairs(WORDS) do
+        act.current_scene[k] = v
+    end
+    fill(act, act.actors.sakura, act.actors.kero)
+    local BUILDER = require("pasta.shiori.sakura_builder")
+    return BUILDER.build(act:build(), { line_newlines = line_newlines }, {})
+end
+
+describe("BUILDER.build - 辞書の行末に行末の待ちを入れる", function()
+    test("行末にだけ行末の待ちが入り、行の途中には入らない", function()
+        expect(built(function(act, s)
+            act:line():talk(s, "雨？晴れ。"):line():talk(s, "曇り？")
+        end)):toBe("\\p[0]雨？晴れ。\\_w[750]曇り？\\_w[1150]\\e")
+    end)
+
+    test("トークンをまたいでも、次のトークンに字が続けば行の途中", function()
+        expect(built(function(act, s)
+            act:line():talk(s, "雨？"):talk(s, "晴れ")
+        end)):toBe("\\p[0]雨？晴れ\\e")
+    end)
+
+    test("トークンをまたいだ行末（行末の字の後ろの表情）", function()
+        expect(built(function(act, s)
+            act:line():talk(s, "雨？"):talk(s, act:word("笑顔"))
+        end)):toBe("\\p[0]雨？\\_w[1150]\\s[5]\\e")
+    end)
+
+    test("行の改行を差し込んでも、行末の字の後ろに入る", function()
+        expect(built(function(act, s)
+            act:line():talk(s, "雨？"):line():talk(s, "曇り？")
+        end, 1.8)):toBe("\\p[0]雨？\\_w[1150]\\n[180]曇り？\\_w[1150]\\e")
+    end)
+end)
