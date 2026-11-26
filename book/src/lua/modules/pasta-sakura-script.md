@@ -22,13 +22,14 @@ local SAKURA_SCRIPT = require "@pasta_sakura_script"
 
 ふつうのゴーストでは、このモジュールを直接 `require` する必要はない。ウェイトの長さや自動改行は、pasta.toml の `[talk]` セクションと `[actor."名前"]` のキーで調整する（[pasta.toml での設定](#pastatoml-での設定)・[pasta.toml での budoux 設定](#pastatoml-での-budoux-設定)）。
 
-## talk_to_script(actor, talk, column)
+## talk_to_script(actor, talk, column, line_ends)
 
 テキストにウェイトタグを挿入して返す。アクターの表に `budoux` があれば、続けて自動改行も行う。
 
 ```lua
 SAKURA_SCRIPT.talk_to_script(actor, talk) -> string
 SAKURA_SCRIPT.talk_to_script(actor, talk, column) -> string
+SAKURA_SCRIPT.talk_to_script(actor, talk, column, line_ends) -> string
 ```
 
 | パラメータ | 型 | 必須 | 説明 |
@@ -36,6 +37,7 @@ SAKURA_SCRIPT.talk_to_script(actor, talk, column) -> string
 | `actor` | table \| nil | ✅ | アクターの表。ウェイトの設定（[アクター表のウェイト設定](#アクター表のウェイト設定)）と `budoux`・`budoux_newlines`・`budoux_jump` をこの表の直下から読む。表でない値（`nil` など）を渡すと、`[talk]` の値と実装の既定値を使い、自動改行はしない |
 | `talk` | string \| nil | ✅ | 変換する台詞のテキスト |
 | `column` | table \| nil | — | 自動改行の行の状態の表（[行の状態の表](#行の状態の表)）。渡すと、始めの状態として読み、変換の後に終わりの状態へ書き換える。渡さない（`nil`）ときは、最初の行の頭から数える。表でも `nil` でもない値を渡すと Lua のエラーになる |
+| `line_ends` | table \| nil | — | テキストの中の行末（[行末の表](#行末の表)）。渡さない（`nil`）ときは、テキストの最後の見える字を行末とする |
 
 **戻り値**: 変換後の文字列（`column` を渡しても、戻り値は文字列 1 つである）。
 
@@ -64,6 +66,33 @@ SAKURA_SCRIPT.talk_to_script({ budoux = {40, 12} }, "今日は", col)
 -- col.line → 3、col.width → 6、col.jump → false
 ```
 
+### 行末の表
+
+`line_ends` に渡す表は、行末ごとに次のフィールドを持つ表の配列である。並びの順は問わない。行末の待ちの規則は [行末の待ち](../../reference/pasta-toml.md#行末の待ち) と同じである。
+
+| フィールド | 型 | 説明 |
+| ---- | ---- | ---- |
+| `pos` | integer | テキストの頭から、行末の字の最後のバイトまでのバイト数 |
+| `author_wait` | boolean \| nil | 行末のすぐ後ろに作者の `\_w[…]` が続くか（`nil` は偽）。真なら、行末のキーが効く行末に自動の待ちを入れない |
+
+- `line_ends` を渡さない（`nil`）ときは、テキストの最後の見える字を行末とし、その直後が `\_w[…]` なら作者の待ちとする。見える字が無ければ行末は無い。
+- 空の表 `{}` は、行末の無いテキストである。
+- `pos` が 0 以下・テキストより長い・字の終わりに当たらない項目は無視する。
+- 表でも `nil` でもない値、表でない項目、整数として読めない `pos` を渡すと、Lua のエラー（`talk_to_script の line_ends は { pos = 整数, author_wait = 真偽 } の並びで渡してください`）になる。
+- 行末のキーの無いアクターでは、`line_ends` によらず出力は同じである。
+
+```lua
+-- [talk] は script_wait_normal = 90・script_wait_strong = 750・script_wait_strong_eol = 1200
+SAKURA_SCRIPT.talk_to_script(nil, "雨？\\s[5]")
+-- → 雨\_w[40]？\_w[1150]\s[5]（最後の見える字「？」が行末）
+SAKURA_SCRIPT.talk_to_script(nil, "雨？\\_w[500]")
+-- → 雨\_w[40]？\_w[500]
+SAKURA_SCRIPT.talk_to_script(nil, "雨？", nil, {})
+-- → 雨\_w[40]？\_w[700]
+SAKURA_SCRIPT.talk_to_script(nil, "雨？雨？", nil, { { pos = 6 } })
+-- → 雨\_w[40]？\_w[1150]雨\_w[40]？\_w[700]
+```
+
 ## アクター表のウェイト設定
 
 ウェイトの長さ（ミリ秒）は、アクター表の直下にある次のキーで決まる。キーごとに「アクター表の値 → pasta.toml の `[talk]` の値 → 実装の既定値」の順で最初に見つかった値を使う。
@@ -75,8 +104,14 @@ SAKURA_SCRIPT.talk_to_script({ budoux = {40, 12} }, "今日は", col)
 | `script_wait_comma` | 読点 | `500` |
 | `script_wait_strong` | 感嘆符・疑問符 | `500` |
 | `script_wait_leader` | リーダー（`…` など） | `200` |
+| `script_wait_normal_eol` | 一般の文字で終わる行末 | （なし＝行の途中の値） |
+| `script_wait_period_eol` | 句点を含む並びで終わる行末 | （なし＝行の途中の値） |
+| `script_wait_comma_eol` | 読点を含む並びで終わる行末 | （なし＝行の途中の値） |
+| `script_wait_strong_eol` | 感嘆符・疑問符を含む並びで終わる行末 | （なし＝行の途中の値） |
+| `script_wait_leader_eol` | リーダーで終わる行末 | （なし＝行の途中の値） |
 
 - 既定値は実装の既定値である。
+- 行末のキー（`script_wait_*_eol`）は「アクター表の値 → pasta.toml の `[talk]` の値」の順で探し、どちらにも無ければ、行の途中のキーの値を使う（[行末の待ち](../../reference/pasta-toml.md#行末の待ち)）。
 - アクター表の値が数値（数値に変換できる文字列を含む）でないキーは、無いものとして扱う。小数は整数に切り捨てる。
 - 実際に挿入されるウェイトは、設定値から 50 を引いた値（`値 - 50`）である。計算した値が 0 以下のときは何も挿入しない。既定の `script_wait_normal = 50` では、一般の文字の後ろにウェイトは入らない。
 - どの文字を句点・読点などとみなすかは、アクター表では変えられない。pasta.toml の `[talk]` で変える（[pasta.toml での設定](#pastatoml-での設定)）。

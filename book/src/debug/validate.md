@@ -72,7 +72,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 - 次のどれかが 1 つでもあると、飛び先の検査・おすすめメニューの検査・条件と優先の検査をまるごと省く。検査した辞書のシーンが、`pasta.dll` が読み込むシーンと同じとは言えないためである。
   - 構文エラー（`syntax`）
   - 読めない辞書ファイル（`file-not-utf8`・`file-unreadable`）
-  - `pasta.toml` の誤り（`config-syntax`・`config-loader-type`・`config-scene-alias`・`config-pattern-invalid`、`pasta.toml` の `file-unreadable`）。`pasta.toml` が無いこと（`config-missing`）と、装いの誤り（`config-actor-font`）は入らない
+  - `pasta.toml` の誤り（`config-syntax`・`config-loader-type`・`config-scene-alias`・`config-pattern-invalid`、`pasta.toml` の `file-unreadable`）。`pasta.toml` が無いこと（`config-missing`）と、装いの誤り（`config-actor-font`）と、行末のキーの誤り（`config-line-end-wait`）は入らない
 - 省いたときは、まとめの行の前に、理由を並べた 1 行を出す（「構文エラーがあるため、飛び先の検査をしていません。」「読めない辞書ファイルと pasta.toml の誤りがあるため、飛び先の検査をしていません。」など）。このときまとめの行に最後の項は出ない。
 
 ## 誤りと注意
@@ -90,7 +90,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 
 検査は次の順に進む。
 
-1. **`pasta.toml`**: TOML として読めるか、`[loader]` のキーの型、`[scene.alias]` の別名表、`[actor."名前"]` の `font`（装い）を確かめる（[pasta.toml リファレンス](../reference/pasta-toml.md)）。
+1. **`pasta.toml`**: TOML として読めるか、`[loader]` のキーの型、`[scene.alias]` の別名表、`[actor."名前"]` の `font`（装い）、`[talk]` と `[actor."名前"]` の行末のキー（`script_wait_*_eol`）の型を確かめる（[pasta.toml リファレンス](../reference/pasta-toml.md)）。
 2. **辞書の集め方**: `[loader]` の [`pasta_patterns`](../reference/pasta-toml.md#pasta_patterns) に一致する `.pasta` を辞書ファイルとして集める。`pasta_patterns` の `.pasta` を `.lua` に替えたパターンに一致する `.lua` を辞書モジュールとして集める。集め方は `pasta.dll` と同じである。`pasta.toml` が無いときも、既定の `dic/**/*.pasta` で集めて検査を続ける。
 3. **ファイル**: 辞書ファイルが UTF-8 として読めるか、使えないファイル名でないか、辞書のパターンに一致するフォルダが無いかを確かめる。
 4. **モジュール名の重なり**: 辞書ファイルと辞書モジュールのファイル名から作られるモジュール名が重ならないかを確かめる。
@@ -114,6 +114,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 | `config-loader-type` | 誤り | `[loader]` が表でない、または `pasta_patterns`・`lua_search_paths`（文字列の配列）・`transpiled_output_dir`（文字列）の型が違う | 示されたキーを決まった型で書く |
 | `config-scene-alias` | 誤り | `[scene.alias]` の別名表が正しくない。同じ別名が 2 つ以上の名前にある（重複）、空の名前、別名を別名で置き換える（連鎖）、型の違い、書いた別名か置き換え先が書かなかったキーの既定の別名と同じ（既定とのぶつかり）のどれか。別名表は `pasta.dll` と同じく、書いたキーだけ既定を置き換えて読む（[[scene]](../reference/pasta-toml.md#sceneシーン名)） | 理由に示された別名・名前を直す。重複は関わる行のすべてに出る。既定とのぶつかりは、理由に相手の既定のキーが出るので、そのキーに空の配列（`OnTalk = []` など）を書いて既定を消すか、書いた名前を変える |
 | `config-actor-font` | 誤り | `[actor."名前"]` の `font`（[装い](../reference/pasta-toml.md#装いfont)）が正しくない。12 個に無い属性名、値が文字列・整数・真偽値でない、空の文字列、値に `]` か `\` が含まれる、`font` が表でない、のどれか。`pasta.dll` はゴーストを読み込めない。行は属性の値の行（表でないときは `font` の値の行） | 理由に示された属性と値を直す |
+| `config-line-end-wait` | 誤り | `[talk]` か `[actor."名前"]` の行末のキー（`script_wait_*_eol`。[行末の待ち](../reference/pasta-toml.md#行末の待ち)）が整数でない。`pasta.dll` はゴーストを読み込めない。理由はキーの名前と書いた場所と書かれた型を示す（`[talk] の script_wait_strong_eol は整数（ミリ秒）で書いてください: 浮動小数点数が書かれています`）。行は値の行 | ミリ秒の整数で書く |
 | `calendar-invalid` | 誤り | 行事の表（`ghost/master` 直下の `calendar.csv`。[行事の表](../grammar/variables.md#行事の表calendarcsv)）が正しくない。引用符（`"`）がある、`日付,名前` の 2 欄でない、日付の形が `MMDD`・`MMDD-MMDD`・`YYYYMMDD` のどれでもない、暦にない日付、名前が空、UTF-8 として読めない、読めない、大文字・小文字だけ違う表が 2 つ以上ある、のどれか。`pasta.dll` はゴーストを読み込めない。行は誤りのある行（ファイル全体の誤りは行なし）。この誤りは辞書の検査を省く理由にならず、飛び先と条件の検査も続く | 理由に示された行を直す。表の書き方は[行事の表](../grammar/variables.md#行事の表calendarcsv) |
 | `config-pattern-invalid` | 誤り | `pasta_patterns` の要素がパターンとして読めない | パターンの書き方を直す |
 | `pattern-ignored` | 注意 | `pasta_patterns` の要素が `..`・ドライブ名・先頭の `/` を含むため使われない。`pasta.dll` もこのパターンを使わない | `ghost/master` の中を指すパターンにする |
