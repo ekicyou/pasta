@@ -129,7 +129,9 @@ crates/
 - `crates/pasta_lua/src/loader/config/sections.rs` — `TalkConfig` に `Option<i64>` の欄 5 つ（既定 None）。
 - `crates/pasta_lua/src/loader/config/mod.rs` — `parse` で `actor_font::apply` の後に `line_end_wait::check` を呼ぶ。`mod line_end_wait;`。
 - `crates/pasta_lua/src/sakura_script/wait_inserter.rs` — `LineEndWaits`・`LineEnd`、`WaitValues.line_end`、`insert_waits` の行末の規則と単体テスト（今のテストは `&[]` を渡して残す）。
-- `crates/pasta_lua/src/sakura_script/mod.rs` — `talk_to_script` の 4 つ目の引数、`resolve_wait_values` の行末のキー、省いたときの既定の行末。モジュールの説明の例。
+- `crates/pasta_lua/src/sakura_script/mod.rs` — `talk_to_script` の 4 つ目の引数（形の違いを決めた文言のエラーにするため `Value` で受ける）、`resolve_wait_values` の行末のキー（`WaitValues` の構造体の書き方に `line_end` を足す）、省いたときの既定の行末。モジュールの説明の例。
+- `crates/pasta_lua/src/sakura_script/line_breaker.rs` — テストの補助（835〜844 行目付近）の `WaitValues`・`insert_waits` の呼び方だけを合わせる（改行の規則は触らない）。
+- `crates/pasta_lua/tests/sakura_script/edge_case_test.rs` — `insert_waits` の呼び出し（5 か所）に `&[]`、`WaitValues` の構造体の書き方に `line_end`。
 - `crates/pasta_lua/src/sakura_script/tokenizer.rs` — `Token::shows_text`（Lua の `unit_shows_text` の写し）。
 - `crates/pasta_lua/pasta_scripts/pasta/act.lua` — `ACT_IMPL.line` が `_line_newlines` を見ずに印を立てる。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` — `find_line_ends`、`join_lines` の位置の写し替え、`inner_token_to_string`・`emit_inner_token` に行末を渡す、`BUILDER.build` がまとまりごとに 1 回求める。
@@ -298,7 +300,7 @@ pub const LINE_END_WAIT_KEYS: [&str; 5] = [
 
 - `TalkConfig` に `script_wait_normal_eol: Option<i64>` から `script_wait_leader_eol: Option<i64>` の 5 欄を足す。既定は `None`（書かれていない）。`#[serde(default)]` のまま。
 - 欄の名前は `LINE_END_WAIT_KEYS` と同じ。`register` が `WaitValues::from_config` で `LineEndWaits` に写す。
-- 実装の注意: テストの `TalkConfig { … }` の書き方は、ほとんどが `..TalkConfig::default()` を使う。使っていない所があれば足す。
+- 実装の注意: `TalkConfig` の `Default` は手で書いた impl なので、5 欄の `None` を足す。テストの `TalkConfig { … }` の書き方は、ほとんどが `..TalkConfig::default()` を使う。使っていない所があれば足す。
 
 #### LineEndKeyCheck（`loader/config/line_end_wait.rs`）
 
@@ -320,7 +322,7 @@ pub const LINE_END_WAIT_KEYS: [&str; 5] = [
 pub(super) fn check(content: &str, custom_fields: &toml::Table) -> Result<(), toml::de::Error>;
 ```
 
-- エラーの文言の形（仮。設計の議題 6）: `script_wait_strong_eol は整数（ミリ秒）で書いてください: 浮動小数点数が書かれています; at [talk] (line 12)`、アクターは `at [actor."妹"] (line 20)`。型の言い方は `pasta_check` の `type_label` と同じ（文字列・浮動小数点数・真偽値・配列・表・日時）。
+- エラーの文言の形: `script_wait_strong_eol は整数（ミリ秒）で書いてください: 浮動小数点数が書かれています; at [talk] (line 12)`、アクターは `at [actor."妹"] (line 20)`。型の言い方は `pasta_check` の `type_label` と同じ（文字列・浮動小数点数・真偽値・配列・表・日時）。
 - Preconditions: `content` は `toml::from_str` で読めた本文（`parse` の先頭で確かめ済み）。
 - Postconditions: `Ok` なら、`[talk]` の行末のキーはすべて整数で、`talk()` は `[talk]` のほかのキーを落とさずに読める。
 
@@ -393,7 +395,7 @@ pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues, line_ends: &[Lin
 2. **行末の並び**:
    - k が `General`・`Leader` なら、並びは k だけ。字の種類は k の種類。
    - k が句読点・行頭禁則の字なら、並びは今の「並び」（k までに続けてたまった `Period`・`Comma`・`Strong`・`LineStartProhibited`）。並びに句読点が 1 つでもあれば、字の種類は並びの中の句読点の種類。
-   - 並びが行頭禁則の字だけで、その直前のトークン j が `General`・`Leader` で、j が別の行末のトークンでなければ、並びは j と行頭禁則の字（4.4）。字の種類は j の種類。それ以外（直前がタグ・行末禁則の字・頭）なら字の種類は無い。
+   - 並びが行頭禁則の字（`chars_line_start_prohibited` の字。今の `LineStartProhibited`）だけで、その直前のトークン j が `General`・`Leader` で、j が別の行末のトークンでなければ、並びは j と行頭禁則の字（4.4）。字の種類は j の種類。それ以外（直前がタグ・行末禁則の字・頭）なら字の種類は無い。
 3. **効くかどうか**: 並びの字の種類のどれかに、行末の値が書かれている（`line_end` のその種類が `Some`）とき、その行末に行末のキーが効く。効かない行末では、ここから下を何もしない（4.7・5.3。今と同じ位置・値）。
 4. **値**: 字の種類ごとに `line_end` の値、無ければ行の途中の値（`WaitValues` の 5 値。2.2 の順の最後）。並びの値は、その中の一番長いもの（4.1）。
 5. **位置と出し方**（効く行末だけ）:
@@ -417,6 +419,23 @@ pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues, line_ends: &[Lin
 | `strong_eol = 1200` | `雨？` ＋ 作者の待ち | `雨\_w[40]？` ＋ `\_w[500]`（自動の待ちなし） |
 | なし | `雨？` ＋ 作者の待ち | `雨\_w[40]？\_w[700]` ＋ `\_w[500]`（今のまま） |
 | `period_eol = 1200` | `。＠笑顔` | `。\_w[1150]\s[5]` |
+
+**計画と出力の分け方**
+- `insert_waits` は、トークンを出す前に `plan_line_ends(tokens, wait_values, line_ends) -> Vec<LineEndPlan>` で規則 1〜4（行末のトークン k・並びの頭・効くかどうか・値・`author_wait`）を 1 回で決める。計画が空なら、今のループそのものを通る（6.1・4.7・5.3 を作りで守る）。
+- 出力のループは、計画の添字（並びの頭・行末のトークン）と比べるだけで、先を読まない。
+- 単体テストは `plan_line_ends` に直接当てる（どの行末が効くか・値・並びの頭）。出力の文字列のテストは別に置く。
+
+```rust
+/// 1 つの効く行末の計画
+struct LineEndPlan {
+    /// 並びの頭のトークンの添字（4.4 の j、句読点の並びの頭、または k 自身）
+    start: usize,
+    /// 行末のトークン k の添字
+    end: usize,
+    /// 入れる値（値−50 する前）。author_wait なら None
+    wait: Option<i64>,
+}
+```
 
 **Implementation Notes**
 - Integration: 呼ぶのは `talk_to_script_impl` だけ。今の単体テストは `&[]` を渡し、`default_wait_values()` に `line_end: LineEndWaits::default()` か `..Default::default()` を足す。
@@ -457,7 +476,7 @@ fn talk_to_script_impl(
     actor: Value,
     talk: Option<String>,
     column: Option<Table>,
-    line_ends: Option<Table>,
+    line_ends: Value,
 ) -> LuaResult<String>;
 fn read_line_ends(t: &Table) -> LuaResult<Vec<LineEnd>>;
 fn default_line_ends(tokens: &[Token]) -> Vec<LineEnd>;
@@ -474,7 +493,7 @@ fn default_line_ends(tokens: &[Token]) -> Vec<LineEnd>;
 #### ActLine（`act.lua`）
 
 - `ACT_IMPL.line` は `_line_newlines` を見ずに `_seam_next = true` を立てる。`take_seam`・`merge_consecutive_talks` は今のまま。
-- 継ぎ目の意味（行の頭のバイト位置）は変えない。`line_newlines` が nil・0 なら `join_lines` は台詞を読まずに返すので、出力は変わらない。変わるのは `act:build()` のトークンの表に `seams` の欄がいつも現れることだけ（設計の議題 1）。
+- 継ぎ目の意味（行の頭のバイト位置）は変えない。`line_newlines` が nil・0 なら `join_lines` は台詞を読まずに返すので、出力は変わらない。変わるのは `act:build()` のトークンの表に `seams` の欄がいつも現れることだけ（設計ディスカッションの議題 1）。
 - 3.9: 空行・コメント行・変数代入行・Call 行は `act:line()` を出さないので継ぎ目にならない。Call の先のシーンの行は自分の `act:line()` を出す。Call の先が Lua の関数で `act:line()` を出さずに台詞を積めば、前の行の続きになる。
 
 #### LineEndFinder（`sakura_builder.lua`）
@@ -485,7 +504,7 @@ fn default_line_ends(tokens: &[Token]) -> Vec<LineEnd>;
 | Requirements | 2.4, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 5.1, 5.2, 5.5, 5.6 |
 
 **Responsibilities & Constraints**
-- 見える字の判定は `read_unit` をそのまま使う（talk は見える単位すべて、sakura_script は字を表示するタグと中身のある囲みだけ）。
+- 見える字の判定は `read_unit` をそのまま使う（talk は見える単位すべて、sakura_script は字を表示するタグと中身のある囲みだけ）。空白（全角・半角）も見える字なので、行の終わりに空白を書いた行（`雨？　`）の行末は空白である。救う規則は足さない。
 - 行を閉じる所: 継ぎ目に達したとき、`choice` のトークン、まとまりの終わり。閉じるとき、その行の最後の見える単位の終わりを行末として記録する。見える単位が無ければ記録しない（3.5）。
 - 読み飛ばすトークン: `surface`・`wait`・`newline`・`clear`・`raw_script`・`choice_timeout`（見える字を出さない。3.4）。
 - 作者の `\_w[…]` が続くか（`author_wait`）: 行末の単位の直後の最初の単位が、名前 `_w` で引数のあるタグなら真。ただし、その位置に継ぎ目があれば次の行の頭なので偽（5.5）。直後がテキストの終わりなら、次のトークンが継ぎ目の無い sakura_script で、その頭の単位が `\_w[…]` のときだけ真。`\w1`〜`\w9`・`\__w[…]`・`wait` のトークン・`raw_script` は数えない（5.5）。間に別のタグがあれば偽（5.6）。
@@ -510,7 +529,7 @@ local function join_lines(inner, column, ratio, ends) end
 ```
 
 - `BUILDER.build` は、まとまりごとに `find_line_ends(token.tokens)` を 1 回呼び、内側のループで添字ごとの行末を `emit_inner_token` → `inner_token_to_string` に渡す。行末の無いトークンには、共有の空の表を渡す（nil は `talk_to_script` の既定になるので渡さない）。
-- `join_lines` は、改行を差し込むとき、行末の単位の直後までの出力の長さを新しい `pos` にする。行末は `read_unit` の単位の終わりにあるので、`join_lines` の同じ単位の切り方で必ず当たる。
+- `join_lines` は、差し込んだ片の元の位置と長さを控え、各行末の `pos` に「元の位置が `pos` 以下の片の長さの合計」を足して写す。差し込む片は単位の頭（継ぎ目・budoux の切れ目）にしか入らないので、`find_line_ends` と `join_lines` の単位の切り方が一致しているかに頼らない。
 - 実装の注意: `BUILDER.build` は複雑度 28 で luacheck を外している。先読みは `find_line_ends` と小さな下請け（行を閉じる・作者の待ちを見る）に出し、`BUILDER.build` の分岐は増やさない。`emit_inner_token` の引数が 1 つ増える。
 
 ### pasta_check
@@ -620,6 +639,8 @@ pub fn config_line_end_wait(place: &str, key: &str, written: &str) -> String;
 1. 要件の導入の例（`script_wait_strong_eol = 1200` で行の途中は 700・行末は 1150）と、4.1〜4.5・5.1〜5.4・6.4 の例を、行末のキーを書いたゴーストの `SHIORI.request` の出力で比べる。
 2. アクターごとの行末（妹だけ `script_wait_normal_eol`。2.1・2.4）。
 3. budoux の幅を持つアクターで、行末のキーの有無で `\_w[…]` を取り除いた出力が同じ（6.2）。行の途中の待ちの位置と値が同じ（6.3）。
+4. 行末のキー・`line_newlines = 1.8`・budoux の幅を一緒に持つゴーストで、4.5（行末の後ろの `＠笑顔`）・5.1 の 2 つの道（辞書に直接書いた `\_w` と `＠単語`）・`＠左` で始まる継続行の行末が効くこと（`join_lines` の位置の写し替え）。
+5. 行の終わりに空白を書いた行（`雨？　`）の行末が空白であること（今の振る舞いを固める）。
 
 ### 検査のテスト（`pasta_check`）
 
@@ -629,12 +650,16 @@ pub fn config_line_end_wait(place: &str, key: &str, written: &str) -> String;
 
 ## Open Questions / Risks
 
-- **議題 1（継ぎ目をいつも付ける）**: トークンの表に `seams` がいつも現れる。`actor-line-newlines` の「既定ではトークンの表が今と同じ」を改め、`line_newlines_test.lua` の 3 つのテストを直す。出力は変わらない。（仮の決定: いつも付ける）
-- **議題 2（選択肢は行を閉じる）**: 要件 3.4 は選択肢を挙げていない。選択肢の前の最後の見える字をその行の行末とする。（仮の決定: 閉じる）
-- **議題 3（4 つ目の引数の形）**: `{ pos, author_wait }` の並び、nil は最後の見える字、直接の呼び出しでは直後の `\_w` も作者の待ちとみなす。（仮の決定: このとおり）
-- **議題 4（見える字の写し）**: 直接の呼び出しの既定のために、`unit_shows_text` の写し（`Token::shows_text`）を Rust に置き、適合テストで保つ。（仮の決定: 置く）
-- **議題 5（報告の種類の名前）**: `config-line-end-wait`（誤り・読み込みを止める・飛び先の検査は省かない）。（仮の決定: このとおり）
-- **議題 6（エラーの文言）**: `… は整数（ミリ秒）で書いてください: …が書かれています; at [talk] (line N)`。（仮の決定: このとおり）
-- **議題 7（句読点だけの行が、効かなかった前の行末の並びに続くとき）**: 前の行の行末のキーが効かず並びを吐き出さなかったとき、次の行の行末の並びは前の行の句読点を含んだ今の並びのまま扱う（値は並び全体の字の種類で決める）。（仮の決定: このとおり。まれな形）
+設計ディスカッション（2026-11-26）で決めること:
+
+- **議題 1（継ぎ目をいつも付ける）**: トークンの表に `seams` がいつも現れる。`actor-line-newlines` の「既定ではトークンの表が今と同じ」を改め、`line_newlines_test.lua` の 3 つのテストを直す。出力は変わらない。（推奨: いつも付ける）
+- **議題 2（4 つ目の引数の形と、Rust の見える字の写し）**: `{ pos, author_wait }` の並び、nil は最後の見える字、直接の呼び出しでは直後の `\_w` も作者の待ちとみなす。nil の既定のために `unit_shows_text` の写し（`Token::shows_text`）を Rust に置き、適合テストで保つ。（推奨: このとおり）
+
+自明として閉じたもの:
+
+- 選択肢（`choice`）は行を閉じる。選択肢は辞書のアクション行・継続行ではない（3.1）ので、選択肢の前の最後の見える字がその行の行末。
+- 報告の種類は `config-line-end-wait`（誤り・読み込みを止める・飛び先の検査は省かない）、pasta.dll のエラーの文言は上の形。どちらも `config-actor-font` の前例どおり。
+- 句読点だけの行が、効かなかった前の行末の並びに続くときは、今の並びのまま扱う（値は並び全体の字の種類で決める）。まれな形で、今の出力に倒れる。
+- 行の終わりの空白は見える字なので行末になる。救う規則は足さない（想定外の書き方を意図の推測で救わない）。e2e で今の振る舞いを固める。
 - 危険: Lua の単位の切り方と Rust のトークンの境目がずれると行末を無視する（今と同じ出力に倒れる）。タグの読み取りの適合テストと、行末の例の結合テストで確かめる。
 - 危険: `.claude/skills` の生成物の書き込みが止められることがある。タスクで独立した段にし、止められたら開発者の許可を求める。
