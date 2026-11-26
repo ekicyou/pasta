@@ -71,7 +71,7 @@ pub(super) fn apply(content: &str, custom_fields: &mut toml::Table) -> Result<()
 }
 
 /// 表のキーを名前で引く（キーが span つきなので走査する）
-fn entry<'a, 'i>(table: &'a DeTable<'i>, key: &str) -> Option<&'a Spanned<DeValue<'i>>> {
+pub(super) fn entry<'a, 'i>(table: &'a DeTable<'i>, key: &str) -> Option<&'a Spanned<DeValue<'i>>> {
     table
         .iter()
         .find(|(k, _)| k.get_ref().as_ref() == key)

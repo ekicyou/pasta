@@ -83,6 +83,7 @@ impl PastaConfig {
 
         // `[actor."name"].font` → checked tag string (written order from spans).
         actor_font::apply(content, &mut custom_fields)?;
+        line_end_wait::check(content, &custom_fields)?;
 
         tracing::debug!("Parsed configuration");
         let mut config = Self {
@@ -341,6 +342,9 @@ pub use sections::*;
 
 /// `[actor."name"].font` loading (checked display-style tags).
 mod actor_font;
+
+/// Type check of the line-end wait keys in `[talk]` and `[actor."name"]`.
+mod line_end_wait;
 
 #[cfg(test)]
 #[path = "../config_tests.rs"]
