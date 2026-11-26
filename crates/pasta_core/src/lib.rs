@@ -20,6 +20,7 @@
 pub mod actor_font;
 pub mod calendar;
 pub mod error;
+pub mod line_end_wait;
 pub mod registry;
 
 // Convenience re-exports
@@ -29,6 +30,7 @@ pub use error::{
     ActorFontError, CalendarError, CalendarProblem, FontValueProblem, SceneAliasError,
     SceneTableError, WordTableError,
 };
+pub use line_end_wait::LINE_END_WAIT_KEYS;
 pub use registry::{
     CmpOp, DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneAttr,
     SceneAttrValue, SceneEntry, SceneId, SceneInfo, SceneRegistry, SceneScope, SceneTable,
