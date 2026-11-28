@@ -138,7 +138,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
 | 順 | spec | 要件定義 | 規模 | 始められる時期 |
 | -- | ---- | -------- | ---- | -------------- |
-| 1 | novel-areka-contract | Opus | 8〜10（文書だけ） | **ウェーブ 1**。先に要るものは無い |
+| 1 | novel-areka-contract | Opus | 8〜10（文書だけ） | **ウェーブ 1**。先に要るものは無い。2026-11-28 の discovery の推奨: 0.7.0 の範囲の承認を待たずに `/kiro-start` する（areka のノベルの層が依頼書を待っている。brief の「discovery（2026-11-28）」） |
 | 2 | cue-command-runtime | Opus | 14〜16（ト書き） | **ウェーブ 1**。2026-11-20 に柱を `scene-stage-attributes` へ分けた |
 | 3 | shiori-debug-toggle | Opus | 12〜15 | **ウェーブ 1**。ノベルの spec とファイルを共有しない |
 | 4 | scene-stage-attributes | Opus | 7〜9（柱） | ウェーブ 2 の見込み。`cue-command-runtime`（`act.lua`・`sakura_builder.lua` を共有する）と `novel-areka-contract`（既定の名前）の後 |
